@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nokware-backend"
+version = "0.1.0"
+description = "Nokware backend — FastAPI + Appwrite + pgvector RAG + MinIO + Gemini"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "python-dotenv",
+    "pydantic-settings",
+    "appwrite",
+    "psycopg[binary]",
+    "pgvector",
+    "minio",
+    "langchain",
+    "langchain-google-genai",
+    "langchain-postgres",
+]
+
+[tool.setuptools.packages.find]
+include = ["app*"]
