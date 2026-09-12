@@ -17,15 +17,23 @@ from app.config import get_settings
 
 MAX_PHOTOS = 10
 DEFAULT_URL_EXPIRY_SECONDS = 3600
+# Set explicitly so the client never auto-detects it: detection needs
+# s3:GetBucketLocation, which our access key's policy does not grant (every
+# bucket operation then fails with AccessDenied). us-east-1 is MinIO's default.
+MINIO_REGION = "us-east-1"
 
 
 def _parse_endpoint(raw: str) -> tuple[str, bool]:
-    """Split an endpoint into (host:port, secure). Defaults to secure=True."""
+    """Split an endpoint into (host[:port], secure) as minio.Minio expects.
+
+    Accepts a bare hostname ("s3.example.com", HTTPS on 443) or a URL with an
+    http:// or https:// scheme. Bare hostnames default to secure=True.
+    """
     if raw.startswith("https://"):
         return raw[len("https://"):].rstrip("/"), True
     if raw.startswith("http://"):
         return raw[len("http://"):].rstrip("/"), False
-    return raw, True
+    return raw.rstrip("/"), True
 
 
 @lru_cache
@@ -37,6 +45,7 @@ def get_minio() -> Minio:
         access_key=settings.minio_access_key,
         secret_key=settings.minio_secret_key,
         secure=secure,
+        region=MINIO_REGION,
     )
 
 

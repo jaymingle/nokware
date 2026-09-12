@@ -17,6 +17,7 @@ from dataclasses import dataclass
 
 import psycopg
 from appwrite.query import Query
+from minio.error import S3Error
 from psycopg.conninfo import conninfo_to_dict
 from pydantic import ValidationError
 
@@ -41,6 +42,7 @@ DATABASE_ID = "nokware"
 EXPECTED_COLLECTIONS = ("ledger_documents", "citizen_reports", "case_history")
 EXPECTED_COLUMNS = (ID_COLUMN, CONTENT_COLUMN, EMBEDDING_COLUMN, *METADATA_COLUMNS)
 PSYCOPG_SCHEME = "postgresql+psycopg://"
+MINIO_PROBE_OBJECT = "__nokware_permission_probe__/does-not-exist"
 
 _COLUMNS_SQL = """
     SELECT attname, format_type(atttypid, atttypmod)
@@ -128,19 +130,27 @@ def check_postgres() -> str:
     return f"{where}: '{TABLE_NAME}' has all {len(EXPECTED_COLUMNS)} columns, vector({EMBEDDING_DIMENSIONS}), {chunks} chunk(s)"
 
 
+def _assert_readable(bucket: str) -> None:
+    """Stat a key that never exists: NoSuchKey proves GetObject is permitted."""
+    try:
+        get_minio().stat_object(bucket_name=bucket, object_name=MINIO_PROBE_OBJECT)
+    except S3Error as exc:
+        if exc.code != "NoSuchKey":
+            raise
+
+
 def check_minio() -> str:
     settings = get_settings()
-    client = get_minio()
     buckets = (settings.minio_ledger_bucket, settings.minio_photos_bucket)
     problems = []
     for bucket in buckets:
-        if not client.bucket_exists(bucket_name=bucket):
+        if not get_minio().bucket_exists(bucket_name=bucket):
             problems.append(f"'{bucket}' does not exist")
             continue
-        next(iter(client.list_objects(bucket_name=bucket)), None)  # proves read access
+        _assert_readable(bucket)
     if problems:
         raise CheckFailed("; ".join(problems))
-    return f"buckets reachable: {', '.join(buckets)}"
+    return f"buckets reachable and readable: {', '.join(buckets)}"
 
 
 def check_embeddings() -> str:
