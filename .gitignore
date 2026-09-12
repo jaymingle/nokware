@@ -1,5 +1,6 @@
 .mcp.json
 .claude/launch.json
+backend/scripts/seed_users.toml
 .env
 .env.*
 !.env.example

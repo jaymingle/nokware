@@ -1,0 +1,99 @@
+# Nokware seed accounts for scripts/seed_users.py.
+#
+# Copy this file to scripts/seed_users.toml (git-ignored) and replace every
+# email and CHANGE_ME password with real values. Passwords need at least 8
+# characters; the CHANGE_ME placeholder is rejected.
+#
+# Required shape: one account per department team (12, including dept-press),
+# one contributor, and two mce-team accounts (the MCE plus a separate admin
+# account with the same permissions) — 15 in total.
+
+[[users]]
+name = "Central Administration"
+email = "central-administration@example.org"
+password = "CHANGE_ME"
+team = "dept-central-administration"
+
+[[users]]
+name = "Finance Department"
+email = "finance@example.org"
+password = "CHANGE_ME"
+team = "dept-finance"
+
+[[users]]
+name = "Education Department"
+email = "education@example.org"
+password = "CHANGE_ME"
+team = "dept-education"
+
+[[users]]
+name = "Health Department"
+email = "health@example.org"
+password = "CHANGE_ME"
+team = "dept-health"
+
+[[users]]
+name = "Waste Management Department"
+email = "waste-management@example.org"
+password = "CHANGE_ME"
+team = "dept-waste-management"
+
+[[users]]
+name = "Works Department"
+email = "works@example.org"
+password = "CHANGE_ME"
+team = "dept-works"
+
+[[users]]
+name = "Physical Planning Department"
+email = "physical-planning@example.org"
+password = "CHANGE_ME"
+team = "dept-physical-planning"
+
+[[users]]
+name = "Agriculture Department"
+email = "agriculture@example.org"
+password = "CHANGE_ME"
+team = "dept-agriculture"
+
+[[users]]
+name = "Social Welfare Department"
+email = "social-welfare@example.org"
+password = "CHANGE_ME"
+team = "dept-social-welfare"
+
+[[users]]
+name = "Disaster Management Department"
+email = "disaster-management@example.org"
+password = "CHANGE_ME"
+team = "dept-disaster-management"
+
+[[users]]
+name = "Transport Department"
+email = "transport@example.org"
+password = "CHANGE_ME"
+team = "dept-transport"
+
+[[users]]
+name = "Press"
+email = "press@example.org"
+password = "CHANGE_ME"
+team = "dept-press"
+
+[[users]]
+name = "Contributor"
+email = "contributor@example.org"
+password = "CHANGE_ME"
+team = "contributor"
+
+[[users]]
+name = "MCE"
+email = "mce@example.org"
+password = "CHANGE_ME"
+team = "mce"
+
+[[users]]
+name = "Admin"
+email = "admin@example.org"
+password = "CHANGE_ME"
+team = "mce"
