@@ -26,7 +26,7 @@ from appwrite.query import Query
 from pydantic import ValidationError
 
 from app.config import get_settings, settings_error_summary
-from app.services.appwrite_client import get_teams, get_users
+from app.services.appwrite_client import get_teams, get_users, quiet_sdk_deprecation_warnings
 from app.teams import CONTRIBUTOR_TEAM, DEPARTMENT_TEAMS, MCE_TEAM
 
 DEFAULT_CONFIG = Path(__file__).resolve().parent / "seed_users.toml"
@@ -151,6 +151,7 @@ def main() -> int:
     parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG, help="path to the seed TOML config")
     parser.add_argument("--dry-run", action="store_true", help="show what would change without writing")
     args = parser.parse_args()
+    quiet_sdk_deprecation_warnings()
     try:
         get_settings()
         users = load_config(args.config)

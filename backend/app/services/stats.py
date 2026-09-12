@@ -14,9 +14,8 @@ from datetime import datetime, timedelta, timezone
 
 from appwrite.query import Query
 
-from app.services.appwrite_client import get_databases
+from app.services.appwrite_client import DATABASE_ID, get_databases
 
-DATABASE_ID = "nokware"
 COLLECTION_ID = "citizen_reports"
 PERSONAL_SAFETY = "personal_safety"
 CATEGORIES = ("civic_service", "public_safety", PERSONAL_SAFETY)
