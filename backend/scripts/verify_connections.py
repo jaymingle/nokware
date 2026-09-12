@@ -22,7 +22,12 @@ from psycopg.conninfo import conninfo_to_dict
 from pydantic import ValidationError
 
 from app.config import get_settings, settings_error_summary
-from app.services.appwrite_client import get_databases, get_teams
+from app.services.appwrite_client import (
+    DATABASE_ID,
+    get_databases,
+    get_teams,
+    quiet_sdk_deprecation_warnings,
+)
 from app.services.rag import LLM_MODEL, get_llm
 from app.services.storage import get_minio
 from app.services.vectorstore import (
@@ -34,11 +39,11 @@ from app.services.vectorstore import (
     METADATA_COLUMNS,
     TABLE_NAME,
     get_embeddings,
+    libpq_url,
 )
 from app.teams import ALL_TEAMS
 
 EXPECTED_TEAMS = ALL_TEAMS
-DATABASE_ID = "nokware"
 EXPECTED_COLLECTIONS = ("ledger_documents", "citizen_reports", "case_history")
 EXPECTED_COLUMNS = (ID_COLUMN, CONTENT_COLUMN, EMBEDDING_COLUMN, *METADATA_COLUMNS)
 PSYCOPG_SCHEME = "postgresql+psycopg://"
@@ -62,15 +67,9 @@ class Result:
     detail: str
 
 
-def _libpq_url(url: str) -> str:
-    """psycopg wants a plain libpq URL, so drop any SQLAlchemy driver suffix."""
-    scheme, sep, rest = url.partition("://")
-    return f"{scheme.split('+')[0]}{sep}{rest}"
-
-
 def _redact(text: str) -> str:
     settings = get_settings()
-    password = conninfo_to_dict(_libpq_url(settings.postgres_url)).get("password")
+    password = conninfo_to_dict(libpq_url(settings.postgres_url)).get("password")
     secrets = [
         settings.postgres_url, password, settings.appwrite_api_key,
         settings.minio_access_key, settings.minio_secret_key, settings.gemini_api_key,
@@ -90,21 +89,22 @@ def check_teams() -> str:
 
 
 def check_database() -> str:
-    databases = get_databases()
-    database = databases.get(DATABASE_ID)
-    listing = databases.list_collections(DATABASE_ID, queries=[Query.limit(100)])
+    # Listing collections proves the database exists (404 otherwise). databases.get()
+    # is avoided: SDK 17's Database model requires fields a self-hosted 1.9.0
+    # server doesn't return, so parsing it fails.
+    listing = get_databases().list_collections(DATABASE_ID, queries=[Query.limit(100)])
     found = {collection.id for collection in listing.collections}
     missing = [c for c in EXPECTED_COLLECTIONS if c not in found]
     if missing:
-        raise CheckFailed(f"database '{database.id}' is missing: {', '.join(missing)}")
-    return f"database '{database.id}' has {', '.join(EXPECTED_COLLECTIONS)}"
+        raise CheckFailed(f"database '{DATABASE_ID}' is missing: {', '.join(missing)}")
+    return f"database '{DATABASE_ID}' has {', '.join(EXPECTED_COLLECTIONS)}"
 
 
 def _connect(url: str) -> tuple[psycopg.Connection, str]:
-    params = conninfo_to_dict(_libpq_url(url))
+    params = conninfo_to_dict(libpq_url(url))
     where = f"{params.get('host', 'localhost')}:{params.get('port', '5432')}"
     try:
-        return psycopg.connect(_libpq_url(url), connect_timeout=5), where
+        return psycopg.connect(libpq_url(url), connect_timeout=5), where
     except psycopg.OperationalError as exc:
         raise CheckFailed(
             f"could not connect to Postgres at {where}. Is the SSH tunnel open? ({exc})"
@@ -196,6 +196,7 @@ def print_summary(results: list[Result]) -> None:
 
 
 def main() -> int:
+    quiet_sdk_deprecation_warnings()
     try:
         get_settings()
     except ValidationError as exc:

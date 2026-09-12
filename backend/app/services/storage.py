@@ -12,6 +12,7 @@ from functools import lru_cache
 from uuid import uuid4
 
 from minio import Minio
+from minio.error import S3Error
 
 from app.config import get_settings
 
@@ -57,8 +58,8 @@ def _content_type(filename: str) -> str:
     return mimetypes.guess_type(filename)[0] or "application/octet-stream"
 
 
-def _upload(bucket: str, file_bytes: bytes, filename: str) -> str:
-    object_name = _object_name(filename)
+def _upload(bucket: str, file_bytes: bytes, filename: str, object_name: str | None = None) -> str:
+    object_name = object_name or _object_name(filename)
     get_minio().put_object(
         bucket_name=bucket,
         object_name=object_name,
@@ -69,10 +70,33 @@ def _upload(bucket: str, file_bytes: bytes, filename: str) -> str:
     return object_name
 
 
-def upload_ledger_file(file_bytes: bytes, filename: str) -> str:
-    """Upload a ledger document; returns its object id (name in the bucket)."""
+def upload_ledger_file(file_bytes: bytes, filename: str, object_name: str | None = None) -> str:
+    """Upload a ledger document; returns its object id (name in the bucket).
+
+    Pass object_name for a stable name (e.g. derived from a content hash) so
+    repeated uploads of the same file land on the same object.
+    """
     settings = get_settings()
-    return _upload(settings.minio_ledger_bucket, file_bytes, filename)
+    return _upload(settings.minio_ledger_bucket, file_bytes, filename, object_name)
+
+
+def download_ledger_file(file_id: str) -> bytes:
+    response = get_minio().get_object(bucket_name=get_settings().minio_ledger_bucket, object_name=file_id)
+    try:
+        return response.read()
+    finally:
+        response.close()
+        response.release_conn()
+
+
+def ledger_file_exists(file_id: str) -> bool:
+    try:
+        get_minio().stat_object(bucket_name=get_settings().minio_ledger_bucket, object_name=file_id)
+    except S3Error as exc:
+        if exc.code == "NoSuchKey":
+            return False
+        raise
+    return True
 
 
 def upload_report_photos(files: list[bytes], filenames: list[str]) -> list[str]:

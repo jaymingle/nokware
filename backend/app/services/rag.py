@@ -3,8 +3,12 @@
 Retrieves the top-k chunks from the pgvector store, enriches each with its
 parent document's metadata from Appwrite's ``ledger_documents`` collection,
 asks Gemini (``gemini-2.5-flash``) to answer strictly from that context while
-citing each source's document id and publish date, and returns the answer
+citing each source's document id and document year, and returns the answer
 alongside structured source metadata.
+
+Citations use ``documentYear`` (the year of the document itself), never
+``publishedAt``, which is when the document was added to the Ledger; for the
+imported AMA archive that is the import date.
 """
 
 import logging
@@ -19,8 +23,8 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_google_genai import ChatGoogleGenerativeAI
 
 from app.config import get_settings
-from app.services.appwrite_client import get_databases
-from app.services.vectorstore import DEFAULT_K, get_retriever
+from app.services import ledger_documents
+from app.services.vectorstore import DEFAULT_K, DOCUMENT_ID_COLUMN, get_retriever
 
 logger = logging.getLogger(__name__)
 
@@ -29,19 +33,18 @@ logger = logging.getLogger(__name__)
 LLM_MODEL = "gemini-2.5-flash"
 LLM_TEMPERATURE = 0.2
 NO_INFO_ANSWER = "I don't have information on that in the Ledger."
-LEDGER_DATABASE_ID = "nokware"
-LEDGER_COLLECTION_ID = "ledger_documents"
-CHUNK_DOCUMENT_ID_KEY = "appwrite_document_id"
+UNKNOWN_YEAR = "unknown"
 
 _SYSTEM_PROMPT = (
     "You are the Nokware Ledger assistant. Answer the question using ONLY the "
     "context below, which contains excerpts from official municipal documents. "
     "Each excerpt starts with a metadata header in square brackets giving its "
-    "document_id, published_at, department and source_type. For every fact you "
-    "state, cite the document_id and published_at from that excerpt's header, "
-    "e.g. (source: <document_id>, published <published_at>). Never take the "
-    "citation id or date from the excerpt text itself. If published_at is "
-    "None, cite the document_id and say the publish date is unavailable. "
+    "document_id, document_year, department and source_type. For every fact you "
+    "state, cite the document_id and document_year from that excerpt's header, "
+    "e.g. (source: <document_id>, <document_year>). If document_year is "
+    f"{UNKNOWN_YEAR}, cite the document_id and say the document's date is not "
+    "recorded. Never take the citation id or year from the excerpt text itself, "
+    "and never cite the date a document was added to the Ledger. "
     f'If the context does not contain the answer, reply exactly: "{NO_INFO_ANSWER}"'
 )
 
@@ -57,6 +60,7 @@ class LedgerMeta(TypedDict):
     department: str | None
     source_type: str | None
     published_at: str | None
+    document_year: int | None
 
 
 class Source(TypedDict):
@@ -65,6 +69,7 @@ class Source(TypedDict):
     department: str | None
     source_type: str | None
     published_at: str | None
+    document_year: int | None
 
 
 class RagAnswer(TypedDict):
@@ -83,23 +88,21 @@ def get_llm() -> ChatGoogleGenerativeAI:
 
 
 def _empty_meta() -> LedgerMeta:
-    return LedgerMeta(department=None, source_type=None, published_at=None)
+    return LedgerMeta(department=None, source_type=None, published_at=None, document_year=None)
 
 
 def _fetch_ledger_meta(document_id: str) -> LedgerMeta:
     """Fetch one ledger document's metadata; nulls if it is missing or fails."""
     try:
-        doc = get_databases().get_document(
-            LEDGER_DATABASE_ID, LEDGER_COLLECTION_ID, document_id
-        )
+        data = ledger_documents.get_document(document_id)
     except AppwriteException as exc:
         logger.warning("Ledger lookup failed for %s: %s", document_id, exc)
         return _empty_meta()
-    data = doc.data
     return LedgerMeta(
         department=data.get("department"),
         source_type=data.get("sourceType"),
         published_at=data.get("publishedAt"),
+        document_year=data.get("documentYear"),
     )
 
 
@@ -110,7 +113,7 @@ def _lookup_ledger_meta(document_ids: Iterable[str | None]) -> dict[str, LedgerM
 
 
 def _chunk_document_id(doc: Document) -> str | None:
-    return (doc.metadata or {}).get(CHUNK_DOCUMENT_ID_KEY)
+    return (doc.metadata or {}).get(DOCUMENT_ID_COLUMN)
 
 
 def _to_source(doc: Document, ledger: dict[str, LedgerMeta]) -> Source:
@@ -124,7 +127,7 @@ def _format_context(sources: list[Source]) -> str:
     for source in sources:
         header = (
             f"[document_id={source['document_id']}, "
-            f"published_at={source['published_at']}, "
+            f"document_year={source['document_year'] or UNKNOWN_YEAR}, "
             f"department={source['department']}, "
             f"source_type={source['source_type']}]"
         )
