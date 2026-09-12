@@ -2,7 +2,7 @@
 
 Retrieves the top-k chunks from the pgvector store, enriches each with its
 parent document's metadata from Appwrite's ``ledger_documents`` collection,
-asks Gemini (``gemini-2.0-flash``) to answer strictly from that context while
+asks Gemini (``gemini-2.5-flash``) to answer strictly from that context while
 citing each source's document id and publish date, and returns the answer
 alongside structured source metadata.
 """
@@ -24,7 +24,9 @@ from app.services.vectorstore import DEFAULT_K, get_retriever
 
 logger = logging.getLogger(__name__)
 
-LLM_MODEL = "gemini-2.0-flash"
+# Must honour temperature: low temperature keeps answers grounded in the
+# retrieved chunks, so fixed-sampling models (e.g. gemini-3.6-flash) are out.
+LLM_MODEL = "gemini-2.5-flash"
 LLM_TEMPERATURE = 0.2
 NO_INFO_ANSWER = "I don't have information on that in the Ledger."
 LEDGER_DATABASE_ID = "nokware"
