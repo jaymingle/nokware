@@ -13,7 +13,7 @@ dependencies = [
     "uvicorn",
     "python-dotenv",
     "pydantic-settings",
-    "appwrite>=24,<25",
+    "appwrite>=23,<24",
     "psycopg[binary]",
     "pgvector>=0.2.5,<0.4",
     "minio>=7,<8",
