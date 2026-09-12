@@ -13,13 +13,13 @@ dependencies = [
     "uvicorn",
     "python-dotenv",
     "pydantic-settings",
-    "appwrite",
+    "appwrite>=24,<25",
     "psycopg[binary]",
-    "pgvector",
-    "minio",
-    "langchain",
-    "langchain-google-genai",
-    "langchain-postgres",
+    "pgvector>=0.5,<0.6",
+    "minio>=7,<8",
+    "langchain>=1,<2",
+    "langchain-google-genai>=4,<5",
+    "langchain-postgres>=0.0.17,<0.1",
 ]
 
 [tool.setuptools.packages.find]
