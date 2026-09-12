@@ -1,7 +1,7 @@
 # Nokware Backend
 
 Python 3.11 · FastAPI · LangChain · Google Gemini (`gemini-2.0-flash`,
-`text-embedding-004`) · Appwrite SDK · MinIO · Postgres/pgvector.
+`gemini-embedding-2` at 768 dims) · Appwrite SDK · MinIO · Postgres/pgvector.
 
 ## Install
 

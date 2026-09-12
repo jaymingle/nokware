@@ -27,6 +27,7 @@ from app.services.storage import get_minio
 from app.services.vectorstore import (
     CONTENT_COLUMN,
     EMBEDDING_COLUMN,
+    EMBEDDING_DIMENSIONS,
     EMBEDDING_MODEL,
     ID_COLUMN,
     METADATA_COLUMNS,
@@ -39,7 +40,6 @@ EXPECTED_TEAMS = ALL_TEAMS
 DATABASE_ID = "nokware"
 EXPECTED_COLLECTIONS = ("ledger_documents", "citizen_reports", "case_history")
 EXPECTED_COLUMNS = (ID_COLUMN, CONTENT_COLUMN, EMBEDDING_COLUMN, *METADATA_COLUMNS)
-EMBEDDING_DIM = 768
 PSYCOPG_SCHEME = "postgresql+psycopg://"
 
 _COLUMNS_SQL = """
@@ -121,11 +121,11 @@ def check_postgres() -> str:
     missing = [c for c in EXPECTED_COLUMNS if c not in columns]
     if missing:
         raise CheckFailed(f"'{TABLE_NAME}' is missing column(s): {', '.join(missing)}")
-    if columns[EMBEDDING_COLUMN] != f"vector({EMBEDDING_DIM})":
-        raise CheckFailed(f"'{EMBEDDING_COLUMN}' is {columns[EMBEDDING_COLUMN]}, expected vector({EMBEDDING_DIM})")
+    if columns[EMBEDDING_COLUMN] != f"vector({EMBEDDING_DIMENSIONS})":
+        raise CheckFailed(f"'{EMBEDDING_COLUMN}' is {columns[EMBEDDING_COLUMN]}, expected vector({EMBEDDING_DIMENSIONS})")
     if not url.startswith(PSYCOPG_SCHEME):
         raise CheckFailed(f"table OK, but POSTGRES_URL must start with {PSYCOPG_SCHEME} for vectorstore.py")
-    return f"{where}: '{TABLE_NAME}' has all {len(EXPECTED_COLUMNS)} columns, vector({EMBEDDING_DIM}), {chunks} chunk(s)"
+    return f"{where}: '{TABLE_NAME}' has all {len(EXPECTED_COLUMNS)} columns, vector({EMBEDDING_DIMENSIONS}), {chunks} chunk(s)"
 
 
 def check_minio() -> str:
@@ -145,8 +145,8 @@ def check_minio() -> str:
 
 def check_embeddings() -> str:
     vector = get_embeddings().embed_query("Nokware connectivity check")
-    if len(vector) != EMBEDDING_DIM:
-        raise CheckFailed(f"{EMBEDDING_MODEL} returned {len(vector)} dims, expected {EMBEDDING_DIM}")
+    if len(vector) != EMBEDDING_DIMENSIONS:
+        raise CheckFailed(f"{EMBEDDING_MODEL} returned {len(vector)} dims, expected {EMBEDDING_DIMENSIONS}")
     return f"{EMBEDDING_MODEL} returned a {len(vector)}-dim vector"
 
 

@@ -1,8 +1,9 @@
 """pgvector-backed vector store for RAG document chunks.
 
 Maps langchain-postgres' ``PGVectorStore`` onto the pre-provisioned
-``document_chunks`` table in ``nokware_rag`` using 768-dimensional Google
-Gemini embeddings (``text-embedding-004``). The table is never created or
+``document_chunks`` table in ``nokware_rag`` using Google Gemini embeddings
+(``gemini-embedding-2``) truncated to 768 dimensions to match the table's
+``VECTOR(768)`` column. The table is never created or
 altered here — ``PGVectorStore.create_sync`` only introspects it and validates
 that the mapped columns exist.
 
@@ -33,7 +34,8 @@ ID_COLUMN = "id"
 CONTENT_COLUMN = "chunk_text"
 EMBEDDING_COLUMN = "embedding"
 METADATA_COLUMNS = ["appwrite_document_id", "chunk_index", "created_at"]
-EMBEDDING_MODEL = "models/text-embedding-004"
+EMBEDDING_MODEL = "models/gemini-embedding-2"
+EMBEDDING_DIMENSIONS = 768  # must equal the VECTOR(n) size of the embedding column
 DEFAULT_K = 5
 
 
@@ -42,6 +44,7 @@ def get_embeddings() -> GoogleGenerativeAIEmbeddings:
     settings = get_settings()
     return GoogleGenerativeAIEmbeddings(
         model=EMBEDDING_MODEL,
+        output_dimensionality=EMBEDDING_DIMENSIONS,
         google_api_key=settings.gemini_api_key,
     )
 
