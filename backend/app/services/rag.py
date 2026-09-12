@@ -57,6 +57,7 @@ _PROMPT = ChatPromptTemplate.from_messages(
 
 
 class LedgerMeta(TypedDict):
+    title: str | None
     department: str | None
     source_type: str | None
     published_at: str | None
@@ -65,6 +66,7 @@ class LedgerMeta(TypedDict):
 
 class Source(TypedDict):
     document_id: str | None
+    title: str | None
     chunk_text: str
     department: str | None
     source_type: str | None
@@ -88,7 +90,7 @@ def get_llm() -> ChatGoogleGenerativeAI:
 
 
 def _empty_meta() -> LedgerMeta:
-    return LedgerMeta(department=None, source_type=None, published_at=None, document_year=None)
+    return LedgerMeta(title=None, department=None, source_type=None, published_at=None, document_year=None)
 
 
 def _fetch_ledger_meta(document_id: str) -> LedgerMeta:
@@ -99,6 +101,7 @@ def _fetch_ledger_meta(document_id: str) -> LedgerMeta:
         logger.warning("Ledger lookup failed for %s: %s", document_id, exc)
         return _empty_meta()
     return LedgerMeta(
+        title=data.get("title"),
         department=data.get("department"),
         source_type=data.get("sourceType"),
         published_at=data.get("publishedAt"),
