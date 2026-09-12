@@ -13,5 +13,5 @@ This repository is a monorepo with two applications:
 
 - [`backend/`](backend/README.md) — Python 3.11 · FastAPI · LangChain · Gemini ·
   Appwrite SDK · MinIO · pgvector.
-- [`frontend/`](frontend/README.md) — Next.js 15 (App Router, TypeScript,
+- [`frontend/`](frontend/README.md) — Next.js 16 (App Router, TypeScript,
   Tailwind) with shadcn/ui.

@@ -1,6 +1,6 @@
 # Nokware Frontend
 
-Next.js 15 (App Router, TypeScript) · Tailwind CSS v4 · shadcn/ui (Radix base,
+Next.js 16 (App Router, TypeScript) · Tailwind CSS v4 · shadcn/ui (Radix base,
 Nova preset — Lucide icons, Geist font, neutral base color, CSS variables).
 
 ## Setup
