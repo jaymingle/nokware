@@ -15,7 +15,7 @@ dependencies = [
     "pydantic-settings",
     "appwrite>=24,<25",
     "psycopg[binary]",
-    "pgvector>=0.5,<0.6",
+    "pgvector>=0.2.5,<0.4",
     "minio>=7,<8",
     "langchain>=1,<2",
     "langchain-google-genai>=4,<5",
