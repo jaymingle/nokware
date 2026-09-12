@@ -1,6 +1,10 @@
 from functools import lru_cache
+from pathlib import Path
 
+from pydantic import ValidationError
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+ENV_FILE = Path(__file__).resolve().parents[1] / ".env"
 
 
 class Settings(BaseSettings):
@@ -13,7 +17,7 @@ class Settings(BaseSettings):
     """
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=ENV_FILE,
         env_file_encoding="utf-8",
         extra="ignore",
     )
@@ -40,3 +44,16 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
+
+
+def settings_error_summary(exc: ValidationError) -> str:
+    """Name the missing/invalid variables without echoing any values.
+
+    Never print str(exc) for a settings error: pydantic includes the loaded
+    input in it, which is the secrets.
+    """
+    problems = [
+        f"{str(err['loc'][0]).upper()} ({err['msg'].lower()})"
+        for err in exc.errors(include_url=False, include_input=False)
+    ]
+    return f"Cannot load settings from {ENV_FILE}: {', '.join(problems)}"

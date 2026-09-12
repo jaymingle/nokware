@@ -11,18 +11,16 @@ Exits 0 when every check passes, 1 otherwise. Secret values from .env are
 redacted from any error text that gets printed.
 """
 
-import os
 import sys
 from collections.abc import Callable
 from dataclasses import dataclass
-from pathlib import Path
 
 import psycopg
 from appwrite.query import Query
 from psycopg.conninfo import conninfo_to_dict
 from pydantic import ValidationError
 
-from app.config import get_settings
+from app.config import get_settings, settings_error_summary
 from app.services.appwrite_client import get_databases, get_teams
 from app.services.rag import LLM_MODEL, get_llm
 from app.services.storage import get_minio
@@ -35,14 +33,9 @@ from app.services.vectorstore import (
     TABLE_NAME,
     get_embeddings,
 )
+from app.teams import ALL_TEAMS
 
-BACKEND_DIR = Path(__file__).resolve().parents[1]
-EXPECTED_TEAMS = (
-    "dept-central-administration", "dept-finance", "dept-education",
-    "dept-health", "dept-waste-management", "dept-works",
-    "dept-physical-planning", "dept-agriculture", "dept-social-welfare",
-    "dept-disaster-management", "dept-transport", "contributor", "mce",
-)
+EXPECTED_TEAMS = ALL_TEAMS
 DATABASE_ID = "nokware"
 EXPECTED_COLLECTIONS = ("ledger_documents", "citizen_reports", "case_history")
 EXPECTED_COLUMNS = (ID_COLUMN, CONTENT_COLUMN, EMBEDDING_COLUMN, *METADATA_COLUMNS)
@@ -193,16 +186,10 @@ def print_summary(results: list[Result]) -> None:
 
 
 def main() -> int:
-    os.chdir(BACKEND_DIR)  # settings read .env relative to the working directory
     try:
         get_settings()
     except ValidationError as exc:
-        # Never print str(exc): pydantic echoes the loaded input, i.e. the secrets.
-        problems = [
-            f"{str(err['loc'][0]).upper()} ({err['msg'].lower()})"
-            for err in exc.errors(include_url=False, include_input=False)
-        ]
-        print(f"Cannot load settings from {BACKEND_DIR / '.env'}: {', '.join(problems)}")
+        print(settings_error_summary(exc))
         return 1
     print("Nokware connection checks (read-only)\n")
     results = [run_check(i, name, check) for i, (name, check) in enumerate(CHECKS, 1)]
