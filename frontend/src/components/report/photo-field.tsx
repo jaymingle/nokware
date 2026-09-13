@@ -7,8 +7,7 @@ import { ImagePlusIcon, XIcon } from "lucide-react";
 import { ErrorNote } from "@/components/documents/panels";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { PHOTO_TYPES, addPhotos, type PhotoLimits, type ReportPhoto } from "@/lib/report/photos";
-import { formatBytes } from "@/lib/uploads";
+import { PHOTO_TYPES, addPhotos, limitLabel, type PhotoLimits, type ReportPhoto } from "@/lib/report/photos";
 
 function Thumb({ photo, index, onRemove }: { photo: ReportPhoto; index: number; onRemove: () => void }) {
   return (
@@ -59,7 +58,7 @@ export function PhotoField({ photos, onChange, limits, hint }: PhotoFieldProps) 
     <div className="flex flex-col gap-2">
       <Label htmlFor="report-photos">Photos (optional)</Label>
       <p className="text-[12.5px] text-ink-soft">
-        Up to {limits.maxPhotos} JPEG, PNG or WebP photos, {formatBytes(limits.maxBytes)} each. {hint}
+        Up to {limits.maxPhotos} JPEG, PNG or WebP photos, {limitLabel(limits.maxBytes)} each. {hint}
       </p>
       {photos.length > 0 ? (
         <ul className="grid grid-cols-3 gap-2 sm:grid-cols-5" data-testid="report-photos">

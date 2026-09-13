@@ -30,6 +30,7 @@ export function PreferencesForm({ reference, token }: { reference: string; token
   };
   return (
     <form onSubmit={submit} className="flex flex-col gap-3" data-testid="report-preferences">
+      <p className="text-[14px]">You gave a number before knowing this, so no messages have been sent. Choose what you would like:</p>
       <ConsentBox checked={notify} onChange={setNotify} testId="report-preferences-notify">
         {NOTIFY_CONSENT}
       </ConsentBox>

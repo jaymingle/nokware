@@ -8,7 +8,7 @@ type SafetyTypeFieldProps = { types: SafetyType[]; value: string; onChange: (id:
 export function SafetyTypeField({ types, value, onChange }: SafetyTypeFieldProps) {
   return (
     <fieldset className="flex flex-col gap-2">
-      <legend className="mb-1.5 text-[12.5px] text-ink-soft">What is happening?</legend>
+      <legend className="mb-1.5 text-[12.5px] text-ink-soft">What kind of danger is it?</legend>
       {types.map((type) => (
         <label
           key={type.id}

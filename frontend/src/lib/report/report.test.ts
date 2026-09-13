@@ -17,7 +17,7 @@ describe("addPhotos", () => {
     const { photos, problem } = addPhotos([], [photo("a.jpg"), photo("b.heic", MB, "image/heic"), photo("c.png", 11 * MB, "image/png")], LIMITS);
     expect(photos.map((p) => p.name)).toEqual(["a.jpg"]);
     expect(problem).toContain("b.heic isn't a JPEG, PNG or WebP photo.");
-    expect(problem).toContain("c.png is 11.0 MB");
+    expect(problem).toContain("c.png is 11.0 MB; each photo can be up to 10 MB.");
   });
 
   it("stops at the limit", () => {

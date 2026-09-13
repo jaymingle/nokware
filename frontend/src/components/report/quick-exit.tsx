@@ -34,7 +34,8 @@ function useShiftToLeave() {
 export function QuickExit() {
   useShiftToLeave();
   return (
-    <div className="sticky top-3 z-40 flex justify-end">
+    // Pinned at the top on a phone; in the page's right margin on a wide screen, clear of the form.
+    <div className="sticky top-3 z-40 flex justify-end lg:fixed lg:top-24 lg:right-6">
       <div className="flex flex-col items-end gap-1">
         <Button onClick={leave} className="bg-ink text-paper hover:bg-ink/85" data-testid="quick-exit">
           <LogOutIcon data-icon="inline-start" />

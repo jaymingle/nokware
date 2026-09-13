@@ -36,9 +36,8 @@ function HeldForConsent({ receipt }: { receipt: ReportReceipt }) {
     <section className="flex flex-col gap-3 rounded-xl bg-brick-tint p-4 text-ink" data-testid="report-held">
       <h3 className="text-[18px]">Filed as a report about someone&apos;s safety</h3>
       <p className="text-[14px]">
-        From what you wrote, Nokware has filed this as a report about someone&apos;s safety. It is handled privately: it
-        goes only to {joinNames(receipt.recipients)}, and it never appears on the public dashboard.
-        {receipt.preferences_token ? " You gave a number before knowing this, so no messages have been sent. Choose what you would like:" : ""}
+        From what you wrote, Nokware has filed this as a report about someone&apos;s safety, so it is handled privately
+        and never appears on the public dashboard.
       </p>
       {receipt.preferences_token ? <PreferencesForm reference={receipt.reference} token={receipt.preferences_token} /> : null}
     </section>

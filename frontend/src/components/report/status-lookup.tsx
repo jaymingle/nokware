@@ -21,6 +21,7 @@ export function StatusLookup({ busy, showing, onLookup, onClear }: StatusLookupP
     const reference = normaliseReference(typed);
     setProblem(reference ? null : NOT_A_REFERENCE);
     if (reference) onLookup(reference);
+    else onClear(); // no earlier result or error left under the new message
   };
   const clear = () => {
     setTyped("");

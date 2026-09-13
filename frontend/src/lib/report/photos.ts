@@ -8,12 +8,17 @@ export type PhotoLimits = { maxPhotos: number; maxBytes: number };
 /** An attached photo and its preview address (an object URL, revoked when the photo is removed). */
 export type ReportPhoto = { file: File; url: string };
 
+/** A size limit as people say it: "10 MB". */
+export function limitLabel(bytes: number): string {
+  return `${Math.round(bytes / (1024 * 1024))} MB`;
+}
+
 export type PhotoPick = { photos: File[]; problem: string | null };
 
 function photoProblem(file: Pick<File, "name" | "type" | "size">, limits: PhotoLimits): string | null {
   if (!PHOTO_TYPES.includes(file.type)) return `${file.name} isn't a JPEG, PNG or WebP photo.`;
   if (file.size === 0) return `${file.name} is empty.`;
-  if (file.size > limits.maxBytes) return `${file.name} is ${formatBytes(file.size)}; each photo can be up to ${formatBytes(limits.maxBytes)}.`;
+  if (file.size > limits.maxBytes) return `${file.name} is ${formatBytes(file.size)}; each photo can be up to ${limitLabel(limits.maxBytes)}.`;
   return null;
 }
 
