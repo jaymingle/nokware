@@ -82,13 +82,21 @@ def allowed_case_actions(principal: Principal, case: dict[str, Any], assignments
     """Exactly what the server would accept from the caller now."""
     status = case.get("status")
     if principal.role == Role.MCE:
-        actions = [] if status == CaseStatus.RESOLVED else [CaseAction.REASSIGN]
+        movable = status != CaseStatus.RESOLVED and bool(reassign_targets(case))
+        actions = [CaseAction.REASSIGN] if movable else []
         return actions + ([CaseAction.REOPEN, CaseAction.CONFIRM_RESOLUTION] if status == CaseStatus.ESCALATED else [])
     mine = assignment_for(principal, assignments)
     if mine is None or status == CaseStatus.ESCALATED:  # an escalated case waits for the MCE
         return []
     actions = [CaseAction.ACKNOWLEDGE] if mine["status"] == AssignmentStatus.ASSIGNED else []
     return actions + ([CaseAction.RESOLVE] if mine["status"] != AssignmentStatus.RESOLVED else [])
+
+
+def reassign_targets(case: dict[str, Any]) -> list[str]:
+    """Where the MCE could move a part of the case: anyone it isn't with, only safety services for personal safety."""
+    allowed = SAFETY_RECIPIENTS if case.get("category") == Category.PERSONAL_SAFETY else RECIPIENT_NAMES
+    current = set(case.get("recipients") or [])
+    return [recipient for recipient in allowed if recipient not in current]
 
 
 def _own_assignment(principal: Principal, assignment: dict[str, Any]) -> None:

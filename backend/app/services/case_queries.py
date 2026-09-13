@@ -65,7 +65,8 @@ def oversight_stats(cases: list[dict[str, Any]], now: datetime) -> dict[str, int
     safety_open = sum(1 for c in cases if c["category"] == Category.PERSONAL_SAFETY and c["status"] in OPEN)
     return {
         "open": sum(1 for c in everyday if c["status"] in OPEN),
-        "escalated": sum(1 for c in everyday if c["status"] == CaseStatus.ESCALATED),
+        # Every escalation, safety included: the MCE must act on each, and sees each one in outline anyway.
+        "escalated": sum(1 for c in cases if c["status"] == CaseStatus.ESCALATED),
         "resolved_30_days": sum(
             1 for c in everyday
             if c["status"] == CaseStatus.RESOLVED and (ledger_documents.parse_datetime(c.get("resolvedAt")) or now) >= cutoff

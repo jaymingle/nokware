@@ -151,3 +151,12 @@ def test_the_mce_reopens_an_escalated_case_with_a_note_for_the_recipients() -> N
         reopen(MCE, case(status="in_progress"), "Why?")
     with pytest.raises(NotAllowed):
         reopen(WORKS, case(status="escalated"), "Me")
+
+
+def test_reassign_is_offered_only_when_there_is_somewhere_to_move_the_case() -> None:
+    from app.services.case_workflow import allowed_case_actions, reassign_targets
+
+    assert reassign_targets(SAFETY) == []  # already with both Police and Social Welfare
+    assert allowed_case_actions(MCE, SAFETY, []) == []
+    police_only = {**SAFETY, "recipients": ["agency-police"]}
+    assert reassign_targets(police_only) == ["dept-social-welfare"]
