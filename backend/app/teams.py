@@ -4,23 +4,34 @@ Team membership decides what a user can see and do. Department staff act on
 documents for their own department, contributors submit documents for review,
 and the MCE team (the MCE and admin accounts) rules on escalated disputes.
 
+The departments are AMA's own list (ama.gov.gh/departments), under AMA's own
+names, plus Press for assembly-wide publications. Environmental Health
+Services sits under Metro Public Health on AMA's site; it is not a department.
+
 Agencies are services outside the Assembly that receive citizen reports about
 safety. They are not AMA departments, so they never appear in department lists
 and have no part in the Ledger; they see only the cases routed to them.
 """
 
 DEPARTMENT_NAMES = {
+    "dept-budget-rating": "Budget & Rating",
     "dept-central-administration": "Central Administration",
+    "dept-education": "Department of Education",
+    "dept-disaster-management": "Disaster Management & Prevention",
     "dept-finance": "Finance",
-    "dept-education": "Education",
-    "dept-health": "Health",
-    "dept-waste-management": "Waste Management",
-    "dept-works": "Works",
+    "dept-food-agriculture": "Food & Agriculture",
+    "dept-gamada": "GAMADA",
+    "dept-human-resource": "Human Resource Department",
+    "dept-international-relations": "International Relations",
+    "dept-legal": "Legal Department",
+    "dept-metro-public-health": "Metro Public Health Department",
+    "dept-metro-transport": "Metro Transport",
     "dept-physical-planning": "Physical Planning",
-    "dept-agriculture": "Agriculture",
-    "dept-social-welfare": "Social Welfare",
-    "dept-disaster-management": "Disaster Management",
-    "dept-transport": "Transport",
+    "dept-social-welfare": "Social Welfare & Community Development",
+    "dept-statistics": "Statistics Department",
+    "dept-urban-roads": "Urban Roads",
+    "dept-waste-management": "Waste Management",
+    "dept-works": "Works Department",
     "dept-press": "Press",  # assembly-wide documents: press releases, general notices
 }
 DEPARTMENT_TEAMS = tuple(DEPARTMENT_NAMES)
@@ -31,6 +42,14 @@ AGENCY_NAMES = {
 AGENCY_TEAMS = tuple(AGENCY_NAMES)
 # Everyone a citizen report can be routed to.
 RECIPIENT_NAMES = {**DEPARTMENT_NAMES, **AGENCY_NAMES}
+# Plainer names for pages that list recipients to someone reporting a danger to
+# a person; the full name is used everywhere else.
+SHORT_NAMES = {"dept-social-welfare": "Social Welfare"}
 CONTRIBUTOR_TEAM = "contributor"
 MCE_TEAM = "mce"
 ALL_TEAMS = (*DEPARTMENT_TEAMS, *AGENCY_TEAMS, CONTRIBUTOR_TEAM, MCE_TEAM)
+
+
+def short_name(team: str) -> str:
+    """A recipient's name as a citizen in distress reads it: "Social Welfare", not the full departmental title."""
+    return SHORT_NAMES.get(team) or RECIPIENT_NAMES.get(team, team)

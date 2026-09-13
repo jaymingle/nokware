@@ -116,7 +116,8 @@ def _format_context(chunks: list[RetrievedChunk], labels: dict[str, str]) -> str
         header = (
             f"[{label}] {document.get('title') or 'Untitled'} | "
             f"year: {document.get('documentYear') or UNKNOWN_YEAR} | "
-            f"department: {document.get('department')} | source: {document.get('sourceType')}"
+            f"department: {DEPARTMENT_NAMES.get(document.get('department') or '', 'unknown')} | "
+            f"source: {document.get('sourceType')}"
         )
         excerpts = "\n[...]\n".join(c.chunk.text for c in document_chunks)
         blocks.append(f"{header}\n{excerpts}")

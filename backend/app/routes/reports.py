@@ -30,7 +30,7 @@ from app.services.notifications import notify_quietly
 from app.services.report_intake import DESCRIPTION_MIN, ReportSubmission
 from app.services.report_photos import MAX_PHOTO_BYTES, PhotoRejected
 from app.services.report_taxonomy import TOPICS_BY_ID, Category, topics_in
-from app.teams import RECIPIENT_NAMES
+from app.teams import RECIPIENT_NAMES, short_name
 from app.wards import sub_metros, wards
 
 router = APIRouter(prefix="/api/reports", tags=["reports"])
@@ -49,7 +49,7 @@ def options() -> ReportOptions:
         for sm in sub_metros().values()
     ]
     safety = [
-        SafetyType(id=t.id, label=t.label, guide=t.guide, recipients=[RECIPIENT_NAMES[r] for r in t.recipients])
+        SafetyType(id=t.id, label=t.label, guide=t.guide, recipients=[short_name(r) for r in t.recipients])
         for t in topics_in(Category.PERSONAL_SAFETY)
     ]
     return ReportOptions(
@@ -101,7 +101,8 @@ def _receipt(receipt: report_intake.Receipt) -> ReportReceipt:
         case_id=case["$id"],
         private=case["isSensitive"],
         topic=None if case["isSensitive"] else TOPICS_BY_ID[case["topic"]].label,
-        recipients=[RECIPIENT_NAMES[r] for r in case["recipients"]],
+        # Someone reporting a danger to a person reads plain names ("Social Welfare").
+        recipients=[short_name(r) if case["isSensitive"] else RECIPIENT_NAMES[r] for r in case["recipients"]],
         messages_on=receipt.messages_on,
         held_for_consent=receipt.held_for_consent,
         preferences_token=receipt.preferences_token,

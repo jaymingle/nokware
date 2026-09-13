@@ -15,7 +15,7 @@ class SafetyType(BaseModel):
     id: str
     label: str
     guide: str
-    recipients: list[str]  # who a report of this type goes to, named as the citizen sees them
+    recipients: list[str]  # who a report of this type goes to, in plain names ("Social Welfare")
 
 
 class ReportOptions(BaseModel):
@@ -32,7 +32,7 @@ class ReportReceipt(BaseModel):
     case_id: str
     private: bool  # filed as personal safety
     topic: str | None  # the topic's label; None for personal safety
-    recipients: list[str]  # who it was sent to (shown once, on the confirmation page)
+    recipients: list[str]  # who it was sent to (shown once, on the confirmation page); plain names if private
     messages_on: bool  # the citizen will get the received / resolved / escalated messages
     held_for_consent: bool  # filed as personal safety by the classifier: ask about messages and calls
     preferences_token: str | None  # send back as X-Receipt-Token to answer that question, once, within the hour

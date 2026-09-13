@@ -25,7 +25,7 @@ def test_the_form_gets_wards_by_sub_metro_and_the_safety_types() -> None:
     assert {t["id"] for t in body["safety_types"]} >= {"abuse", "child_at_risk", "threat_to_life"}
     assert body["max_photos"] == 10
     abuse = next(t for t in body["safety_types"] if t["id"] == "abuse")
-    assert abuse["recipients"] == ["Ghana Police Service", "Social Welfare"]  # so the form can say where it goes
+    assert abuse["recipients"] == ["Ghana Police Service", "Social Welfare"]  # plain names, for someone in danger
 
 
 def test_an_invalid_report_is_a_422_with_a_message_to_show(monkeypatch: pytest.MonkeyPatch) -> None:

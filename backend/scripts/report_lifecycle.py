@@ -74,7 +74,7 @@ def civic_report() -> str:
     response = file("The main drain on Mudor road is choked with plastic and water stands at the school gate.",
                     [gps_photo()], ward="mudor", phone="024 123 4567")
     body = response.json()
-    check("filed -> 201, routed to Works", response.status_code == 201 and body["recipients"] == ["Works"], response.text)
+    check("filed -> 201, routed to Works", response.status_code == 201 and body["recipients"] == ["Works Department"], response.text)
     check("topic shown, not private, messages on", body["topic"] == "Drainage and flooding" and not body["private"] and body["messages_on"], body)
     case = report_store.find_case(body["case_id"])
     check("stored with ward and sub-metro, severity 1-5", case["wardLocation"] == "mudor" and case["subMetro"] == "ashiedu-keteke"
@@ -99,7 +99,7 @@ def lookups(case_id: str) -> None:
     by_ref = client.get(f"/api/reports/{typed}").json()
     check("found by the reference as typed (lower case, space)", by_ref.get("reference") == case["reference"], by_ref)
     check("found by case ID too", client.get(f"/api/reports/{case_id}").json().get("reference") == case["reference"])
-    check("shows topic, ward, department", (by_ref["topic"], by_ref["ward"], by_ref["recipients"]) == ("Drainage and flooding", "Mudor", ["Works"]), by_ref)
+    check("shows topic, ward, department", (by_ref["topic"], by_ref["ward"], by_ref["recipients"]) == ("Drainage and flooding", "Mudor", ["Works Department"]), by_ref)
     check("unknown reference -> 404", client.get("/api/reports/ZZZZ-2222").status_code == 404)
 
 

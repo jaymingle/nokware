@@ -81,7 +81,7 @@ def reassign() -> None:
     body = new_case("Nobody has emptied the public bins at Kaneshie lorry station for two weeks.", ward="kaneshie")
     case_id = body["case_id"]
     first = body["recipients"][0]
-    source = {"Works": "dept-works", "Waste Management": "dept-waste-management"}.get(first, "dept-waste-management")
+    source = {"Works Department": "dept-works", "Waste Management": "dept-waste-management"}.get(first, "dept-waste-management")
     target = "dept-works" if source == "dept-waste-management" else "dept-waste-management"
     moved = act(MCE, case_id, "reassign", from_recipient=source, to_recipient=target, reason="[TEST] Moved for the test.")
     check("reassigned, with the reason in the trail", moved.status_code == 200 and any("Moved for the test" in (e["note"] or "") for e in moved.json()["history"]), moved.text)

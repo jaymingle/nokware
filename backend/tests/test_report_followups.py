@@ -25,8 +25,8 @@ DONE = [{"recipient": "dept-works", "active": True, "resolutionNote": "Drain des
 
 def test_an_everyday_case_shows_what_where_who_and_the_resolution() -> None:
     view = public_status(CIVIC, DONE, NOW)
-    assert (view["topic"], view["ward"], view["recipients"]) == ("Drainage and flooding", "Mudor", ["Works"])
-    assert view["resolution_notes"] == [{"recipient": "Works", "note": "Drain desilted on 11 September."}]
+    assert (view["topic"], view["ward"], view["recipients"]) == ("Drainage and flooding", "Mudor", ["Works Department"])
+    assert view["resolution_notes"] == [{"recipient": "Works Department", "note": "Drain desilted on 11 September."}]
     assert view["escalate_until"] == (NOW - timedelta(days=2) + timedelta(days=14)).isoformat()
 
 

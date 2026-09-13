@@ -71,7 +71,7 @@ def test_a_department_starts_and_finishes_a_case_and_the_citizen_is_told(fake: F
     outcome = case_actions.resolve(WORKS, "c1", "Drain desilted on 12 September.", NOW)
     assert outcome.resolved and outcome.case["status"] == "resolved" and outcome.case["resolvedAt"]
     assert [e.action for e in fake.trail] == ["acknowledged", "resolved"]
-    assert fake.trail[1].note == "Resolved by Works. Drain desilted on 12 September." and fake.trail[1].actor.name == "Kofi (Works)"
+    assert fake.trail[1].note == "Resolved by Works Department. Drain desilted on 12 September." and fake.trail[1].actor.name == "Kofi (Works)"
 
 
 def test_a_two_recipient_case_waits_for_both_and_its_trail_never_quotes_them(fake: Fake) -> None:
@@ -95,7 +95,7 @@ def test_the_mce_reassigns_one_part_and_the_trail_gives_the_reason(fake: Fake) -
     outcome = case_actions.reassign(MCE, "c4", Reassignment("dept-works", "dept-waste-management"), "Refuse, not drains.", NOW)
     active = [a["recipient"] for a in fake.assignments_for("c4") if a["active"]]
     assert active == ["dept-waste-management"] and outcome.case["recipients"] == ["dept-waste-management"]
-    assert fake.trail[-1].note == "Moved from Works to Waste Management: Refuse, not drains."
+    assert fake.trail[-1].note == "Moved from Works Department to Waste Management: Refuse, not drains."
 
 
 def test_the_mce_reopens_or_confirms_an_escalated_case(fake: Fake) -> None:
@@ -125,4 +125,4 @@ def test_recipients_see_everything_and_the_mce_sees_a_safety_case_only_in_outlin
     mce = case_presenters.detail(MCE, case, fake.assignments_for("c7"))
     assert mce.view == "oversight" and mce.topic == "Personal safety"
     assert (mce.description, mce.photos, mce.place, mce.contact, mce.excerpt, mce.classification_note) == (None, [], None, None, None, None)
-    assert mce.history[0].note == "Filed as personal safety." and mce.recipients == ["Ghana Police Service", "Social Welfare"]
+    assert mce.history[0].note == "Filed as personal safety." and mce.recipients == ["Ghana Police Service", "Social Welfare & Community Development"]  # staff see full names
