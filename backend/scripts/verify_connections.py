@@ -44,7 +44,7 @@ from app.services.vectorstore import (
 from app.teams import ALL_TEAMS
 
 EXPECTED_TEAMS = ALL_TEAMS
-EXPECTED_COLLECTIONS = ("ledger_documents", "citizen_reports", "case_history")
+EXPECTED_COLLECTIONS = ("ledger_documents", "document_history", "citizen_reports", "case_history")
 EXPECTED_COLUMNS = (ID_COLUMN, CONTENT_COLUMN, EMBEDDING_COLUMN, *METADATA_COLUMNS)
 PSYCOPG_SCHEME = "postgresql+psycopg://"
 MINIO_PROBE_OBJECT = "__nokware_permission_probe__/does-not-exist"
