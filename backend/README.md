@@ -77,6 +77,11 @@ membership.
 | `POST /api/documents/{id}/accept-dispute`, `/escalate`, `/resubmit` (multipart) | contributor |
 | `POST /api/documents/{id}/uphold`, `/overrule` | MCE |
 | `POST /api/jobs/publish-expired` | MCE, or `X-Job-Token` |
+| `GET /api/cases/queue` (citizen reports routed to the caller, most severe and oldest first) | department, agency |
+| `GET /api/cases/oversight` (every case and headline counts; personal safety in outline) | MCE |
+| `GET /api/cases/{id}` (as the caller may see it; 404 for anyone with no part in it) | department, agency, MCE |
+| `POST /api/cases/{id}/acknowledge`, `/resolve` (`note`) | the case's recipients |
+| `POST /api/cases/{id}/reassign` (`from_recipient`, `to_recipient`, `reason`), `/reopen`, `/confirm-resolution` (`note`) | MCE |
 
 Every Ask source says where its document came from (`provenance`): imported
 from ama.gov.gh, submitted by a department through the portal, or from a
@@ -113,9 +118,16 @@ written to the outbox and, until Arkesel and Twilio are wired in
 (`SMS_PROVIDER`, `WHATSAPP_PROVIDER`), recorded as not sent. Numbers are
 deleted by an hourly job 30 days after their case closes.
 
+Staff work cases through `app/services/case_actions.py` (under a per-case
+lock, like Ledger documents). What each caller sees is decided in one place
+(`case_workflow.case_view`): recipients see everything; the MCE sees a
+personal-safety case only in outline (status, recipients, age, audit trail),
+and its audit trail never carries what anyone wrote about the case.
+
 `scripts/report_lifecycle.py` files `[TEST]` reports against the live services
-and checks what was stored; `scripts/delete_test_reports.py` lists them (and
-removes them with `--yes`).
+and checks what was stored; `scripts/case_lifecycle.py` works them through the
+staff routes as seeded accounts; `scripts/delete_test_reports.py` lists them
+(and removes them with `--yes`).
 
 Police and GNFS receive safety reports as agency teams (`agency-police`,
 `agency-gnfs`); they are not Assembly departments and have no part in the
