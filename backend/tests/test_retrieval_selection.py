@@ -1,11 +1,13 @@
 """Edition preference and near-duplicate collapse used by retrieval."""
 
 from app.services.retrieval import (
+    FINAL_K,
     Chunk,
     RetrievedChunk,
     apply_edition_preference,
     collapse_near_duplicates,
     question_years,
+    select_final,
     series_key,
 )
 
@@ -76,3 +78,31 @@ def test_near_duplicates_collapse_to_preferred_edition() -> None:
     asked_2023 = collapse_near_duplicates(apply_edition_preference([*editions, distinct], asked_years={2023}))
     assert ids(asked_2023)[0] == "rti-2023"
     assert "rti-2024" not in ids(asked_2023) and "rti-2025" not in ids(asked_2023)
+
+
+def ranked_candidates(count: int) -> list[RetrievedChunk]:
+    return [
+        RetrievedChunk(Chunk(n, f"doc-{n}", 0, f"text {n}"), score=1.0 - n / 100, document={"title": f"Doc {n}"})
+        for n in range(count)
+    ]
+
+
+def test_pinned_keyword_hit_below_the_cutoff_is_added_without_displacing_the_top() -> None:
+    ranked = ranked_candidates(FINAL_K + 5)
+    pinned_late = ranked[FINAL_K + 3].chunk.chunk_id  # e.g. the newsletter's revenue chunk at rank 25
+    final = select_final(ranked, {pinned_late})
+    assert len(final) == FINAL_K + 1
+    assert final[:FINAL_K] == ranked[:FINAL_K]  # every top chunk kept
+    assert final[-1].chunk.chunk_id == pinned_late
+    assert final == sorted(final, key=lambda c: c.score, reverse=True)  # ranking order kept
+
+
+def test_pinned_hits_already_in_the_top_change_nothing() -> None:
+    ranked = ranked_candidates(FINAL_K + 5)
+    assert select_final(ranked, {ranked[0].chunk.chunk_id, ranked[2].chunk.chunk_id}) == ranked[:FINAL_K]
+
+
+def test_pinned_chunk_removed_as_a_near_duplicate_is_not_reinstated() -> None:
+    ranked = ranked_candidates(FINAL_K + 5)
+    collapsed_away = 999  # not in the ranked list any more
+    assert select_final(ranked, {collapsed_away}) == ranked[:FINAL_K]

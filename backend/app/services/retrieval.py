@@ -7,7 +7,9 @@
    index) and BM25 keyword ranking over the chunk_tsv full-text column. Vector
    search alone misses a fact buried in a multi-topic chunk; keyword search
    alone misses paraphrases. Together they catch both.
-3. Reciprocal rank fusion merges every list into one ranking.
+3. Reciprocal rank fusion merges every list into one ranking. Each keyword
+   search's top hit is pinned into the final set, so a precise match cannot be
+   crowded out by a document that merely appears in more lists.
 4. Selection: only published documents. Where a document comes in annual
    editions, the newest is preferred, unless the question names a year, in
    which case that year's edition is (so history stays retrievable). Near-
@@ -48,7 +50,7 @@ QUERY_EXPANSIONS = 3  # rewrites per question, in addition to the question itsel
 LIST_LIMIT = 30  # chunks per ranked list (per query, per arm)
 RRF_K = 60  # standard reciprocal-rank-fusion constant
 CANDIDATE_POOL = 40  # fused chunks considered for selection
-FINAL_K = 8  # chunks passed to the answering model
+FINAL_K = 8  # chunks passed to the answering model, plus any pinned keyword hits
 OLDER_EDITION_WEIGHT = 0.5  # score multiplier for a non-preferred edition
 MATCHING_YEAR_WEIGHT = 1.5  # score multiplier for the edition the question asks about
 NEAR_DUPLICATE_SIMILARITY = 0.8  # Jaccard similarity of word 3-grams
@@ -163,13 +165,13 @@ def keyword_search(query: str) -> list[Chunk]:
     return [Chunk(row[0], row[1], row[2], row[3]) for row in rows]
 
 
-def ranked_lists(queries: list[str]) -> list[list[Chunk]]:
-    """A vector list and a keyword list per query, built in parallel."""
+def ranked_lists(queries: list[str]) -> tuple[list[list[Chunk]], list[list[Chunk]]]:
+    """(vector lists, keyword lists): one of each per query, built in parallel."""
     vectors = get_embeddings().embed_documents(queries, task_type="RETRIEVAL_QUERY")
     with ThreadPoolExecutor(max_workers=2 * len(queries)) as pool:
         vector_lists = pool.map(vector_search, vectors)
         keyword_lists = pool.map(keyword_search, queries)
-        return [*vector_lists, *keyword_lists]
+        return list(vector_lists), list(keyword_lists)
 
 
 def fuse(ranked_lists: Iterable[list[Chunk]]) -> list[tuple[Chunk, float]]:
@@ -244,14 +246,30 @@ def collapse_near_duplicates(candidates: list[RetrievedChunk]) -> list[Retrieved
     return [candidate for candidate, _ in kept]
 
 
+def select_final(ranked: list[RetrievedChunk], pinned_ids: set[int]) -> list[RetrievedChunk]:
+    """The top FINAL_K chunks plus any pinned chunk outside them, in ranking order.
+
+    Pinned chunks are each keyword search's top hit. A precise keyword match can
+    lose the fused ranking to a document that appears in many lists; pinning it
+    keeps a second source (for example one whose figures disagree) in view. Pins
+    are added on top of the top FINAL_K rather than displacing them, so the
+    best-supported chunks are never traded away (at most one extra per query).
+    """
+    chosen = {c.chunk.chunk_id for c in ranked[:FINAL_K]} | pinned_ids
+    return [c for c in ranked if c.chunk.chunk_id in chosen]
+
+
 def retrieve(question: str) -> Retrieval:
     queries = expand_query(question)
-    fused = fuse(ranked_lists(queries))[:CANDIDATE_POOL]
-    documents = ledger_documents.get_documents(chunk.document_id for chunk, _ in fused)
+    vector_lists, keyword_lists = ranked_lists(queries)
+    fused = fuse([*vector_lists, *keyword_lists])
+    pinned_ids = {ranked[0].chunk_id for ranked in keyword_lists if ranked}
+    pool = fused[:CANDIDATE_POOL] + [pair for pair in fused[CANDIDATE_POOL:] if pair[0].chunk_id in pinned_ids]
+    documents = ledger_documents.get_documents(chunk.document_id for chunk, _ in pool)
     candidates = [
         RetrievedChunk(chunk, score, documents[chunk.document_id])
-        for chunk, score in fused
+        for chunk, score in pool
         if documents.get(chunk.document_id, {}).get("status") == LedgerStatus.PUBLISHED
     ]
-    candidates = apply_edition_preference(candidates, question_years(question))
-    return Retrieval(queries=queries, chunks=collapse_near_duplicates(candidates)[:FINAL_K])
+    ranked = collapse_near_duplicates(apply_edition_preference(candidates, question_years(question)))
+    return Retrieval(queries=queries, chunks=select_final(ranked, pinned_ids))

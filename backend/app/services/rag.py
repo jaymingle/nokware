@@ -27,6 +27,8 @@ ANSWER_TEMPERATURE = 0.2
 ANSWER_THINKING_BUDGET = 1024
 NO_INFO_ANSWER = "I don't have information on that in the Ledger."
 UNKNOWN_YEAR = "unknown"
+# Fixed wording so readers, and the UI, can reliably spot conflicting sources.
+DISAGREEMENT_LEAD = "The sources disagree"
 
 _SYSTEM_PROMPT = (
     "You are the Nokware Ledger assistant. Answer the resident's question using ONLY "
@@ -40,8 +42,12 @@ _SYSTEM_PROMPT = (
     "- Cite once per point, at the end of the point, with the label(s) it comes from, "
     "e.g. [S2] or [S1][S3]. Do not cite every sentence. Cite only labels listed below.\n"
     "- When a year matters, take it from the source header. If the header year is "
-    f"{UNKNOWN_YEAR}, do not state or guess one. If sources from different years "
-    "disagree, say so and give each figure's year.\n"
+    f"{UNKNOWN_YEAR}, do not state or guess one.\n"
+    "- If sources disagree (different figures, dates or facts for the same thing), "
+    "never pick one, merge them or average them. Start that point with the exact words "
+    f'"{DISAGREEMENT_LEAD}" and give each version with the document it comes from, '
+    f'named by title, e.g. "{DISAGREEMENT_LEAD} on 2023 revenue: the 2023 Monitoring and '
+    'Evaluation Report gives X [S1]; the AMA Biweekly Newsletter gives Y [S2]."\n'
     f'- If the sources do not contain the answer, reply exactly: "{NO_INFO_ANSWER}"'
 )
 
