@@ -1,4 +1,4 @@
-"""Gemini chat models used by Ask (answering and query expansion)."""
+"""Gemini chat models: Ask (answering and query expansion) and the report classifier."""
 
 import logging
 from functools import lru_cache
@@ -23,5 +23,23 @@ def get_chat_model(temperature: float, thinking_budget: int | None = None) -> Ch
         model=CHAT_MODEL,
         temperature=temperature,
         thinking_budget=thinking_budget,
+        google_api_key=get_settings().gemini_api_key,
+    )
+
+
+# Filing a report waits on the classifier, so it gets a hard limit instead of
+# the client's default of six retries; on failure the filing rules take over.
+CLASSIFIER_TIMEOUT_SECONDS = 15
+CLASSIFIER_RETRIES = 1
+
+
+@lru_cache
+def get_classifier_model() -> ChatGoogleGenerativeAI:
+    return ChatGoogleGenerativeAI(
+        model=CHAT_MODEL,
+        temperature=0.0,
+        thinking_budget=0,
+        timeout=CLASSIFIER_TIMEOUT_SECONDS,
+        max_retries=CLASSIFIER_RETRIES,
         google_api_key=get_settings().gemini_api_key,
     )
