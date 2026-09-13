@@ -14,7 +14,8 @@ class Settings(BaseSettings):
     environment variables case-insensitively (e.g. ``appwrite_endpoint`` reads
     ``APPWRITE_ENDPOINT``). Service settings are required — a missing variable
     raises at startup rather than silently defaulting. Only the CORS settings
-    have defaults, which suit local development.
+    (whose defaults suit local development) and the optional JOB_TOKEN have
+    defaults.
     """
 
     model_config = SettingsConfigDict(
@@ -45,6 +46,10 @@ class Settings(BaseSettings):
     # plus a pattern. The default pattern admits localhost on any port.
     cors_origins: str = ""
     cors_origin_regex: str = r"^http://(localhost|127\.0\.0\.1)(:\d+)?$"
+
+    # Lets a scheduler call POST /api/jobs/publish-expired with an X-Job-Token
+    # header. Empty means only a signed-in MCE can run the job.
+    job_token: str = ""
 
     @property
     def cors_origin_list(self) -> list[str]:

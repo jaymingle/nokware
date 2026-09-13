@@ -5,15 +5,17 @@ restrict a route to particular roles. Both are plain (sync) dependencies, so
 the Appwrite round trips run in FastAPI's threadpool.
 """
 
+import hmac
 import logging
 from collections.abc import Callable
 from typing import Annotated
 
 import requests
 from appwrite.exception import AppwriteException
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, Header, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
+from app.config import get_settings
 from app.services.auth import InvalidTokenError, NoRoleError, Principal, Role, authenticate
 
 logger = logging.getLogger(__name__)
@@ -44,6 +46,20 @@ def current_principal(
 
 
 CurrentPrincipal = Annotated[Principal, Depends(current_principal)]
+
+
+def authorize_job(
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
+    x_job_token: Annotated[str | None, Header()] = None,
+) -> str:
+    """Admit a scheduler holding JOB_TOKEN, or a signed-in MCE. Returns who called."""
+    expected = get_settings().job_token
+    if expected and x_job_token and hmac.compare_digest(x_job_token.encode(), expected.encode()):
+        return "job-token"
+    principal = current_principal(credentials)
+    if principal.role != Role.MCE:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only the MCE can run the deadline job.")
+    return principal.user_id
 
 
 def require_roles(*roles: Role) -> Callable[[Principal], Principal]:

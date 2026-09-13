@@ -1,9 +1,12 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.config import get_settings
-from app.routes import ask, me
+from app.routes import ask, documents, jobs, me, options, queues
 from app.services.appwrite_client import quiet_sdk_deprecation_warnings
+from app.services.portal_queries import DocumentNotFound
+from app.services.workflow import WorkflowError
 
 quiet_sdk_deprecation_warnings()
 settings = get_settings()
@@ -21,6 +24,16 @@ app.add_middleware(
 )
 
 
+@app.exception_handler(WorkflowError)
+def workflow_error(_: Request, exc: WorkflowError) -> JSONResponse:
+    return JSONResponse({"detail": str(exc)}, status_code=exc.status_code)
+
+
+@app.exception_handler(DocumentNotFound)
+def document_not_found(_: Request, __: DocumentNotFound) -> JSONResponse:
+    return JSONResponse({"detail": "No such document."}, status_code=404)
+
+
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
@@ -28,3 +41,7 @@ def health() -> dict[str, str]:
 
 app.include_router(ask.router)
 app.include_router(me.router)
+app.include_router(options.router)
+app.include_router(queues.router)  # before documents: /documents/library must not match /documents/{id}
+app.include_router(documents.router)
+app.include_router(jobs.router)
