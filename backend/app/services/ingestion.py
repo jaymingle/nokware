@@ -13,6 +13,7 @@ marked not searchable: chunkCount=0 with an ingestionError saying why.
 
 import io
 import logging
+import re
 import time
 from dataclasses import dataclass
 
@@ -34,6 +35,10 @@ EMBED_BATCH_SIZE = 100
 EMBED_MAX_ATTEMPTS = 5
 NO_TEXT_NOTE = "Not searchable: no extractable text (image-only PDF). OCR is not supported yet."
 _TRANSIENT_MARKERS = ("429", "RESOURCE_EXHAUSTED", "500", "503", "UNAVAILABLE", "DEADLINE_EXCEEDED")
+# Postgres text rejects NUL, and lone surrogates cannot be encoded as UTF-8: drop them.
+_DROP_CHARS = re.compile(r"[\x00\ud800-\udfff]")
+# Other C0 controls and DEL are junk for search and embeddings; a space keeps words apart.
+_SPACE_CHARS = re.compile(r"[\x01-\x08\x0b\x0c\x0e-\x1f\x7f]")
 
 
 class IngestionRefused(Exception):
@@ -47,10 +52,15 @@ class IngestionResult:
     searchable: bool
 
 
+def clean_text(text: str) -> str:
+    """Make extracted PDF text safe for Postgres and useful for embeddings."""
+    return _SPACE_CHARS.sub(" ", _DROP_CHARS.sub("", text))
+
+
 def extract_pdf_pages(pdf_bytes: bytes) -> list[str]:
-    """Return the stripped text of each page (empty string for image-only pages)."""
+    """Return the cleaned, stripped text of each page (empty for image-only pages)."""
     reader = PdfReader(io.BytesIO(pdf_bytes))
-    return [(page.extract_text() or "").strip() for page in reader.pages]
+    return [clean_text(page.extract_text() or "").strip() for page in reader.pages]
 
 
 def split_text(text: str) -> list[str]:
