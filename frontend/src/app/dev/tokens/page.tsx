@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { notFound } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -10,10 +10,16 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
+import type { Metadata } from "next";
+import type { ReactNode } from "react";
+
 type Swatch = { name: string; hex: string; className: string };
 
-// Temporary token showcase. Hex values are display labels copied from the spec;
-// if a swatch's colour and its label disagree, the CSS token is miswired.
+export const metadata: Metadata = { title: "Design tokens", robots: { index: false } };
+
+// Developer-only token showcase: a 404 in production builds. Hex values are
+// display labels copied from the spec; if a swatch's colour and its label
+// disagree, the CSS token is miswired.
 const SWATCHES: Swatch[] = [
   { name: "paper", hex: "#F3F5F2", className: "bg-paper" },
   { name: "paper-raised", hex: "#FFFFFF", className: "bg-paper-raised" },
@@ -125,7 +131,8 @@ function Buttons() {
   );
 }
 
-export default function Home() {
+export default function DesignTokensPage() {
+  if (process.env.NODE_ENV === "production") notFound();
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-col gap-12 px-6 py-12">
       <header className="flex flex-col gap-2">
