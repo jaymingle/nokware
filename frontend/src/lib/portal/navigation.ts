@@ -1,6 +1,9 @@
 import type { Me, Role } from "@/lib/api/types";
 
-export type NavItem = { href: string; label: string; testId: string };
+/** A live count shown on a nav item, e.g. documents awaiting review. */
+export type NavCountKind = "review";
+
+export type NavItem = { href: string; label: string; testId: string; count?: NavCountKind };
 
 export const ROLE_HOME: Record<Role, string> = {
   department: "/portal/department",
@@ -10,7 +13,7 @@ export const ROLE_HOME: Record<Role, string> = {
 
 export const ROLE_NAV: Record<Role, NavItem[]> = {
   department: [
-    { href: "/portal/department", label: "Review", testId: "portal-nav-review" },
+    { href: "/portal/department", label: "Review", testId: "portal-nav-review", count: "review" },
     { href: "/portal/department/publish", label: "Publish", testId: "portal-nav-publish" },
     { href: "/portal/department/library", label: "Library", testId: "portal-nav-library" },
   ],

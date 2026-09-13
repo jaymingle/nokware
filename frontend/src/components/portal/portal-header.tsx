@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { Brand } from "@/components/portal/brand";
+import { NavCount } from "@/components/portal/nav-count";
 import { Button } from "@/components/ui/button";
 import { useAuth, useMe } from "@/lib/auth/auth-context";
 import { cn } from "@/lib/utils";
@@ -28,6 +29,7 @@ function PortalNav() {
             )}
           >
             {item.label}
+            {item.count ? <NavCount kind={item.count} active={active} /> : null}
           </Link>
         );
       })}
