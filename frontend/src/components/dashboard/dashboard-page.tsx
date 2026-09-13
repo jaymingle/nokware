@@ -33,10 +33,10 @@ function stats(figures: Dashboard): Stat[] {
 
 function StatCards({ figures }: { figures: Dashboard }) {
   return (
-    <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <ul className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
       {stats(figures).map((stat) => (
-        <li key={stat.label} className="rounded-xl border bg-card p-5 sm:p-[22px]" data-testid={stat.testId}>
-          <div className="font-heading text-[44px] leading-none tabular-nums sm:text-[48px]">{stat.value}</div>
+        <li key={stat.label} className="rounded-xl border bg-card p-4 sm:p-[22px]" data-testid={stat.testId}>
+          <div className="font-heading text-[38px] leading-none tabular-nums sm:text-[48px]">{stat.value}</div>
           <div className="mt-3 text-[13.5px]">{stat.label}</div>
           <div className="mt-0.5 text-[12px] text-ink-soft">{stat.note}</div>
         </li>
