@@ -529,6 +529,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/dashboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Dashboard */
+        get: operations["dashboard_api_dashboard_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -807,6 +824,31 @@ export interface components {
             /** Whatsapp */
             whatsapp: string | null;
         };
+        /** Dashboard */
+        Dashboard: {
+            /** Generated At */
+            generated_at: string;
+            /** Period Start */
+            period_start: string;
+            /** Received */
+            received: number;
+            /** Resolved */
+            resolved: number;
+            /** Median Days */
+            median_days: number | null;
+            /** Months */
+            months: components["schemas"]["MonthFigures"][];
+            /** Topics */
+            topics: components["schemas"]["TopicFigures"][];
+            /** Sub Metros */
+            sub_metros: components["schemas"]["SubMetroFigures"][];
+            /** Documents Published */
+            documents_published: number;
+            /** Departments Publishing */
+            departments_publishing: number;
+            /** Recent Documents */
+            recent_documents: components["schemas"]["RecentDocument"][];
+        };
         /**
          * DeltaEvent
          * @description The next piece of the model's raw answer text.
@@ -1022,6 +1064,15 @@ export interface components {
             /** Agency Name */
             agency_name: string | null;
         };
+        /** MonthFigures */
+        MonthFigures: {
+            /** Month */
+            month: string;
+            /** Received */
+            received: number;
+            /** Resolved */
+            resolved: number;
+        };
         /** NoteRequest */
         NoteRequest: {
             /** Note */
@@ -1071,6 +1122,17 @@ export interface components {
             to_recipient: string;
             /** Reason */
             reason: string;
+        };
+        /** RecentDocument */
+        RecentDocument: {
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+            /** Department Name */
+            department_name: string | null;
+            /** Published At */
+            published_at: string | null;
         };
         /** ReportOptions */
         ReportOptions: {
@@ -1160,6 +1222,8 @@ export interface components {
             label: string;
             /** Guide */
             guide: string;
+            /** Recipients */
+            recipients: string[];
         };
         /**
          * SourceType
@@ -1192,6 +1256,17 @@ export interface components {
              */
             stage: "searching" | "writing";
         };
+        /** SubMetroFigures */
+        SubMetroFigures: {
+            /** Name */
+            name: string;
+            /** Reports */
+            reports: number;
+            /** Resolved */
+            resolved: number;
+            /** Median Days */
+            median_days: number | null;
+        };
         /** SubMetroOption */
         SubMetroOption: {
             /** Id */
@@ -1200,6 +1275,13 @@ export interface components {
             name: string;
             /** Wards */
             wards: components["schemas"]["Option"][];
+        };
+        /** TopicFigures */
+        TopicFigures: {
+            /** Label */
+            label: string;
+            /** Count */
+            count: number;
         };
         /** ValidationError */
         ValidationError: {
@@ -2083,6 +2165,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    dashboard_api_dashboard_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Dashboard"];
                 };
             };
         };
