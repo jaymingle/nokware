@@ -14,7 +14,7 @@ from appwrite.exception import AppwriteException
 from appwrite.models import Document
 from appwrite.query import Query
 
-from app.services.appwrite_client import DATABASE_ID, get_databases
+from app.services.appwrite_client import DATABASE_ID, as_record, get_databases
 
 COLLECTION_ID = "ledger_documents"
 INGESTION_ERROR_MAX = 1024  # size of the ingestionError attribute
@@ -103,8 +103,7 @@ def year_from_title(title: str) -> int | None:
 
 
 def _record(document: Document) -> dict[str, Any]:
-    """The document's attributes plus its $id, $createdAt and $updatedAt."""
-    return {**document.data, "$id": document.id, "$createdAt": document.createdat, "$updatedAt": document.updatedat}
+    return as_record(document)
 
 
 def get_documents(document_ids: Iterable[str]) -> dict[str, dict[str, Any]]:
