@@ -31,5 +31,5 @@ def read_pdf(upload: UploadFile) -> bytes:
     if len(data) > MAX_PDF_BYTES:
         raise HTTPException(status.HTTP_413_CONTENT_TOO_LARGE, "The PDF is larger than 50 MB.")
     if PDF_SIGNATURE not in data[:PDF_SIGNATURE_WINDOW]:
-        raise HTTPException(status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, "Upload a PDF file.")
+        raise HTTPException(status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, "That file isn't a valid PDF. Choose the original PDF and try again.")
     return data
