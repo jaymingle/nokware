@@ -7,6 +7,7 @@ export type NavItem = { href: string; label: string; testId: string; count?: Nav
 
 export const ROLE_HOME: Record<Role, string> = {
   department: "/portal/department",
+  agency: "/portal/agency",
   contributor: "/portal/contributor",
   mce: "/portal/mce",
 };
@@ -17,6 +18,7 @@ export const ROLE_NAV: Record<Role, NavItem[]> = {
     { href: "/portal/department/publish", label: "Publish", testId: "portal-nav-publish" },
     { href: "/portal/department/library", label: "Library", testId: "portal-nav-library" },
   ],
+  agency: [{ href: "/portal/agency", label: "Cases", testId: "portal-nav-cases" }],
   contributor: [
     { href: "/portal/contributor", label: "My submissions", testId: "portal-nav-submissions", count: "responses" },
     { href: "/portal/contributor/submit", label: "Submit a document", testId: "portal-nav-submit" },
@@ -27,6 +29,7 @@ export const ROLE_NAV: Record<Role, NavItem[]> = {
 /** Where the user sits in the Assembly, as shown beside their name. */
 export function roleLabel(me: Me): string {
   if (me.role === "department") return me.department_name ?? "Department";
+  if (me.role === "agency") return me.agency_name ?? "Agency";
   return me.role === "mce" ? "MCE oversight" : "Contributor";
 }
 

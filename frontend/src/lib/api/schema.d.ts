@@ -612,6 +612,10 @@ export interface components {
             department: string | null;
             /** Department Name */
             department_name: string | null;
+            /** Agency */
+            agency: string | null;
+            /** Agency Name */
+            agency_name: string | null;
         };
         /** Option */
         Option: {
@@ -630,7 +634,7 @@ export interface components {
          * Role
          * @enum {string}
          */
-        Role: "department" | "contributor" | "mce";
+        Role: "department" | "agency" | "contributor" | "mce";
         /**
          * SourceType
          * @enum {string}
