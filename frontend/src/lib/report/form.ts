@@ -1,13 +1,18 @@
+/** The citizen's numbers, and (safety form only) what they agreed they may be used for. */
+export type Contact = { phone: string; whatsapp: string; notify: boolean; callbackConsent: boolean };
+
+export const NO_CONTACT: Contact = { phone: "", whatsapp: "", notify: false, callbackConsent: false };
+
+export function hasNumber(contact: Pick<Contact, "phone" | "whatsapp">): boolean {
+  return Boolean(contact.phone.trim() || contact.whatsapp.trim());
+}
+
 /** What the citizen filled in, from either form. */
-export type ReportDraft = {
+export type ReportDraft = Contact & {
   description: string;
   ward?: string;
   subMetro?: string;
   safetyTopic?: string; // set only by the personal-safety form
-  phone: string;
-  whatsapp: string;
-  notify: boolean; // safety form only: the citizen's opt-in to messages
-  callbackConsent: boolean; // safety form only
   photos: File[];
 };
 
@@ -27,12 +32,14 @@ export function reportFormData(draft: ReportDraft): FormData {
   setIfGiven(form, "ward", draft.ward);
   setIfGiven(form, "sub_metro", draft.subMetro);
   const safety = Boolean(draft.safetyTopic);
+  const notify = draft.notify && hasNumber(draft);
+  const callbackConsent = draft.callbackConsent && hasNumber(draft);
   if (safety) {
     form.set("safety_topic", draft.safetyTopic ?? "");
-    form.set("notify", String(draft.notify));
-    form.set("callback_consent", String(draft.callbackConsent));
+    form.set("notify", String(notify));
+    form.set("callback_consent", String(callbackConsent));
   }
-  if (!safety || draft.notify || draft.callbackConsent) {
+  if (!safety || notify || callbackConsent) {
     setIfGiven(form, "phone", draft.phone);
     setIfGiven(form, "whatsapp", draft.whatsapp);
   }

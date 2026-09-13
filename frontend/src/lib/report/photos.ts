@@ -5,6 +5,9 @@ export const PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
 export type PhotoLimits = { maxPhotos: number; maxBytes: number };
 
+/** An attached photo and its preview address (an object URL, revoked when the photo is removed). */
+export type ReportPhoto = { file: File; url: string };
+
 export type PhotoPick = { photos: File[]; problem: string | null };
 
 function photoProblem(file: Pick<File, "name" | "type" | "size">, limits: PhotoLimits): string | null {
