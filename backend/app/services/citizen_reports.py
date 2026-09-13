@@ -38,3 +38,4 @@ class NotificationStatus(StrEnum):
     QUEUED = "queued"
     SENT = "sent"
     FAILED = "failed"
+    NOT_SENT = "not_sent"  # recorded only: no provider is configured for the channel yet

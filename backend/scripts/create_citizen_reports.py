@@ -101,6 +101,15 @@ def adjust_history() -> None:
     print("updated   case_history.action (the full set of case steps)")
 
 
+def adjust_notifications() -> None:
+    """The outbox's status gains "not_sent" (recorded while no provider is wired in)."""
+    db = get_databases()
+    existing = {a.key for a in db.list_attributes(DATABASE_ID, NOTIFICATIONS).attributes}
+    if "status" in existing:
+        db.update_enum_attribute(DATABASE_ID, NOTIFICATIONS, "status", values(NotificationStatus), True, None)
+        print("updated   notifications.status (the full set of outcomes)")
+
+
 def assignment_attributes() -> dict[str, Creator]:
     db, c = get_databases(), (DATABASE_ID, ASSIGNMENTS)
     return {
@@ -126,6 +135,10 @@ def contact_attributes() -> dict[str, Creator]:
         "notify": lambda: db.create_boolean_attribute(*c, "notify", False, default=False),
         "callbackConsent": lambda: db.create_boolean_attribute(*c, "callbackConsent", False, default=False),
         "purgeAt": lambda: db.create_datetime_attribute(*c, "purgeAt", False),
+        # A one-time token (stored hashed) that lets the confirmation page ask
+        # again about messages when the classifier filed a report as personal safety.
+        "preferencesTokenHash": lambda: db.create_string_attribute(*c, "preferencesTokenHash", 64, False),
+        "preferencesExpiresAt": lambda: db.create_datetime_attribute(*c, "preferencesExpiresAt", False),
     }
 
 
@@ -209,6 +222,7 @@ def main() -> int:
     build(ASSIGNMENTS, assignment_attributes())
     build(CONTACTS, contact_attributes())
     build(NOTIFICATIONS, notification_attributes())
+    adjust_notifications()
     return 0
 
 

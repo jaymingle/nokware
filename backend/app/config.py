@@ -13,9 +13,9 @@ class Settings(BaseSettings):
     Field names are snake_case; pydantic-settings maps them to the uppercase
     environment variables case-insensitively (e.g. ``appwrite_endpoint`` reads
     ``APPWRITE_ENDPOINT``). Service settings are required — a missing variable
-    raises at startup rather than silently defaulting. Only the CORS settings
-    (whose defaults suit local development), the optional JOB_TOKEN and the
-    deadline job's interval have defaults.
+    raises at startup rather than silently defaulting. Only settings whose
+    defaults suit local development (CORS, the job intervals, the notification
+    providers and the public site URL) and the optional JOB_TOKEN have defaults.
     """
 
     model_config = SettingsConfigDict(
@@ -54,6 +54,17 @@ class Settings(BaseSettings):
     # How often the API publishes documents whose 72-hour clock has run out
     # (and retries stalled ingestion). 0 turns the built-in runner off.
     deadline_job_interval_seconds: int = 120
+
+    # Citizen notifications. "log" records each message without sending it; the
+    # Arkesel (SMS) and Twilio (WhatsApp) providers are wired in later.
+    sms_provider: str = "log"
+    whatsapp_provider: str = "log"
+    # Where citizens follow their reports; used in the links messages carry.
+    public_site_url: str = "http://localhost:3000"
+
+    # How often the API deletes citizens' numbers whose retention has ended.
+    # 0 turns it off.
+    contact_purge_interval_seconds: int = 3600
 
     @property
     def cors_origin_list(self) -> list[str]:
