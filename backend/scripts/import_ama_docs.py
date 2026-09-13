@@ -31,6 +31,7 @@ from typing import Any
 
 from pydantic import ValidationError
 
+from app.categories import categories_by_id
 from app.config import get_settings, settings_error_summary
 from app.services.appwrite_client import get_teams, quiet_sdk_deprecation_warnings
 from app.services.ingestion import ingest_document
@@ -49,7 +50,6 @@ from app.teams import DEPARTMENT_TEAMS
 
 SCRIPTS_DIR = Path(__file__).resolve().parent
 DEFAULT_DOCS_DIR = Path.home() / "nokware-docs"
-CATEGORIES_FILE = SCRIPTS_DIR / "ama_categories.json"
 ADDITIONS_FILE = SCRIPTS_DIR / "ama_manifest_additions.json"
 REQUIRED_FIELDS = ("file", "title", "category_id", "department", "year", "source_url")
 ID_PREFIX = "ama-"  # Appwrite IDs allow at most 36 characters: prefix + 32 hex
@@ -183,7 +183,7 @@ def to_entry(raw: dict[str, Any], docs_dir: Path, categories: dict[int, str]) ->
 
 def build_entries(docs_dir: Path) -> tuple[list[Entry], list[tuple[str, str]]]:
     """Validate everything up front; returns (unique entries, (duplicate, original) pairs)."""
-    categories = {int(k): v for k, v in json.loads(CATEGORIES_FILE.read_text())["categories"].items()}
+    categories = categories_by_id()
     entries, duplicates, seen, errors = [], [], {}, []
     for raw in load_raw_entries(docs_dir):
         try:
