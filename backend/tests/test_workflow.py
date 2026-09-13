@@ -251,3 +251,14 @@ def test_contributor_upload_needs_a_department_and_a_source(department: str | No
 def test_mce_does_not_upload() -> None:
     with pytest.raises(NotAllowed):
         new_document(MCE, SUBMISSION, "f", NOW)
+
+
+POLICE = Principal("u-pol", "Police liaison", "p@x.org", Role.AGENCY, agency="agency-police")
+
+
+def test_agencies_have_no_part_in_the_ledger() -> None:
+    with pytest.raises(NotAllowed):
+        new_document(POLICE, SUBMISSION, "f", NOW)
+    held = doc(LedgerStatus.HELD, heldUntil=(NOW + REVIEW_WINDOW).isoformat())
+    assert allowed_actions(held, POLICE, NOW) == []
+    assert can_view(POLICE, doc(LedgerStatus.PUBLISHED)) and not can_view(POLICE, held)

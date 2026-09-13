@@ -27,15 +27,18 @@ from pydantic import ValidationError
 
 from app.config import get_settings, settings_error_summary
 from app.services.appwrite_client import get_teams, get_users, quiet_sdk_deprecation_warnings
-from app.teams import CONTRIBUTOR_TEAM, DEPARTMENT_TEAMS, MCE_TEAM
+from app.teams import AGENCY_TEAMS, CONTRIBUTOR_TEAM, DEPARTMENT_TEAMS, MCE_TEAM
 
 DEFAULT_CONFIG = Path(__file__).resolve().parent / "seed_users.toml"
 MIN_PASSWORD_LENGTH = 8  # Appwrite's minimum
 PLACEHOLDER_PASSWORD = "CHANGE_ME"
 MEMBER_ROLES = ["member"]
-# One account per department, one contributor, and two MCE-team accounts
-# (the MCE and a separate admin account with the same permissions).
-EXPECTED_ACCOUNTS = Counter({**dict.fromkeys(DEPARTMENT_TEAMS, 1), CONTRIBUTOR_TEAM: 1, MCE_TEAM: 2})
+# One account per department, one liaison per agency (Police, GNFS), one
+# contributor, and two MCE-team accounts (the MCE and a separate admin account
+# with the same permissions).
+EXPECTED_ACCOUNTS = Counter(
+    {**dict.fromkeys(DEPARTMENT_TEAMS, 1), **dict.fromkeys(AGENCY_TEAMS, 1), CONTRIBUTOR_TEAM: 1, MCE_TEAM: 2}
+)
 SCOPE_ERROR = "general_unauthorized_scope"
 
 

@@ -10,3 +10,5 @@ class MeResponse(BaseModel):
     role: Role
     department: str | None  # department team ID, for the department role only
     department_name: str | None
+    agency: str | None  # agency team ID, for the agency role only
+    agency_name: str | None

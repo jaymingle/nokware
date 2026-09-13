@@ -5,8 +5,9 @@
 # characters; the CHANGE_ME placeholder is rejected.
 #
 # Required shape: one account per department team (12, including dept-press),
-# one contributor, and two mce-team accounts (the MCE plus a separate admin
-# account with the same permissions) — 15 in total.
+# one liaison account per agency (Police and GNFS, which receive citizen safety
+# reports), one contributor, and two mce-team accounts (the MCE plus a separate
+# admin account with the same permissions) — 17 in total.
 
 [[users]]
 name = "Central Administration"
@@ -79,6 +80,18 @@ name = "Press"
 email = "press@example.org"
 password = "CHANGE_ME"
 team = "dept-press"
+
+[[users]]
+name = "Police liaison"
+email = "police-liaison@example.org"
+password = "CHANGE_ME"
+team = "agency-police"
+
+[[users]]
+name = "GNFS liaison"
+email = "gnfs-liaison@example.org"
+password = "CHANGE_ME"
+team = "agency-gnfs"
 
 [[users]]
 name = "Contributor"

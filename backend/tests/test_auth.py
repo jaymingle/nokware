@@ -23,11 +23,24 @@ def test_contributor_and_mce_have_no_department() -> None:
     assert resolve_role(["mce"]) == (Role.MCE, None)
 
 
+def test_police_and_gnfs_are_agencies_not_departments() -> None:
+    assert resolve_role(["agency-police"]) == (Role.AGENCY, "agency-police")
+    assert resolve_role(["agency-gnfs"]) == (Role.AGENCY, "agency-gnfs")
+
+
+def test_a_principal_receives_reports_through_its_department_or_agency() -> None:
+    police = Principal(user_id="u", name="n", email="e", role=Role.AGENCY, agency="agency-police")
+    assert police.recipient == "agency-police" and police.department is None
+    assert FINANCE.recipient == "dept-finance"
+
+
 def test_teams_outside_nokware_are_ignored() -> None:
     assert resolve_role(["newsletter", "dept-works"]) == (Role.DEPARTMENT, "dept-works")
 
 
-@pytest.mark.parametrize("teams", [[], ["newsletter"], ["dept-finance", "dept-works"], ["contributor", "mce"]])
+@pytest.mark.parametrize(
+    "teams", [[], ["newsletter"], ["dept-finance", "dept-works"], ["contributor", "mce"], ["agency-police", "dept-social-welfare"]]
+)
 def test_no_role_or_an_ambiguous_one_is_refused(teams: list[str]) -> None:
     with pytest.raises(NoRoleError):
         resolve_role(teams)

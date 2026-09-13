@@ -17,11 +17,12 @@ from appwrite.services.account import Account
 
 from app.config import get_settings
 from app.services.appwrite_client import get_users
-from app.teams import ALL_TEAMS, CONTRIBUTOR_TEAM, MCE_TEAM
+from app.teams import AGENCY_TEAMS, ALL_TEAMS, CONTRIBUTOR_TEAM, MCE_TEAM
 
 
 class Role(StrEnum):
     DEPARTMENT = "department"
+    AGENCY = "agency"  # Police or GNFS: citizen safety reports only, never the Ledger
     CONTRIBUTOR = "contributor"
     MCE = "mce"
 
@@ -33,6 +34,12 @@ class Principal:
     email: str
     role: Role
     department: str | None = None  # the department team ID; set only for Role.DEPARTMENT
+    agency: str | None = None  # the agency team ID; set only for Role.AGENCY
+
+    @property
+    def recipient(self) -> str | None:
+        """The team citizen reports reach this user through: their department or agency."""
+        return self.department or self.agency
 
 
 class InvalidTokenError(Exception):
@@ -44,7 +51,7 @@ class NoRoleError(Exception):
 
 
 def resolve_role(team_ids: Iterable[str]) -> tuple[Role, str | None]:
-    """Map confirmed team memberships to (role, department team or None).
+    """Map confirmed team memberships to (role, department or agency team, or None).
 
     Exactly one Nokware team is required: an account in none has no access, and
     an account in several would make "your own department" ambiguous.
@@ -57,6 +64,8 @@ def resolve_role(team_ids: Iterable[str]) -> tuple[Role, str | None]:
         return Role.MCE, None
     if team == CONTRIBUTOR_TEAM:
         return Role.CONTRIBUTOR, None
+    if team in AGENCY_TEAMS:
+        return Role.AGENCY, team
     return Role.DEPARTMENT, team
 
 
@@ -87,5 +96,12 @@ def confirmed_team_ids(user_id: str) -> list[str]:
 def authenticate(jwt: str) -> Principal:
     """Verify the JWT with Appwrite, then resolve the role from team membership."""
     user = verify_jwt(jwt)
-    role, department = resolve_role(confirmed_team_ids(user.id))
-    return Principal(user_id=user.id, name=user.name, email=user.email, role=role, department=department)
+    role, team = resolve_role(confirmed_team_ids(user.id))
+    return Principal(
+        user_id=user.id,
+        name=user.name,
+        email=user.email,
+        role=role,
+        department=team if role == Role.DEPARTMENT else None,
+        agency=team if role == Role.AGENCY else None,
+    )

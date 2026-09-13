@@ -229,7 +229,7 @@ def new_document(principal: Principal, submission: Submission, file_id: str, now
         return {**common, **_agency_fields(principal, submission, now)}
     if principal.role == Role.CONTRIBUTOR:
         return {**common, **_contributor_fields(submission, now)}
-    raise NotAllowed("The MCE rules on disputes but does not upload documents.")
+    raise NotAllowed("Only departments and contributors upload documents to the Ledger.")
 
 
 def _agency_fields(principal: Principal, submission: Submission, now: datetime) -> dict[str, Any]:
