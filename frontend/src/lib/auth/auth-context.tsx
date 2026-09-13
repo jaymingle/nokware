@@ -3,7 +3,7 @@
 import { createContext, use, useCallback, useMemo, type ReactNode } from "react";
 import { useQuery, useQueryClient, type UseQueryResult } from "@tanstack/react-query";
 
-import { ApiError } from "@/lib/api/client";
+import { ApiError } from "@/lib/api/errors";
 import { getMe } from "@/lib/api/endpoints";
 import { endSession, SignInError, startSession } from "@/lib/auth/session";
 

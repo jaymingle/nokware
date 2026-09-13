@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
-import { ApiError } from "@/lib/api/client";
+import { ApiError } from "@/lib/api/errors";
 
 const MAX_RETRIES = 2;
 
