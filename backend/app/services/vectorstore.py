@@ -17,6 +17,7 @@ Table schema:
     chunk_text            TEXT          -> content_column
     embedding             VECTOR(768)   -> embedding_column (HNSW, cosine)
     created_at            TIMESTAMPTZ   -> metadata (defaults to now())
+    chunk_tsv             TSVECTOR      -> generated from chunk_text; keyword search (GIN)
 
 There is no JSON metadata column, so ``metadata_json_column`` is ``None``.
 
@@ -24,16 +25,17 @@ Note: ``POSTGRES_URL`` must use the psycopg v3 driver scheme, e.g.
 ``postgresql+psycopg://user:pass@host:5432/nokware_rag``.
 """
 
+import atexit
 from collections.abc import Iterator
 from contextlib import contextmanager
 from functools import lru_cache
 
 import numpy as np
 import psycopg
-from langchain_core.vectorstores import VectorStoreRetriever
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_postgres import PGEngine, PGVectorStore
 from pgvector.psycopg import register_vector
+from psycopg_pool import ConnectionPool
 
 from app.config import get_settings
 
@@ -47,7 +49,8 @@ CREATED_AT_COLUMN = "created_at"
 METADATA_COLUMNS = [DOCUMENT_ID_COLUMN, CHUNK_INDEX_COLUMN, CREATED_AT_COLUMN]
 EMBEDDING_MODEL = "models/gemini-embedding-2"
 EMBEDDING_DIMENSIONS = 768  # must equal the VECTOR(n) size of the embedding column
-DEFAULT_K = 5
+FULLTEXT_COLUMN = "chunk_tsv"  # generated tsvector over chunk_text (migration 0002)
+POOL_MAX_SIZE = 8  # enough for retrieval's parallel keyword queries
 
 _DELETE_SQL = f'DELETE FROM "{TABLE_NAME}" WHERE "{DOCUMENT_ID_COLUMN}" = %s'
 _INSERT_SQL = (
@@ -92,15 +95,32 @@ def get_vectorstore() -> PGVectorStore:
     )
 
 
-def get_retriever(k: int = DEFAULT_K) -> VectorStoreRetriever:
-    """Return a retriever over the vector store, fetching ``k`` chunks."""
-    return get_vectorstore().as_retriever(search_kwargs={"k": k})
+@lru_cache
+def get_pool() -> ConnectionPool:
+    """Shared connection pool: each new connection through the SSH tunnel costs
+    several ~120 ms round trips, and retrieval runs its queries in parallel.
+    Connections are checked on checkout, so one dropped by the tunnel is
+    replaced rather than surfacing as an error."""
+    pool = ConnectionPool(
+        libpq_url(get_settings().postgres_url),
+        min_size=1,
+        max_size=POOL_MAX_SIZE,
+        kwargs={"connect_timeout": 10},
+        configure=register_vector,
+        check=ConnectionPool.check_connection,
+        open=True,
+    )
+    atexit.register(pool.close)
+    return pool
 
 
 @contextmanager
-def _connect() -> Iterator[psycopg.Connection]:
-    with psycopg.connect(libpq_url(get_settings().postgres_url), connect_timeout=10) as conn:
-        register_vector(conn)
+def connect() -> Iterator[psycopg.Connection]:
+    """A pooled connection to nokware_rag with the pgvector type registered.
+
+    Commits on normal exit, rolls back on an exception, then returns to the pool.
+    """
+    with get_pool().connection() as conn:
         yield conn
 
 
@@ -117,7 +137,7 @@ def replace_document_chunks(document_id: str, chunks: list[str], embeddings: lis
         (document_id, index, text, np.asarray(vector, dtype=np.float32))
         for index, (text, vector) in enumerate(zip(chunks, embeddings))
     ]
-    with _connect() as conn, conn.transaction():
+    with connect() as conn, conn.transaction():
         conn.execute(_DELETE_SQL, (document_id,))
         with conn.cursor() as cursor:
             cursor.executemany(_INSERT_SQL, rows)
@@ -125,5 +145,5 @@ def replace_document_chunks(document_id: str, chunks: list[str], embeddings: lis
 
 
 def count_document_chunks(document_id: str) -> int:
-    with _connect() as conn:
+    with connect() as conn:
         return conn.execute(_COUNT_SQL, (document_id,)).fetchone()[0]

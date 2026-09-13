@@ -16,7 +16,9 @@ class AskRequest(BaseModel):
 
 
 class AskSource(BaseModel):
-    document_id: str | None
+    label: str  # "S1": the citation label used in the answer text
+    cited: bool  # whether the answer cites this source's label
+    document_id: str
     title: str | None
     chunk_text: str
     department: str | None

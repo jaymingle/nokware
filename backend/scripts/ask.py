@@ -1,8 +1,9 @@
 """Ask the Ledger a question from the terminal and print the cited answer.
 
-Runs the same RAG chain as POST /api/ask, so it is a quick way to judge
-retrieval quality without a frontend: each source shows its rank, title,
-document id, department and year, and a snippet of the retrieved chunk.
+Runs the same pipeline as POST /api/ask, so it is a quick way to judge retrieval
+quality without a frontend. It prints the answer, the search queries used, and
+each labelled source document (cited or merely retrieved) with snippets of the
+chunks retrieved from it.
 
     backend/.venv/bin/python backend/scripts/ask.py "What does the 2026 fee-fixing resolution cover?"
     backend/.venv/bin/python backend/scripts/ask.py --full "..."   # whole chunks, not snippets
@@ -11,9 +12,9 @@ Exits 0 when an answer is printed, 1 on invalid input or a settings/service erro
 """
 
 import argparse
-import logging
 import sys
 import textwrap
+from itertools import groupby
 
 from pydantic import ValidationError
 
@@ -26,27 +27,31 @@ SNIPPET_LENGTH = 220
 WRAP_WIDTH = 100
 
 
-def format_source(rank: int, source: Source, full: bool) -> str:
-    text = " ".join(source["chunk_text"].split())
-    if not full and len(text) > SNIPPET_LENGTH:
-        text = f"{text[:SNIPPET_LENGTH].rstrip()}…"
-    year = source["document_year"] or UNKNOWN_YEAR
-    return "\n".join(
-        [
-            f"[{rank}] {source['title'] or '(untitled)'}",
-            f"    {source['document_id']} · {source['department']} · {source['source_type']} · year {year}",
-            textwrap.indent(textwrap.fill(text, WRAP_WIDTH - 4), "    "),
-        ]
-    )
+def format_document(label: str, chunks: list[Source], full: bool) -> str:
+    first = chunks[0]
+    status = "cited" if first["cited"] else "retrieved, not cited"
+    lines = [
+        f"[{label}] {first['title'] or '(untitled)'}  ({status})",
+        f"     {first['document_id']} · {first['department']} · {first['source_type']} · "
+        f"year {first['document_year'] or UNKNOWN_YEAR} · {len(chunks)} chunk(s)",
+    ]
+    for chunk in chunks:
+        text = " ".join(chunk["chunk_text"].split())
+        if not full and len(text) > SNIPPET_LENGTH:
+            text = f"{text[:SNIPPET_LENGTH].rstrip()}…"
+        lines.append(textwrap.fill(text, WRAP_WIDTH, initial_indent="     › ", subsequent_indent="       "))
+    return "\n".join(lines)
 
 
 def print_answer(question: str, result: RagAnswer, full: bool) -> None:
     sources = result["sources"]
-    documents = len({source["document_id"] for source in sources})
+    documents = [(label, list(chunks)) for label, chunks in groupby(sources, key=lambda s: s["label"])]
+    cited = sum(chunks[0]["cited"] for _, chunks in documents)
     print(f"Q: {question}\n\n{result['answer']}\n")
-    print(f"Sources: {len(sources)} chunk(s) from {documents} document(s)\n")
-    for rank, source in enumerate(sources, 1):
-        print(f"{format_source(rank, source, full)}\n")
+    print("Searched for: " + " | ".join(result["search_queries"]))
+    print(f"Sources: {len(documents)} document(s), {cited} cited, {len(sources)} chunk(s)\n")
+    for label, chunks in documents:
+        print(f"{format_document(label, chunks, full)}\n")
 
 
 def parse_question() -> tuple[str, bool]:
@@ -64,7 +69,6 @@ def parse_question() -> tuple[str, bool]:
 def main() -> int:
     question, full = parse_question()
     quiet_sdk_deprecation_warnings()
-    logging.getLogger("google_genai.models").setLevel(logging.ERROR)  # drops an AFC usage notice
     try:
         get_settings()
     except ValidationError as exc:

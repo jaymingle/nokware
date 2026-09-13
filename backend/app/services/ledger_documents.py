@@ -4,16 +4,22 @@ One place for the collection's ID, its status values and the reads and writes
 the backend makes, so ingestion, the AMA import and the portal routes agree.
 """
 
+import re
+from collections.abc import Iterable
 from datetime import datetime, timezone
 from enum import StrEnum
 from typing import Any
 
 from appwrite.exception import AppwriteException
+from appwrite.query import Query
 
 from app.services.appwrite_client import DATABASE_ID, get_databases
 
 COLLECTION_ID = "ledger_documents"
 INGESTION_ERROR_MAX = 1024  # size of the ingestionError attribute
+EARLIEST_YEAR = 1900
+_YEAR_RANGE = re.compile(r"\b((?:19|20)\d{2})\s*[-–—/]\s*(?:19|20)?\d{2}\b")
+_YEAR = re.compile(r"\b((?:19|20)\d{2})\b")
 
 
 class LedgerStatus(StrEnum):
@@ -30,6 +36,38 @@ class SourceType(StrEnum):
 
 def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def plausible_year(year: int | None) -> int | None:
+    """Keep a year only if it could be a document's own year (not in the future)."""
+    return year if year and EARLIEST_YEAR <= year <= datetime.now().year else None
+
+
+def year_from_title(title: str) -> int | None:
+    """A document's year as stated in its title.
+
+    A range such as "Medium Term Development Plan, 2026-2029" gives its first
+    year; otherwise the first plausible year in the title is used.
+    """
+    year_range = _YEAR_RANGE.search(title)
+    if year_range:
+        return plausible_year(int(year_range.group(1)))
+    for match in _YEAR.findall(title):
+        year = plausible_year(int(match))
+        if year:
+            return year
+    return None
+
+
+def get_documents(document_ids: Iterable[str]) -> dict[str, dict[str, Any]]:
+    """Fetch many documents in one call; missing ids are simply absent."""
+    ids = list(dict.fromkeys(document_ids))
+    if not ids:
+        return {}
+    listing = get_databases().list_documents(
+        DATABASE_ID, COLLECTION_ID, queries=[Query.equal("$id", ids), Query.limit(len(ids))]
+    )
+    return {document.id: document.data for document in listing.documents}
 
 
 def get_document(document_id: str) -> dict[str, Any]:

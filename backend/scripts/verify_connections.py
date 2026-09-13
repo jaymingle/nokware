@@ -28,7 +28,7 @@ from app.services.appwrite_client import (
     get_teams,
     quiet_sdk_deprecation_warnings,
 )
-from app.services.rag import LLM_MODEL, get_llm
+from app.services.llm import CHAT_MODEL, get_chat_model
 from app.services.storage import get_minio
 from app.services.vectorstore import (
     CONTENT_COLUMN,
@@ -161,10 +161,10 @@ def check_embeddings() -> str:
 
 
 def check_chat() -> str:
-    reply = get_llm().invoke("Reply with exactly one word: pong").text.strip()
+    reply = get_chat_model(0.0).invoke("Reply with exactly one word: pong").text.strip()
     if not reply:
-        raise CheckFailed(f"{LLM_MODEL} returned an empty response")
-    return f"{LLM_MODEL} replied {reply[:60]!r}"
+        raise CheckFailed(f"{CHAT_MODEL} returned an empty response")
+    return f"{CHAT_MODEL} replied {reply[:60]!r}"
 
 
 CHECKS: list[tuple[str, Callable[[], str]]] = [
