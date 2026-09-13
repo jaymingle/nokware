@@ -6,9 +6,12 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "api:types": "../backend/.venv/bin/python ../backend/scripts/export_openapi.py > .openapi.json && openapi-typescript .openapi.json -o src/lib/api/schema.d.ts && rm .openapi.json"
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.102.8",
+    "appwrite": "~24.1.1",
     "class-variance-authority": "^0.7.1",
     "cn": "^0.3.0",
     "lucide-react": "^1.45.0",
@@ -26,6 +29,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.3.5",
+    "openapi-typescript": "^7.13.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   }
