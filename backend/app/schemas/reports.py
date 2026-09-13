@@ -15,6 +15,7 @@ class SafetyType(BaseModel):
     id: str
     label: str
     guide: str
+    recipients: list[str]  # who a report of this type goes to, named as the citizen sees them
 
 
 class ReportOptions(BaseModel):

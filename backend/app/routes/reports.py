@@ -48,7 +48,10 @@ def options() -> ReportOptions:
         )
         for sm in sub_metros().values()
     ]
-    safety = [SafetyType(id=t.id, label=t.label, guide=t.guide) for t in topics_in(Category.PERSONAL_SAFETY)]
+    safety = [
+        SafetyType(id=t.id, label=t.label, guide=t.guide, recipients=[RECIPIENT_NAMES[r] for r in t.recipients])
+        for t in topics_in(Category.PERSONAL_SAFETY)
+    ]
     return ReportOptions(
         sub_metros=grouped,
         safety_types=safety,
