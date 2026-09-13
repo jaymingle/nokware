@@ -4,10 +4,22 @@
 # email and CHANGE_ME password with real values. Passwords need at least 8
 # characters; the CHANGE_ME placeholder is rejected.
 #
-# Required shape: one account per department team (12, including dept-press),
-# one liaison account per agency (Police and GNFS, which receive citizen safety
-# reports), one contributor, and two mce-team accounts (the MCE plus a separate
-# admin account with the same permissions) — 17 in total.
+# Required shape: one account per department team (AMA's 18 departments plus
+# dept-press, so 19), one liaison account per agency (Police and GNFS, which
+# receive citizen safety reports), one contributor, and two mce-team accounts
+# (the MCE plus a separate admin account with the same permissions): 24 in total.
+#
+# Moving from the 12-department list: scripts/migrate_departments.py moves the
+# Health, Transport and Agriculture accounts to their new teams. In your own
+# seed_users.toml, change only those three `team =` lines (to
+# dept-metro-public-health, dept-metro-transport and dept-food-agriculture),
+# keep their emails, and add the seven new departments.
+
+[[users]]
+name = "Budget & Rating"
+email = "budget-rating@example.org"
+password = "CHANGE_ME"
+team = "dept-budget-rating"
 
 [[users]]
 name = "Central Administration"
@@ -16,25 +28,91 @@ password = "CHANGE_ME"
 team = "dept-central-administration"
 
 [[users]]
-name = "Finance Department"
-email = "finance@example.org"
-password = "CHANGE_ME"
-team = "dept-finance"
-
-[[users]]
-name = "Education Department"
+name = "Department of Education"
 email = "education@example.org"
 password = "CHANGE_ME"
 team = "dept-education"
 
 [[users]]
-name = "Health Department"
-email = "health@example.org"
+name = "Disaster Management & Prevention"
+email = "disaster-management@example.org"
 password = "CHANGE_ME"
-team = "dept-health"
+team = "dept-disaster-management"
 
 [[users]]
-name = "Waste Management Department"
+name = "Finance"
+email = "finance@example.org"
+password = "CHANGE_ME"
+team = "dept-finance"
+
+[[users]]
+name = "Food & Agriculture"
+email = "food-agriculture@example.org"
+password = "CHANGE_ME"
+team = "dept-food-agriculture"
+
+[[users]]
+name = "GAMADA"
+email = "gamada@example.org"
+password = "CHANGE_ME"
+team = "dept-gamada"
+
+[[users]]
+name = "Human Resource Department"
+email = "human-resource@example.org"
+password = "CHANGE_ME"
+team = "dept-human-resource"
+
+[[users]]
+name = "International Relations"
+email = "international-relations@example.org"
+password = "CHANGE_ME"
+team = "dept-international-relations"
+
+[[users]]
+name = "Legal Department"
+email = "legal@example.org"
+password = "CHANGE_ME"
+team = "dept-legal"
+
+[[users]]
+name = "Metro Public Health Department"
+email = "metro-public-health@example.org"
+password = "CHANGE_ME"
+team = "dept-metro-public-health"
+
+[[users]]
+name = "Metro Transport"
+email = "metro-transport@example.org"
+password = "CHANGE_ME"
+team = "dept-metro-transport"
+
+[[users]]
+name = "Physical Planning"
+email = "physical-planning@example.org"
+password = "CHANGE_ME"
+team = "dept-physical-planning"
+
+[[users]]
+name = "Social Welfare & Community Development"
+email = "social-welfare@example.org"
+password = "CHANGE_ME"
+team = "dept-social-welfare"
+
+[[users]]
+name = "Statistics Department"
+email = "statistics@example.org"
+password = "CHANGE_ME"
+team = "dept-statistics"
+
+[[users]]
+name = "Urban Roads"
+email = "urban-roads@example.org"
+password = "CHANGE_ME"
+team = "dept-urban-roads"
+
+[[users]]
+name = "Waste Management"
 email = "waste-management@example.org"
 password = "CHANGE_ME"
 team = "dept-waste-management"
@@ -44,36 +122,6 @@ name = "Works Department"
 email = "works@example.org"
 password = "CHANGE_ME"
 team = "dept-works"
-
-[[users]]
-name = "Physical Planning Department"
-email = "physical-planning@example.org"
-password = "CHANGE_ME"
-team = "dept-physical-planning"
-
-[[users]]
-name = "Agriculture Department"
-email = "agriculture@example.org"
-password = "CHANGE_ME"
-team = "dept-agriculture"
-
-[[users]]
-name = "Social Welfare Department"
-email = "social-welfare@example.org"
-password = "CHANGE_ME"
-team = "dept-social-welfare"
-
-[[users]]
-name = "Disaster Management Department"
-email = "disaster-management@example.org"
-password = "CHANGE_ME"
-team = "dept-disaster-management"
-
-[[users]]
-name = "Transport Department"
-email = "transport@example.org"
-password = "CHANGE_ME"
-team = "dept-transport"
 
 [[users]]
 name = "Press"

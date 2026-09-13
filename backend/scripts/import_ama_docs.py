@@ -48,6 +48,7 @@ from app.services.ledger_documents import (
 )
 from app.services.storage import ledger_file_exists, upload_ledger_file
 from app.teams import DEPARTMENT_TEAMS
+from ama_departments import ama_department
 
 SCRIPTS_DIR = Path(__file__).resolve().parent
 DEFAULT_DOCS_DIR = Path.home() / "nokware-docs"
@@ -164,18 +165,19 @@ def to_entry(raw: dict[str, Any], docs_dir: Path, categories: dict[int, str]) ->
     if missing:
         raise ManifestError(f"{raw.get('file', '?')}: missing {', '.join(missing)}")
     path = docs_dir / raw["file"]
-    team = f"dept-{raw['department']}"
     if not path.is_file():
         raise ManifestError(f"{raw['file']}: file not found")
-    if team not in DEPARTMENT_TEAMS:
-        raise ManifestError(f"{raw['file']}: unknown department '{raw['department']}'")
     if int(raw["category_id"]) not in categories:
         raise ManifestError(f"{raw['file']}: unknown category_id {raw['category_id']}")
     title = clean_title(raw["title"])
+    category = categories[int(raw["category_id"])]
+    team = ama_department(f"dept-{raw['department']}", category, title)  # the folder, on AMA's full list
+    if team not in DEPARTMENT_TEAMS:
+        raise ManifestError(f"{raw['file']}: unknown department '{raw['department']}'")
     return Entry(
         file=raw["file"],
         title=title,
-        category=categories[int(raw["category_id"])],
+        category=category,
         team=team,
         document_year=document_year(raw["year"], title),
         source_url=raw["source_url"],

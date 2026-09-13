@@ -142,6 +142,24 @@ Ledger. `scripts/create_citizen_reports.py` creates those teams and the report
 collections (citizen phone numbers are encrypted at rest); add their liaison
 accounts to `scripts/seed_users.toml` and re-run `scripts/seed_users.py`.
 
+## Departments
+
+The departments are AMA's own list (ama.gov.gh/departments) under AMA's own
+names, plus Press for assembly-wide publications: 19 teams, in
+`app/teams.py`. Pages that list recipients to someone reporting a danger to a
+person use a plainer name where AMA's is long ("Social Welfare", not "Social
+Welfare & Community Development"); everywhere else uses the full name.
+
+AMA's site doesn't say which department published each document, so the AMA
+import files each by its Documents Centre folder, refined by
+`scripts/ama_departments.py` (the budget and fee-fixing documents belong to
+Budget & Rating, the road-safety reports to Urban Roads, international reports
+to International Relations). `scripts/migrate_departments.py` moved an existing
+install from the earlier 12-department list: a dry run by default, `--yes` to
+apply, `--delete-old-teams` to remove the three superseded teams once nothing
+refers to them. Each document change is logged to `scripts/logs/` so it can be
+reversed.
+
 The rules behind the Ledger routes live in `app/services/workflow.py`. Every change
 is written to the `document_history` collection
 (`scripts/create_document_history.py` creates it).
