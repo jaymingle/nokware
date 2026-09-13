@@ -35,6 +35,32 @@ class SourceType(StrEnum):
     CONTRIBUTOR = "contributor"
 
 
+class Origin(StrEnum):
+    """How a document entered the Ledger, so every answer can say where it came from."""
+
+    AMA_WEBSITE = "ama_website"  # imported from the documents centre on ama.gov.gh
+    PORTAL = "portal"  # uploaded through the Institution Portal (a department or a contributor)
+
+
+class Provenance(StrEnum):
+    """Where a document came from, as Ask states it."""
+
+    AMA_WEBSITE = "ama_website"  # a department's document, imported from ama.gov.gh
+    DEPARTMENT_PORTAL = "department_portal"  # a department account uploaded it through the portal
+    CONTRIBUTOR = "contributor"  # a verified contributor's, reviewed by the department
+
+
+def provenance(record: dict[str, Any]) -> Provenance | None:
+    """None only if the record doesn't say how it entered the Ledger: never guessed."""
+    if record.get("sourceType") == SourceType.CONTRIBUTOR:
+        return Provenance.CONTRIBUTOR
+    if record.get("origin") == Origin.AMA_WEBSITE:
+        return Provenance.AMA_WEBSITE
+    if record.get("origin") == Origin.PORTAL:
+        return Provenance.DEPARTMENT_PORTAL
+    return None
+
+
 class IngestionState(StrEnum):
     PROCESSING = "processing"  # published, chunks not written yet
     SEARCHABLE = "searchable"

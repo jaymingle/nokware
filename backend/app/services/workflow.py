@@ -25,7 +25,7 @@ from typing import Any
 
 from app.services.auth import Principal, Role
 from app.services.document_history import HistoryAction
-from app.services.ledger_documents import LedgerStatus, SourceType, parse_datetime
+from app.services.ledger_documents import LedgerStatus, Origin, SourceType, parse_datetime
 from app.teams import DEPARTMENT_TEAMS
 
 REVIEW_WINDOW = timedelta(hours=72)  # the department's time to review a held document
@@ -223,6 +223,7 @@ def new_document(principal: Principal, submission: Submission, file_id: str, now
         "documentYear": submission.document_year,
         "fileId": file_id,
         "uploadedBy": principal.user_id,
+        "origin": Origin.PORTAL.value,
     }
     if principal.role == Role.DEPARTMENT:
         return {**common, **_agency_fields(principal, submission, now)}

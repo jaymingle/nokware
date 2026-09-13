@@ -219,6 +219,7 @@ def test_department_upload_publishes_under_its_own_name() -> None:
     fields = new_document(FINANCE, SUBMISSION, "portal/d1/a.pdf", NOW)
     assert fields["department"] == "dept-finance" and fields["sourceType"] == "agency"
     assert fields["status"] == "published" and fields["publishedAt"] == NOW.isoformat()
+    assert fields["origin"] == "portal"  # Ask says "Submitted by Finance", not "Published … on ama.gov.gh"
 
 
 def test_department_cannot_upload_for_another_department() -> None:
@@ -231,6 +232,7 @@ def test_contributor_upload_is_held_for_the_chosen_department() -> None:
     fields = new_document(CONTRIBUTOR, submission, "f", NOW)
     assert fields["status"] == "held" and fields["department"] == "dept-press"
     assert fields["heldUntil"] == (NOW + REVIEW_WINDOW).isoformat() and fields["sourceType"] == "contributor"
+    assert fields["origin"] == "portal"
 
 
 @pytest.mark.parametrize(

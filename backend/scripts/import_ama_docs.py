@@ -37,6 +37,7 @@ from app.services.appwrite_client import get_teams, quiet_sdk_deprecation_warnin
 from app.services.ingestion import ingest_document
 from app.services.ledger_documents import (
     LedgerStatus,
+    Origin,
     SourceType,
     create_document,
     find_document,
@@ -93,6 +94,7 @@ class Entry:
             **self.metadata(),
             "fileId": self.object_name,
             "sourceType": SourceType.AGENCY.value,
+            "origin": Origin.AMA_WEBSITE.value,
             "uploadedBy": uploaded_by,
             "status": LedgerStatus.PUBLISHED.value,
             "publishedAt": now_iso(),
