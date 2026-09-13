@@ -11,6 +11,7 @@ from enum import StrEnum
 from typing import Any
 
 from appwrite.exception import AppwriteException
+from appwrite.models import Document
 from appwrite.query import Query
 
 from app.services.appwrite_client import DATABASE_ID, get_databases
@@ -34,8 +35,20 @@ class SourceType(StrEnum):
     CONTRIBUTOR = "contributor"
 
 
+class IngestionState(StrEnum):
+    PROCESSING = "processing"  # published, chunks not written yet
+    SEARCHABLE = "searchable"
+    NOT_SEARCHABLE = "not_searchable"  # ingested, but no extractable text
+    FAILED = "failed"  # the last attempt failed; the deadline job retries it
+
+
 def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def parse_datetime(value: str | None) -> datetime | None:
+    """Appwrite datetime strings (ISO 8601 with offset) as aware datetimes."""
+    return datetime.fromisoformat(value) if value else None
 
 
 def plausible_year(year: int | None) -> int | None:
@@ -59,20 +72,29 @@ def year_from_title(title: str) -> int | None:
     return None
 
 
+def _record(document: Document) -> dict[str, Any]:
+    """The document's attributes plus its $id and $createdAt."""
+    return {**document.data, "$id": document.id, "$createdAt": document.createdat}
+
+
 def get_documents(document_ids: Iterable[str]) -> dict[str, dict[str, Any]]:
     """Fetch many documents in one call; missing ids are simply absent."""
     ids = list(dict.fromkeys(document_ids))
     if not ids:
         return {}
-    listing = get_databases().list_documents(
-        DATABASE_ID, COLLECTION_ID, queries=[Query.equal("$id", ids), Query.limit(len(ids))]
-    )
-    return {document.id: document.data for document in listing.documents}
+    records, _ = list_documents([Query.equal("$id", ids), Query.limit(len(ids))])
+    return {record["$id"]: record for record in records}
+
+
+def list_documents(queries: list[str]) -> tuple[list[dict[str, Any]], int]:
+    """Documents matching the queries, and the total number that match."""
+    listing = get_databases().list_documents(DATABASE_ID, COLLECTION_ID, queries=queries)
+    return [_record(document) for document in listing.documents], int(listing.total)
 
 
 def get_document(document_id: str) -> dict[str, Any]:
     """Return the document's attributes. Raises AppwriteException (404) if missing."""
-    return get_databases().get_document(DATABASE_ID, COLLECTION_ID, document_id).data
+    return _record(get_databases().get_document(DATABASE_ID, COLLECTION_ID, document_id))
 
 
 def find_document(document_id: str) -> dict[str, Any] | None:
@@ -86,11 +108,20 @@ def find_document(document_id: str) -> dict[str, Any] | None:
 
 
 def create_document(document_id: str, data: dict[str, Any]) -> dict[str, Any]:
-    return get_databases().create_document(DATABASE_ID, COLLECTION_ID, document_id, data).data
+    return _record(get_databases().create_document(DATABASE_ID, COLLECTION_ID, document_id, data))
 
 
 def update_document(document_id: str, data: dict[str, Any]) -> dict[str, Any]:
-    return get_databases().update_document(DATABASE_ID, COLLECTION_ID, document_id, data).data
+    return _record(get_databases().update_document(DATABASE_ID, COLLECTION_ID, document_id, data))
+
+
+def ingestion_state(record: dict[str, Any]) -> IngestionState | None:
+    """Where a published document is in ingestion; None for unpublished ones."""
+    if record.get("status") != LedgerStatus.PUBLISHED:
+        return None
+    if record.get("ingestedAt"):
+        return IngestionState.SEARCHABLE if record.get("chunkCount") else IngestionState.NOT_SEARCHABLE
+    return IngestionState.FAILED if record.get("ingestionError") else IngestionState.PROCESSING
 
 
 def mark_ingested(document_id: str, chunk_count: int, note: str | None = None) -> None:
