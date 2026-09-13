@@ -79,7 +79,32 @@ verified contributor. It comes from each record's `origin` attribute, which
 `scripts/add_document_origin.py` added and backfilled; the AMA import and the
 portal set it on every new document.
 
-The rules behind these routes live in `app/services/workflow.py`. Every change
+## Citizen reports
+
+Residents report problems (civic service, public safety) or danger to a person
+(personal safety). The rules live in pure, unit-tested modules:
+
+- `app/services/report_taxonomy.py`: the fixed list of topics and who each is
+  routed to. The classifier picks a topic, never a recipient. The routing is a
+  first draft for the Assembly to review.
+- `app/services/report_rules.py`: filing. Every doubt resolves toward
+  privacy: a report is personal safety if the citizen says so, the model says
+  so, or the model fails and the words suggest danger to a person. Personal
+  safety is always severity 5 and keeps no ward, only a sub-metro at most.
+- `app/services/case_workflow.py`: the lifecycle (one assignment per
+  recipient; one escalation to the MCE within 14 days of resolution), what each
+  role may see (the MCE sees personal-safety cases only in outline), and when a
+  citizen's numbers are deleted (30 days after the case closes).
+- `app/wards.py`: AMA's 20 electoral areas in 3 sub-metros, from its 2023
+  Monitoring and Evaluation Report.
+
+Police and GNFS receive safety reports as agency teams (`agency-police`,
+`agency-gnfs`); they are not Assembly departments and have no part in the
+Ledger. `scripts/create_citizen_reports.py` creates those teams and the report
+collections (citizen phone numbers are encrypted at rest); add their liaison
+accounts to `scripts/seed_users.toml` and re-run `scripts/seed_users.py`.
+
+The rules behind the Ledger routes live in `app/services/workflow.py`. Every change
 is written to the `document_history` collection
 (`scripts/create_document_history.py` creates it).
 
