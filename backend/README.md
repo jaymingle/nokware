@@ -66,6 +66,7 @@ membership.
 | `GET /api/reports/{reference}` (by reference or case ID; personal safety shows only its stage) | public, 30 a minute |
 | `POST /api/reports/{reference}/escalate` (`note`; once, within 14 days of resolution) | public |
 | `POST /api/reports/{reference}/preferences` (`X-Receipt-Token`; after a safety reclassification, once, within the hour) | public |
+| `GET /api/dashboard` (twelve months of report figures, no personal safety; Ledger counts and latest documents; cached a minute) | public |
 | `GET /api/me` | anyone signed in |
 | `GET /api/departments`, `GET /api/categories` | anyone signed in |
 | `POST /api/documents` (multipart: `file`, `title`, `category`, `document_year`, `department`, `source_url`) | department (published), contributor (held 72h) |
@@ -123,6 +124,12 @@ lock, like Ledger documents). What each caller sees is decided in one place
 (`case_workflow.case_view`): recipients see everything; the MCE sees a
 personal-safety case only in outline (status, recipients, age, audit trail),
 and its audit trail never carries what anyone wrote about the case.
+
+The public dashboard (`app/services/report_dashboard.py`) counts only civic
+and public-safety reports. Personal safety is left out of every figure,
+totals included, so no total less the visible topics can give its number
+away; nothing is broken down finer than a sub-metro, and a median needs five
+resolved reports.
 
 `scripts/report_lifecycle.py` files `[TEST]` reports against the live services
 and checks what was stored; `scripts/case_lifecycle.py` works them through the
