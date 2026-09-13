@@ -38,6 +38,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/ask/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ask Stream */
+        post: operations["ask_stream_api_ask_stream_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ledger/{document_id}/file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Published File
+         * @description Redirects to a fresh 10-minute link to a published document's PDF; 404 for anything else.
+         */
+        get: operations["published_file_api_ledger__document_id__file_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/me": {
         parameters: {
             query?: never;
@@ -294,10 +331,18 @@ export interface components {
         AskResponse: {
             /** Answer */
             answer: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "answered" | "no_information";
             /** Sources */
             sources: components["schemas"]["AskSource"][];
         };
-        /** AskSource */
+        /**
+         * AskSource
+         * @description One retrieved chunk; a document's chunks share its label.
+         */
         AskSource: {
             /** Label */
             label: string;
@@ -311,13 +356,23 @@ export interface components {
             chunk_text: string;
             /** Department */
             department: string | null;
+            /** Department Name */
+            department_name: string | null;
             /** Source Type */
             source_type: string | null;
+            provenance: components["schemas"]["Provenance"] | null;
+            /** Source Url */
+            source_url: string | null;
             /** Published At */
             published_at: string | null;
             /** Document Year */
             document_year: number | null;
         };
+        /**
+         * AskStreamEvent
+         * @description One line of POST /api/ask/stream's newline-delimited JSON.
+         */
+        AskStreamEvent: components["schemas"]["StageEvent"] | components["schemas"]["SourcesEvent"] | components["schemas"]["DeltaEvent"] | components["schemas"]["DoneEvent"] | components["schemas"]["ErrorEvent"];
         /** Body_resubmit_api_documents__document_id__resubmit_post */
         Body_resubmit_api_documents__document_id__resubmit_post: {
             /**
@@ -351,6 +406,19 @@ export interface components {
              * @description Required from contributors
              */
             source_url?: string | null;
+        };
+        /**
+         * DeltaEvent
+         * @description The next piece of the model's raw answer text.
+         */
+        DeltaEvent: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "delta";
+            /** Text */
+            text: string;
         };
         /** DocumentDetail */
         DocumentDetail: {
@@ -453,6 +521,36 @@ export interface components {
             /** Total */
             total: number;
         };
+        /**
+         * DoneEvent
+         * @description The checked answer, which replaces the streamed text, and the labels it cites.
+         */
+        DoneEvent: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "done";
+            /** Answer */
+            answer: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "answered" | "no_information";
+            /** Cited */
+            cited: string[];
+        };
+        /** ErrorEvent */
+        ErrorEvent: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "error";
+            /** Message */
+            message: string;
+        };
         /** FileLink */
         FileLink: {
             /** Url */
@@ -523,6 +621,12 @@ export interface components {
             name: string;
         };
         /**
+         * Provenance
+         * @description Where a document came from, as Ask states it.
+         * @enum {string}
+         */
+        Provenance: "ama_website" | "department_portal" | "contributor";
+        /**
          * Role
          * @enum {string}
          */
@@ -532,6 +636,32 @@ export interface components {
          * @enum {string}
          */
         SourceType: "agency" | "contributor";
+        /**
+         * SourcesEvent
+         * @description Every source retrieved, before the answer is written; none is marked cited yet.
+         */
+        SourcesEvent: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "sources";
+            /** Sources */
+            sources: components["schemas"]["AskSource"][];
+        };
+        /** StageEvent */
+        StageEvent: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "stage";
+            /**
+             * Stage
+             * @enum {string}
+             */
+            stage: "searching" | "writing";
+        };
         /** ValidationError */
         ValidationError: {
             /** Location */
@@ -597,6 +727,68 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["AskResponse"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ask_stream_api_ask_stream_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AskRequest"];
+            };
+        };
+        responses: {
+            /** @description Newline-delimited JSON: one AskStreamEvent per line. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AskStreamEvent"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    published_file_api_ledger__document_id__file_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            307: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

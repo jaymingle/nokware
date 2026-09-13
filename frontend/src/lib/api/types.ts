@@ -18,3 +18,7 @@ export type IngestionState = Schemas["IngestionState"];
 export type LedgerStatus = Schemas["LedgerStatus"];
 export type FileLink = Schemas["FileLink"];
 export type Option = Schemas["Option"];
+export type AskSource = Schemas["AskSource"];
+export type AskStreamEvent = Schemas["AskStreamEvent"];
+export type AnswerStatus = Schemas["DoneEvent"]["status"];
+export type Provenance = Schemas["Provenance"];
