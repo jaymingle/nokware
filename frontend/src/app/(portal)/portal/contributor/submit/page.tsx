@@ -1,3 +1,4 @@
+import { SubmitForm } from "@/components/contributor/submit-form";
 import { RolePage } from "@/components/portal/role-page";
 
 export default function ContributorSubmitPage() {
@@ -5,6 +6,8 @@ export default function ContributorSubmitPage() {
     <RolePage
       title="Submit a sourced document"
       lead="Contributions are held out of Ask until the owning department reviews them. Nothing reaches the public unsigned."
-    />
+    >
+      <SubmitForm />
+    </RolePage>
   );
 }

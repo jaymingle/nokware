@@ -12,6 +12,22 @@ const TONE = {
   passed: "border-hairline bg-paper-subtle",
 } as const;
 
+/** The same clock as one line of text, for tables and compact rows. */
+export function DeadlineLine({ heldUntil, unless, testId }: { heldUntil: string; unless: string; testId?: string }) {
+  const { label, urgency } = deadlineFrom(heldUntil, useNow());
+  if (urgency === "passed") return null;
+  return (
+    <p data-testid={testId} data-urgency={urgency} className="flex items-start gap-1.5 text-[12.5px] text-ink-soft">
+      <ClockIcon aria-hidden className={cn("mt-0.5 size-3.5 shrink-0", urgency === "urgent" ? "text-brick" : "text-gold")} />
+      <span>
+        Publishes automatically in{" "}
+        <span className={cn("font-medium tabular-nums", urgency === "urgent" ? "text-brick" : "text-ink")}>{label}</span>{" "}
+        unless {unless}.
+      </span>
+    </p>
+  );
+}
+
 type DeadlineNoticeProps = {
   heldUntil: string;
   /** What stops publication, e.g. "you dispute it". */

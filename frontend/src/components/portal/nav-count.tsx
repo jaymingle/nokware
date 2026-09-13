@@ -1,8 +1,8 @@
 "use client";
 
 import { useNow } from "@/hooks/use-now";
-import { useReviewQueue } from "@/lib/api/queries";
-import { splitHeld } from "@/lib/documents";
+import { useReviewQueue, useSubmissions } from "@/lib/api/queries";
+import { awaitingResponse, splitHeld } from "@/lib/documents";
 import { cn } from "@/lib/utils";
 
 import type { NavCountKind } from "@/lib/portal/navigation";
@@ -31,7 +31,14 @@ function ReviewCount({ active }: { active: boolean }) {
   return <Count value={open} active={active} testId="nav-count-review" />;
 }
 
+/** Disputes waiting on this contributor, which don't move until they respond. */
+function ResponsesCount({ active }: { active: boolean }) {
+  const { data } = useSubmissions();
+  return <Count value={data ? awaitingResponse(data).length : 0} active={active} testId="nav-count-responses" />;
+}
+
 export function NavCount({ kind, active }: { kind: NavCountKind; active: boolean }) {
   if (kind === "review") return <ReviewCount active={active} />;
+  if (kind === "responses") return <ResponsesCount active={active} />;
   return null;
 }

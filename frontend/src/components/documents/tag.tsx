@@ -3,17 +3,18 @@ import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 import type { IngestionState } from "@/lib/api/types";
+import type { Tone } from "@/lib/documents";
 
 // The design's status tags. Gold tags carry ink text: gold on its tint is
 // under 4.5:1 at this size.
-const TONES = {
+const TONES: Record<Tone, string> = {
   teal: "bg-teal-tint text-teal",
   gold: "bg-gold-tint text-ink",
   brick: "bg-brick-tint text-brick",
   neutral: "border text-ink-soft",
-} as const;
+};
 
-export type TagTone = keyof typeof TONES;
+export type TagTone = Tone;
 
 export function Tag({ tone, children, testId }: { tone: TagTone; children: ReactNode; testId?: string }) {
   return (

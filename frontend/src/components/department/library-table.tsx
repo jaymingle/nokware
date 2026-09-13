@@ -12,8 +12,9 @@ import { formatDate } from "@/lib/time";
 
 import type { DocumentOut } from "@/lib/api/types";
 
-const TH = "border-b px-4 py-2.5 text-left text-[12.5px] font-medium text-ink-soft";
-const TD = "border-b px-4 py-3.5 align-top";
+const TH = "border-b px-3 py-2.5 text-left text-[12.5px] font-medium text-ink-soft sm:px-4";
+const TD = "border-b px-3 py-3.5 align-top sm:px-4";
+const WIDE_ONLY = "hidden sm:table-cell"; // on phones these details move under the title
 
 function LibraryRow({ doc }: { doc: DocumentOut }) {
   return (
@@ -21,14 +22,17 @@ function LibraryRow({ doc }: { doc: DocumentOut }) {
       <td className={TD}>
         <div className="text-[14.5px]">{doc.title}</div>
         <div className="text-[12px] text-ink-soft">{[doc.category, doc.document_year].filter(Boolean).join(" · ")}</div>
+        <div className="text-[12px] text-ink-soft sm:hidden">{doc.published_at ? `Published ${formatDate(doc.published_at)}` : ""}</div>
       </td>
-      <td className={`${TD} text-[13px] text-ink-soft`}>{doc.source_type === "contributor" ? "Contributor" : "Department"}</td>
-      <td className={`${TD} text-[13px] whitespace-nowrap text-ink-soft tabular-nums`}>
+      <td className={`${TD} ${WIDE_ONLY} text-[13px] text-ink-soft`}>
+        {doc.source_type === "contributor" ? "Contributor" : "Department"}
+      </td>
+      <td className={`${TD} ${WIDE_ONLY} text-[13px] whitespace-nowrap text-ink-soft tabular-nums`}>
         {doc.published_at ? formatDate(doc.published_at) : ""}
       </td>
       <td className={TD}>{doc.ingestion ? <IngestionTag state={doc.ingestion} testId={`ingestion-${doc.id}`} /> : null}</td>
       <td className={`${TD} text-right`}>
-        <ViewPdfButton documentId={doc.id} label="PDF" />
+        <ViewPdfButton documentId={doc.id} label="PDF" compact />
       </td>
     </tr>
   );
@@ -67,10 +71,10 @@ export function LibraryTable() {
           <thead>
             <tr>
               <th className={TH}>Document</th>
-              <th className={`${TH} w-32`}>Source</th>
-              <th className={`${TH} w-32`}>Published</th>
-              <th className={`${TH} w-52`}>In Ask</th>
-              <th className={`${TH} w-24`}><span className="sr-only">File</span></th>
+              <th className={`${TH} ${WIDE_ONLY} w-32`}>Source</th>
+              <th className={`${TH} ${WIDE_ONLY} w-32`}>Published</th>
+              <th className={`${TH} sm:w-52`}>In Ask</th>
+              <th className={`${TH} sm:w-24`}><span className="sr-only">File</span></th>
             </tr>
           </thead>
           <tbody>

@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
-import { useCategories } from "@/lib/api/queries";
+import { useCategories, useDepartments } from "@/lib/api/queries";
 
 export function FormField({ id, label, hint, children }: { id: string; label: string; hint?: string; children: ReactNode }) {
   return (
@@ -40,6 +40,28 @@ export function CategoryField() {
         {categories?.map((category) => (
           <NativeSelectOption key={category.id} value={category.id}>
             {category.name}
+          </NativeSelectOption>
+        ))}
+      </NativeSelect>
+    </FormField>
+  );
+}
+
+export function DepartmentField() {
+  const { data: departments, isPending, error } = useDepartments();
+  return (
+    <FormField
+      id="department"
+      label="Department it belongs to"
+      hint={error ? `Couldn't load departments: ${error.message}` : "That department reviews it before it can publish."}
+    >
+      <NativeSelect id="department" name="department" required defaultValue="" disabled={isPending} className="w-full" data-testid="field-department">
+        <NativeSelectOption value="" disabled>
+          {isPending ? "Loading departments…" : "Choose a department"}
+        </NativeSelectOption>
+        {departments?.map((department) => (
+          <NativeSelectOption key={department.id} value={department.id}>
+            {department.name}
           </NativeSelectOption>
         ))}
       </NativeSelect>
