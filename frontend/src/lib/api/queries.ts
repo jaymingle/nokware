@@ -4,22 +4,35 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient, type QueryClie
 
 import {
   getCategories,
+  getDepartments,
   getLibrary,
   getReviewQueue,
+  getSubmissions,
+  resubmitDocument,
   takeAction,
   uploadDocument,
 } from "@/lib/api/endpoints";
+
+import { anyPublishingNow } from "@/lib/documents";
 
 import type { DocumentOut, ReviewAction } from "@/lib/api/types";
 
 export const LIBRARY_PAGE_SIZE = 25;
 const QUEUE_REFRESH_MS = 60_000; // keeps queues current as clocks run out elsewhere
 const PROCESSING_REFRESH_MS = 10_000;
+const PUBLISHING_REFRESH_MS = 10_000; // while a clock has run out, until the deadline job publishes it
+
+/** Refresh a queue every minute, or every 10 seconds while something is about to publish. */
+function queueRefresh(documents: DocumentOut[] | undefined): number {
+  return anyPublishingNow(documents, Date.now()) ? PUBLISHING_REFRESH_MS : QUEUE_REFRESH_MS;
+}
 
 export const queryKeys = {
   reviewQueue: ["review-queue"] as const,
   library: (page: number) => ["library", page] as const,
+  submissions: ["submissions"] as const,
   categories: ["categories"] as const,
+  departments: ["departments"] as const,
 };
 
 /** Every list or view of documents; refreshed after any change to one. */
@@ -30,7 +43,11 @@ function refreshDocuments(queryClient: QueryClient): Promise<void> {
 }
 
 export function useReviewQueue() {
-  return useQuery({ queryKey: queryKeys.reviewQueue, queryFn: getReviewQueue, refetchInterval: QUEUE_REFRESH_MS });
+  return useQuery({
+    queryKey: queryKeys.reviewQueue,
+    queryFn: getReviewQueue,
+    refetchInterval: (query) => queueRefresh(query.state.data),
+  });
 }
 
 export function useLibrary(page: number) {
@@ -44,8 +61,20 @@ export function useLibrary(page: number) {
   });
 }
 
+export function useSubmissions() {
+  return useQuery({
+    queryKey: queryKeys.submissions,
+    queryFn: getSubmissions,
+    refetchInterval: (query) => queueRefresh(query.state.data),
+  });
+}
+
 export function useCategories() {
   return useQuery({ queryKey: queryKeys.categories, queryFn: getCategories, staleTime: Infinity });
+}
+
+export function useDepartments() {
+  return useQuery({ queryKey: queryKeys.departments, queryFn: getDepartments, staleTime: Infinity });
 }
 
 type ActionInput = { id: string; action: ReviewAction; note?: string };
@@ -54,6 +83,16 @@ export function useDocumentAction() {
   const queryClient = useQueryClient();
   return useMutation<DocumentOut, Error, ActionInput>({
     mutationFn: ({ id, action, note }) => takeAction(id, action, note),
+    onSuccess: () => refreshDocuments(queryClient),
+  });
+}
+
+type ResubmitInput = { id: string; form: FormData };
+
+export function useResubmit() {
+  const queryClient = useQueryClient();
+  return useMutation<DocumentOut, Error, ResubmitInput>({
+    mutationFn: ({ id, form }) => resubmitDocument(id, form),
     onSuccess: () => refreshDocuments(queryClient),
   });
 }

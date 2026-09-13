@@ -28,6 +28,10 @@ export function getReviewQueue(): Promise<DocumentOut[]> {
   return apiRequest<DocumentOut[]>("/api/review-queue");
 }
 
+export function getSubmissions(): Promise<DocumentOut[]> {
+  return apiRequest<DocumentOut[]>("/api/documents/mine");
+}
+
 export function getLibrary(limit: number, offset: number): Promise<DocumentPage> {
   return apiRequest<DocumentPage>(`/api/documents/library?limit=${limit}&offset=${offset}`);
 }
@@ -46,6 +50,11 @@ export function takeAction(id: string, action: ReviewAction, note?: string): Pro
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ note: note ?? null }),
   });
+}
+
+/** A revised PDF ("file") and optional "note", sent after a dispute. */
+export function resubmitDocument(id: string, form: FormData): Promise<DocumentOut> {
+  return apiRequest<DocumentOut>(`${documentPath(id)}/resubmit`, { method: "POST", body: form });
 }
 
 /** A multipart upload: the PDF as "file" plus the form fields. */
