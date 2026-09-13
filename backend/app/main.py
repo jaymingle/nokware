@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.config import get_settings
-from app.routes import ask, documents, jobs, me, options, queues
+from app.routes import ask, documents, jobs, ledger, me, options, queues
 from app.services import scheduler
 from app.services.appwrite_client import quiet_sdk_deprecation_warnings
 from app.services.portal_actions import run_deadline_job
@@ -73,6 +73,7 @@ def health() -> dict[str, str]:
 
 
 app.include_router(ask.router)
+app.include_router(ledger.router)
 app.include_router(me.router)
 app.include_router(options.router)
 app.include_router(queues.router)  # before documents: /documents/library must not match /documents/{id}

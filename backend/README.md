@@ -51,12 +51,16 @@ Health check: `GET http://localhost:8000/health` → `{"status": "ok"}`.
 
 ## API
 
-`POST /api/ask` is public. Every other route needs an Appwrite JWT
-(`account.createJWT()` in the browser) as `Authorization: Bearer <jwt>`; the
-server resolves the role from the user's team membership.
+The Ask routes and the published-file link are public. Every other route needs
+an Appwrite JWT (`account.createJWT()` in the browser) as
+`Authorization: Bearer <jwt>`; the server resolves the role from the user's team
+membership.
 
 | Route | Who |
 |---|---|
+| `POST /api/ask` (whole answer) | public |
+| `POST /api/ask/stream` (newline-delimited JSON events: stage, sources, answer text, done) | public |
+| `GET /api/ledger/{id}/file` (redirects to a 10-minute PDF link; published documents only, 404 otherwise) | public |
 | `GET /api/me` | anyone signed in |
 | `GET /api/departments`, `GET /api/categories` | anyone signed in |
 | `POST /api/documents` (multipart: `file`, `title`, `category`, `document_year`, `department`, `source_url`) | department (published), contributor (held 72h) |
@@ -68,6 +72,12 @@ server resolves the role from the user's team membership.
 | `POST /api/documents/{id}/accept-dispute`, `/escalate`, `/resubmit` (multipart) | contributor |
 | `POST /api/documents/{id}/uphold`, `/overrule` | MCE |
 | `POST /api/jobs/publish-expired` | MCE, or `X-Job-Token` |
+
+Every Ask source says where its document came from (`provenance`): imported
+from ama.gov.gh, submitted by a department through the portal, or from a
+verified contributor. It comes from each record's `origin` attribute, which
+`scripts/add_document_origin.py` added and backfilled; the AMA import and the
+portal set it on every new document.
 
 The rules behind these routes live in `app/services/workflow.py`. Every change
 is written to the `document_history` collection

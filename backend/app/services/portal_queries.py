@@ -43,6 +43,18 @@ def file_link(principal: Principal, document_id: str) -> str:
     return get_ledger_file_url(load_visible(principal, document_id)["fileId"], expires=FILE_LINK_SECONDS)
 
 
+def public_file_link(document_id: str) -> str:
+    """A short-lived link to a published document's PDF, for anyone.
+
+    Anything unpublished is reported as not found, so the public can't learn
+    that a held, disputed or withdrawn document exists.
+    """
+    document = load(document_id)
+    if document.get("status") != LedgerStatus.PUBLISHED:
+        raise DocumentNotFound(document_id)
+    return get_ledger_file_url(document["fileId"], expires=FILE_LINK_SECONDS)
+
+
 def review_queue(principal: Principal) -> list[dict[str, Any]]:
     """The department's held documents, most urgent first, then its open disputes."""
     records, _ = ledger_documents.list_documents(
