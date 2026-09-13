@@ -61,6 +61,11 @@ membership.
 | `POST /api/ask` (whole answer) | public |
 | `POST /api/ask/stream` (newline-delimited JSON events: stage, sources, answer text, done) | public |
 | `GET /api/ledger/{id}/file` (redirects to a 10-minute PDF link; published documents only, 404 otherwise) | public |
+| `GET /api/reports/options` (wards by sub-metro, personal-safety types, limits) | public |
+| `POST /api/reports` (multipart: `description`, `ward` or `sub_metro`, `safety_topic`, `phone`, `whatsapp`, `notify`, `callback_consent`, up to 10 `photos`) | public, 5 per 10 minutes per client |
+| `GET /api/reports/{reference}` (by reference or case ID; personal safety shows only its stage) | public, 30 a minute |
+| `POST /api/reports/{reference}/escalate` (`note`; once, within 14 days of resolution) | public |
+| `POST /api/reports/{reference}/preferences` (`X-Receipt-Token`; after a safety reclassification, once, within the hour) | public |
 | `GET /api/me` | anyone signed in |
 | `GET /api/departments`, `GET /api/categories` | anyone signed in |
 | `POST /api/documents` (multipart: `file`, `title`, `category`, `document_year`, `department`, `source_url`) | department (published), contributor (held 72h) |
@@ -97,6 +102,20 @@ Residents report problems (civic service, public safety) or danger to a person
   citizen's numbers are deleted (30 days after the case closes).
 - `app/wards.py`: AMA's 20 electoral areas in 3 sub-metros, from its 2023
   Monitoring and Evaluation Report.
+
+Filing (`app/services/report_intake.py`) checks everything before writing:
+photos are re-encoded from their pixels alone (`report_photos.py`: no EXIF,
+so no GPS), numbers are validated and stored apart (`report_contacts.py`),
+and the model's verdict (`report_classifier.py`, 15-second limit) goes through
+the filing rules. Messages (`notifications.py`) go only on submission,
+resolution and escalation, content-neutral for personal safety; each is
+written to the outbox and, until Arkesel and Twilio are wired in
+(`SMS_PROVIDER`, `WHATSAPP_PROVIDER`), recorded as not sent. Numbers are
+deleted by an hourly job 30 days after their case closes.
+
+`scripts/report_lifecycle.py` files `[TEST]` reports against the live services
+and checks what was stored; `scripts/delete_test_reports.py` lists them (and
+removes them with `--yes`).
 
 Police and GNFS receive safety reports as agency teams (`agency-police`,
 `agency-gnfs`); they are not Assembly departments and have no part in the

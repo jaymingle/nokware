@@ -1,0 +1,36 @@
+"""A small in-memory rate limit for the public report routes.
+
+Filing a report costs a model call and up to 10 photos, and a status lookup by
+reference must not become a way to guess references. Counts are per client
+address and per route, kept in this process (the API runs as a single worker).
+Behind a reverse proxy, the proxy must pass the real client address.
+"""
+
+import threading
+import time
+from collections import defaultdict, deque
+
+
+class RateLimit:
+    def __init__(self, limit: int, window_seconds: float) -> None:
+        self.limit = limit
+        self.window = window_seconds
+        self._hits: dict[str, deque[float]] = defaultdict(deque)
+        self._lock = threading.Lock()
+
+    def retry_after(self, key: str, now: float | None = None) -> float | None:
+        """Record a hit for key. None if it is allowed; otherwise the seconds until it would be."""
+        moment = time.monotonic() if now is None else now
+        with self._lock:
+            hits = self._hits[key]
+            while hits and hits[0] <= moment - self.window:
+                hits.popleft()
+            if len(hits) >= self.limit:
+                return hits[0] + self.window - moment
+            hits.append(moment)
+            return None
+
+
+SUBMISSIONS = RateLimit(limit=5, window_seconds=600)
+LOOKUPS = RateLimit(limit=30, window_seconds=60)
+ESCALATIONS = RateLimit(limit=5, window_seconds=3600)

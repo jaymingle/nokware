@@ -1,4 +1,4 @@
-"""FastAPI dependencies for authenticated portal routes.
+"""FastAPI dependencies: sign-in and roles for portal routes, rate limits for public ones.
 
 Use ``CurrentPrincipal`` for any signed-in user, or ``require_roles(...)`` to
 restrict a route to particular roles. Both are plain (sync) dependencies, so
@@ -7,16 +7,18 @@ the Appwrite round trips run in FastAPI's threadpool.
 
 import hmac
 import logging
+import math
 from collections.abc import Callable
 from typing import Annotated
 
 import requests
 from appwrite.exception import AppwriteException
-from fastapi import Depends, Header, HTTPException, status
+from fastapi import Depends, Header, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.config import get_settings
 from app.services.auth import InvalidTokenError, NoRoleError, Principal, Role, authenticate
+from app.services.rate_limit import RateLimit
 
 logger = logging.getLogger(__name__)
 
@@ -71,3 +73,18 @@ def require_roles(*roles: Role) -> Callable[[Principal], Principal]:
         return principal
 
     return dependency
+
+
+def rate_limited(limit: RateLimit) -> Callable[[Request], None]:
+    """A dependency that refuses a client over the limit with 429 and a Retry-After."""
+
+    def check(request: Request) -> None:
+        wait = limit.retry_after(request.client.host if request.client else "unknown")
+        if wait is not None:
+            raise HTTPException(
+                status.HTTP_429_TOO_MANY_REQUESTS,
+                "Too many requests from this device. Try again in a few minutes.",
+                headers={"Retry-After": str(math.ceil(wait))},
+            )
+
+    return check
