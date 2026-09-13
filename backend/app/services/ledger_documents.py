@@ -42,8 +42,12 @@ class IngestionState(StrEnum):
     FAILED = "failed"  # the last attempt failed; the deadline job retries it
 
 
+def utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
 def now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return utc_now().isoformat()
 
 
 def parse_datetime(value: str | None) -> datetime | None:
