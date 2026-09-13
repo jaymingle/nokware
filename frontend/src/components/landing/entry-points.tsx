@@ -1,19 +1,14 @@
 import Link from "next/link";
 import { ArrowRightIcon, KeyRoundIcon, MegaphoneIcon, MessageCircleQuestionIcon } from "lucide-react";
 
-import { Tag } from "@/components/documents/tag";
-
 import type { LucideIcon } from "lucide-react";
-
-// Citizen reporting opens when the report form ships (Citizen Reports, R4).
-const REPORTING_OPEN = false;
 
 type Entry = {
   icon: LucideIcon;
   title: string;
   body: string;
   action: string;
-  href: string | null;
+  href: string;
   testId: string;
 };
 
@@ -29,9 +24,9 @@ const ENTRIES: Entry[] = [
   {
     icon: MegaphoneIcon,
     title: "Report an issue",
-    body: "Tell the Assembly about a blocked drain, uncollected refuse or a broken streetlight. It goes to the department responsible, and you can follow it with your case number.",
+    body: "Tell the Assembly about a blocked drain, uncollected refuse or a broken streetlight. It goes to the department responsible, and you follow it with your reference. Reports about someone's safety are handled privately.",
     action: "Report an issue",
-    href: REPORTING_OPEN ? "/report" : null,
+    href: "/report",
     testId: "landing-report",
   },
   {
@@ -46,8 +41,12 @@ const ENTRIES: Entry[] = [
 
 function EntryCard({ entry }: { entry: Entry }) {
   const Icon = entry.icon;
-  const content = (
-    <>
+  return (
+    <Link
+      href={entry.href}
+      className="group flex h-full flex-col items-start gap-4 rounded-xl border bg-card p-6 transition-colors hover:border-teal"
+      data-testid={entry.testId}
+    >
       <span aria-hidden className="grid size-10 place-items-center rounded-lg bg-teal-tint text-teal">
         <Icon className="size-5" />
       </span>
@@ -55,27 +54,10 @@ function EntryCard({ entry }: { entry: Entry }) {
         <h2 className="text-[22px] leading-snug">{entry.title}</h2>
         <p className="text-[14.5px] text-ink-soft">{entry.body}</p>
       </div>
-      {entry.href ? (
-        <span className="inline-flex items-center gap-1.5 text-[14px] font-medium text-teal">
-          {entry.action}
-          <ArrowRightIcon aria-hidden className="size-4 transition-transform group-hover:translate-x-0.5" />
-        </span>
-      ) : (
-        <Tag tone="neutral">Opening soon</Tag>
-      )}
-    </>
-  );
-  const frame = "flex h-full flex-col items-start gap-4 rounded-xl border bg-card p-6";
-  if (!entry.href) {
-    return (
-      <div className={frame} data-testid={entry.testId} aria-disabled>
-        {content}
-      </div>
-    );
-  }
-  return (
-    <Link href={entry.href} className={`group ${frame} transition-colors hover:border-teal`} data-testid={entry.testId}>
-      {content}
+      <span className="inline-flex items-center gap-1.5 text-[14px] font-medium text-teal">
+        {entry.action}
+        <ArrowRightIcon aria-hidden className="size-4 transition-transform group-hover:translate-x-0.5" />
+      </span>
     </Link>
   );
 }
