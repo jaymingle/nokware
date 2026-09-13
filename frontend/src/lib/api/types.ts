@@ -22,3 +22,7 @@ export type AskSource = Schemas["AskSource"];
 export type AskStreamEvent = Schemas["AskStreamEvent"];
 export type AnswerStatus = Schemas["DoneEvent"]["status"];
 export type Provenance = Schemas["Provenance"];
+export type CaseSummary = Schemas["CaseSummary"];
+export type CaseDetail = Schemas["CaseDetail"];
+export type CaseOversight = Schemas["CaseOversight"];
+export type CaseAction = Schemas["CaseAction"];

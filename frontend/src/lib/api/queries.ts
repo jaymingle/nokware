@@ -3,6 +3,9 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 
 import {
+  getCase,
+  getCaseOversight,
+  getCaseQueue,
   getCategories,
   getDepartments,
   getDocument,
@@ -12,12 +15,14 @@ import {
   getSubmissions,
   resubmitDocument,
   takeAction,
+  takeCaseAction,
   uploadDocument,
+  type CaseActionBody,
 } from "@/lib/api/endpoints";
 
 import { anyPublishingNow } from "@/lib/documents";
 
-import type { DocumentOut, ReviewAction } from "@/lib/api/types";
+import type { CaseAction, CaseDetail, DocumentOut, ReviewAction } from "@/lib/api/types";
 
 export const LIBRARY_PAGE_SIZE = 25;
 const QUEUE_REFRESH_MS = 60_000; // keeps queues current as clocks run out elsewhere
@@ -35,6 +40,9 @@ export const queryKeys = {
   submissions: ["submissions"] as const,
   escalations: ["escalations"] as const,
   document: (id: string) => ["document", id] as const,
+  caseQueue: ["cases", "queue"] as const,
+  caseOversight: ["cases", "oversight"] as const,
+  case: (id: string) => ["cases", "detail", id] as const,
   categories: ["categories"] as const,
   departments: ["departments"] as const,
 };
@@ -125,5 +133,32 @@ export function useUploadDocument() {
   return useMutation<DocumentOut, Error, FormData>({
     mutationFn: uploadDocument,
     onSuccess: () => refreshDocuments(queryClient),
+  });
+}
+
+const CASES_REFRESH_MS = 60_000; // new reports arrive at any time
+
+export function useCaseQueue() {
+  return useQuery({ queryKey: queryKeys.caseQueue, queryFn: getCaseQueue, refetchInterval: CASES_REFRESH_MS });
+}
+
+export function useCaseOversight() {
+  return useQuery({ queryKey: queryKeys.caseOversight, queryFn: getCaseOversight, refetchInterval: CASES_REFRESH_MS });
+}
+
+export function useCase(id: string | null) {
+  return useQuery({ queryKey: queryKeys.case(id ?? ""), queryFn: () => getCase(id ?? ""), enabled: id !== null });
+}
+
+export type CaseActionInput = { id: string; action: CaseAction; body?: CaseActionBody };
+
+export function useCaseAction() {
+  const queryClient = useQueryClient();
+  return useMutation<CaseDetail, Error, CaseActionInput>({
+    mutationFn: ({ id, action, body }) => takeCaseAction(id, action, body),
+    onSuccess: (detail) => {
+      queryClient.setQueryData(queryKeys.case(detail.case_id), detail);
+      return queryClient.invalidateQueries({ queryKey: ["cases"] });
+    },
   });
 }

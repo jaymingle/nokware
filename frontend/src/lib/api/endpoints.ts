@@ -1,6 +1,10 @@
 import { apiRequest } from "@/lib/api/client";
 
 import type {
+  CaseAction,
+  CaseDetail,
+  CaseOversight,
+  CaseSummary,
   DocumentDetail,
   DocumentOut,
   DocumentPage,
@@ -64,4 +68,29 @@ export function resubmitDocument(id: string, form: FormData): Promise<DocumentOu
 /** A multipart upload: the PDF as "file" plus the form fields. */
 export function uploadDocument(form: FormData): Promise<DocumentOut> {
   return apiRequest<DocumentOut>("/api/documents", { method: "POST", body: form });
+}
+
+const casePath = (id: string) => `/api/cases/${encodeURIComponent(id)}`;
+
+export function getCaseQueue(): Promise<{ cases: CaseSummary[] }> {
+  return apiRequest<{ cases: CaseSummary[] }>("/api/cases/queue");
+}
+
+export function getCaseOversight(): Promise<CaseOversight> {
+  return apiRequest<CaseOversight>("/api/cases/oversight");
+}
+
+export function getCase(id: string): Promise<CaseDetail> {
+  return apiRequest<CaseDetail>(casePath(id));
+}
+
+/** A note for resolve / reopen / confirm-resolution; from, to and reason for reassign. */
+export type CaseActionBody = { note?: string; from_recipient?: string; to_recipient?: string; reason?: string };
+
+export function takeCaseAction(id: string, action: CaseAction, body?: CaseActionBody): Promise<CaseDetail> {
+  return apiRequest<CaseDetail>(`${casePath(id)}/${action}`, {
+    method: "POST",
+    headers: body ? { "Content-Type": "application/json" } : undefined,
+    body: body ? JSON.stringify(body) : undefined,
+  });
 }
