@@ -1,8 +1,8 @@
 "use client";
 
 import { OpenDisputes } from "@/components/department/open-disputes";
-import { QueueSummary } from "@/components/department/queue-summary";
 import { ReviewCard } from "@/components/department/review-card";
+import { ClockSummary } from "@/components/documents/clock-summary";
 import { EmptyPanel, ErrorPanel, LoadingPanel } from "@/components/documents/panels";
 import { useNow } from "@/hooks/use-now";
 import { useReviewQueue } from "@/lib/api/queries";
@@ -30,7 +30,14 @@ export function ReviewQueue() {
   const disputed = data.filter((doc) => doc.status === "disputed");
   return (
     <div className="flex flex-col gap-8">
-      <QueueSummary open={open} closed={closed.length} now={now} />
+      <ClockSummary
+        open={open}
+        closed={closed.length}
+        now={now}
+        unless={{ one: "you dispute it", many: "you dispute them" }}
+        consequence="If you do nothing, each goes into the public Ledger and Ask under your department's name when its clock runs out."
+        testId="review-summary"
+      />
       {open.length > 0 ? (
         <CardList label="Awaiting your review" documents={open} />
       ) : (
