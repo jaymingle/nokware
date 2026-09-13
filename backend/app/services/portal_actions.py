@@ -8,9 +8,6 @@ single worker until changes move to Appwrite transactions.
 
 import hashlib
 import logging
-import threading
-from collections.abc import Iterator
-from contextlib import contextmanager
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -21,6 +18,7 @@ from app.services import document_history, ledger_documents, workflow
 from app.services.auth import Principal
 from app.services.document_history import SYSTEM_ACTOR, Actor, HistoryAction
 from app.services.ingestion import ingest_document
+from app.services.locks import record_lock
 from app.services.ledger_documents import LedgerStatus, parse_datetime, utc_now
 from app.services.portal_queries import load
 from app.services.storage import upload_ledger_file
@@ -32,16 +30,7 @@ JOB_BATCH = 100
 INGESTION_GRACE = timedelta(minutes=15)  # a published document still unindexed after this is retried
 INGESTION_RETRY_AFTER = timedelta(minutes=30)  # a failed ingestion is retried at most this often
 
-_locks: dict[str, threading.Lock] = {}
-_locks_guard = threading.Lock()
-
-
-@contextmanager
-def document_lock(document_id: str) -> Iterator[None]:
-    with _locks_guard:
-        lock = _locks.setdefault(document_id, threading.Lock())
-    with lock:
-        yield
+document_lock = record_lock  # the Ledger's name for it
 
 
 def _actor(principal: Principal) -> Actor:
