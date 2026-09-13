@@ -45,7 +45,9 @@ def doc(status: LedgerStatus, **fields: Any) -> dict[str, Any]:
 
 
 def escalated(**fields: Any) -> dict[str, Any]:
-    return doc(LedgerStatus.DISPUTED, **{"escalatedToMce": True, "heldUntil": (NOW + timedelta(hours=5)).isoformat(), **fields})
+    return doc(
+        LedgerStatus.DISPUTED, **{"escalatedToMce": True, "heldUntil": (NOW + timedelta(hours=5)).isoformat(), **fields}
+    )
 
 
 # Department review of held documents
@@ -210,9 +212,7 @@ def test_visibility() -> None:
 
 # Uploads
 
-SUBMISSION = Submission(
-    title="Budget", category="Annual Reports", document_year=2025, department=None, source_url=None
-)
+SUBMISSION = Submission(title="Budget", category="Annual Reports", document_year=2025, department=None, source_url=None)
 
 
 def test_department_upload_publishes_under_its_own_name() -> None:
@@ -238,7 +238,12 @@ def test_contributor_upload_is_held_for_the_chosen_department() -> None:
 )
 def test_contributor_upload_needs_a_department_and_a_source(department: str | None, source_url: str | None) -> None:
     with pytest.raises(MissingInput):
-        new_document(CONTRIBUTOR, Submission(**{**SUBMISSION.__dict__, "department": department, "source_url": source_url}), "f", NOW)
+        new_document(
+            CONTRIBUTOR,
+            Submission(**{**SUBMISSION.__dict__, "department": department, "source_url": source_url}),
+            "f",
+            NOW,
+        )
 
 
 def test_mce_does_not_upload() -> None:

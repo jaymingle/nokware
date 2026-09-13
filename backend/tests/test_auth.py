@@ -8,7 +8,9 @@ from app import dependencies
 from app.dependencies import CurrentPrincipal, require_roles
 from app.services.auth import InvalidTokenError, NoRoleError, Principal, Role, resolve_role
 
-FINANCE = Principal(user_id="u1", name="Finance", email="f@example.org", role=Role.DEPARTMENT, department="dept-finance")
+FINANCE = Principal(
+    user_id="u1", name="Finance", email="f@example.org", role=Role.DEPARTMENT, department="dept-finance"
+)
 
 
 def test_department_team_gives_its_department() -> None:
