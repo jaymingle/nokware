@@ -19,14 +19,15 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { usePdfForm } from "@/hooks/use-pdf-form";
-import { useResubmit } from "@/lib/api/queries";
+import { useRefreshDocuments, useResubmit } from "@/lib/api/queries";
 
 import type { DocumentOut } from "@/lib/api/types";
 
 const NOTE_MAX = 2000;
 
-function ResubmitForm({ doc, onDone }: { doc: DocumentOut; onDone: () => void }) {
-  const resubmit = useResubmit();
+type ResubmitFormProps = { doc: DocumentOut; resubmit: ReturnType<typeof useResubmit>; onDone: () => void };
+
+function ResubmitForm({ doc, resubmit, onDone }: ResubmitFormProps) {
   const { file, chooseFile, fileMissing, onSubmit } = usePdfForm(async (form) => {
     const updated = await resubmit.mutateAsync({ id: doc.id, form });
     onDone();
@@ -60,9 +61,19 @@ function ResubmitForm({ doc, onDone }: { doc: DocumentOut; onDone: () => void })
 /** Send a corrected PDF back to the department after a dispute. Allowed once per document. */
 export function ResubmitDialog({ doc }: { doc: DocumentOut }) {
   const [open, setOpen] = useState(false);
+  const resubmit = useResubmit();
+  const refresh = useRefreshDocuments();
   const department = doc.department_name ?? "the department";
+
+  function onOpenChange(next: boolean) {
+    setOpen(next);
+    if (next) return;
+    if (resubmit.isError) void refresh(); // the document may have changed elsewhere
+    resubmit.reset();
+  }
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogTrigger asChild>
         <Button variant="secondary" data-testid={`resubmit-${doc.id}`}>
           Resubmit a corrected version
@@ -76,7 +87,7 @@ export function ResubmitDialog({ doc }: { doc: DocumentOut }) {
             your note.
           </DialogDescription>
         </DialogHeader>
-        {open ? <ResubmitForm doc={doc} onDone={() => setOpen(false)} /> : null}
+        {open ? <ResubmitForm doc={doc} resubmit={resubmit} onDone={() => onOpenChange(false)} /> : null}
       </DialogContent>
     </Dialog>
   );

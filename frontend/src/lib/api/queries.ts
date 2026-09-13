@@ -46,6 +46,12 @@ function refreshDocuments(queryClient: QueryClient): Promise<void> {
   return queryClient.invalidateQueries({ predicate: (query) => DOCUMENT_QUERY_ROOTS.has(String(query.queryKey[0])) });
 }
 
+/** Reloads every document view, e.g. after an action failed because a document changed elsewhere. */
+export function useRefreshDocuments(): () => Promise<void> {
+  const queryClient = useQueryClient();
+  return () => refreshDocuments(queryClient);
+}
+
 export function useReviewQueue() {
   return useQuery({
     queryKey: queryKeys.reviewQueue,

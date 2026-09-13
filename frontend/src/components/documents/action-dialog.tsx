@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { useDocumentAction } from "@/lib/api/queries";
+import { useDocumentAction, useRefreshDocuments } from "@/lib/api/queries";
 
 import type { DocumentOut, ReviewAction } from "@/lib/api/types";
 
@@ -53,6 +53,7 @@ export function ActionDialog(props: ActionDialogProps) {
   const { doc, action, tone, note } = props;
   const [open, setOpen] = useState(false);
   const mutation = useDocumentAction();
+  const refresh = useRefreshDocuments();
   const variant = tone === "destructive" ? "destructive" : "default";
   const testId = `${action}-${doc.id}`;
 
@@ -70,7 +71,10 @@ export function ActionDialog(props: ActionDialogProps) {
 
   function onOpenChange(next: boolean) {
     setOpen(next);
-    if (!next) mutation.reset();
+    if (next) return;
+    // A refused action usually means the document changed elsewhere: show where it stands now.
+    if (mutation.isError) void refresh();
+    mutation.reset();
   }
 
   return (
