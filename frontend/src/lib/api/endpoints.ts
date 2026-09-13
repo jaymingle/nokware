@@ -32,6 +32,10 @@ export function getSubmissions(): Promise<DocumentOut[]> {
   return apiRequest<DocumentOut[]>("/api/documents/mine");
 }
 
+export function getEscalations(): Promise<DocumentOut[]> {
+  return apiRequest<DocumentOut[]>("/api/escalations");
+}
+
 export function getLibrary(limit: number, offset: number): Promise<DocumentPage> {
   return apiRequest<DocumentPage>(`/api/documents/library?limit=${limit}&offset=${offset}`);
 }

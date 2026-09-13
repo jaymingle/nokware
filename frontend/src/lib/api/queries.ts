@@ -5,6 +5,8 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient, type QueryClie
 import {
   getCategories,
   getDepartments,
+  getDocument,
+  getEscalations,
   getLibrary,
   getReviewQueue,
   getSubmissions,
@@ -31,6 +33,8 @@ export const queryKeys = {
   reviewQueue: ["review-queue"] as const,
   library: (page: number) => ["library", page] as const,
   submissions: ["submissions"] as const,
+  escalations: ["escalations"] as const,
+  document: (id: string) => ["document", id] as const,
   categories: ["categories"] as const,
   departments: ["departments"] as const,
 };
@@ -67,6 +71,19 @@ export function useSubmissions() {
     queryFn: getSubmissions,
     refetchInterval: (query) => queueRefresh(query.state.data),
   });
+}
+
+export function useEscalations() {
+  return useQuery({
+    queryKey: queryKeys.escalations,
+    queryFn: getEscalations,
+    refetchInterval: (query) => queueRefresh(query.state.data),
+  });
+}
+
+/** One document with its audit trail, fetched only once it's wanted. */
+export function useDocumentDetail(id: string, enabled: boolean) {
+  return useQuery({ queryKey: queryKeys.document(id), queryFn: () => getDocument(id), enabled });
 }
 
 export function useCategories() {

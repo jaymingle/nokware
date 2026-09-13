@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { anyPublishingNow, awaitingResponse, clockRunning, describeSubmission, splitHeld } from "@/lib/documents";
+import { anyPublishingNow, awaitingResponse, clockRunning, describeSubmission, splitByClock, splitHeld } from "@/lib/documents";
 
 import type { DocumentOut } from "@/lib/api/types";
 
@@ -22,6 +22,15 @@ describe("splitHeld", () => {
     const { open, closed } = splitHeld(docs, NOW);
     expect(open.map((d) => d.id)).toEqual(["urgent", "fresh"]);
     expect(closed.map((d) => d.id)).toEqual(["closed"]);
+  });
+});
+
+describe("splitByClock", () => {
+  it("splits any documents by their clock, keeping ones with no clock open", () => {
+    const docs = [doc("ruled-late", "disputed", inHours(-1)), doc("escalated", "disputed", inHours(30)), doc("no-clock", "disputed", null)];
+    const { open, closed } = splitByClock(docs, NOW);
+    expect(open.map((d) => d.id)).toEqual(["escalated", "no-clock"]);
+    expect(closed.map((d) => d.id)).toEqual(["ruled-late"]);
   });
 });
 

@@ -7,16 +7,25 @@ export function clockRunning(doc: DocumentOut, now: number): boolean {
   return !doc.held_until || deadlineFrom(doc.held_until, now).urgency !== "passed";
 }
 
+export type ClockSplit = { open: DocumentOut[]; closed: DocumentOut[] };
+
 /**
- * Held documents split by whether their review window is open. Closed ones are
+ * Documents split by whether their clock is still running. Closed ones are
  * publishing automatically: nobody can act on them, so they sit apart.
  */
-export function splitHeld(documents: DocumentOut[], now: number): { open: DocumentOut[]; closed: DocumentOut[] } {
-  const held = documents.filter((doc) => doc.status === "held");
+export function splitByClock(documents: DocumentOut[], now: number): ClockSplit {
   return {
-    open: held.filter((doc) => clockRunning(doc, now)),
-    closed: held.filter((doc) => !clockRunning(doc, now)),
+    open: documents.filter((doc) => clockRunning(doc, now)),
+    closed: documents.filter((doc) => !clockRunning(doc, now)),
   };
+}
+
+/** Held documents split by whether their review window is open. */
+export function splitHeld(documents: DocumentOut[], now: number): ClockSplit {
+  return splitByClock(
+    documents.filter((doc) => doc.status === "held"),
+    now,
+  );
 }
 
 export type Tone = "teal" | "gold" | "brick" | "neutral";
