@@ -22,7 +22,7 @@ from typing import Any
 from appwrite.query import Query
 
 from app.services import ledger_documents
-from app.services.appwrite_client import DATABASE_ID, as_record, get_databases
+from app.services.appwrite_client import every_record
 from app.services.case_workflow import CaseStatus
 from app.services.citizen_reports import REPORTS_COLLECTION
 from app.services.ledger_documents import LedgerStatus, parse_datetime
@@ -33,7 +33,6 @@ from app.wards import sub_metros
 PERIOD_MONTHS = 12
 MEDIAN_MIN = 5  # resolved cases needed before a median is shown
 RECENT_DOCUMENTS = 4
-PAGE_SIZE = 500
 CACHE_SECONDS = 60
 CASE_FIELDS = ["category", "isSensitive", "topic", "subMetro", "status", "createdAt", "resolvedAt"]
 DAY_SECONDS = 86_400
@@ -119,22 +118,9 @@ def aggregate(cases: list[dict[str, Any]], now: datetime) -> dict[str, Any]:
     }
 
 
-def _every(collection_id: str, queries: list[str]) -> list[dict[str, Any]]:
-    """Every matching document, a page at a time."""
-    found: list[dict[str, Any]] = []
-    cursor: list[str] = []
-    while True:
-        page = [*queries, *cursor, Query.limit(PAGE_SIZE)]
-        listing = get_databases().list_documents(DATABASE_ID, collection_id, queries=page)
-        found.extend(as_record(d) for d in listing.documents)
-        if len(listing.documents) < PAGE_SIZE:
-            return found
-        cursor = [Query.cursor_after(listing.documents[-1].id)]
-
-
 def public_cases() -> list[dict[str, Any]]:
     """Every report but personal safety, with only the fields the figures need."""
-    return _every(
+    return every_record(
         REPORTS_COLLECTION,
         [Query.not_equal("category", Category.PERSONAL_SAFETY.value), Query.select(CASE_FIELDS)],
     )
@@ -146,7 +132,7 @@ def ledger_figures() -> dict[str, Any]:
     latest, total = ledger_documents.list_documents(
         [published, Query.order_desc("publishedAt"), Query.limit(RECENT_DOCUMENTS)]
     )
-    every = _every(ledger_documents.COLLECTION_ID, [published, Query.select(["department"])])
+    every = every_record(ledger_documents.COLLECTION_ID, [published, Query.select(["department"])])
     departments = {d.get("department") for d in every}
     recent = [
         {

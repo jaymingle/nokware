@@ -15,6 +15,7 @@ import requests
 from appwrite.client import Client
 from appwrite.exception import AppwriteException
 from appwrite.models import Document
+from appwrite.query import Query
 from appwrite.services.databases import Databases
 from appwrite.services.storage import Storage
 from appwrite.services.teams import Teams
@@ -113,3 +114,19 @@ def find_record(collection_id: str, document_id: str) -> dict[str, Any] | None:
         if exc.code == 404:
             return None
         raise
+
+
+PAGE_SIZE = 500
+
+
+def every_record(collection_id: str, queries: list[str]) -> list[dict[str, Any]]:
+    """Every document matching the queries, read a page at a time."""
+    found: list[dict[str, Any]] = []
+    cursor: list[str] = []
+    while True:
+        page = [*queries, *cursor, Query.limit(PAGE_SIZE)]
+        listing = get_databases().list_documents(DATABASE_ID, collection_id, queries=page)
+        found.extend(as_record(d) for d in listing.documents)
+        if len(listing.documents) < PAGE_SIZE:
+            return found
+        cursor = [Query.cursor_after(listing.documents[-1].id)]
