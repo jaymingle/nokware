@@ -3,6 +3,7 @@
 import { useEffect, useState, type ComponentProps, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
+import { ErrorNote } from "@/components/documents/panels";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -46,11 +47,7 @@ export function LoginForm() {
     <form onSubmit={onSubmit} className="flex flex-col gap-4" data-testid="login-form">
       <Field id="email" label="Email" type="email" autoComplete="username" data-testid="login-email" />
       <Field id="password" label="Password" type="password" autoComplete="current-password" data-testid="login-password" />
-      {error ? (
-        <p role="alert" className="rounded-lg bg-brick-tint px-3 py-2.5 text-[13.5px] text-brick" data-testid="login-error">
-          {error}
-        </p>
-      ) : null}
+      {error ? <ErrorNote testId="login-error">{error}</ErrorNote> : null}
       <Button type="submit" disabled={submitting || status === "loading"} data-testid="login-submit">
         {submitting ? "Signing in…" : "Sign in"}
       </Button>
