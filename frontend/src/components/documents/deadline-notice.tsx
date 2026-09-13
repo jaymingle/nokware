@@ -21,7 +21,7 @@ export function DeadlineLine({ heldUntil, unless, testId }: { heldUntil: string;
       <ClockIcon aria-hidden className={cn("mt-0.5 size-3.5 shrink-0", urgency === "urgent" ? "text-brick" : "text-gold")} />
       <span>
         Publishes automatically in{" "}
-        <span className={cn("font-medium tabular-nums", urgency === "urgent" ? "text-brick" : "text-ink")}>{label}</span>{" "}
+        <span className={cn("font-medium whitespace-nowrap tabular-nums", urgency === "urgent" ? "text-brick" : "text-ink")}>{label}</span>{" "}
         unless {unless}.
       </span>
     </p>
@@ -58,7 +58,7 @@ export function DeadlineNotice({ heldUntil, unless, size = "lg", testId }: Deadl
           Publishes automatically in{" "}
           <span
             className={cn(
-              "font-heading leading-none tabular-nums",
+              "font-heading leading-none whitespace-nowrap tabular-nums",
               large ? "text-[26px]" : "text-[18px]",
               urgency === "urgent" && "text-brick",
             )}
