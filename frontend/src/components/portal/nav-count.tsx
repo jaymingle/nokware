@@ -1,7 +1,8 @@
 "use client";
 
 import { useNow } from "@/hooks/use-now";
-import { useEscalations, useReviewQueue, useSubmissions } from "@/lib/api/queries";
+import { useCaseOversight, useCaseQueue, useEscalations, useReviewQueue, useSubmissions } from "@/lib/api/queries";
+import { openForMe } from "@/lib/cases";
 import { awaitingResponse, splitByClock, splitHeld } from "@/lib/documents";
 import { cn } from "@/lib/utils";
 
@@ -45,9 +46,23 @@ function EscalationsCount({ active }: { active: boolean }) {
   return <Count value={open} active={active} testId="nav-count-escalations" />;
 }
 
+/** Cases with something left for this department or agency to do. */
+function CasesCount({ active }: { active: boolean }) {
+  const { data } = useCaseQueue();
+  return <Count value={data ? openForMe(data.cases) : 0} active={active} testId="nav-count-cases" />;
+}
+
+/** Cases citizens have escalated, waiting for the MCE. */
+function CaseEscalationsCount({ active }: { active: boolean }) {
+  const { data } = useCaseOversight();
+  return <Count value={data?.stats.escalated ?? 0} active={active} testId="nav-count-case-escalations" />;
+}
+
 export function NavCount({ kind, active }: { kind: NavCountKind; active: boolean }) {
   if (kind === "review") return <ReviewCount active={active} />;
   if (kind === "responses") return <ResponsesCount active={active} />;
   if (kind === "escalations") return <EscalationsCount active={active} />;
+  if (kind === "cases") return <CasesCount active={active} />;
+  if (kind === "case-escalations") return <CaseEscalationsCount active={active} />;
   return null;
 }
