@@ -18,7 +18,8 @@ export function monthLabel(key: string): string {
   return MONTHS[parts(key)[1]];
 }
 
-function longMonth(key: string): string {
+/** "2026-09" as "September 2026". */
+export function longMonth(key: string): string {
   const [year, month] = parts(key);
   return `${LONG_MONTHS[month]} ${year}`;
 }

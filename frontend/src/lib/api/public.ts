@@ -30,6 +30,11 @@ function postJson<T>(path: string, body: unknown, headers: Record<string, string
   });
 }
 
+/** A published document's PDF: the API redirects to a fresh short-lived link. */
+export function ledgerFileUrl(documentId: string): string {
+  return `${env.apiUrl}/api/ledger/${encodeURIComponent(documentId)}/file`;
+}
+
 const reportPath = (reference: string) => `/api/reports/${encodeURIComponent(reference)}`;
 
 export function getReportOptions(): Promise<ReportOptions> {
