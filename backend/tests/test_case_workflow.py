@@ -125,3 +125,29 @@ def test_a_number_is_shown_only_to_a_recipient_and_only_with_callback_consent() 
 
 def test_small_personal_safety_counts_are_never_shown_as_numbers() -> None:
     assert shown_count(4) is None and shown_count(0) is None and shown_count(5) == 5
+
+
+def test_each_person_is_offered_only_what_they_may_do() -> None:
+    from app.services.case_workflow import allowed_case_actions
+
+    works = [assignment("dept-works")]
+    assert allowed_case_actions(WORKS, case(), works) == ["acknowledge", "resolve"]
+    assert allowed_case_actions(WORKS, case(), [assignment("dept-works", "in_progress")]) == ["resolve"]
+    assert allowed_case_actions(FINANCE, case(), works) == []
+    assert allowed_case_actions(MCE, case(), works) == ["reassign"]
+    escalated = case(status="escalated")
+    assert allowed_case_actions(MCE, escalated, works) == ["reassign", "reopen", "confirm-resolution"]
+    assert allowed_case_actions(WORKS, escalated, [assignment("dept-works", "resolved")]) == []
+    assert allowed_case_actions(MCE, case(status="resolved"), works) == []
+
+
+def test_the_mce_reopens_an_escalated_case_with_a_note_for_the_recipients() -> None:
+    from app.services.case_workflow import reopen
+
+    reopen(MCE, case(status="escalated"), "The water still stands at the gate.")
+    with pytest.raises(MissingInput):
+        reopen(MCE, case(status="escalated"), "")
+    with pytest.raises(WrongState):
+        reopen(MCE, case(status="in_progress"), "Why?")
+    with pytest.raises(NotAllowed):
+        reopen(WORKS, case(status="escalated"), "Me")

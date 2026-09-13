@@ -76,6 +76,9 @@ def compose(event: NotificationEvent, case: dict[str, Any]) -> Message:
         return Message(f"private_{event.value}", neutral[event])
     site = get_settings().public_site_url.rstrip("/")
     who = recipients_named(case)
+    if event == NotificationEvent.RESOLVED and case.get("escalatedAt"):  # after the one escalation: final
+        return Message("resolved_after_escalation",
+                       f"Nokware: report {reference} has been reviewed and resolved. See the outcome at {site}/report/status")
     bodies = {
         NotificationEvent.SUBMITTED: f"Nokware: your report {reference} was received and sent to {who}. "
         f"We'll message you when it's resolved. Track it at {site}/report/status",

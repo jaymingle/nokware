@@ -59,3 +59,8 @@ def test_a_provider_failure_is_recorded_and_never_raised() -> None:
 
     outcome = notifications._deliver(Broken(), "+233241234567", compose(NotificationEvent.SUBMITTED, CIVIC))
     assert outcome["status"] == NotificationStatus.FAILED.value and outcome["provider"] == "arkesel"
+
+
+def test_a_resolution_after_the_escalation_is_final_and_offers_no_second_escalation() -> None:
+    message = compose(NotificationEvent.RESOLVED, {**CIVIC, "escalatedAt": "2026-09-13T10:00:00+00:00"})
+    assert message.template == "resolved_after_escalation" and "escalate" not in message.body

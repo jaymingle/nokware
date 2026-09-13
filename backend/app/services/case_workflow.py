@@ -6,7 +6,8 @@ resolved when every active assignment is.
 
     submitted -> assigned -> in_progress -> resolved
     resolved -> escalated (the citizen, once, within 14 days)
-      escalated -> assigned (the MCE reassigns it) or resolved (the MCE confirms)
+      escalated -> assigned (the MCE reassigns it, or reopens it with the same recipients)
+      escalated -> resolved (the MCE confirms the resolution)
 
 "submitted" lasts only while a report waits for a person to route it (triage).
 Errors reuse the Ledger workflow's, so they map to the same HTTP statuses.
@@ -59,6 +60,35 @@ def case_status(assignments: list[dict[str, Any]]) -> CaseStatus:
     if AssignmentStatus.IN_PROGRESS in statuses or AssignmentStatus.RESOLVED in statuses:
         return CaseStatus.IN_PROGRESS
     return CaseStatus.ASSIGNED
+
+
+class CaseAction(StrEnum):
+    ACKNOWLEDGE = "acknowledge"
+    RESOLVE = "resolve"
+    REASSIGN = "reassign"
+    REOPEN = "reopen"
+    CONFIRM_RESOLUTION = "confirm-resolution"
+
+
+def assignment_for(principal: Principal, assignments: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """The caller's own active assignment on a case, if any."""
+    return next(
+        (a for a in assignments if a.get("active", True) and principal.recipient and a["recipient"] == principal.recipient),
+        None,
+    )
+
+
+def allowed_case_actions(principal: Principal, case: dict[str, Any], assignments: list[dict[str, Any]]) -> list[CaseAction]:
+    """Exactly what the server would accept from the caller now."""
+    status = case.get("status")
+    if principal.role == Role.MCE:
+        actions = [] if status == CaseStatus.RESOLVED else [CaseAction.REASSIGN]
+        return actions + ([CaseAction.REOPEN, CaseAction.CONFIRM_RESOLUTION] if status == CaseStatus.ESCALATED else [])
+    mine = assignment_for(principal, assignments)
+    if mine is None or status == CaseStatus.ESCALATED:  # an escalated case waits for the MCE
+        return []
+    actions = [CaseAction.ACKNOWLEDGE] if mine["status"] == AssignmentStatus.ASSIGNED else []
+    return actions + ([CaseAction.RESOLVE] if mine["status"] != AssignmentStatus.RESOLVED else [])
 
 
 def _own_assignment(principal: Principal, assignment: dict[str, Any]) -> None:
@@ -151,6 +181,20 @@ def confirm_resolution(principal: Principal, case: dict[str, Any], note: str | N
     if not note:
         raise MissingInput("Say why the resolution stands, for the citizen and the record.")
     return {"status": CaseStatus.RESOLVED.value, "resolvedAt": _now(now)}
+
+
+def reopen(principal: Principal, case: dict[str, Any], note: str | None) -> None:
+    """Whether the MCE may send an escalated case back to its recipients to finish the work."""
+    _mce(principal)
+    if case.get("status") != CaseStatus.ESCALATED:
+        raise WrongState("Only an escalated case can be reopened.")
+    if not note:
+        raise MissingInput("Say what is still to be done; the recipients see it.")
+
+
+def reopened_assignment() -> dict[str, Any]:
+    """An assignment sent back to work; its earlier resolution stays in the audit trail."""
+    return {"status": AssignmentStatus.ASSIGNED.value, "acknowledgedAt": None, "resolvedAt": None, "resolutionNote": None}
 
 
 def closes_at(case: dict[str, Any]) -> datetime | None:
