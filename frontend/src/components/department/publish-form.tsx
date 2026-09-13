@@ -1,6 +1,5 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
 import Link from "next/link";
 
 import { CategoryField, SourceUrlField, TitleField, YearField } from "@/components/documents/document-fields";
@@ -8,6 +7,7 @@ import { ErrorNote } from "@/components/documents/panels";
 import { PdfField } from "@/components/documents/pdf-field";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { usePdfForm } from "@/hooks/use-pdf-form";
 import { useMe } from "@/lib/auth/auth-context";
 import { useUploadDocument } from "@/lib/api/queries";
 import { roleLabel } from "@/lib/portal/navigation";
@@ -39,44 +39,14 @@ function Published({ doc, onAnother }: { doc: DocumentOut; onAnother: () => void
   );
 }
 
-function usePublish() {
-  const upload = useUploadDocument();
-  const [file, setFile] = useState<File | null>(null);
-  const [fileMissing, setFileMissing] = useState(false);
-  const [published, setPublished] = useState<DocumentOut | null>(null);
-
-  async function onSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!file) {
-      setFileMissing(true);
-      return;
-    }
-    const form = new FormData(event.currentTarget);
-    form.set("file", file);
-    try {
-      setPublished(await upload.mutateAsync(form));
-      setFile(null);
-    } catch {
-      // upload.error is shown below the form
-    }
-  }
-
-  const chooseFile = (next: File | null) => {
-    setFile(next);
-    setFileMissing(false);
-  };
-  const startOver = () => {
-    setPublished(null);
-    upload.reset();
-  };
-  return { upload, file, chooseFile, fileMissing, published, startOver, onSubmit };
-}
-
 /** A department publishes under its own name only; the server enforces it too. */
 export function PublishForm() {
   const me = useMe();
-  const { upload, file, chooseFile, fileMissing, published, startOver, onSubmit } = usePublish();
-  if (published) return <Published doc={published} onAnother={startOver} />;
+  const upload = useUploadDocument();
+  const { file, chooseFile, fileMissing, result, clearResult, onSubmit } = usePdfForm(upload.mutateAsync);
+  if (result) {
+    return <Published doc={result} onAnother={() => { clearResult(); upload.reset(); }} />;
+  }
   return (
     <Card className="max-w-2xl">
       <CardContent>
