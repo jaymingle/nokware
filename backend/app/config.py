@@ -14,8 +14,8 @@ class Settings(BaseSettings):
     environment variables case-insensitively (e.g. ``appwrite_endpoint`` reads
     ``APPWRITE_ENDPOINT``). Service settings are required — a missing variable
     raises at startup rather than silently defaulting. Only the CORS settings
-    (whose defaults suit local development) and the optional JOB_TOKEN have
-    defaults.
+    (whose defaults suit local development), the optional JOB_TOKEN and the
+    deadline job's interval have defaults.
     """
 
     model_config = SettingsConfigDict(
@@ -50,6 +50,10 @@ class Settings(BaseSettings):
     # Lets a scheduler call POST /api/jobs/publish-expired with an X-Job-Token
     # header. Empty means only a signed-in MCE can run the job.
     job_token: str = ""
+
+    # How often the API publishes documents whose 72-hour clock has run out
+    # (and retries stalled ingestion). 0 turns the built-in runner off.
+    deadline_job_interval_seconds: int = 120
 
     @property
     def cors_origin_list(self) -> list[str]:

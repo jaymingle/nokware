@@ -32,8 +32,9 @@ Required vars: `APPWRITE_ENDPOINT`, `APPWRITE_PROJECT_ID`, `APPWRITE_API_KEY`,
 `MINIO_LEDGER_BUCKET`, `MINIO_PHOTOS_BUCKET`, `GEMINI_API_KEY`.
 
 Optional: `CORS_ORIGINS` (comma-separated browser origins; localhost on any
-port is allowed by default) and `JOB_TOKEN` (lets a scheduler run the deadline
-job; without it only a signed-in MCE can).
+port is allowed by default), `DEADLINE_JOB_INTERVAL_SECONDS` (default 120; `0`
+turns the built-in deadline job off) and `JOB_TOKEN` (lets an outside scheduler
+call the job route; without it only a signed-in MCE can).
 
 ## Run
 
@@ -42,7 +43,9 @@ uvicorn app.main:app --reload
 ```
 
 Run a single worker: portal changes are serialised per document within one
-process (see `app/services/portal_actions.py`).
+process (see `app/services/portal_actions.py`), and the deadline job runs inside
+it. Every `DEADLINE_JOB_INTERVAL_SECONDS` the API publishes documents whose
+72-hour clock has run out and retries stalled ingestion, so no cron is needed.
 
 Health check: `GET http://localhost:8000/health` → `{"status": "ok"}`.
 

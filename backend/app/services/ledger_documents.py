@@ -77,8 +77,8 @@ def year_from_title(title: str) -> int | None:
 
 
 def _record(document: Document) -> dict[str, Any]:
-    """The document's attributes plus its $id and $createdAt."""
-    return {**document.data, "$id": document.id, "$createdAt": document.createdat}
+    """The document's attributes plus its $id, $createdAt and $updatedAt."""
+    return {**document.data, "$id": document.id, "$createdAt": document.createdat, "$updatedAt": document.updatedat}
 
 
 def get_documents(document_ids: Iterable[str]) -> dict[str, dict[str, Any]]:
