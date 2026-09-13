@@ -59,3 +59,9 @@ export function useReportPreferences() {
 export function useDashboard() {
   return useQuery({ queryKey: publicKeys.dashboard, queryFn: getDashboard, staleTime: DASHBOARD_STALE_MS });
 }
+
+/** Drops a looked-up status from memory, for a citizen clearing the page on a shared device. */
+export function useForgetStatus(): (reference: string) => void {
+  const queryClient = useQueryClient();
+  return (reference) => queryClient.removeQueries({ queryKey: publicKeys.reportStatus(reference) });
+}

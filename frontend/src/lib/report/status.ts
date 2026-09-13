@@ -3,6 +3,8 @@ import type { Tone } from "@/lib/documents";
 
 export type Stage = "received" | "in_progress" | "completed";
 
+export const STAGES: Stage[] = ["received", "in_progress", "completed"];
+
 // The three steps a citizen sees. A personal-safety case shows only these.
 const STAGE_OF: Record<string, Stage> = {
   submitted: "received",
