@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 
+import { ContactList } from "@/components/contacts/contact-list";
 import { NumberFields, SafetyConsents } from "@/components/report/contact-fields";
 import { DescriptionField } from "@/components/report/description-field";
 import { FormActions, FormSection } from "@/components/report/form-parts";
-import { EmergencyNote, Note } from "@/components/report/notes";
+import { Note } from "@/components/report/notes";
 import { PhotoField } from "@/components/report/photo-field";
 import { SubMetroField } from "@/components/report/place-fields";
 import { SafetyTypeField } from "@/components/report/safety-type-field";
@@ -35,6 +36,14 @@ export function SafetyForm({ options, onFiled, onBack }: ReportFormProps) {
     <Card>
       <CardContent className="py-2 sm:px-6 sm:py-4">
         <form onSubmit={(event) => submit(event, topic)} autoComplete="off" className="flex flex-col gap-6" data-testid="report-safety-form">
+          <ContactList
+            title="Need help now?"
+            lead="If someone is in danger, call one of these first. This form is not watched around the clock."
+            contacts={options.safety_contacts}
+            testId="report-safety-contacts"
+            directoryLink={false}
+            columns
+          />
           <SafetyTypeField types={options.safety_types} value={topic} onChange={setTopic} />
           {chosen ? <WhoReceives type={chosen} /> : null}
           <DescriptionField
@@ -53,7 +62,6 @@ export function SafetyForm({ options, onFiled, onBack }: ReportFormProps) {
             <NumberFields contact={contact} onChange={setContact} sensitive />
             <SafetyConsents contact={contact} onChange={setContact} />
           </FormSection>
-          <EmergencyNote />
           <FormActions busy={filing.isPending} error={filing.error} onBack={onBack} />
         </form>
       </CardContent>

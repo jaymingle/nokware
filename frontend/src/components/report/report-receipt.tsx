@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { CheckIcon, CopyIcon } from "lucide-react";
 
+import { ContactList } from "@/components/contacts/contact-list";
 import { Tag } from "@/components/documents/tag";
 import { PreferencesForm } from "@/components/report/preferences-form";
 import { Button } from "@/components/ui/button";
@@ -78,6 +79,11 @@ export function ReportReceiptView({ receipt, onAnother }: { receipt: ReportRecei
         <Filed receipt={receipt} />
         {messages ? <p className="text-[14px] text-ink-soft" data-testid="report-messages">{messages}</p> : null}
         {receipt.held_for_consent ? <HeldForConsent receipt={receipt} /> : null}
+        <ContactList
+          title={receipt.private ? "If you need help now" : "Numbers for this report"}
+          contacts={receipt.contacts}
+          testId="report-receipt-contacts"
+        />
         <div className="flex flex-wrap gap-2 border-t pt-4">
           <Button asChild>
             <Link href="/report/status" data-testid="report-go-status">Check its status</Link>

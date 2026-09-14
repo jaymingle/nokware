@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 
+import { ContactList } from "@/components/contacts/contact-list";
 import { Tag } from "@/components/documents/tag";
 import { EscalateForm } from "@/components/report/escalate-form";
 import { Card, CardContent } from "@/components/ui/card";
@@ -86,6 +87,7 @@ export function CivicStatus({ status }: { status: ReportStatus }) {
       </dl>
       <ResolutionNotes status={status} />
       <CivicFollowUp status={status} />
+      <ContactList title="Numbers for this report" contacts={status.contacts ?? []} testId="status-contacts" />
     </StatusFrame>
   );
 }
