@@ -30,9 +30,10 @@ def _cases() -> list[dict[str, Any]]:
     """A case for every topic citizens can get messages about, and one with the two longest office names."""
     longest = sorted(RECIPIENT_NAMES, key=lambda team: len(RECIPIENT_NAMES[team]))[-2:]
     everyday = [t for t in TOPICS if t.category != Category.PERSONAL_SAFETY]
-    cases = [{"reference": "K7QM-4TXP", "category": t.category.value, "recipients": list(t.recipients)} for t in everyday]
-    return [*cases, {"reference": "K7QM-4TXP", "category": "civic_service", "recipients": longest},
-            {"reference": "K7QM-4TXP", "category": "personal_safety", "recipients": longest}]
+    cases = [{"reference": "K7QM-4TXP", "category": t.category.value, "topic": t.id, "recipients": list(t.recipients)} for t in everyday]
+    return [*cases, {"reference": "K7QM-4TXP", "category": "civic_service", "topic": "roads", "recipients": longest},
+            {"reference": "K7QM-4TXP", "category": "public_safety", "topic": "public_crime", "recipients": longest},
+            {"reference": "K7QM-4TXP", "category": "personal_safety", "topic": "abuse", "recipients": longest}]
 
 
 def test_every_message_fits_one_plain_page(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -40,8 +41,9 @@ def test_every_message_fits_one_plain_page(monkeypatch: pytest.MonkeyPatch) -> N
     for case in _cases():
         for event in NotificationEvent:
             for variant in (case, {**case, "escalatedAt": "2026-09-13T10:00:00+00:00"}):
-                body = notifications.compose(event, variant).body
-                assert is_gsm7(body) and pages(body) == 1, (len(body), body)
+                message = notifications.compose(event, variant)
+                allowed = 2 if message.template == "submitted_emergency" else 1  # an emergency's numbers
+                assert is_gsm7(message.body) and pages(message.body) <= allowed, (len(message.body), message.body)
 
 
 def test_names_give_way_to_a_count_only_when_they_would_not_fit(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -147,3 +149,12 @@ def test_a_sandbox_send_is_recorded_as_not_delivered() -> None:
     assert outcome["status"] == NotificationStatus.SENT.value and outcome["provider"] == "arkesel-sandbox"
     note = notifications._history_note(NotificationEvent.SUBMITTED, NotificationChannel.SMS, outcome, provider)
     assert note == "Submission SMS accepted by the provider's sandbox, not delivered."
+
+
+def test_an_emergencys_received_message_carries_numbers_to_try_but_personal_safety_never_does() -> None:
+    fire = notifications.compose(NotificationEvent.SUBMITTED, {"reference": "K7QM-4TXP", "category": "public_safety",
+                                                                "topic": "fire", "recipients": ["agency-gnfs"]})
+    assert "Fire: 112, 192. Ambulance: 193, 0501 614 877." in fire.body and "/contacts" in fire.body
+    private = notifications.compose(NotificationEvent.SUBMITTED, {"reference": "M3RD-8WQA", "category": "personal_safety",
+                                                                   "topic": "abuse", "recipients": ["agency-police"]})
+    assert private.body == "Nokware: reference M3RD-8WQA received."

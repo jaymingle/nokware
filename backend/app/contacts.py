@@ -7,12 +7,20 @@ national emergency line (tier 1), an official site checked on a given date
 page, both are shown and the cited one is marked current. A number with no
 source at all is kept in the file's "held" list and never shown.
 
-A report's confirmation shows the numbers for where it went. A public-safety
-report starts with 112, and a report for the Police or the Fire Service gets
-that service's emergency line; then any numbers for the topic (ROUTES), or the
-Assembly's switchboard if there are none. A personal-safety report gets the
-emergency lines, the helpline and the Social Welfare desk for the sub-metro the
-citizen gave, or the head office if they gave none.
+Ghana's emergency hotlines often don't connect, so a report where someone may
+be in danger shows every number we have for each service involved, in the order
+to try them, so the citizen can work down the list. 112 comes first; then each
+service the topic needs (EMERGENCY_TOPICS), and the ambulance for anything where
+someone could be hurt. A personal-safety report gets the Police (with their
+reporting lines, marked as not independently verified), the Helpline of Hope,
+Social Welfare (the citizen's sub-metro desk, or every desk if unknown, and the
+head office) and the ambulance. Unverified numbers stay marked as such: in an
+emergency a number worth trying beats none. Where a phone screen can't hold
+the list (SMS, USSD), short_line() gives two numbers per service.
+
+An everyday report shows any numbers for its topic (ROUTES), or the Assembly's
+switchboard. Safety reporters are never pointed to an Assembly Member: elected
+politicians, not responders, and in a small area they may know the abuser.
 """
 
 import json
@@ -26,21 +34,43 @@ from app.wards import sub_metros
 
 CONTACTS_FILE = Path(__file__).resolve().parent / "data" / "contacts.json"
 
-SAFETY = ("emergency-112", "police-191", "police-18555", "helpline-of-hope")
-SAFETY_DESK_FALLBACK = "sw-head-office"
 PUBLIC_EMERGENCY = "emergency-112"
+SAFETY_DESK_FALLBACK = "sw-head-office"
 # The emergency line of each agency a report can go to.
 AGENCY_LINES = {POLICE: "police-191", GNFS: "fire-192"}
-# Numbers for a topic, after its emergency lines. The waste route will add AMA
+# Each emergency service's numbers, in the order to try them.
+EMERGENCY_SERVICES: dict[str, tuple[str, ...]] = {
+    "police": ("police-191", "police-18555", "police-main"),
+    "police_reporting": ("police-mobile", "police-whatsapp"),  # reported via X: shown for personal safety
+    "fire": ("fire-192", "gnfs"),
+    "ambulance": ("ambulance-193", "nas"),
+    "disaster": ("nadmo-emergency", "nadmo-whatsapp"),
+    "helpline": ("helpline-of-hope",),
+}
+SERVICE_NAMES = {
+    "emergency": "Any emergency", "police": "Police", "police_reporting": "Police reporting lines",
+    "fire": "Fire service", "ambulance": "Ambulance",
+    "disaster": "NADMO (floods and disasters)", "helpline": "Helpline of Hope (abuse and children)", "welfare": "Social Welfare",
+}
+SAFETY_SERVICES = ("police", "police_reporting", "helpline", "welfare", "ambulance")
+# The services an emergency topic needs; anything where someone could be hurt includes the ambulance.
+EMERGENCY_TOPICS: dict[str, tuple[str, ...]] = {
+    "fire": ("fire", "ambulance"),
+    "disaster": ("disaster", "ambulance"),
+    "structural_danger": ("fire", "ambulance"),  # rescue from a collapse is the fire service's
+    "public_crime": ("police", "ambulance"),
+    **{t.id: SAFETY_SERVICES for t in TOPICS_BY_ID.values() if t.category == Category.PERSONAL_SAFETY},
+}
+# Numbers for a topic, after its emergency numbers. The waste route will add AMA
 # Waste Management's own line once a source for it is found.
 ROUTES = {
-    "fire": ("gnfs",),
-    "disaster": ("nadmo-emergency",),
     "structural_danger": ("ama-general",),
     "solid_waste": ("ama-sanitation-whatsapp", "ama-general"),
     "sanitation_facilities": ("ama-sanitation-whatsapp", "ama-general"),
 }
 DEFAULT = ("ama-general",)
+SHORT_PER_SERVICE = 2  # numbers per service where a screen can't hold them all
+WITH_112 = ("police", "fire", "disaster")  # services whose short form leads with 112
 
 
 def _contact(raw: dict[str, Any], sources: dict[str, Any], checked: str) -> PublicContact:
@@ -79,10 +109,25 @@ def directory() -> ContactDirectory:
     return ContactDirectory(about=raw["about"], checked=raw["checked"], services=services)
 
 
+def _welfare(sub_metro: str | None) -> list[str]:
+    """The citizen's sub-metro desk, or every desk if we don't know it, then the head office."""
+    desks = _desks()
+    return [desks[sub_metro] if sub_metro in desks else None, *([] if sub_metro in desks else desks.values()), SAFETY_DESK_FALLBACK]
+
+
+def emergency_groups(topic: str, sub_metro: str | None) -> list[tuple[str, list[PublicContact]]]:
+    """Every number for each service an emergency topic needs, by service, 112 first. Empty for everyday topics."""
+    services = EMERGENCY_TOPICS.get(topic)
+    if not services:
+        return []
+    groups = [("emergency", [PUBLIC_EMERGENCY])]
+    groups += [(s, _welfare(sub_metro) if s == "welfare" else list(EMERGENCY_SERVICES[s])) for s in services]
+    return [(service, [contacts()[i] for i in ids if i]) for service, ids in groups]
+
+
 def safety_contacts(sub_metro: str | None) -> list[PublicContact]:
-    """For a report about a danger to a person: emergency lines, the helpline, and the nearest Social Welfare desk."""
-    desk = _desks().get(sub_metro or "", SAFETY_DESK_FALLBACK)
-    return [contacts()[i] for i in (*SAFETY, desk)]
+    """For a report about a danger to a person: every number to try, in order."""
+    return for_report("abuse", sub_metro)
 
 
 def emergency_lines(topic: str) -> list[str]:
@@ -93,21 +138,33 @@ def emergency_lines(topic: str) -> list[str]:
 
 
 def for_report(topic: str, sub_metro: str | None) -> list[PublicContact]:
-    """The numbers to show a citizen for where their report went."""
-    if TOPICS_BY_ID[topic].category == Category.PERSONAL_SAFETY:
-        return safety_contacts(sub_metro)
-    lines = emergency_lines(topic)
-    extra = ROUTES.get(topic, () if lines else DEFAULT)
-    return [contacts()[i] for i in dict.fromkeys([*lines, *extra])]
+    """The numbers to show a citizen for their report: every emergency number, then the topic's own."""
+    urgent = [c.id for _, group in emergency_groups(topic, sub_metro) for c in group]
+    extra = ROUTES.get(topic, () if urgent else DEFAULT)
+    return [contacts()[i] for i in dict.fromkeys([*urgent, *extra])]
+
+
+def short_line(topic: str, sub_metro: str | None) -> str:
+    """Two numbers per service, for an SMS or a USSD screen: "Police: 112, 191. Ambulance: 193, 0501 614 877."."""
+    parts = []
+    for service, group in emergency_groups(topic, sub_metro)[1:]:
+        if service == "police_reporting":
+            continue
+        if service == "welfare":  # one number: their desk, or the head office when we don't know where they are
+            group = [contacts()[_desks().get(sub_metro or "", SAFETY_DESK_FALLBACK)]]
+        numbers = (["112"] if service in WITH_112 else []) + [n.number for c in group for n in c.numbers if n.current and n.kind == "call"]
+        label = {"helpline": "Helpline", "disaster": "NADMO", "fire": "Fire"}.get(service, SERVICE_NAMES[service])
+        parts.append(f"{label}: {', '.join(numbers[: 1 if service == 'welfare' else SHORT_PER_SERVICE])}.")
+    return " ".join(parts)
 
 
 def _check() -> None:
     """Fail at import if a route names a contact or topic that doesn't exist."""
     known = contacts()
-    named = {*SAFETY, SAFETY_DESK_FALLBACK, *DEFAULT, PUBLIC_EMERGENCY, *AGENCY_LINES.values(),
-             *(i for ids in ROUTES.values() for i in ids)}
+    named = {SAFETY_DESK_FALLBACK, *DEFAULT, PUBLIC_EMERGENCY, *AGENCY_LINES.values(),
+             *(i for ids in ROUTES.values() for i in ids), *(i for ids in EMERGENCY_SERVICES.values() for i in ids)}
     missing = named - set(known)
-    if missing or not set(ROUTES) <= set(TOPICS_BY_ID):
+    if missing or not set(ROUTES) | set(EMERGENCY_TOPICS) <= set(TOPICS_BY_ID):
         raise ValueError(f"contact routes name unknown contacts {sorted(missing)} or topics")
     services = {s["id"] for s in _load()[0]["services"]}
     if any(c.service not in services for c in known.values()):

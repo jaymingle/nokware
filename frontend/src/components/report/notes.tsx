@@ -24,7 +24,10 @@ export function EmergencyNote() {
       <PhoneCallIcon aria-hidden className="mt-0.5 size-4 shrink-0 text-brick" />
       <span>
         If someone is in danger right now, call <a href="tel:112" className="font-medium text-ink underline underline-offset-2" data-testid="report-call-112">112</a>,
-        Ghana&apos;s emergency number. Reports here are not watched around the clock.
+        Ghana&apos;s emergency number. If it doesn&apos;t connect, try the Police on{" "}
+        <a href="tel:191" className="font-medium text-ink underline underline-offset-2" data-testid="report-call-191">191</a> or{" "}
+        <a href="tel:18555" className="font-medium text-ink underline underline-offset-2" data-testid="report-call-18555">18555</a>.
+        Reports here are not watched around the clock.
       </span>
     </p>
   );

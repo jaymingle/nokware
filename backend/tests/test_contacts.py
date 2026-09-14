@@ -11,6 +11,7 @@ from app import contacts
 from app.main import app
 from app.routes import reports as routes
 from app.services import rate_limit
+from app.services.channel_contacts import numbers_text
 from app.services.report_taxonomy import TOPICS, Category
 
 client = TestClient(app)
@@ -20,19 +21,45 @@ def ids(found: list[contacts.PublicContact]) -> list[str]:
     return [c.id for c in found]
 
 
-def test_a_safety_report_gets_emergency_lines_the_helpline_and_its_sub_metros_welfare_desk() -> None:
+POLICE = ["police-191", "police-18555", "police-main"]
+AMBULANCE = ["ambulance-193", "nas"]
+
+
+def test_a_safety_report_gets_every_number_to_try_and_its_sub_metros_welfare_desk() -> None:
     assert ids(contacts.for_report("abuse", "ablekuma-south")) == [
-        "emergency-112", "police-191", "police-18555", "helpline-of-hope", "sw-ablekuma-south"]
-    assert ids(contacts.for_report("child_at_risk", None))[-1] == "sw-head-office"  # no sub-metro given
+        "emergency-112", *POLICE, "police-mobile", "police-whatsapp", "helpline-of-hope",
+        "sw-ablekuma-south", "sw-head-office", *AMBULANCE]
+    unknown = ids(contacts.for_report("child_at_risk", None))  # no sub-metro given: every desk, then the head office
+    assert unknown[unknown.index("helpline-of-hope") + 1:unknown.index("ambulance-193")] == [
+        "sw-ashiedu-keteke", "sw-ablekuma-south", "sw-okaikoi-south", "sw-head-office"]
+    assert contacts.safety_contacts(None) == contacts.for_report("abuse", None)
 
 
-def test_other_reports_get_the_numbers_for_where_they_went() -> None:
-    assert ids(contacts.for_report("fire", "kinka")) == ["emergency-112", "fire-192", "gnfs"]
-    assert ids(contacts.for_report("disaster", None)) == ["emergency-112", "nadmo-emergency"]
-    assert ids(contacts.for_report("public_crime", None)) == ["emergency-112", "police-191"]
-    assert ids(contacts.for_report("structural_danger", None)) == ["emergency-112", "ama-general"]
+def test_other_emergencies_get_every_number_for_each_service_they_need() -> None:
+    assert ids(contacts.for_report("fire", None)) == ["emergency-112", "fire-192", "gnfs", *AMBULANCE]
+    assert ids(contacts.for_report("disaster", None)) == ["emergency-112", "nadmo-emergency", "nadmo-whatsapp", *AMBULANCE]
+    assert ids(contacts.for_report("public_crime", None)) == ["emergency-112", *POLICE, *AMBULANCE]  # no unverified lines
+    assert ids(contacts.for_report("structural_danger", None)) == ["emergency-112", "fire-192", "gnfs", *AMBULANCE, "ama-general"]
     assert ids(contacts.for_report("solid_waste", None)) == ["ama-sanitation-whatsapp", "ama-general"]
     assert ids(contacts.for_report("roads", None)) == ids(contacts.for_report("revenue", None)) == ["ama-general"]
+
+
+def test_where_a_screen_cannot_hold_them_two_numbers_per_service() -> None:
+    assert contacts.short_line("fire", None) == "Fire: 112, 192. Ambulance: 193, 0501 614 877."
+    assert contacts.short_line("public_crime", None) == "Police: 112, 191. Ambulance: 193, 0501 614 877."
+    assert contacts.short_line("abuse", "okaikoi-south") == (
+        "Police: 112, 191. Helpline: 0800 800 800, 0800 900 900. Social Welfare: 0303 935 397. Ambulance: 193, 0501 614 877.")
+    assert "Social Welfare: 0550 006 688." in contacts.short_line("abuse", None)  # the head office when unknown
+    assert contacts.short_line("roads", None) == ""
+
+
+def test_the_chat_list_keeps_every_number_and_its_source_label() -> None:
+    text = numbers_text("abuse", None)
+    listed = {n.number for c in contacts.for_report("abuse", None) for n in c.numbers}
+    assert all(number in text for number in listed)
+    assert "*Police reporting lines* (reported via X by the Ghana Police Service, not independently verified)" in text
+    assert "0302 773 900 (Police HQ, Accra; an earlier listing, may not connect)" in text
+    assert "Assembly" not in text and numbers_text("roads", None) == ""
 
 
 def test_every_danger_to_the_public_starts_with_112_and_every_agency_report_gets_its_line() -> None:

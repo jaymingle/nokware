@@ -10,7 +10,9 @@ service, not even the word "report". A phone can be shared.
 
 Every message fits one SMS page in plain GSM-7 (a credit each): the office
 names are short names, and when they still don't fit, a shorter way of saying
-who replaces them.
+who replaces them. The one exception: the "received" message for an emergency
+(a fire, a flood, a crime) carries two numbers per service to try, on up to
+two pages. A personal-safety message never does: it says only the reference.
 
 Every message is written to the notifications outbox first (never with the
 number, which is read from report_contacts at the moment of sending), then
@@ -37,6 +39,7 @@ from appwrite.id import ID
 from appwrite.query import Query
 
 from app.config import get_settings
+from app.contacts import EMERGENCY_TOPICS, short_line
 from app.services import case_history
 from app.services.appwrite_client import DATABASE_ID, get_databases
 from app.services.case_history import SYSTEM, CaseEntry, CaseHistoryAction
@@ -88,10 +91,10 @@ def _who_options(case: dict[str, Any]) -> list[str]:
     return [" and ".join(names), f"{names[0]} and {others} other office{'s' if others > 1 else ''}", f"{len(names)} offices"]
 
 
-def _one_page(render: Callable[[str], str], case: dict[str, Any]) -> str:
-    """The fullest wording that fits one SMS page."""
+def _one_page(render: Callable[[str], str], case: dict[str, Any], pages_allowed: int = 1) -> str:
+    """The fullest wording that fits one SMS page (two for an emergency's numbers)."""
     bodies = [render(who) for who in _who_options(case)]
-    return next((body for body in bodies if pages(body) == 1), bodies[-1])
+    return next((body for body in bodies if pages(body) <= pages_allowed), bodies[-1])
 
 
 def _neutral(event: NotificationEvent, reference: str) -> Message:
@@ -114,6 +117,10 @@ def compose(event: NotificationEvent, case: dict[str, Any]) -> Message:
         return Message("resolved_after_escalation", f"Nokware: report {reference} was reviewed and resolved. Outcome: {status_page}")
     if event == NotificationEvent.ESCALATED:
         return Message(event.value, f"Nokware: we've received your escalation of report {reference}. The MCE's office will review it.")
+    if event == NotificationEvent.SUBMITTED and case.get("topic") in EMERGENCY_TOPICS:  # worth a second page
+        site = get_settings().public_site_url.rstrip("/")
+        numbers = f"If anyone is in danger: {short_line(case['topic'], None)} More numbers: {site}/contacts"
+        return Message("submitted_emergency", _one_page(lambda who: f"Nokware: report {reference} is with {who}. {numbers}", case, pages_allowed=2))
     renders: dict[NotificationEvent, Callable[[str], str]] = {
         NotificationEvent.SUBMITTED: lambda who: f"Nokware: report {reference} is with {who}. "
         f"We'll message you when it's resolved. Track it: {status_page}",
