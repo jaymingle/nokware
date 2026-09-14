@@ -16,6 +16,7 @@ adds; nothing is deleted. Safe to re-run.
 import argparse
 import sys
 
+from appwrite.exception import AppwriteException
 from appwrite.query import Query
 
 from app.services.appwrite_client import DATABASE_ID, every_record, get_databases, quiet_sdk_deprecation_warnings
@@ -68,6 +69,14 @@ def civic_without_public_id() -> list[dict[str, str]]:
     return [r for r in everyday if r["$id"] not in have]
 
 
+def dry_run_missing() -> list[dict[str, str]]:
+    """The civic reports a run would give a public ID: all of them, before publicId exists."""
+    try:
+        return civic_without_public_id()
+    except AppwriteException:  # publicId isn't an attribute yet
+        return every_record(REPORTS, [Query.equal("category", Category.CIVIC_SERVICE.value), Query.select(["reference"])])
+
+
 def backfill() -> int:
     missing = civic_without_public_id()
     for report in missing:
@@ -82,9 +91,10 @@ def main() -> int:
     args = parser.parse_args()
     quiet_sdk_deprecation_warnings()
     if not args.yes:
-        print("[dry run] would create collection case_voices, add citizen_reports.publicId and .voiceCount, and their indexes")
-        everyday = every_record(REPORTS, [Query.equal("category", Category.CIVIC_SERVICE.value), Query.select(["reference"])])
-        print(f"[dry run] {len(everyday)} civic report(s) would get a public ID: {', '.join(r['reference'] for r in everyday)}")
+        print("[dry run] would create collection case_voices, add citizen_reports.publicId and .voiceCount, and their indexes"
+              " (any that exist are left as they are)")
+        missing = dry_run_missing()
+        print(f"[dry run] {len(missing)} civic report(s) would get a public ID: {', '.join(r['reference'] for r in missing) or 'none'}")
         return 0
     build_schema()
     count = backfill()

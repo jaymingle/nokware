@@ -1,7 +1,7 @@
 """List, and with --yes delete, test citizen reports: those whose description starts "[TEST]".
 
-For each: the case, its assignments, audit trail, contact, outbox rows and
-photos. Also lists photos under reports/ that belong to no case (left by a
+For each: the case, its assignments, audit trail, contact, outbox rows,
+residents' voices and photos. Also lists photos under reports/ that belong to no case (left by a
 filing that failed after its photos were stored).
 
 A dry run by default: nothing is deleted without --yes.
@@ -22,6 +22,7 @@ from app.services.citizen_reports import (
     CONTACTS_COLLECTION,
     NOTIFICATIONS_COLLECTION,
     REPORTS_COLLECTION,
+    VOICES_COLLECTION,
 )
 from app.services.storage import get_minio
 
@@ -57,6 +58,7 @@ def related(case_id: str) -> dict[str, list[Any]]:
         HISTORY: documents(HISTORY, by_case),
         NOTIFICATIONS_COLLECTION: documents(NOTIFICATIONS_COLLECTION, by_case),
         CONTACTS_COLLECTION: documents(CONTACTS_COLLECTION, by_case),
+        VOICES_COLLECTION: documents(VOICES_COLLECTION, by_case),
     }
 
 
