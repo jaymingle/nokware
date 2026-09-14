@@ -34,3 +34,4 @@ class RateLimit:
 SUBMISSIONS = RateLimit(limit=5, window_seconds=600)
 LOOKUPS = RateLimit(limit=30, window_seconds=60)
 ESCALATIONS = RateLimit(limit=5, window_seconds=3600)
+VOICES = RateLimit(limit=20, window_seconds=3600)

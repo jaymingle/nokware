@@ -33,9 +33,10 @@ from app.services.report_rules import (
     InvalidReport,
     classify,
     locate,
+    new_public_id,
     new_reference,
 )
-from app.services.report_taxonomy import TOPICS_BY_ID
+from app.services.report_taxonomy import TOPICS_BY_ID, Category
 from app.teams import RECIPIENT_NAMES
 
 DESCRIPTION_MIN = 10
@@ -128,10 +129,16 @@ def _case_fields(
     }
 
 
+def _drawn_ids(fields: dict[str, Any]) -> dict[str, Any]:
+    """A fresh reference, and for a civic report a public ID for the issue list (both random, so drawn together)."""
+    civic = fields["category"] == Category.CIVIC_SERVICE
+    return {"reference": new_reference(), **({"publicId": new_public_id(), "voiceCount": 0} if civic else {})}
+
+
 def _create(case_id: str, fields: dict[str, Any]) -> dict[str, Any]:
     for _ in range(REFERENCE_ATTEMPTS):
         try:
-            return report_store.create_report(case_id, {**fields, "caseId": case_id, "reference": new_reference()})
+            return report_store.create_report(case_id, {**fields, "caseId": case_id, **_drawn_ids(fields)})
         except report_store.DuplicateReference:
             continue
     raise RuntimeError("Could not draw an unused case reference")

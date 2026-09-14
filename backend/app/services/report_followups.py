@@ -26,7 +26,8 @@ from app.services.ledger_documents import parse_datetime
 from app.services.report_contacts import contact_for, contacts_due_for_deletion, delete_contact, update_contact
 from app.services.report_intake import token_hash
 from app.services.report_rules import normalise_reference
-from app.services.report_taxonomy import TOPICS_BY_ID
+from app.services.issue_voices import sync_voice_retention
+from app.services.report_taxonomy import TOPICS_BY_ID, Category
 from app.services.workflow import NotAllowed
 from app.teams import RECIPIENT_NAMES
 from app.wards import sub_metros, wards
@@ -101,6 +102,7 @@ def public_status(case: dict[str, Any], assignments: list[dict[str, Any]], now: 
         "sub_metro": sub_metro.name if sub_metro else None,
         "resolved_at": case.get("resolvedAt"),
         "resolution_notes": _resolution_notes(assignments),
+        "voices": (case.get("voiceCount") or 0) if case.get("category") == Category.CIVIC_SERVICE else None,
     }
 
 
@@ -146,12 +148,13 @@ def set_preferences(reference_or_id: str, token: str, choice: Preferences, now: 
 
 
 def sync_contact_retention(case: dict[str, Any]) -> None:
-    """Keep the numbers' deletion date in step with the case: none while open, 30 days after it closes."""
-    contact = contact_for(case["$id"])
-    if contact is None:
-        return
+    """Keep the deletion date of the citizen's numbers, and of names given with voices, in step with the case:
+    none while open, 30 days after it closes."""
     purge_at = contact_purge_at(case)
-    update_contact(case["$id"], {"purgeAt": purge_at.isoformat() if purge_at else None})
+    if contact_for(case["$id"]) is not None:
+        update_contact(case["$id"], {"purgeAt": purge_at.isoformat() if purge_at else None})
+    if case.get("category") == Category.CIVIC_SERVICE:
+        sync_voice_retention(case["$id"], purge_at)
 
 
 def purge_expired_contacts(now: datetime) -> int:

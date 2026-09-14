@@ -3,14 +3,14 @@
 from typing import Any
 
 from app.schemas.cases import CaseAssignment, CaseDetail, CaseEvent, CaseSummary, Contact
-from app.services import case_history
+from app.services import case_history, issue_voices
 from app.services.case_history import CaseHistoryAction
 from app.services.auth import Principal
 from app.services.case_workflow import CaseView, allowed_case_actions, assignment_for, case_view, may_see_contact
 from app.services.report_contacts import contact_for
 from app.services.report_photos import photo_link
 from app.services.report_rules import ClassificationMethod
-from app.services.report_taxonomy import TOPICS_BY_ID
+from app.services.report_taxonomy import TOPICS_BY_ID, Category
 from app.teams import RECIPIENT_NAMES
 from app.wards import sub_metros, wards
 
@@ -48,6 +48,7 @@ def summary(principal: Principal, case: dict[str, Any], assignments: list[dict[s
         escalated=bool(case.get("escalatedAt")),
         needs_routing=case.get("classifiedBy") == ClassificationMethod.TRIAGE,
         allowed_actions=allowed_case_actions(principal, case, assignments),
+        voices=(case.get("voiceCount") or 0) if case.get("category") == Category.CIVIC_SERVICE else 0,
     )
 
 
@@ -78,6 +79,13 @@ def _event(entry: dict[str, Any], full: bool) -> CaseEvent:
     return CaseEvent(action=entry["action"], actor_name=entry["actorName"], actor_role=entry["actorRole"], note=note, at=entry["timestamp"])
 
 
+def _voice_names(principal: Principal, case: dict[str, Any], assignments: list[dict[str, Any]]) -> list[str] | None:
+    """Names given with voices reach the department handling the issue, not the MCE or anyone else."""
+    if case.get("category") != Category.CIVIC_SERVICE or assignment_for(principal, assignments) is None:
+        return None
+    return issue_voices.named_voices(case["$id"]) if case.get("voiceCount") else []
+
+
 def detail(principal: Principal, case: dict[str, Any], assignments: list[dict[str, Any]]) -> CaseDetail:
     full = case_view(principal, case) == CaseView.FULL
     history = [_event(entry, full) for entry in case_history.entries_for(case["$id"])]
@@ -90,4 +98,5 @@ def detail(principal: Principal, case: dict[str, Any], assignments: list[dict[st
         contact=_contact(principal, case) if full else None,
         assignments=[_assignment(a, full) for a in assignments],
         history=history,
+        voice_names=_voice_names(principal, case, assignments),
     )

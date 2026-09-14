@@ -27,6 +27,7 @@ class CaseSummary(BaseModel):
     escalated: bool
     needs_routing: bool  # the classifier failed; routed to Central Administration for a person to route
     allowed_actions: list[CaseAction]  # exactly what the server would accept from the caller now
+    voices: int  # residents who said this civic issue affects them too; 0 for anything else
 
 
 class CaseAssignment(BaseModel):
@@ -62,6 +63,7 @@ class CaseDetail(CaseSummary):
     contact: Contact | None
     assignments: list[CaseAssignment]
     history: list[CaseEvent]
+    voice_names: list[str] | None  # names residents gave with their voices; the handling department only
 
 
 class CaseQueue(BaseModel):

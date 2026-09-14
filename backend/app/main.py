@@ -7,9 +7,24 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.config import get_settings
-from app.routes import ask, cases, contacts, dashboard, documents, jobs, ledger, me, options, queues, reports, representatives
+from app.routes import (
+    ask,
+    cases,
+    contacts,
+    dashboard,
+    documents,
+    issues,
+    jobs,
+    ledger,
+    me,
+    options,
+    queues,
+    reports,
+    representatives,
+)
 from app.services import scheduler
 from app.services.appwrite_client import quiet_sdk_deprecation_warnings
+from app.services.issue_voices import InvalidVoice, IssueNotFound, purge_expired_voice_names
 from app.services.ledger_documents import utc_now
 from app.services.portal_actions import run_deadline_job
 from app.services.portal_queries import DocumentNotFound
@@ -45,7 +60,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     # Documents publish when their clock runs out, without cron: the deadline
     # job runs in this process every DEADLINE_JOB_INTERVAL_SECONDS.
     task = scheduler.start(settings.deadline_job_interval_seconds, run_deadline_job, "Deadline job")
-    # Citizens' numbers are deleted 30 days after their case closes.
+    # Citizens' numbers, and names given with voices, are deleted 30 days after their case closes.
     purge = scheduler.start(settings.contact_purge_interval_seconds, run_contact_purge, "Contact purge")
     yield
     await scheduler.stop(task)
@@ -53,7 +68,9 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 
 def run_contact_purge() -> None:
-    purge_expired_contacts(utc_now())
+    now = utc_now()
+    purge_expired_contacts(now)
+    purge_expired_voice_names(now)
 
 
 app = FastAPI(title="Nokware Backend", version="0.1.0", lifespan=lifespan)
@@ -78,6 +95,7 @@ def workflow_error(_: Request, exc: WorkflowError) -> JSONResponse:
 @app.exception_handler(InvalidReport)
 @app.exception_handler(InvalidNumber)
 @app.exception_handler(PhotoRejected)
+@app.exception_handler(InvalidVoice)
 def invalid_report(_: Request, exc: ValueError) -> JSONResponse:
     return JSONResponse({"detail": str(exc)}, status_code=422)
 
@@ -85,6 +103,11 @@ def invalid_report(_: Request, exc: ValueError) -> JSONResponse:
 @app.exception_handler(CaseNotFound)
 def case_not_found(_: Request, __: CaseNotFound) -> JSONResponse:
     return JSONResponse({"detail": "No report has that reference. Check it and try again."}, status_code=404)
+
+
+@app.exception_handler(IssueNotFound)
+def issue_not_found(_: Request, __: IssueNotFound) -> JSONResponse:
+    return JSONResponse({"detail": "No open issue has that ID."}, status_code=404)
 
 
 @app.exception_handler(DocumentNotFound)
@@ -109,3 +132,4 @@ app.include_router(cases.router)
 app.include_router(dashboard.router)
 app.include_router(contacts.router)
 app.include_router(representatives.router)
+app.include_router(issues.router)
