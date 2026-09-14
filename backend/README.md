@@ -66,6 +66,7 @@ membership.
 | `GET /api/reports/{reference}` (by reference or case ID; personal safety shows only its stage) | public, 30 a minute |
 | `POST /api/reports/{reference}/escalate` (`note`; once, within 14 days of resolution) | public |
 | `POST /api/reports/{reference}/preferences` (`X-Receipt-Token`; after a safety reclassification, once, within the hour) | public |
+| `GET /api/representatives` (each sub-metro's chairperson, office and electoral areas; `?area=` finds one area by any spelling) | public |
 | `GET /api/contacts` (who to call, grouped by service; each number with its tier and source) | public |
 | `GET /api/dashboard` (twelve months of report figures, no personal safety; Ledger counts and latest documents; cached a minute) | public |
 | `GET /api/me` | anyone signed in |
@@ -107,8 +108,10 @@ Residents report problems (civic service, public safety) or danger to a person
   recipient; one escalation to the MCE within 14 days of resolution), what each
   role may see (the MCE sees personal-safety cases only in outline), and when a
   citizen's numbers are deleted (30 days after the case closes).
-- `app/wards.py`: AMA's 20 electoral areas in 3 sub-metros, from its 2023
-  Monitoring and Evaluation Report.
+- `app/wards.py`: AMA's electoral areas in 3 sub-metros, with each
+  sub-metro's chairperson and office, as given from ama.gov.gh. The 2023
+  Monitoring and Evaluation Report's spellings are kept as alternates, and
+  `find_ward` matches any of them; Mukose comes from that report alone.
 
 Filing (`app/services/report_intake.py`) checks everything before writing:
 photos are re-encoded from their pixels alone (`report_photos.py`: no EXIF,
