@@ -6,7 +6,7 @@ export default function MceCasesPage() {
     <RolePage
       eyebrow="Oversight · Metropolitan Chief Executive"
       title="Citizen cases"
-      lead="Every report residents have filed, across all twelve departments and the Police and Fire services. Personal-safety cases appear only in outline: their recipients alone can read them. Every reassignment is written to the audit trail with your name, the time and the departments involved."
+      lead="Every report residents have filed, across every department and the Police and Fire services. Personal-safety cases appear only in outline: their recipients alone can read them. Every reassignment is written to the audit trail with your name, the time and the departments involved."
     >
       <CaseOversightScreen />
     </RolePage>
