@@ -14,8 +14,16 @@ who replaces them.
 
 Every message is written to the notifications outbox first (never with the
 number, which is read from report_contacts at the moment of sending), then
-handed to the channel's provider: Arkesel for SMS (SMS_PROVIDER=arkesel), or
-"log", which records the message as not sent. Twilio (WhatsApp) comes later.
+handed to the channel's provider: Arkesel for SMS (SMS_PROVIDER=arkesel),
+Twilio for WhatsApp (WHATSAPP_PROVIDER=twilio), or "log", which records the
+message as not sent.
+
+WhatsApp carries a free-form message only within 24 hours of the citizen's last
+message, and until WhatsApp templates are approved nothing else can go. So a
+WhatsApp update outside that window goes by SMS to the same number instead,
+when the number is Ghanaian and the citizen isn't getting SMS already: before
+sending, when Redis shows the window closed, and afterwards, when Twilio reports
+the message undelivered for that reason (error 63016).
 """
 
 import logging
@@ -39,10 +47,11 @@ from app.services.citizen_reports import (
     NotificationStatus,
 )
 from app.services.ledger_documents import now_iso
-from app.services.report_contacts import contact_for, masked
+from app.services.report_contacts import GHANA_CODE, contact_for, masked
 from app.services.report_taxonomy import Category
 from app.services.sms import arkesel
 from app.services.sms_text import pages
+from app.services.whatsapp import first_delivery, twilio, window_open
 from app.teams import short_name
 
 logger = logging.getLogger(__name__)
@@ -130,6 +139,8 @@ def provider_for(channel: NotificationChannel) -> Provider | None:
         return None
     if channel == NotificationChannel.SMS and configured == "arkesel":
         return arkesel()
+    if channel == NotificationChannel.WHATSAPP and configured == "twilio":
+        return twilio()
     raise NotImplementedError(f"{channel.value} provider {configured!r} is not wired in yet")
 
 
@@ -179,29 +190,67 @@ def _history_note(event: NotificationEvent, channel: NotificationChannel, outcom
     return f"{what} failed to send."
 
 
+WINDOW_CLOSED = "WhatsApp's 24-hour window had closed, so it went by SMS to the same number."
+OUTSIDE_WINDOW_ERROR = "63016"  # Twilio: a free-form WhatsApp message outside the 24-hour window
+
+
+def _send(case_id: str, event: NotificationEvent, channel: NotificationChannel, number: str, message: Message, why: str = "") -> None:
+    """One message: written to the outbox, handed to the provider, and the outcome in the case history."""
+    outbox_id = _outbox(case_id, event, channel, message)
+    provider = provider_for(channel)
+    outcome = _deliver(provider, number, message)
+    get_databases().update_document(DATABASE_ID, NOTIFICATIONS_COLLECTION, outbox_id, outcome)
+    note = _history_note(event, channel, outcome, provider) + (f" {why}" if why else "")
+    case_history.record(case_id, CaseEntry(CaseHistoryAction.NOTIFIED, SYSTEM, note=note, channel=channel.value))
+
+
+def _sms_can_stand_in(number: str, contact: dict[str, Any]) -> bool:
+    """SMS can carry a WhatsApp update: Twilio is on, the number is Ghanaian and gets no SMS already."""
+    return get_settings().whatsapp_provider == "twilio" and number.startswith(f"+{GHANA_CODE}") and not contact.get("phone")
+
+
 def notify(case: dict[str, Any], event: NotificationEvent) -> None:
     """Message the citizen about one of the three events, on every channel they agreed to."""
-    for channel, number in channels_for(contact_for(case["$id"])):
+    contact = contact_for(case["$id"]) or {}
+    for channel, number in channels_for(contact):
         message = compose(event, case)
-        outbox_id = _outbox(case["$id"], event, channel, message)
-        provider = provider_for(channel)
-        outcome = _deliver(provider, number, message)
-        get_databases().update_document(DATABASE_ID, NOTIFICATIONS_COLLECTION, outbox_id, outcome)
-        note = _history_note(event, channel, outcome, provider)
-        entry = CaseEntry(CaseHistoryAction.NOTIFIED, SYSTEM, note=note, channel=channel.value)
-        case_history.record(case["$id"], entry)
+        if channel == NotificationChannel.WHATSAPP and _sms_can_stand_in(number, contact) and not window_open(number):
+            _send(case["$id"], event, NotificationChannel.SMS, number, message, WINDOW_CLOSED)
+        else:
+            _send(case["$id"], event, channel, number, message)
+
+
+def _outbox_row(provider_message_id: str) -> dict[str, Any] | None:
+    rows = get_databases().list_documents(
+        DATABASE_ID, NOTIFICATIONS_COLLECTION, queries=[Query.equal("providerMessageId", provider_message_id), Query.limit(1)]
+    ).documents
+    return {"$id": rows[0].id, **rows[0].data} if rows else None
 
 
 def record_delivery(provider_message_id: str, status: str, now: datetime) -> bool:
     """A provider's delivery report, on the outbox row it is about. False if no message has that ID."""
-    rows = get_databases().list_documents(
-        DATABASE_ID, NOTIFICATIONS_COLLECTION, queries=[Query.equal("providerMessageId", provider_message_id), Query.limit(1)]
-    ).documents
-    if not rows:
+    row = _outbox_row(provider_message_id)
+    if row is None:
         return False
     delivery = re.sub(r"[^A-Za-z_ -]", "", status).upper()[:32]
     changes = {"deliveryStatus": delivery, **({"deliveredAt": now.isoformat()} if delivery == "DELIVERED" else {})}
-    get_databases().update_document(DATABASE_ID, NOTIFICATIONS_COLLECTION, rows[0].id, changes)
+    get_databases().update_document(DATABASE_ID, NOTIFICATIONS_COLLECTION, row["$id"], changes)
+    return True
+
+
+def whatsapp_undelivered(provider_message_id: str, error_code: str) -> bool:
+    """Twilio couldn't deliver a WhatsApp update because the window had closed: send it by SMS instead, once."""
+    row = _outbox_row(provider_message_id) if error_code == OUTSIDE_WINDOW_ERROR else None
+    if row is None or row["channel"] != NotificationChannel.WHATSAPP.value:
+        return False
+    contact = contact_for(row["caseId"]) or {}
+    number = contact.get("whatsapp")
+    if not number or not contact.get("notify") or not _sms_can_stand_in(number, contact):
+        return False
+    if not first_delivery(f"sms-instead:{provider_message_id}"):
+        return False
+    message = Message(row["template"], row["body"])
+    _send(row["caseId"], NotificationEvent(row["event"]), NotificationChannel.SMS, number, message, WINDOW_CLOSED)
     return True
 
 

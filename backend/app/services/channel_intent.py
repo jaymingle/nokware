@@ -1,10 +1,11 @@
 """What a WhatsApp message (or typed USSD text) is: a status check, a question, a report, or unclear.
 
 Rules first, at no cost: a short message holding a case reference asks for its
-status, and a greeting or "help" asks for the menu. Anything else goes to the
-quick model, which says question, report or unclear. A danger to a person is a
-report. If the model fails, the answer is "unclear" and the citizen is asked,
-so a message is never filed or answered on a guess.
+status, a greeting or "help" asks for the menu, and "thanks" or "ok" needs no
+answer. Anything else goes to the quick model, which says question, report or
+unclear. A danger to a person is a report. If the model fails, the answer is
+"unclear" and the citizen is asked, so a message is never filed or answered on
+a guess.
 """
 
 import logging
@@ -25,6 +26,7 @@ STATUS_MESSAGE_MAX = 40  # "status of K7QM-4TXP please": longer text with a refe
 _CODE = f"[{REFERENCE_ALPHABET}{REFERENCE_ALPHABET.lower()}]"
 _REFERENCE = re.compile(rf"(?<![\w-])({_CODE}{{4}}[\s-]?{_CODE}{{4}})(?![\w-])")
 GREETINGS = frozenset({"hi", "hello", "hey", "help", "menu", "start", "good morning", "good afternoon", "good evening"})
+THANKS = frozenset({"thanks", "thank you", "thank you very much", "thanks a lot", "ok", "okay", "ok thanks", "noted", "medaase"})
 
 
 class Intent(StrEnum):
@@ -32,6 +34,7 @@ class Intent(StrEnum):
     QUESTION = "question"
     REPORT = "report"
     HELP = "help"
+    THANKS = "thanks"  # an acknowledgement: nothing to answer
     UNCLEAR = "unclear"
 
 
@@ -91,6 +94,9 @@ def read_message(text: str, has_photo: bool = False) -> Reading:
         return Reading(Intent.STATUS, reference)
     if not stripped:
         return Reading(Intent.REPORT if has_photo else Intent.HELP)
-    if stripped.lower().strip("!.?, ") in GREETINGS:
+    said = " ".join(re.sub(r"[^\w\s]", " ", stripped.lower()).split())
+    if said in GREETINGS:
         return Reading(Intent.HELP)
+    if said in THANKS:
+        return Reading(Intent.THANKS)
     return Reading(_model_kind(stripped, has_photo))

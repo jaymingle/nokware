@@ -72,6 +72,11 @@ class Settings(BaseSettings):
     # The secret in Arkesel's USSD callback address. Arkesel doesn't sign USSD
     # callbacks yet, so this is their only protection. Empty: USSD is off.
     arkesel_ussd_token: str = ""
+    # Twilio WhatsApp, needed when WHATSAPP_PROVIDER=twilio. The sender is the
+    # WhatsApp address messages come from, e.g. whatsapp:+14155238886 (the sandbox).
+    twilio_account_sid: str = ""
+    twilio_auth_token: str = ""
+    twilio_whatsapp_from: str = ""
     # The API's public HTTPS address, which Arkesel and Twilio call back.
     # Empty means no callbacks are asked for.
     public_api_url: str = ""

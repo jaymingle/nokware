@@ -89,6 +89,7 @@ def test_the_route_records_a_signed_report_and_refuses_the_rest(monkeypatch: pyt
 def test_a_report_sets_the_outbox_rows_delivery_status(monkeypatch: pytest.MonkeyPatch) -> None:
     class Row:
         id = "n1"
+        data = {"channel": "sms"}
 
     class Listing:
         def __init__(self, documents: list[Row]) -> None:

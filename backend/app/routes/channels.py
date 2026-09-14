@@ -1,7 +1,9 @@
 """Callbacks from the messaging providers. Public routes: each is verified before it is trusted.
 
-    GET  /api/channels/sms/delivery    Arkesel's delivery report for one SMS (signed)
-    POST /api/channels/ussd/{token}    one keypress in an Arkesel USSD session (secret in the URL)
+    GET  /api/channels/sms/delivery       Arkesel's delivery report for one SMS (signed)
+    POST /api/channels/ussd/{token}       one keypress in an Arkesel USSD session (secret in the URL)
+    POST /api/channels/whatsapp           one incoming WhatsApp message, from Twilio (signed)
+    POST /api/channels/whatsapp/status    Twilio's delivery status for a WhatsApp message (signed)
 """
 
 import hmac
@@ -9,15 +11,16 @@ import logging
 from typing import Any
 
 import redis
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Request, Response
+from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.config import get_settings
-from app.services import notifications, ussd
+from app.services import notifications, ussd, whatsapp, whatsapp_conversation
 from app.services.arkesel_signatures import SIGNATURE_HEADER, TIMESTAMP_HEADER, verify_webhook
 from app.services.ledger_documents import utc_now
 from app.services.redis_store import RedisUnavailable
-from app.services.report_contacts import InvalidNumber, normalise_phone
+from app.services.report_contacts import InvalidNumber, normalise_phone, normalise_whatsapp
 
 logger = logging.getLogger(__name__)
 
@@ -83,3 +86,47 @@ def ussd_session(token: str, request: UssdRequest, tasks: BackgroundTasks) -> di
     reply = _ussd_reply(request, tasks)
     return {"sessionID": request.session_id, "userID": request.user_id, "msisdn": request.msisdn,
             "message": reply.message, "continueSession": reply.more}
+
+
+EMPTY_TWIML = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Response></Response>"
+
+
+async def _signed_form(request: Request, path: str) -> dict[str, str]:
+    """Twilio's form fields, once its signature over them and the public URL checks out."""
+    form = {name: str(value) for name, value in (await request.form()).items()}
+    if not whatsapp.signed_by_twilio(path, form, request.headers.get("X-Twilio-Signature", "")):
+        raise HTTPException(status_code=403, detail="The request's signature is not valid.")
+    return form
+
+
+def _inbound(form: dict[str, str]) -> whatsapp_conversation.Inbound | None:
+    try:
+        number = normalise_whatsapp(form.get("From", "").removeprefix("whatsapp:"))
+    except InvalidNumber:
+        return None
+    media = None
+    if form.get("NumMedia", "0") != "0" and form.get("MediaUrl0"):
+        media = whatsapp_conversation.Media(form["MediaUrl0"], form.get("MediaContentType0", ""))
+    return whatsapp_conversation.Inbound(number, form.get("Body", ""), media, form.get("MessageSid", ""))
+
+
+@router.post("/whatsapp")
+async def whatsapp_message(request: Request, tasks: BackgroundTasks) -> Response:
+    """Twilio gets an empty answer at once; the reply (an answer can take 13 seconds) follows by the API."""
+    inbound = _inbound(await _signed_form(request, whatsapp.WEBHOOK_PATH))
+    if inbound is not None:
+        tasks.add_task(whatsapp_conversation.handle, inbound)
+    return Response(EMPTY_TWIML, media_type="text/xml")
+
+
+@router.post("/whatsapp/status")
+async def whatsapp_status(request: Request) -> dict[str, bool]:
+    """A WhatsApp message's delivery; one refused because WhatsApp's window had closed goes by SMS instead."""
+    form = await _signed_form(request, whatsapp.STATUS_PATH)
+    message_sid, status = form.get("MessageSid", ""), form.get("MessageStatus", "")
+    if not (message_sid and status):
+        return {"recorded": False}
+    recorded = await run_in_threadpool(notifications.record_delivery, message_sid, status, utc_now())
+    if status in ("failed", "undelivered"):
+        await run_in_threadpool(notifications.whatsapp_undelivered, message_sid, form.get("ErrorCode", ""))
+    return {"recorded": recorded}

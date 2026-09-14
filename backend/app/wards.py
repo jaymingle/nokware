@@ -82,3 +82,15 @@ def find_ward(text: str) -> Ward | None:
     """An electoral area by any of its spellings ("Bubuashie", "bubiashie", "Nmlitsa-Gonno", "Nmlitsagonno")."""
     key = _key(text)
     return next((w for w in wards().values() if key in {_key(w.name), *map(_key, w.alternates)}), None) if key else None
+
+
+def _words(text: str) -> str:
+    return " " + " ".join(re.findall(r"[a-z0-9]+", text.lower())) + " "
+
+
+def ward_mentioned(text: str) -> Ward | None:
+    """The one electoral area a sentence names ("the drain at Kaneshie market"), by any spelling, as whole
+    words. None if it names none, or more than one (then the citizen is asked)."""
+    sentence = _words(text)
+    named = [w for w in wards().values() if any(_words(name) in sentence for name in (w.name, *w.alternates))]
+    return named[0] if len(named) == 1 else None

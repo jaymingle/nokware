@@ -81,6 +81,7 @@ def test_rules_read_the_easy_messages_without_the_model(monkeypatch: pytest.Monk
     monkeypatch.setattr(channel_intent, "_model_kind", lambda text, has_photo: pytest.fail("the model was asked"))
     assert read_message("Status of K7QM-4TXP?") == channel_intent.Reading(Intent.STATUS, "K7QM-4TXP")
     assert read_message("Hello!").intent == Intent.HELP
+    assert read_message("Ok, thanks!").intent == Intent.THANKS and read_message("Medaase").intent == Intent.THANKS
     assert read_message("", has_photo=True).intent == Intent.REPORT
     assert read_message("   ").intent == Intent.HELP
 

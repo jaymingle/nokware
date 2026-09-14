@@ -27,6 +27,7 @@ class NumberLimit:
         return int(used) <= self.limit
 
 
+MESSAGES = NumberLimit("messages", limit=60, window_seconds=3600)  # every WhatsApp reply costs money
 QUESTIONS = NumberLimit("questions", limit=20, window_seconds=3600)
 SMS_ANSWERS = NumberLimit("sms-answers", limit=5, window_seconds=86400)  # each costs up to 2 credits
 REPORTS = NumberLimit("reports", limit=5, window_seconds=3600)

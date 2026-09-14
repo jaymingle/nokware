@@ -188,6 +188,28 @@ any SMS about it says only the reference. `scripts/ussd_simulator.py` plays a
 phone against the API (Arkesel's request format, from its sample application),
 so the menu can be tried before a shortcode exists.
 
+WhatsApp (`whatsapp.py`, `whatsapp_conversation.py`) runs through Twilio.
+Every webhook is checked with Twilio's own `RequestValidator` against
+`PUBLIC_API_URL` (Twilio signs the address it called), answered at once, and
+handled afterwards, since an answer can take 13 seconds; a repeated delivery is
+ignored. A question gets a chat-length answer with numbered sources. A report
+becomes a draft for 15 quiet minutes: it needs a description and an electoral
+area (named in the message or asked for), gathers photos, and is filed only
+when the citizen replies 1, so a question the router misread is never filed.
+Photos are fetched once, cleaned and held only with the draft, and deleted from
+Twilio at once. A case reference gets its status. A personal-safety report gets
+its reference and "In danger now? Call 112." and updates only after YES; the
+chat never names what it is about. "Thanks" gets no reply (each costs money),
+and at most 60 messages an hour per number are handled. Voice notes are turned
+away for now. `scripts/whatsapp_simulator.py` sends signed webhooks locally;
+with `WHATSAPP_PROVIDER=log` replies only reach the API's log.
+
+WhatsApp allows free-form messages only within 24 hours of the citizen's last
+message. Each message they send opens that window in Redis; a notification
+outside it goes by SMS to the same number when it is Ghanaian and the citizen
+isn't getting SMS already, and so does one Twilio reports undelivered for that
+reason (error 63016, on the signed status callback).
+
 Known limitations:
 
 - Arkesel does not sign USSD callbacks yet (its signing guide says USSD waits
@@ -202,6 +224,13 @@ Known limitations:
   before delivery. Notifications and USSD answers therefore don't arrive
   promptly until the sender ID is registered; registration (a letter of
   authorization, approved over some days) is the fix.
+- WhatsApp updates outside the 24-hour window need message templates approved
+  by WhatsApp, which the Twilio sandbox can't have. Until a WhatsApp sender with
+  approved templates exists (a production step), those updates go by SMS to
+  Ghanaian numbers and are not delivered to others.
+- Twilio keeps its own log of message bodies. The API deletes incoming photos
+  from Twilio, but what a citizen typed stays in Twilio's message log until
+  deleted there.
 
 Staff work cases through `app/services/case_actions.py` (under a per-case
 lock, like Ledger documents). What each caller sees is decided in one place
