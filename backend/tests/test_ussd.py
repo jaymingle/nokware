@@ -222,3 +222,9 @@ def test_a_medical_emergency_gets_numbers_and_nothing_is_filed(session: list[tup
 
 def test_more_numbers_point_to_the_emergency_page_not_the_directory() -> None:
     assert ussd.numbers_screen("fire").split("More numbers: ")[1].startswith("http://localhost:3000/contacts/emergency")
+
+
+def test_a_ussd_session_from_an_older_version_ends_cleanly(session: list[tuple[Any, ...]]) -> None:
+    channel_sessions.save("ussd", "old", {"step": "retired-step"}, 60)
+    assert ussd.respond(Dial("old", PHONE, "1", False), lambda *a: None) == ussd.Reply("Your session ended. Please dial again.", False)
+    assert channel_sessions.load("ussd", "old") is None

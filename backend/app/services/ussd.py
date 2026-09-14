@@ -357,9 +357,11 @@ def respond(dial: Dial, later: Later) -> Reply:
         channel_sessions.save("ussd", dial.session_id, {"step": "menu"}, SESSION_SECONDS)
         return con(MENU)
     state = channel_sessions.load("ussd", dial.session_id)
-    if state is None:
+    step = STEPS.get(state.get("step", "")) if state else None
+    if state is None or step is None:  # expired, or left by an older version of this menu
+        channel_sessions.clear("ussd", dial.session_id)
         return end("Your session ended. Please dial again.")
-    reply, next_state = STEPS[state["step"]](dial, state, later)
+    reply, next_state = step(dial, state, later)
     if reply.more and next_state is not None:
         channel_sessions.save("ussd", dial.session_id, next_state, SESSION_SECONDS)
     else:

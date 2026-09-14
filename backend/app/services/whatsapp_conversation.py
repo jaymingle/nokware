@@ -349,7 +349,10 @@ def handle(inbound: Inbound) -> None:
             whatsapp_reply.reply(inbound.number, problem)
             return
         state = channel_sessions.load("whatsapp", inbound.number)
-        if not (state and STEPS[state["step"]](inbound, state)):
+        step = STEPS.get(state.get("step", "")) if state else None
+        if state and step is None:  # a session from an older version of this flow: start again
+            channel_sessions.clear("whatsapp", inbound.number)
+        if not (state and step and step(inbound, state)):
             _fresh(inbound)
     except Exception:
         logger.exception("A WhatsApp message from %s couldn't be handled", masked(inbound.number))
