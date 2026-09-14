@@ -68,6 +68,8 @@ membership.
 | `POST /api/reports/{reference}/preferences` (`X-Receipt-Token`; after a safety reclassification, once, within the hour) | public |
 | `GET /api/representatives` (each sub-metro's chairperson, office and electoral areas; `?area=` finds one area by any spelling) | public |
 | `GET /api/contacts` (who to call, grouped by service; each number with its tier and source) | public |
+| `GET /api/issues` (open civic issues: topic, area, department, status and voice count; `?sub_metro`, `?topic`) | public |
+| `POST /api/issues/{public_id}/voices` (`device_token`, optional `name`; one voice per browser per issue) | public, 20 an hour per client |
 | `GET /api/dashboard` (twelve months of report figures, no personal safety; Ledger counts and latest documents; cached a minute) | public |
 | `GET /api/me` | anyone signed in |
 | `GET /api/departments`, `GET /api/categories` | anyone signed in |
@@ -145,6 +147,50 @@ Police and GNFS receive safety reports as agency teams (`agency-police`,
 Ledger. `scripts/create_citizen_reports.py` creates those teams and the report
 collections (citizen phone numbers are encrypted at rest); add their liaison
 accounts to `scripts/seed_users.toml` and re-run `scripts/seed_users.py`.
+
+## What the public sees, and the privacy model
+
+Three public surfaces read citizen reports: the dashboard, Ask's live figures
+and the issue list. They share one set of rules (`app/services/stats.py`):
+
+- **Personal safety is never counted**, not as a filter and not in any total,
+  so no total less the visible topics can give its number away. Ask answers a
+  request for such figures with "Nokware doesn't publish figures on reports
+  about someone's safety."
+- **A count from 1 to 4 reads "fewer than 5"**, on the dashboard and in Ask
+  alike. Zero is shown.
+- **Only aggregates, never content.** Ask's tool returns numbers only; the
+  issue list shows a civic issue's topic, electoral area, department, status
+  and voice count, never the citizen's words, photos or number, and never its
+  reference or case ID (either opens a status page), only a separate public ID.
+
+Ask's figures come from a counting tool (`app/services/ask_figures.py`) that a
+quick planning call can invoke; each figure is cited as `[R1]` beside the
+documents' `[S1]`, and the answer says it is live report data, not a document.
+
+"Add your voice" (`app/services/issue_voices.py`) takes open civic-service
+issues only. A voice is anonymous unless the resident gives a name; names are
+encrypted at rest, reach the handling department only (the MCE and the public
+see counts), and are deleted 30 days after the case closes. One voice per
+browser per issue: only a hash of the browser's random token and the case is
+stored. `scripts/create_case_voices.py` creates the structure (a dry run by
+default; run it with `--yes` before deploying this code).
+
+**Known limits, stated rather than hidden:**
+
+- **Differencing.** Any system that answers counts allows it: comparing an
+  electoral area's count with its sub-metro's, or a total with its parts, can
+  narrow a "fewer than 5" cell. Leaving personal safety out entirely is the
+  protection that matters; for civic and public-safety counts, this residual
+  risk is accepted.
+- **Voices are not verified.** Without accounts, one person can add voices from
+  several browsers; the count is a signal of how many residents care, not a
+  signature list, and the page says so. A per-connection rate limit caps abuse.
+
+**Roadmap:** a department-written, one-line public title for an issue (for
+example "Pothole on Kaneshie market road near the footbridge"), added when the
+department starts work, so residents can tell similar issues apart without the
+citizen's own words ever being published.
 
 ## Contact numbers
 
