@@ -61,8 +61,8 @@ function AnswerFigures({ turn, anchorFor, highlighted, testId }: {
   const cited = turn.figures.filter((figure) => figure.cited);
   if (cited.length === 0) return null;
   return (
-    <section aria-label="Live report data" className="flex flex-col gap-3">
-      <h3 className="text-[12.5px] font-medium tracking-wide text-ink-soft uppercase">Live report data</h3>
+    <section aria-label="Figures" className="flex flex-col gap-3">
+      <h3 className="text-[12.5px] font-medium tracking-wide text-ink-soft uppercase">Figures</h3>
       {cited.map((figure) => (
         <FigureCard key={figure.label} figure={figure} anchorId={anchorFor(figure.label)} highlighted={highlighted === figure.label} testIdPrefix={testId} />
       ))}

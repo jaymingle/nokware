@@ -43,7 +43,7 @@ type AnswerSourcesProps = {
 export function AnswerSources({ cited, uncited, anchorFor, highlighted, testIdPrefix }: AnswerSourcesProps) {
   return (
     <section aria-label="Sources" className="flex flex-col gap-3">
-      <h3 className="text-[12.5px] font-medium tracking-wide text-ink-soft uppercase">Sources</h3>
+      {cited.length > 0 ? <h3 className="text-[12.5px] font-medium tracking-wide text-ink-soft uppercase">Sources</h3> : null}
       {cited.map((doc) => (
         <SourceCard key={doc.label} doc={doc} anchorId={anchorFor(doc.label)} highlighted={highlighted === doc.label} testIdPrefix={testIdPrefix} />
       ))}
