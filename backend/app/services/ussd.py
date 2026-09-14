@@ -7,9 +7,13 @@ A screen holds 160 characters and a session lasts seconds, so:
 - a report is filed while the citizen waits, for up to 8 seconds. If it takes
   longer, the reference follows by SMS, even if they chose no updates: they
   would otherwise lose it.
-Reports carry no photos. A personal-safety report gets the reference and the
-emergency number on screen, and updates only if the citizen then says yes; an
-SMS about it says nothing but the reference. The same services as the web:
+The report is read (classified) as soon as it is described, allowed 4 seconds
+before the rules decide alone. An emergency (a danger to a person, a fire, a
+flood, a crime) then shows two numbers per service to try, before anything
+else. A personal-safety report is asked only for its sub-metro, which it may
+skip, never its electoral area; it gets the reference on screen, updates only
+if the citizen then says yes, and any SMS about it says nothing but the
+reference. Reports carry no photos. The same services as the web:
 report_intake.submit() and rag.answer_question().
 """
 
@@ -21,6 +25,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from app.config import get_settings
+from app.contacts import EMERGENCY_TOPICS, short_line
 from app.services import channel_limits, channel_sessions, report_followups, report_intake, report_store
 from app.services.channel_answers import for_sms
 from app.services.channel_messages import send_sms
@@ -31,7 +36,7 @@ from app.services.notifications import notify_quietly
 from app.services.rag import AnswerLength, answer_question
 from app.services.report_contacts import InvalidNumber, masked
 from app.services.report_intake import DESCRIPTION_MIN, Receipt, ReportSubmission
-from app.services.report_rules import InvalidReport, normalise_reference
+from app.services.report_rules import Classification, ClassificationMethod, InvalidReport, classify, normalise_reference
 from app.services.report_taxonomy import Category
 from app.services.sms_text import plain
 from app.services.workflow import NotAllowed
@@ -42,10 +47,11 @@ logger = logging.getLogger(__name__)
 
 SESSION_SECONDS = 180
 FILING_WAIT_SECONDS = 8.0
+CLASSIFY_WAIT_SECONDS = 4.0
+CONTINUE = "\n1 Continue"
 SCREEN_MAX = 160
 QUESTION_MIN = 5
 WHO_MAX = 40  # longer office names give way to a count, so the receipt keeps its last words
-EMERGENCY = "In danger now? Call 112."
 MENU = "Nokware - Accra Assembly\n1 Ask a question\n2 Report an issue\n3 Check a case"
 CONFIRM = "File this report?\n1 File, and SMS me updates\n2 File, no SMS\n0 Cancel"
 _filing = ThreadPoolExecutor(max_workers=4, thread_name_prefix="ussd-filing")
@@ -142,11 +148,72 @@ def _ask(dial: Dial, state: State, later: Later) -> tuple[Reply, State | None]:
     return end("Thank you. Your answer is on its way by SMS."), None
 
 
+def _read(description: str) -> Classification:
+    """How the report will be filed, within a few seconds: past that, the rules alone (whose danger screen
+    still catches a report about a person), so a slow model never costs the citizen their session."""
+    reading = _filing.submit(report_intake.read_report, description)
+    try:
+        return reading.result(timeout=CLASSIFY_WAIT_SECONDS)
+    except FilingTimeout:
+        return classify(description, None, None)
+
+
+def _saved(filed: Classification) -> dict[str, Any]:
+    return {"category": filed.category.value, "topic": filed.topic, "severity": filed.severity,
+            "recipients": list(filed.recipients), "method": filed.method.value}
+
+
+def _classification(state: State) -> Classification:
+    saved = state["filed"]
+    return Classification(Category(saved["category"]), saved["topic"], saved["severity"], tuple(saved["recipients"]),
+                          ClassificationMethod(saved["method"]))
+
+
+def _private(state: State) -> bool:
+    return state["filed"]["category"] == Category.PERSONAL_SAFETY
+
+
+def numbers_screen(topic: str) -> str:
+    """Two numbers per service to try now, and where the rest are, then a key to go on."""
+    numbers = short_line(topic, None)
+    more = f"\nMore numbers: {_site()}/contacts"
+    body = numbers + more if len(numbers + more + CONTINUE) <= SCREEN_MAX else numbers
+    return body + CONTINUE
+
+
+def safety_sub_metro_screen() -> str:
+    return _numbered("Which sub-metro are you in? (helps reach Social Welfare)", [sub_metros()[i].name for i in _sub_metro_ids()]) + "\n0 Skip"
+
+
+def _after_help(state: State) -> tuple[Reply, State]:
+    if _private(state):
+        return con(safety_sub_metro_screen()), {**state, "step": "safety_sub_metro"}
+    return con(sub_metro_screen()), {**state, "step": "sub_metro"}
+
+
 def _describe(dial: Dial, state: State, later: Later) -> tuple[Reply, State | None]:
     description = dial.text.strip()
     if len(description) < DESCRIPTION_MIN:
         return con("Please describe it in a few more words, with where it is:"), state
-    return con(sub_metro_screen()), {"step": "sub_metro", "description": description}
+    filed = _read(description)
+    state = {"description": description, "filed": _saved(filed)}
+    if filed.topic in EMERGENCY_TOPICS:  # the numbers first: a danger to a person, a fire, a flood, a crime
+        return con(numbers_screen(filed.topic)), {**state, "step": "help"}
+    return _after_help(state)
+
+
+def _help(dial: Dial, state: State, later: Later) -> tuple[Reply, State | None]:
+    return _after_help(state)
+
+
+def _safety_sub_metro(dial: Dial, state: State, later: Later) -> tuple[Reply, State | None]:
+    """Personal safety: the sub-metro only, and the citizen may skip it. Never the electoral area."""
+    choice = dial.text.strip()
+    ids = _sub_metro_ids()
+    index = _pick(choice, len(ids))
+    if choice != "0" and index is None:
+        return con("Choose a number from the list, or 0 to skip.\n" + safety_sub_metro_screen()), state
+    return con(CONFIRM), {**state, "step": "confirm", "sub_metro": None if choice == "0" else ids[index]}
 
 
 def _sub_metro(dial: Dial, state: State, later: Later) -> tuple[Reply, State | None]:
@@ -171,14 +238,15 @@ def _receipt(receipt: Receipt, later: Later) -> tuple[Reply, State | None]:
     reference = case["reference"]
     if receipt.messages_on:
         later(notify_quietly, case, NotificationEvent.SUBMITTED)
-    if case["isSensitive"]:
+    if case["isSensitive"]:  # the numbers came first; the rest of them are on the contacts page
+        more = f"More numbers: {_site()}/contacts"
         if receipt.preferences_token:  # a number was given: ask about updates, once
-            question = f"Reference {reference} received. {EMERGENCY}\nSMS updates on it? They never say what it is about.\n1 Yes\n2 No"
+            question = f"Reference {reference} received. {more}\nSMS updates on it? They never say what it is about.\n1 Yes\n2 No"
             return con(question), {"step": "updates", "reference": reference, "token": receipt.preferences_token}
-        return end(f"Reference {reference} received. {EMERGENCY}"), None
+        return end(f"Reference {reference} received. {more}"), None
     names = [short_name(r) for r in case["recipients"]]
     who = " and ".join(names) if len(" and ".join(names)) <= WHO_MAX else f"{len(names)} offices"
-    emergency = f" {EMERGENCY}" if case["category"] == Category.PUBLIC_SAFETY else ""
+    emergency = f" {short_line(case['topic'], None).split('. ')[0]}." if case["topic"] in EMERGENCY_TOPICS else ""
     updates = " We'll SMS you when it's resolved." if receipt.messages_on else ""
     return end(f"Report {reference} filed with {who}.{emergency}{updates} Keep this reference."), None
 
@@ -194,18 +262,23 @@ def _reference_later(filing: "Future[Receipt]", msisdn: str) -> None:
     if receipt.messages_on:  # the "received" message carries the reference
         notify_quietly(receipt.case, NotificationEvent.SUBMITTED)
         return
-    reference = receipt.case["reference"]
-    private = receipt.case["isSensitive"]
-    send_sms(msisdn, f"Nokware: reference {reference} received." if private else f"Nokware: your report is filed. Reference {reference}.")
+    case = receipt.case
+    if case["isSensitive"]:
+        send_sms(msisdn, f"Nokware: reference {case['reference']} received.")
+        return
+    numbers = f" If anyone is in danger: {short_line(case['topic'], None)}" if case["topic"] in EMERGENCY_TOPICS else ""
+    send_sms(msisdn, f"Nokware: your report is filed. Reference {case['reference']}.{numbers}")
 
 
 def _file(dial: Dial, state: State, updates: bool, later: Later) -> tuple[Reply, State | None]:
+    private = _private(state)
     submission = ReportSubmission(
-        description=state["description"], ward=state["ward"], sub_metro=None, safety_topic=None,
+        description=state["description"], ward=None if private else state["ward"],
+        sub_metro=state.get("sub_metro") if private else None, safety_topic=None,
         phone=dial.msisdn if updates else None, whatsapp=None, notify=updates, callback_consent=False,
         channel=IntakeChannel.USSD,
     )
-    filing = _filing.submit(report_intake.submit, submission, [], utc_now())
+    filing = _filing.submit(report_intake.submit, submission, [], utc_now(), _classification(state))
     try:
         return _receipt(filing.result(timeout=FILING_WAIT_SECONDS), later)
     except FilingTimeout:
@@ -256,8 +329,8 @@ def _check(dial: Dial, state: State, later: Later) -> tuple[Reply, State | None]
 
 
 STEPS: dict[str, Callable[[Dial, State, Later], tuple[Reply, State | None]]] = {
-    "menu": _menu, "ask": _ask, "describe": _describe, "sub_metro": _sub_metro, "ward": _ward,
-    "confirm": _confirm, "updates": _updates, "check": _check,
+    "menu": _menu, "ask": _ask, "describe": _describe, "help": _help, "sub_metro": _sub_metro, "ward": _ward,
+    "safety_sub_metro": _safety_sub_metro, "confirm": _confirm, "updates": _updates, "check": _check,
 }
 
 

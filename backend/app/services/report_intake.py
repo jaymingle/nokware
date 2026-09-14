@@ -190,13 +190,21 @@ def _save_contact(case_id: str, choice: ContactChoice, ask_again: bool, now: dat
     return token
 
 
-def submit(submission: ReportSubmission, photos: list[bytes], now: datetime) -> Receipt:
-    """File a report. Raises InvalidReport, InvalidNumber or PhotoRejected before anything is stored."""
+def read_report(description: str) -> Classification:
+    """How a report will be filed, before it is: a channel asks this first, so a personal-safety report gets
+    its emergency numbers at once and is never asked for its electoral area. Pass the result to submit()."""
+    return classify(description, None, model_verdict(description))
+
+
+def submit(submission: ReportSubmission, photos: list[bytes], now: datetime, filed: Classification | None = None) -> Receipt:
+    """File a report. Raises InvalidReport, InvalidNumber or PhotoRejected before anything is stored.
+    filed: the classification read_report() already gave for this description, if a channel asked first."""
     description = _description(submission.description)
     cleaned = clean_photos(photos)
     choice = _contact(submission)
-    verdict = None if submission.safety_topic is not None else model_verdict(description)
-    filed = classify(description, submission.safety_topic, verdict)
+    if filed is None:
+        verdict = None if submission.safety_topic is not None else model_verdict(description)
+        filed = classify(description, submission.safety_topic, verdict)
     locate(filed.category, submission.ward, submission.sub_metro)  # check the place before writing anything
     case_id = str(uuid.uuid4())
     fields = _case_fields(filed, submission, description, store_photos(case_id, cleaned), now)

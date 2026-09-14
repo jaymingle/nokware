@@ -27,14 +27,17 @@ from app.services import (
 from app.services.channel_intent import Intent, Reading
 from app.services.citizen_reports import IntakeChannel, NotificationChannel, NotificationEvent
 from app.services.report_intake import Receipt, ReportSubmission
+from app.services.report_rules import Classification, ClassificationMethod
+from app.services.report_taxonomy import TOPICS_BY_ID, Category
 from app.services.whatsapp import TwilioWhatsApp, WhatsAppError, split
 from app.services.whatsapp_conversation import ASK_KIND, CANCELLED, Inbound, Media
 
 NUMBER = "+233507387216"
 TOKEN = "twilio-auth-token"
 PUBLIC = "https://nokware.example.org"
-CIVIC = {"$id": "c1", "reference": "K7QM-4TXP", "category": "civic_service", "isSensitive": False, "recipients": ["dept-works"]}
-SAFETY = {"$id": "c2", "reference": "M3RD-8WQA", "category": "personal_safety", "isSensitive": True,
+CIVIC = {"$id": "c1", "reference": "K7QM-4TXP", "category": "civic_service", "topic": "drainage", "isSensitive": False,
+         "recipients": ["dept-works"]}
+SAFETY = {"$id": "c2", "reference": "M3RD-8WQA", "category": "personal_safety", "topic": "abuse", "isSensitive": True,
           "recipients": ["agency-police", "dept-social-welfare"]}
 
 
@@ -180,10 +183,17 @@ def _reads(monkeypatch: pytest.MonkeyPatch, intent: str) -> None:
     monkeypatch.setattr(whatsapp_conversation, "read_message", lambda text, has_photo=False: Reading(Intent(intent)))
 
 
-def _filing(monkeypatch: pytest.MonkeyPatch, case: dict[str, Any], token: str | None = None) -> list[tuple[ReportSubmission, list[bytes]]]:
-    filed: list[tuple[ReportSubmission, list[bytes]]] = []
+def _classified(topic: str) -> Classification:
+    found = TOPICS_BY_ID[topic]
+    return Classification(found.category, topic, 5 if found.category == Category.PERSONAL_SAFETY else 3, found.recipients, ClassificationMethod.AI)
 
-    def submit(submission: ReportSubmission, photos: list[bytes], now: Any) -> Receipt:
+
+def _filing(monkeypatch: pytest.MonkeyPatch, case: dict[str, Any], token: str | None = None, topic: str = "drainage") -> list[tuple[ReportSubmission, list[bytes]]]:
+    filed: list[tuple[ReportSubmission, list[bytes]]] = []
+    monkeypatch.setattr(report_intake, "read_report", lambda description: _classified(topic))
+
+    def submit(submission: ReportSubmission, photos: list[bytes], now: Any, classification: Classification | None = None) -> Receipt:
+        assert classification == _classified(topic)  # filed as it was read: the model isn't asked twice
         filed.append((submission, photos))
         private = case["isSensitive"]
         return Receipt(case=case, messages_on=not private, held_for_consent=private and token is not None, preferences_token=token)
@@ -264,19 +274,52 @@ def test_unclear_asks_question_or_report_and_uses_the_first_message(monkeypatch:
     assert asked == ["market tolls"]
 
 
-def test_personal_safety_gets_a_neutral_receipt_and_updates_only_on_yes(monkeypatch: pytest.MonkeyPatch, chat: list[str]) -> None:
+def test_personal_safety_gets_every_number_first_and_only_a_sub_metro_question(monkeypatch: pytest.MonkeyPatch, chat: list[str]) -> None:
     _reads(monkeypatch, "report")
-    _filing(monkeypatch, SAFETY, token="one-time")
+    filed = _filing(monkeypatch, SAFETY, token="one-time", topic="abuse")
     chosen: list[Any] = []
     monkeypatch.setattr(report_followups, "set_preferences", lambda ref, token, choice, now: chosen.append((ref, token, choice.notify)) or (SAFETY, choice.notify))
-    say("My neighbour beats his wife every night in Kaneshie")
+    say("My husband beats me every night")
+    first = chat[-1]
+    assert first.startswith("*If anyone is in danger now*") and "0800 800 800" in first and "0591 476 884" in first
+    assert first.index("0800 800 800") < first.index("Which sub-metro are you in?")  # the numbers come before any question
+    assert "electoral area" not in first and "Assembly Member" not in first
+    say("2")  # Okaikoi South
+    assert chat[-1].startswith("Ready to send your report.")
     say("1")
+    submission = filed[0][0]
+    assert (submission.ward, submission.sub_metro, submission.whatsapp) == (None, "okaikoi-south", NUMBER)
     receipt = chat[-1]
-    assert receipt.startswith("Your reference is *M3RD-8WQA*. In danger now? Call 112.") and "Reply *YES*" in receipt
-    for giveaway in ("Police", "Social Welfare", "abuse", "safety"):
-        assert giveaway not in receipt
+    assert receipt.startswith("Your reference is *M3RD-8WQA*.") and "Reply *YES*" in receipt
     say("yes")
     assert chosen == [("M3RD-8WQA", "one-time", True)] and chat[-1] == "Updates are on for M3RD-8WQA."
+
+
+def test_an_area_named_in_a_safety_report_is_kept_only_as_its_sub_metro(monkeypatch: pytest.MonkeyPatch, chat: list[str]) -> None:
+    _reads(monkeypatch, "report")
+    filed = _filing(monkeypatch, SAFETY, topic="abuse")
+    say("My neighbour in Kaneshie beats his wife and I fear for her")
+    assert "Which sub-metro" not in chat[-1] and "0303 935 397 (Okaikoi South desk)" in chat[-1]  # their desk, from the area
+    say("1")
+    assert (filed[0][0].ward, filed[0][0].sub_metro) == (None, "okaikoi-south")
+    assert "kaneshie" not in str(channel_sessions.load("whatsapp", NUMBER))
+
+
+def test_a_safety_reporter_can_skip_the_sub_metro(monkeypatch: pytest.MonkeyPatch, chat: list[str]) -> None:
+    _reads(monkeypatch, "report")
+    filed = _filing(monkeypatch, SAFETY, topic="threat_to_life")
+    say("Someone has threatened to kill me")
+    say("0")
+    say("1")
+    assert (filed[0][0].ward, filed[0][0].sub_metro) == (None, None)
+
+
+def test_a_fire_gets_its_numbers_first_then_the_area_question(monkeypatch: pytest.MonkeyPatch, chat: list[str]) -> None:
+    _reads(monkeypatch, "report")
+    _filing(monkeypatch, {**CIVIC, "category": "public_safety", "topic": "fire", "recipients": ["agency-gnfs"]}, topic="fire")
+    say("A house is on fire near the market")
+    assert chat[-1].startswith("*If anyone is in danger now*") and "*Fire service*\n192" in chat[-1]
+    assert chat[-1].endswith("Reply with its name, for example Kaneshie or Bubiashie.")
 
 
 def test_a_reference_gets_its_status(monkeypatch: pytest.MonkeyPatch, chat: list[str]) -> None:

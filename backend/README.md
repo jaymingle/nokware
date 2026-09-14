@@ -135,6 +135,19 @@ day (counted in the API process, so a restart resets it). A provider named but
 missing its settings stops the API at startup. `scripts/sms_balance.py` shows
 the credits left without spending any. WhatsApp (Twilio) is still `log`.
 
+Emergency numbers (`app/contacts.py`, `channel_contacts.py`): Ghana's hotlines
+often don't connect, so a report where someone may be in danger shows every
+number we have for each service involved, in the order to try them: 112, then
+the services its topic needs (fire, NADMO, the Police), and the ambulance for
+anything where someone could be hurt. Personal safety adds the Police
+reporting lines (marked, as everywhere, as reported via X and not
+independently verified), the Helpline of Hope and Social Welfare (the
+citizen's sub-metro desk, or every desk, and the head office). The web and
+WhatsApp show the full list; an SMS or a USSD screen, which can't hold it,
+gives two numbers per service and points to the contacts page. A
+personal-safety SMS never carries numbers: it says only the reference. Safety
+reporters are never pointed to an Assembly Member.
+
 Callbacks from the providers (`app/routes/channels.py`) are verified before
 they are trusted. Arkesel signs SMS and Voice callbacks, and
 `arkesel_signatures.py` follows its signing guide exactly (the guide is
@@ -178,13 +191,17 @@ a question, 2 Report an issue, 3 Check a case. Each screen fits 160 plain
 characters, and the menu's place is kept in Redis under the session ID for 3
 minutes. An answer takes longer than a screen can wait, so the session ends
 with "your answer is on its way by SMS" and the answer follows as one SMS of
-two pages at most (5 a day per number). A report is described by keypad,
-placed by sub-metro and electoral area from numbered lists, confirmed (with or
-without SMS updates), and filed while the citizen waits for up to 8 seconds;
-if filing takes longer the reference follows by SMS. Reports have no photos.
-A personal-safety report shows only its reference and "In danger now? Call
-112." and asks about updates once, which stay off unless the citizen says yes;
-any SMS about it says only the reference. `scripts/ussd_simulator.py` plays a
+two pages at most (5 a day per number). A report is described by keypad and
+read (classified) at once, allowed 4 seconds before the rules decide alone. An
+emergency then shows two numbers per service to try before anything else. An
+everyday or public-safety report is placed by sub-metro and electoral area
+from numbered lists; a personal-safety report is asked only for its sub-metro,
+which it may skip. Then it is confirmed (with or without SMS updates) and
+filed while the citizen waits for up to 8 seconds; if filing takes longer the
+reference follows by SMS. Reports have no photos. A personal-safety report
+shows its reference and where more numbers are, and asks about updates once,
+which stay off unless the citizen says yes; any SMS about it says only the
+reference. `scripts/ussd_simulator.py` plays a
 phone against the API (Arkesel's request format, from its sample application),
 so the menu can be tried locally.
 
@@ -200,13 +217,16 @@ Every webhook is checked with Twilio's own `RequestValidator` against
 `PUBLIC_API_URL` (Twilio signs the address it called), answered at once, and
 handled afterwards, since an answer can take 13 seconds; a repeated delivery is
 ignored. A question gets a chat-length answer with numbered sources. A report
-becomes a draft for 15 quiet minutes: it needs a description and an electoral
-area (named in the message or asked for), gathers photos, and is filed only
-when the citizen replies 1, so a question the router misread is never filed.
-Photos are fetched once, cleaned and held only with the draft, and deleted from
-Twilio at once. A case reference gets its status. A personal-safety report gets
-its reference and "In danger now? Call 112." and updates only after YES; the
-chat never names what it is about. "Thanks" gets no reply (each costs money),
+is read (classified) as soon as it is described, and becomes a draft for 15
+quiet minutes. An emergency's first reply is every number to try, grouped by
+service, before any question. An everyday or public-safety report needs an
+electoral area (named in the message or asked for); a personal-safety report
+is asked only for its sub-metro, which it may skip, and an area it names is
+kept only as its sub-metro. A draft gathers photos and is filed only when the
+citizen replies 1, so a question the router misread is never filed. Photos are
+fetched once, cleaned and held only with the draft, and deleted from Twilio at
+once. A case reference gets its status. A personal-safety report gets its
+reference and updates only after YES. "Thanks" gets no reply (each costs money),
 and at most 60 messages an hour per number are handled. Voice notes are turned
 away for now. `scripts/whatsapp_simulator.py` sends signed webhooks locally;
 with `WHATSAPP_PROVIDER=log` replies only reach the API's log.
