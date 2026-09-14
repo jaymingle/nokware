@@ -14,6 +14,7 @@ from appwrite.id import ID
 from appwrite.query import Query
 
 from app.services.appwrite_client import DATABASE_ID, get_databases
+from app.services.auth import Principal
 from app.services.ledger_documents import now_iso
 
 COLLECTION_ID = "case_history"
@@ -51,6 +52,11 @@ class CaseActor:
     id: str
     name: str
     role: ActorRole
+
+
+def actor(principal: Principal) -> CaseActor:
+    """A signed-in person as the trail records them: a snapshot of their name and role."""
+    return CaseActor(id=principal.user_id, name=principal.name, role=ActorRole(principal.role.value))
 
 
 CITIZEN = CaseActor(id="citizen", name="The citizen", role=ActorRole.CITIZEN)

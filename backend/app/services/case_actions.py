@@ -13,7 +13,7 @@ from typing import Any
 
 from app.services import case_history, case_workflow, report_store
 from app.services.auth import Principal
-from app.services.case_history import ActorRole, CaseActor, CaseEntry, CaseHistoryAction
+from app.services.case_history import CaseEntry, CaseHistoryAction, actor
 from app.services.case_workflow import AssignmentStatus, CaseStatus, Reassignment
 from app.services.locks import record_lock
 from app.services.report_followups import CaseNotFound, sync_contact_retention
@@ -27,8 +27,6 @@ class Outcome:
     resolved: bool  # the change resolved the case: the citizen gets the resolution message
 
 
-def actor(principal: Principal) -> CaseActor:
-    return CaseActor(id=principal.user_id, name=principal.name, role=ActorRole(principal.role.value))
 
 
 def _load(case_id: str) -> tuple[dict[str, Any], list[dict[str, Any]]]:

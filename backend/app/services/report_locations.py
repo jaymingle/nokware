@@ -22,8 +22,7 @@ from typing import Any
 
 from app.services import case_history
 from app.services.auth import Principal, Role
-from app.services.case_actions import actor
-from app.services.case_history import CITIZEN, CaseEntry, CaseHistoryAction
+from app.services.case_history import CITIZEN, CaseEntry, CaseHistoryAction, actor
 from app.services.report_contacts import contact_for, update_contact
 from app.services.report_taxonomy import POLICE, Category
 from app.services.workflow import NotAllowed
