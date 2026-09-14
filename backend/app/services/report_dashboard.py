@@ -2,9 +2,10 @@
 
 Personal safety is left out entirely, totals included: were it counted anywhere,
 the total less the visible topics would give its number away. Nothing is broken
-down finer than a sub-metro, and no case, place or reporter appears. A median
-is shown only once five cases have been resolved; below that it says little and
-could single a case out.
+down finer than a sub-metro, and no case, place or reporter appears. Every count
+from 1 to 4 reads "fewer than 5" (None here), as in Ask, so the two never give
+different numbers for the same thing. A median is shown only once five cases
+have been resolved; below that it says little and could single a case out.
 
 Figures are cached for a minute, so a busy public page reads Appwrite at most
 once a minute.
@@ -24,9 +25,9 @@ from appwrite.query import Query
 from app.services import ledger_documents
 from app.services.appwrite_client import every_record
 from app.services.case_workflow import CaseStatus
-from app.services.citizen_reports import REPORTS_COLLECTION
 from app.services.ledger_documents import LedgerStatus, parse_datetime
-from app.services.report_taxonomy import TOPICS_BY_ID, Category
+from app.services.report_taxonomy import TOPICS_BY_ID
+from app.services.stats import is_public, public_cases, shown
 from app.teams import DEPARTMENT_NAMES
 from app.wards import sub_metros
 
@@ -34,7 +35,6 @@ PERIOD_MONTHS = 12
 MEDIAN_MIN = 5  # resolved cases needed before a median is shown
 RECENT_DOCUMENTS = 4
 CACHE_SECONDS = 60
-CASE_FIELDS = ["category", "isSensitive", "topic", "subMetro", "status", "createdAt", "resolvedAt"]
 DAY_SECONDS = 86_400
 
 
@@ -48,11 +48,6 @@ def month_keys(now: datetime) -> list[str]:
     start = period_start(now)
     first = start.year * 12 + start.month - 1
     return [f"{(first + i) // 12}-{(first + i) % 12 + 1:02d}" for i in range(PERIOD_MONTHS)]
-
-
-def is_public(case: dict[str, Any]) -> bool:
-    """Everyday and public-safety reports only. Checked twice over: by category and by the private flag."""
-    return case.get("category") != Category.PERSONAL_SAFETY and not case.get("isSensitive")
 
 
 @dataclass(frozen=True)
@@ -79,12 +74,14 @@ def median_days(cases: list[Dated]) -> float | None:
 def _months(dated: list[Dated], now: datetime) -> list[dict[str, Any]]:
     received = Counter(f"{c.created:%Y-%m}" for c in dated)
     resolved = Counter(f"{c.resolved:%Y-%m}" for c in dated if c.resolved)
-    return [{"month": key, "received": received[key], "resolved": resolved[key]} for key in month_keys(now)]
+    return [{"month": key, "received": shown(received[key]), "resolved": shown(resolved[key])} for key in month_keys(now)]
 
 
 def _topics(in_period: list[Dated]) -> list[dict[str, Any]]:
     counts = Counter(c.case["topic"] for c in in_period if c.case.get("topic") in TOPICS_BY_ID)
-    return [{"label": TOPICS_BY_ID[topic].label, "count": n} for topic, n in counts.most_common()]
+    rows = [{"label": TOPICS_BY_ID[topic].label, "count": shown(n)} for topic, n in counts.items()]
+    # Shown counts largest first; the "fewer than 5" topics after them, by name, so their order says nothing.
+    return sorted(rows, key=lambda r: (r["count"] is None, -(r["count"] or 0), r["label"]))
 
 
 def _sub_metro_rows(in_period: list[Dated]) -> list[dict[str, Any]]:
@@ -94,8 +91,8 @@ def _sub_metro_rows(in_period: list[Dated]) -> list[dict[str, Any]]:
         rows.append(
             {
                 "name": sub_metro.name,
-                "reports": len(here),
-                "resolved": sum(1 for c in here if c.resolved),
+                "reports": shown(len(here)),
+                "resolved": shown(sum(1 for c in here if c.resolved)),
                 "median_days": median_days(here),
             }
         )
@@ -109,21 +106,13 @@ def aggregate(cases: list[dict[str, Any]], now: datetime) -> dict[str, Any]:
     in_period = [d for d in dated if d.created >= start]
     return {
         "period_start": start.isoformat(),
-        "received": len(in_period),
-        "resolved": sum(1 for c in in_period if c.resolved),
+        "received": shown(len(in_period)),
+        "resolved": shown(sum(1 for c in in_period if c.resolved)),
         "median_days": median_days(in_period),
         "months": _months(dated, now),  # a month outside the period is simply not listed
         "topics": _topics(in_period),
         "sub_metros": _sub_metro_rows(in_period),
     }
-
-
-def public_cases() -> list[dict[str, Any]]:
-    """Every report but personal safety, with only the fields the figures need."""
-    return every_record(
-        REPORTS_COLLECTION,
-        [Query.not_equal("category", Category.PERSONAL_SAFETY.value), Query.select(CASE_FIELDS)],
-    )
 
 
 def ledger_figures() -> dict[str, Any]:
