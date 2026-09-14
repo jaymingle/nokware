@@ -2,6 +2,7 @@
 
 import json
 from collections.abc import Iterator
+from datetime import datetime, timezone
 from typing import Any
 
 import pytest
@@ -29,13 +30,16 @@ class FakeChain:
     def __init__(self, pieces: list[str]) -> None:
         self.pieces = pieces
         self.calls = 0
+        self.inputs: list[dict[str, str]] = []
 
-    def stream(self, _: dict[str, str]) -> Iterator[str]:
+    def stream(self, prompt_input: dict[str, str]) -> Iterator[str]:
         self.calls += 1
+        self.inputs.append(prompt_input)
         yield from self.pieces
 
-    def invoke(self, _: dict[str, str]) -> str:
+    def invoke(self, prompt_input: dict[str, str]) -> str:
         self.calls += 1
+        self.inputs.append(prompt_input)
         return "".join(self.pieces)
 
 
@@ -62,6 +66,13 @@ def test_stream_sends_progress_then_the_checked_answer(pipeline) -> None:
     assert not any(source["cited"] for source in events[1]["sources"])  # nothing is cited before it is written
     done = events[-1]
     assert done == {"type": "done", "answer": "Fees rise [S1] and.", "status": "answered", "cited": ["S1"]}
+
+
+def test_the_model_is_told_todays_date_so_this_year_means_this_year(pipeline, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(rag, "utc_now", lambda: datetime(2026, 9, 14, 3, 0, tzinfo=timezone.utc))
+    chain = pipeline([retrieved("ama-1", IMPORTED)], ["Fees [S1]."])
+    list(rag.stream_answer("How many cases this year?"))
+    assert chain.inputs[-1]["today"] == "Monday 14 September 2026"
 
 
 def test_sources_carry_department_name_provenance_and_url(pipeline) -> None:

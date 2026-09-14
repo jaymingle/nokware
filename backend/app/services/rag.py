@@ -68,6 +68,8 @@ _SYSTEM_PROMPT = (
     "e.g. [S2] or [S1][S3]. Do not cite every sentence. Cite only labels listed below.\n"
     "- When a year matters, take it from the source header. If the header year is "
     f"{UNKNOWN_YEAR}, do not state or guess one.\n"
+    '- Read "this year", "last month" and the like against today\'s date, given with the question. '
+    "Never assume a different current year.\n"
     "- If sources disagree (different figures, dates or facts for the same thing), "
     "never pick one, merge them or average them. Start that point with the exact words "
     f'"{DISAGREEMENT_LEAD}" and give each version with the document it comes from, '
@@ -86,7 +88,7 @@ _SYSTEM_PROMPT = (
 )
 
 _PROMPT = ChatPromptTemplate.from_messages(
-    [("system", _SYSTEM_PROMPT), ("human", "Sources:\n\n{context}\n\nQuestion: {question}")]
+    [("system", _SYSTEM_PROMPT), ("human", "Sources:\n\n{context}\n\nToday's date: {today}\n\nQuestion: {question}")]
 )
 
 
@@ -224,7 +226,7 @@ def _answer_chain() -> Runnable[dict[str, str], str]:
 
 def _prompt_input(prepared: Prepared) -> dict[str, str]:
     blocks = [_format_context(prepared.chunks, prepared.labels), *map(figure_context, prepared.figures.figures)]
-    return {"context": "\n\n".join(b for b in blocks if b), "question": prepared.question}
+    return {"context": "\n\n".join(b for b in blocks if b), "today": f"{utc_now():%A %d %B %Y}", "question": prepared.question}
 
 
 def _with_safety_notice(answer: str, prepared: Prepared) -> str:
