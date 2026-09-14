@@ -136,13 +136,17 @@ missing its settings stops the API at startup. `scripts/sms_balance.py` shows
 the credits left without spending any. WhatsApp (Twilio) is still `log`.
 
 Callbacks from the providers (`app/routes/channels.py`) are verified before
-they are trusted. Arkesel signs SMS and Voice callbacks; `arkesel_signatures.py`
-implements its guide (`docs/Guide-SE-client-webhook-signature-verification.md`)
-exactly: an HMAC-SHA256 hex digest of `{timestamp}.{canonical JSON}` with
-`ARKESEL_WEBHOOK_SECRET`, keys sorted at every depth and non-ASCII escaped as
-PHP does, either of two `v1=` values accepted during a secret rotation,
-compared in constant time, and refused when the timestamp is more than 5
-minutes off. Each SMS asks for a delivery report only when `PUBLIC_API_URL` and
+they are trusted. Arkesel signs SMS and Voice callbacks, and
+`arkesel_signatures.py` follows its signing guide exactly (the guide is
+Arkesel's and comes from [Arkesel support](https://arkesel.com/contact/); it is
+not in this repository). In short: the `X-Arkesel-Webhook-Signature` header
+carries `v1=` and an HMAC-SHA256 hex digest, made with `ARKESEL_WEBHOOK_SECRET`,
+of `{timestamp}.{canonical JSON}`: the `X-Arkesel-Webhook-Timestamp` header, a
+period, then the callback's query parameters as JSON with keys sorted at every
+level, list order kept, slashes unescaped and non-ASCII escaped as PHP's
+`json_encode` does. During a secret rotation the header holds two
+comma-separated `v1=` values, and either may match. The comparison is
+constant-time, and a timestamp more than 5 minutes off is refused. Each SMS asks for a delivery report only when `PUBLIC_API_URL` and
 the secret are both set; the report sets the outbox row's `deliveryStatus`
 (`scripts/add_delivery_reports.py` adds the fields and the index it needs).
 Arkesel's sandbox records a message as `SANDBOXED` and sends no report.

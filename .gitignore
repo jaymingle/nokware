@@ -16,3 +16,5 @@ node_modules/
 backend/.env
 frontend/.env.local
 backend/scripts/logs/
+# Arkesel's webhook signing guide: their document, kept locally, never committed
+docs/Guide-SE-client-webhook-signature-verification.md

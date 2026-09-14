@@ -1,6 +1,6 @@
-"""Arkesel's signed callbacks (SMS and Voice), verified exactly as Arkesel's guide specifies.
+"""Arkesel's signed callbacks (SMS and Voice), verified exactly as Arkesel's signing guide specifies.
 
-See docs/Guide-SE-client-webhook-signature-verification.md. The signature is an
+The guide comes from Arkesel support (https://arkesel.com/contact/). The signature is an
 HMAC-SHA256 hex digest of "{timestamp}.{canonical JSON of the query
 parameters}". Canonical JSON sorts keys at every depth, keeps list order,
 leaves slashes unescaped and escapes non-ASCII as PHP's json_encode does
