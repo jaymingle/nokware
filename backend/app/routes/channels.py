@@ -4,6 +4,7 @@
     POST /api/channels/ussd/{token}       one keypress in an Arkesel USSD session (secret in the URL)
     POST /api/channels/whatsapp           one incoming WhatsApp message, from Twilio (signed)
     POST /api/channels/whatsapp/status    Twilio's delivery status for a WhatsApp message (signed)
+    GET  /api/channels/whatsapp/audio/{name}  a spoken reply for Twilio to fetch (a random link, for 10 minutes)
 """
 
 import hmac
@@ -16,7 +17,7 @@ from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.config import get_settings
-from app.services import notifications, ussd, whatsapp, whatsapp_conversation
+from app.services import notifications, ussd, whatsapp, whatsapp_conversation, whatsapp_voice
 from app.services.arkesel_signatures import SIGNATURE_HEADER, TIMESTAMP_HEADER, verify_webhook
 from app.services.ledger_documents import utc_now
 from app.services.redis_store import RedisUnavailable
@@ -135,7 +136,22 @@ async def whatsapp_status(request: Request) -> dict[str, bool]:
     message_sid, status = form.get("MessageSid", ""), form.get("MessageStatus", "")
     if not (message_sid and status):
         return {"recorded": False}
+    await run_in_threadpool(whatsapp_voice.release, message_sid, status)
     recorded = await run_in_threadpool(notifications.record_delivery, message_sid, status, utc_now())
     if status in ("failed", "undelivered"):
         await run_in_threadpool(notifications.whatsapp_undelivered, message_sid, form.get("ErrorCode", ""))
     return {"recorded": recorded}
+
+
+@router.api_route("/whatsapp/audio/{name}", methods=["GET", "HEAD"])
+def whatsapp_audio(name: str) -> Response:
+    """A spoken reply, fetched by Twilio as it sends the voice note. The link is random and lasts 10 minutes, and
+    the audio is an answer from public documents, never anything about a report."""
+    try:
+        found = whatsapp_voice.held(name)
+    except (redis.RedisError, RedisUnavailable):
+        found = None
+    if found is None:
+        raise HTTPException(status_code=404, detail="Not found.")
+    data, content_type = found
+    return Response(data, media_type=content_type, headers={"Cache-Control": "no-store"})

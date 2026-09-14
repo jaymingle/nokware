@@ -16,12 +16,16 @@ Photos are fetched from Twilio once, cleaned (no metadata), kept only as long
 as the draft, and deleted from Twilio straight away. A personal-safety report
 gets its reference and updates only if the citizen replies YES within the
 hour. The chat reply is the receipt, so no separate "received" message is sent.
+
+A voice note is heard by whatsapp_voice and then handled as if its English had
+been typed. Its words are shown back ("I understood: …") with a question's
+answer and before a report is filed. Only a question's answer is also spoken.
 """
 
 import base64
 import logging
 from collections.abc import Callable
-from dataclasses import dataclass, replace
+from dataclasses import asdict, dataclass, replace
 from typing import Any
 
 from app.config import get_settings
@@ -40,7 +44,8 @@ from app.services.report_intake import DESCRIPTION_MIN, Receipt, ReportSubmissio
 from app.services.report_photos import PhotoRejected, clean_photo
 from app.services.report_rules import Classification, ClassificationMethod, InvalidReport
 from app.services.report_taxonomy import Category
-from app.services import whatsapp_reply, whatsapp_safety
+from app.services import whatsapp_reply, whatsapp_safety, whatsapp_voice
+from app.services.voice_transcribe import Heard
 from app.services.whatsapp import WhatsAppError, WhatsAppNotConfigured, first_delivery, open_window, twilio
 from app.teams import short_name
 from app.wards import find_ward, sub_metros, ward_mentioned, wards
@@ -54,7 +59,8 @@ HELP = (
     "*Nokware* is the Accra Metropolitan Assembly's public record. Here you can:\n"
     "• Ask a question about the Assembly: fees, budgets, plans, services.\n"
     "• Report a problem, like a blocked drain or a broken streetlight. Send a photo too if you have one.\n"
-    "• Send a case reference, like K7QM-4TXP, to see how it is going."
+    "• Send a case reference, like K7QM-4TXP, to see how it is going.\n"
+    "Type, or send a voice note."
 )
 ASK_KIND = "Is this a question for Nokware, or a problem to report to the Assembly?\nReply *1* for a question or *2* for a report."
 CANCELLED = "Cancelled: nothing was filed. If you meant to ask a question, send it again."
@@ -75,6 +81,7 @@ class Inbound:
     latitude: float | None = None  # a location sent with WhatsApp's location button
     longitude: float | None = None
     place: str | None = None  # the place name or address WhatsApp sent with the pin
+    heard: Heard | None = None  # a voice note's words (text is then their English, as if typed)
 
 
 State = dict[str, Any]
@@ -142,12 +149,14 @@ def _sub_metro_question() -> str:
 def _confirm_question(number: str, state: State) -> str:
     photos = get_redis().llen(_photos_key(number))
     with_photos = f" with {photos} photo{'s' if photos != 1 else ''}" if photos else ""
+    spoken = state.get("spoken_language")
+    heard = f"{whatsapp_voice.understood(state['description'], spoken)}\n" if spoken else ""
     if _private(state):
         who = " and ".join(short_name(r) for r in state["filed"]["recipients"])
-        return (f"Ready to send your report{with_photos} to {who}. You can send photos first: only they will see them.\n"
+        return (f"{heard}Ready to send your report{with_photos} to {who}. You can send photos first: only they will see them.\n"
                 "Reply *1* to send it or *2* to cancel.")
     place = wards()[state["ward"]].name
-    return f"Ready to file your report about {place}{with_photos}.\nReply *1* to file it or *2* to cancel. You can send photos first."
+    return f"{heard}Ready to file your report about {place}{with_photos}.\nReply *1* to file it or *2* to cancel. You can send photos first."
 
 
 def _next(number: str, state: State) -> tuple[State, str]:
@@ -173,15 +182,18 @@ def _prompt(number: str, state: State) -> None:
     whatsapp_reply.reply(number, "\n\n".join(part for part in (numbers, question) if part))
 
 
-def _with_description(state: State, text: str) -> State:
-    """The description, how it will be filed, and any place it names: for personal safety only the sub-metro."""
+def _with_description(state: State, text: str, heard: Heard | None) -> State:
+    """The description, how it will be filed, and any place it names: for personal safety only the sub-metro.
+    From a voice note, its language too, so the confirm can show what was understood."""
     filed = report_intake.read_report(text)
     ward = ward_mentioned(text)
     if filed.private:
         place = {"sub_metro": ward.sub_metro} if ward else {}
     else:
         place = {"ward": state.get("ward") or (ward.id if ward else None)}
-    return {**{k: v for k, v in state.items() if k != "ward"}, "description": text, "filed": _saved(filed), **place}
+    kept = {k: v for k, v in state.items() if k not in ("ward", "spoken_language")}
+    spoken = {"spoken_language": heard.language} if heard else {}
+    return {**kept, "description": text, "filed": _saved(filed), **place, **spoken}
 
 
 def start_report(inbound: Inbound) -> None:
@@ -190,7 +202,7 @@ def start_report(inbound: Inbound) -> None:
         if problem:
             whatsapp_reply.reply(inbound.number, problem)
     text = inbound.text.strip()
-    _prompt(inbound.number, _with_description({}, text) if len(text) >= DESCRIPTION_MIN else {})
+    _prompt(inbound.number, _with_description({}, text, inbound.heard) if len(text) >= DESCRIPTION_MIN else {})
 
 
 def _receipt_text(receipt: Receipt) -> str:
@@ -212,6 +224,7 @@ def _file(number: str, state: State) -> None:
         description=state["description"], ward=None if private else state["ward"],
         sub_metro=state.get("sub_metro") if private else None, safety_topic=None, phone=None,
         whatsapp=number, notify=True, callback_consent=False, channel=IntakeChannel.WHATSAPP,
+        spoken=state.get("spoken_language"),
     )
     try:
         receipt = report_intake.submit(submission, draft_photos(number), utc_now(), _classification(state))
@@ -225,11 +238,16 @@ def _file(number: str, state: State) -> None:
         whatsapp_reply.reply(number, _receipt_text(receipt))
 
 
-def answer(number: str, question: str) -> None:
+def answer(number: str, question: str, heard: Heard | None = None) -> None:
+    """A cited answer. Asked in a voice note: what was understood comes first, and the answer is also spoken."""
     if not channel_limits.QUESTIONS.allow(number, utc_now().timestamp()):
         whatsapp_reply.reply(number, "You've asked a lot of questions this hour. Please try again later.")
         return
-    whatsapp_reply.reply(number, for_chat(answer_question(question, AnswerLength.CHAT), _site()))
+    found = answer_question(question, AnswerLength.CHAT)
+    shown = [whatsapp_voice.understood(heard.english, heard.language)] if heard else []
+    whatsapp_reply.reply(number, "\n\n".join([*shown, for_chat(found, _site())]))
+    if heard:
+        whatsapp_voice.speak_answer(number, found, heard)
 
 
 def status(number: str, reference: str) -> None:
@@ -280,7 +298,7 @@ def _draft_step(inbound: Inbound, state: State) -> bool:
     elif step == "confirm" and text == "1":
         _file(number, state)
     elif step == "describe" and len(text) >= DESCRIPTION_MIN:
-        _prompt(number, _with_description(state, text))
+        _prompt(number, _with_description(state, text, inbound.heard))
     elif step in ("area", "sub_metro") and text:
         placed = _place_reply(state, text)
         if isinstance(placed, str):
@@ -299,10 +317,11 @@ def _kind_step(inbound: Inbound, state: State) -> bool:
         channel_sessions.clear("whatsapp", inbound.number)
         return False
     channel_sessions.clear("whatsapp", inbound.number)
+    heard = Heard(**state["heard"]) if state.get("heard") else None
     if choice == "1":
-        answer(inbound.number, state["text"])
+        answer(inbound.number, state["text"], heard)
     else:
-        start_report(replace(inbound, text=state["text"], media=None))
+        start_report(replace(inbound, text=state["text"], media=None, heard=heard))
     return True
 
 
@@ -317,7 +336,7 @@ def _fresh(inbound: Inbound) -> None:
     if reading.intent == Intent.STATUS and reading.reference:
         status(inbound.number, reading.reference)
     elif reading.intent == Intent.QUESTION:
-        answer(inbound.number, inbound.text.strip())
+        answer(inbound.number, inbound.text.strip(), inbound.heard)
     elif reading.intent == Intent.REPORT:
         start_report(inbound)
     elif reading.intent == Intent.MEDICAL:
@@ -325,7 +344,8 @@ def _fresh(inbound: Inbound) -> None:
     elif reading.intent == Intent.THANKS:
         return  # "thanks" or "ok" needs no reply, and every reply costs money
     elif reading.intent == Intent.UNCLEAR:
-        channel_sessions.save("whatsapp", inbound.number, {"step": "kind", "text": inbound.text.strip()}, DRAFT_SECONDS)
+        kind = {"step": "kind", "text": inbound.text.strip(), **({"heard": asdict(inbound.heard)} if inbound.heard else {})}
+        channel_sessions.save("whatsapp", inbound.number, kind, DRAFT_SECONDS)
         whatsapp_reply.reply(inbound.number, ASK_KIND)
     else:
         whatsapp_reply.reply(inbound.number, HELP)
@@ -334,9 +354,29 @@ def _fresh(inbound: Inbound) -> None:
 def _media_problem(media: Media | None) -> str | None:
     if media is None or media.content_type in PHOTO_TYPES:
         return None
-    if media.content_type.startswith("audio/"):
-        return "Voice notes can't be read yet. Please type your message."
-    return "Only photos can be added to a report."
+    return "Only photos and voice notes can be read. Please type your message."
+
+
+def _heard(inbound: Inbound) -> Inbound | None:
+    """A voice note as the message its words would have made if typed; None if it couldn't be used."""
+    if not (inbound.media and whatsapp_voice.is_voice(inbound.media.content_type)):
+        return inbound
+    heard = whatsapp_voice.hear(inbound.number, inbound.media.url, inbound.media.content_type)
+    return replace(inbound, text=whatsapp_voice.as_typed(heard.english), media=None, heard=heard) if heard else None
+
+
+def _route(inbound: Inbound) -> None:
+    """A message to the step its chat is at, or read afresh."""
+    problem = _media_problem(inbound.media)
+    if problem:
+        whatsapp_reply.reply(inbound.number, problem)
+        return
+    state = channel_sessions.load("whatsapp", inbound.number)
+    step = STEPS.get(state.get("step", "")) if state else None
+    if state and step is None:  # a session from an older version of this flow: start again
+        channel_sessions.clear("whatsapp", inbound.number)
+    if not (state and step and step(inbound, state)):
+        _fresh(inbound)
 
 
 def handle(inbound: Inbound) -> None:
@@ -345,16 +385,9 @@ def handle(inbound: Inbound) -> None:
     if not first_delivery(inbound.message_sid) or not channel_limits.MESSAGES.allow(inbound.number, utc_now().timestamp()):
         return
     try:
-        problem = _media_problem(inbound.media)
-        if problem:
-            whatsapp_reply.reply(inbound.number, problem)
-            return
-        state = channel_sessions.load("whatsapp", inbound.number)
-        step = STEPS.get(state.get("step", "")) if state else None
-        if state and step is None:  # a session from an older version of this flow: start again
-            channel_sessions.clear("whatsapp", inbound.number)
-        if not (state and step and step(inbound, state)):
-            _fresh(inbound)
+        as_typed = _heard(inbound)
+        if as_typed is not None:
+            _route(as_typed)
     except Exception:
         logger.exception("A WhatsApp message from %s couldn't be handled", masked(inbound.number))
         whatsapp_reply.reply(inbound.number, "Sorry, something went wrong. Please try again.")

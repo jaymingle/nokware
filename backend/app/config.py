@@ -84,6 +84,12 @@ class Settings(BaseSettings):
     # per-number limits and the SMS page count. Empty: channels are off and the
     # SMS count is kept in this process.
     redis_url: str = ""
+    # Spoken replies to WhatsApp voice questions: Gemini's speech model (a
+    # preview, hence a setting) and its voice, and the most spoken replies sent
+    # in a day across everyone (each is an extra WhatsApp message).
+    gemini_tts_model: str = "gemini-2.5-flash-preview-tts"
+    gemini_tts_voice: str = "Charon"
+    voice_daily_limit: int = 20
     # Where citizens follow their reports; used in the links messages carry.
     public_site_url: str = "http://localhost:3000"
 

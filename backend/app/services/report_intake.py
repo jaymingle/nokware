@@ -55,6 +55,7 @@ class ReportSubmission:
     notify: bool  # on the safety form, the citizen's explicit opt-in to messages
     callback_consent: bool  # on the safety form only
     channel: IntakeChannel = IntakeChannel.WEB
+    spoken: str | None = None  # the language of the WhatsApp voice note the description was transcribed from
 
 
 @dataclass(frozen=True)
@@ -159,9 +160,17 @@ def _assign(case: dict[str, Any], now: datetime) -> None:
         )
 
 
-def _record_filing(case: dict[str, Any]) -> None:
+def voice_note(language: str) -> str:
+    """The trail's word that a description is Nokware's transcription of a voice note, not the resident's own typing."""
+    translated = "" if language.strip().lower() == "english" else f", translated from {language}"
+    return (f"Reported by a resident in a WhatsApp voice note. The description is a machine transcription{translated}, "
+            "which the resident confirmed before it was filed.")
+
+
+def _record_filing(case: dict[str, Any], spoken: str | None) -> None:
     case_id = case["$id"]
-    case_history.record(case_id, CaseEntry(CaseHistoryAction.SUBMITTED, CITIZEN, to_status=CaseStatus.SUBMITTED.value))
+    note = voice_note(spoken) if spoken else None
+    case_history.record(case_id, CaseEntry(CaseHistoryAction.SUBMITTED, CITIZEN, to_status=CaseStatus.SUBMITTED.value, note=note))
     case_history.record(case_id, CaseEntry(CaseHistoryAction.CLASSIFIED, SYSTEM, note=case["classificationNote"]))
     names = " and ".join(RECIPIENT_NAMES[r] for r in case["recipients"])
     entry = CaseEntry(
@@ -210,7 +219,7 @@ def submit(submission: ReportSubmission, photos: list[bytes], now: datetime, fil
     fields = _case_fields(filed, submission, description, store_photos(case_id, cleaned), now)
     case = _create(case_id, fields)
     _assign(case, now)
-    _record_filing(case)
+    _record_filing(case, submission.spoken)
     if choice is None:
         return Receipt(case=case, messages_on=False, held_for_consent=False, preferences_token=None)
     agreed = _consented(choice, submission, filed)

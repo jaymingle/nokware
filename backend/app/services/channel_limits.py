@@ -32,3 +32,5 @@ QUESTIONS = NumberLimit("questions", limit=20, window_seconds=3600)
 SMS_ANSWERS = NumberLimit("sms-answers", limit=5, window_seconds=86400)  # each costs up to 2 credits
 REPORTS = NumberLimit("reports", limit=5, window_seconds=3600)
 LOOKUPS = NumberLimit("lookups", limit=30, window_seconds=3600)  # status by reference: no guessing
+VOICE_NOTES = NumberLimit("voice-notes", limit=10, window_seconds=3600)  # each is transcribed by Gemini
+SPOKEN_REPLIES = NumberLimit("spoken-replies", limit=10, window_seconds=86400)  # each is an extra WhatsApp message

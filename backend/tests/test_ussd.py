@@ -9,7 +9,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.config import get_settings
-from app.main import RedactUssdSecret, app
+from app.main import RedactChannelSecrets, app
 from app.routes import channels
 from app.services import channel_limits, channel_sessions, redis_store, report_followups, report_intake, ussd
 from app.services.citizen_reports import IntakeChannel, NotificationEvent
@@ -209,7 +209,7 @@ def test_without_a_token_ussd_is_off(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_the_ussd_secret_never_reaches_the_access_log() -> None:
     record = logging.LogRecord("uvicorn.access", logging.INFO, "", 0, '%s - "%s %s HTTP/%s" %d',
                                ("127.0.0.1:5000", "POST", f"/api/channels/ussd/{TOKEN}", "1.1", 200), None)
-    assert RedactUssdSecret().filter(record) and TOKEN not in record.getMessage()
+    assert RedactChannelSecrets().filter(record) and TOKEN not in record.getMessage()
     assert "/api/channels/ussd/[secret]" in record.getMessage()
 
 

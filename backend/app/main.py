@@ -57,10 +57,11 @@ def show_app_logs() -> None:
 show_app_logs()
 
 
-class RedactUssdSecret(logging.Filter):
-    """The USSD callback's address carries its secret (Arkesel doesn't sign USSD yet): keep it out of access logs."""
+class RedactChannelSecrets(logging.Filter):
+    """Keep secrets in channel addresses out of access logs: the USSD callback's (Arkesel doesn't sign USSD yet)
+    and a spoken reply's random link."""
 
-    PATH = re.compile(r"(/api/channels/ussd/)[^/?\s]+")
+    PATH = re.compile(r"(/api/channels/(?:ussd|whatsapp/audio)/)[^/?\s]+")
 
     def filter(self, record: logging.LogRecord) -> bool:
         if isinstance(record.args, tuple):
@@ -68,7 +69,7 @@ class RedactUssdSecret(logging.Filter):
         return True
 
 
-logging.getLogger("uvicorn.access").addFilter(RedactUssdSecret())
+logging.getLogger("uvicorn.access").addFilter(RedactChannelSecrets())
 
 
 @asynccontextmanager

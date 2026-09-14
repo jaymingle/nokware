@@ -69,9 +69,10 @@ class TwilioWhatsApp:
     name: str = "twilio"
     delivers: bool = True
 
-    def send(self, to: str, body: str) -> str:
-        """Send one WhatsApp message; return Twilio's message SID. Raises WhatsAppError."""
-        form = {"From": self.sender, "To": f"whatsapp:{to}", "Body": body[:BODY_MAX]}
+    def send(self, to: str, body: str, media_url: str | None = None) -> str:
+        """Send one WhatsApp message, or a file Twilio fetches from media_url (WhatsApp drops any text sent with
+        audio, so a voice note goes without it); return Twilio's message SID. Raises WhatsAppError."""
+        form = {"From": self.sender, "To": f"whatsapp:{to}", **({"MediaUrl": media_url} if media_url else {"Body": body[:BODY_MAX]})}
         if self.status_callback:
             form["StatusCallback"] = self.status_callback
         try:

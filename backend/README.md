@@ -133,7 +133,8 @@ default) goes through Arkesel without delivering or spending credits, and the
 case history says so; outside it, `SMS_DAILY_LIMIT` caps the pages sent in a
 day (counted in the API process, so a restart resets it). A provider named but
 missing its settings stops the API at startup. `scripts/sms_balance.py` shows
-the credits left without spending any. WhatsApp (Twilio) is still `log`.
+the credits left without spending any. WhatsApp goes through Twilio when
+`WHATSAPP_PROVIDER=twilio` (below).
 
 Emergency numbers (`app/contacts.py`, `channel_contacts.py`): Ghana's hotlines
 often don't connect, so a report where someone may be in danger shows every
@@ -192,8 +193,10 @@ through the same `report_intake.submit()` and `rag.answer_question()` as the web
 
 - `channel_intent.py` reads a message: a short one holding a case reference
   asks for its status and a greeting asks for help, with no model call; the
-  quick model sorts the rest into question, report or unclear, and a failure
-  means "unclear", so nothing is filed or answered on a guess.
+  quick model sorts the rest into question, report, status ("what's happening
+  with my report K7QM-4TXP?", answered only when it names a reference) or
+  unclear, and a failure means "unclear", so nothing is filed or answered on a
+  guess.
 - `rag.answer_question(question, length)` answers at the channel's length (the
   web in full, a chat in about 1,000 characters, an SMS in 240); only a length
   line in the prompt changes, so sources, live figures, "fewer than 5" and the
@@ -250,9 +253,42 @@ citizen replies 1, so a question the router misread is never filed. Photos are
 fetched once, cleaned and held only with the draft, and deleted from Twilio at
 once. A case reference gets its status. A personal-safety report gets its
 reference and updates only after YES. "Thanks" gets no reply (each costs money),
-and at most 60 messages an hour per number are handled. Voice notes are turned
-away for now. `scripts/whatsapp_simulator.py` sends signed webhooks locally;
-with `WHATSAPP_PROVIDER=log` replies only reach the API's log.
+and at most 60 messages an hour per number are handled. A voice note is heard
+and handled as if typed (below). `scripts/whatsapp_simulator.py` sends signed
+webhooks locally, a voice note (`--voice FILE`, served from this machine as
+Twilio would serve it) and a pin (`--pin`) included; with
+`WHATSAPP_PROVIDER=log` replies only reach the API's log.
+
+Voice notes (`whatsapp_voice.py`, `voice_transcribe.py`, `voice_speech.py`,
+`voice_audio.py`). A voice note is fetched from Twilio once and deleted there at
+once; the recording is never stored. Up to 3 minutes, 10 an hour per number.
+Gemini 2.5 Flash listens to it directly, at temperature 0, told the AMA's
+electoral areas and sub-metros (so "Kaneshie" isn't heard as "Canashy") and how
+a reference is spelled, and returns what was said, in the language spoken and
+in English, and whether it was clear. Any language is accepted: the English is
+what Nokware acts on, exactly as if typed, through every step of the chat, and
+a lone spoken choice ("one", "yes", "remove") or a spelled-out reference reads
+as its typed form, so someone who can't type can use every menu. The words are
+shown back ("I understood: …", marked "translated by machine" when they were)
+with a question's answer and in the confirm before a report is filed, so a bad
+transcription is caught by the person who said it; the audit trail records that
+a description is a confirmed machine transcription. A transcript with more
+words than the note's length could hold is taken as unheard: on a half-second
+note Gemini invented a whole sentence. Only a question's answer is also spoken:
+after the text answer (which carries the sources), a voice note of about a
+minute of its gist, in English, ending "The sources are in the message above."
+It is never spoken when Gemini or the report rules' danger words say the note
+is about harm to a person, nor for a report, a status, a safety or a medical
+reply: a voice note about abuse could play aloud near the abuser. Speech is
+Gemini's (`GEMINI_TTS_MODEL`, a preview model, and `GEMINI_TTS_VOICE`), encoded
+with PyAV (FFmpeg bundled in its wheel, so nothing to install on the server) as
+OGG/Opus, the only OGG Twilio takes, which WhatsApp plays as a voice note; MP3
+is the fallback. Twilio fetches it from `GET /api/channels/whatsapp/audio/{name}`:
+a random link, held in Redis for 10 minutes, deleted when Twilio reports on the
+message and kept out of the access log. A spoken reply is a second WhatsApp
+message (WhatsApp drops text sent with audio), so there are 10 a day per number
+and `VOICE_DAILY_LIMIT` (default 20) across everyone; past either, or on any
+failure, the text answer stands alone.
 
 WhatsApp allows free-form messages only within 24 hours of the citizen's last
 message. Each message they send opens that window in Redis; a notification
@@ -266,7 +302,7 @@ Known limitations:
   on gateway work). Until it does, the USSD callback is protected only by the
   secret token in its URL (`ARKESEL_USSD_TOKEN`), which anyone who learns the
   URL (from a log or a proxy, say) could use to post fake sessions. The API
-  redacts it from its own access log (`RedactUssdSecret` in `main.py`), but a
+  redacts it from its own access log (`RedactChannelSecrets` in `main.py`), but a
   proxy in front of it, or ngrok's inspector in development, still records
   it. When Arkesel signs USSD, it moves to the same verification as SMS.
 - While the sender ID is unregistered (the account sends as "Jay" meanwhile),
@@ -279,8 +315,23 @@ Known limitations:
   approved templates exists (a production step), those updates go by SMS to
   Ghanaian numbers and are not delivered to others.
 - Twilio keeps its own log of message bodies. The API deletes incoming photos
-  from Twilio, but what a citizen typed stays in Twilio's message log until
-  deleted there.
+  and voice notes from Twilio, but what a citizen typed stays in Twilio's
+  message log until deleted there.
+- Voice in languages other than English is untested. Twi, Ga and Ewe haven't
+  been tried with real speakers. In testing, a clear French note was heard as
+  Twi-sounding words and marked unclear (so the citizen was asked to try again
+  or type): the prompt's Ghanaian context pulls Gemini towards Twi. Spoken
+  replies are English only. "I understood: …" is the safeguard, not a
+  guarantee.
+- Very short voice notes are unreliable: a half-second "one" was heard as
+  "Hello". A wrong short word only re-asks the question, and invented sentences
+  are rejected, but typing a menu choice is surer.
+- A voice note is sent to Google's Gemini API to be transcribed, as typed text
+  already is to be read, classified and answered. The recording isn't kept by
+  Nokware.
+- Gemini's speech model is a preview (`gemini-2.5-flash-preview-tts`) and may
+  change or be withdrawn; `GEMINI_TTS_MODEL` swaps it without a code change, and
+  if speech fails the text answer is still sent.
 
 Staff work cases through `app/services/case_actions.py` (under a per-case
 lock, like Ledger documents). What each caller sees is decided in one place

@@ -335,13 +335,12 @@ def test_a_reference_gets_its_status(monkeypatch: pytest.MonkeyPatch, chat: list
     assert chat[-1] == "Report K7QM-4TXP (Drainage and flooding in Kaneshie) was received and is with Works Department."
 
 
-def test_voice_notes_and_other_files_are_turned_away_and_a_repeat_is_ignored(chat: list[str]) -> None:
-    say("", Media("https://api.twilio.com/media/ME10", "audio/ogg"))
+def test_files_other_than_photos_and_voice_notes_are_turned_away_and_a_repeat_is_ignored(chat: list[str]) -> None:
     say("", Media("https://api.twilio.com/media/ME11", "application/pdf"))
-    assert chat == ["Voice notes can't be read yet. Please type your message.", "Only photos can be added to a report."]
+    assert chat == ["Only photos and voice notes can be read. Please type your message."]
     whatsapp_conversation.handle(Inbound(NUMBER, "", Media("u", "application/pdf"), "SM-repeat"))
     whatsapp_conversation.handle(Inbound(NUMBER, "", Media("u", "application/pdf"), "SM-repeat"))
-    assert len(chat) == 3
+    assert len(chat) == 2
 
 
 def test_replies_go_by_twilio_in_pieces_of_1600(monkeypatch: pytest.MonkeyPatch) -> None:

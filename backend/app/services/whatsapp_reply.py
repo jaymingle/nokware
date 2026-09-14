@@ -21,3 +21,16 @@ def reply(number: str, text: str) -> None:
             provider.send(number, piece)
     except WhatsAppError:
         logger.exception("WhatsApp reply to %s failed", masked(number))
+
+
+def reply_audio(number: str, media_url: str, about: str) -> str | None:
+    """Send a voice note Twilio fetches from media_url; its message SID, or None if it wasn't sent."""
+    provider = provider_for(NotificationChannel.WHATSAPP)
+    if provider is None:
+        logger.info("WhatsApp voice note to %s not sent (no provider is configured): %s, at %s", masked(number), about, media_url)
+        return None
+    try:
+        return provider.send(number, "", media_url=media_url)
+    except WhatsAppError:
+        logger.exception("WhatsApp voice note to %s failed", masked(number))
+        return None

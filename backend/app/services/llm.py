@@ -1,8 +1,10 @@
-"""Gemini chat models: Ask (answering, query expansion, planning its live figures) and the report classifier."""
+"""Gemini: chat models for Ask (answering, query expansion, planning its live figures) and the report classifier,
+and the plain client for voice notes."""
 
 import logging
 from functools import lru_cache
 
+from google import genai
 from langchain_google_genai import ChatGoogleGenerativeAI
 
 from app.config import get_settings
@@ -49,3 +51,9 @@ def get_quick_model() -> ChatGoogleGenerativeAI:
 
 def get_classifier_model() -> ChatGoogleGenerativeAI:
     return get_quick_model()
+
+
+@lru_cache
+def get_genai_client() -> genai.Client:
+    """Gemini's own client, for what LangChain doesn't wrap simply: voice notes in, speech out."""
+    return genai.Client(api_key=get_settings().gemini_api_key)
