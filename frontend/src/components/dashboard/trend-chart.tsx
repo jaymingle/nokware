@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type RefObject } from "react";
 
-import { FEWER_THAN_FIVE, chartScale, drawnValue, longMonth, monthLabel, shownRuns, type Count } from "@/lib/report/dashboard";
+import { FEWER_THAN_FIVE, SUPPRESSED_RANGE, chartScale, drawnValue, longMonth, monthLabel, shownRuns, type Count } from "@/lib/report/dashboard";
 
 import type { MonthFigures } from "@/lib/api/types";
 
@@ -47,6 +47,16 @@ function MonthsTable({ months }: { months: MonthFigures[] }) {
   );
 }
 
+/** A point for each month's resolved count; a "fewer than 5" month is a dashed mark over the range 1 to 4. */
+function ResolvedMarks({ months, x, y }: { months: MonthFigures[]; x: (i: number) => number; y: (v: number) => number }) {
+  const [low, high] = SUPPRESSED_RANGE;
+  return months.map((m, i) => (m.resolved === null ? (
+    <line key={m.month} x1={x(i)} x2={x(i)} y1={y(low)} y2={y(high)} className="stroke-teal" strokeWidth={1.5} strokeDasharray="3 2" />
+  ) : (
+    <circle key={m.month} cx={x(i)} cy={y(m.resolved)} r={2.5} className="fill-card stroke-teal" strokeWidth={1.5} />
+  )));
+}
+
 /** Twelve months of reports received (bars) and resolved (line), scaled to whole numbers. */
 export function TrendChart({ months }: { months: MonthFigures[] }) {
   const [box, W] = useWidth(600);
@@ -77,9 +87,7 @@ export function TrendChart({ months }: { months: MonthFigures[] }) {
         {lines.map((points) => (
           <polyline key={points} points={points} fill="none" className="stroke-teal" strokeWidth={1.5} strokeLinejoin="round" />
         ))}
-        {months.map((m, i) => (m.resolved === null ? null : (
-          <circle key={m.month} cx={x(i)} cy={y(m.resolved)} r={2.5} className="fill-card stroke-teal" strokeWidth={1.5} />
-        )))}
+        <ResolvedMarks months={months} x={x} y={y} />
       </svg>
       <MonthsTable months={months} />
     </div>

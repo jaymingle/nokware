@@ -34,6 +34,8 @@ export function periodLabel(months: MonthFigures[]): string {
 export type Count = number | null;
 export const FEWER_THAN_FIVE = "fewer than 5";
 const SUPPRESSED_MAX = 4; // the most a "fewer than 5" count can be
+/** Where a "fewer than 5" count may lie, so a chart can draw it as a range instead of guessing a point. */
+export const SUPPRESSED_RANGE: readonly [number, number] = [1, SUPPRESSED_MAX];
 
 /** A count as shown: "1,204", or "<5" for fewer than 5. */
 export function formatCount(count: Count): string {
