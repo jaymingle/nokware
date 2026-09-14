@@ -31,6 +31,7 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import Runnable
 
+from app.services.ask_charts import DOCUMENT_CHART_REFUSAL, ChartDict, asks_for_chart, chart_for
 from app.services.ask_figures import (
     NO_FIGURES,
     SAFETY_FIGURES_ANSWER,
@@ -85,7 +86,10 @@ _SYSTEM_PROMPT = (
     "- Never work out a new figure from others: no adding, subtracting or comparing counts to get a number.\n"
     "- Keep document figures and live report data apart; one never confirms or corrects the other.\n"
     "- If the live figures can't settle the question (for example every count it needs is \"fewer than 5\"), say "
-    "so plainly and cite them. Don't give the no-information reply when live figures were provided."
+    "so plainly and cite them. Don't give the no-information reply when live figures were provided.\n\n"
+    "If the resident asks for a chart or graph, just answer with the figures. Never say you can't make charts or "
+    "explain how to draw one: Nokware draws any chart of live report data itself, beside your answer, and says "
+    "itself why document figures aren't charted."
 )
 
 _PROMPT = ChatPromptTemplate.from_messages(
@@ -140,6 +144,7 @@ class FigureSource(TypedDict):
     value: str  # the count as it may be shown: "12", "fewer than 5", "none"
     rows: list[dict[str, str]]  # a breakdown: {"name", "value"}
     counted_at: str
+    grouped_by: str  # "none", "topic", "sub_metro" or "month" (rows oldest first)
 
 
 class RagAnswer(TypedDict):
@@ -148,6 +153,8 @@ class RagAnswer(TypedDict):
     sources: list[Source]
     figures: list[FigureSource]
     search_queries: list[str]
+    chart: ChartDict | None  # asked for in the question, drawn from the cited live figures (ask_charts)
+    chart_note: str | None  # why the chart isn't the kind asked for, or why there is none
 
 
 @dataclass(frozen=True)
@@ -216,6 +223,7 @@ def _figure_source(figure: Figure, cited: set[str]) -> FigureSource:
         value=figure.value,
         rows=[{"name": name, "value": value} for name, value in figure.rows],
         counted_at=figure.counted_at,
+        grouped_by=figure.grouped_by,
     )
 
 
@@ -266,17 +274,27 @@ def _with_safety_notice(answer: str, prepared: Prepared) -> str:
     return f"{SAFETY_FIGURES_ANSWER}\n\n{answer}"
 
 
+def _with_chart_refusal(answer: str, question: str, figures: list[FigureSource]) -> str:
+    """A chart asked of document data is refused in fixed words: its tables can't be charted accurately yet."""
+    wanted = asks_for_chart(question) and not any(figure["cited"] for figure in figures)
+    return f"{DOCUMENT_CHART_REFUSAL}\n\n{answer}" if wanted and answer_status(answer) == "answered" else answer
+
+
 def finish(prepared: Prepared, raw_answer: str) -> RagAnswer:
-    """The checked answer: only real citations kept, sources and figures marked cited or not."""
+    """The checked answer: only real citations kept, sources and figures marked cited or not, and any chart."""
     valid = set(prepared.labels.values()) | {f.label for f in prepared.figures.figures}
     answer, cited = sanitize_citations(raw_answer if prepared.has_sources else NO_INFO_ANSWER, valid)
-    answer = _with_safety_notice(answer, prepared)
+    figures = _to_figures(prepared, cited)
+    chart, chart_note = chart_for(prepared.question, [dict(f) for f in figures if f["cited"]])
+    answer = _with_safety_notice(_with_chart_refusal(answer, prepared.question, figures), prepared)  # safety first
     return RagAnswer(
         answer=answer,
         status=answer_status(answer),
         sources=_to_sources(prepared.chunks, prepared.labels, cited),
-        figures=_to_figures(prepared, cited),
+        figures=figures,
         search_queries=prepared.queries,
+        chart=chart,
+        chart_note=chart_note,
     )
 
 
@@ -308,4 +326,5 @@ def stream_answer(question: str) -> Iterator[dict[str, Any]]:
     result = finish(prepared, "".join(parts))
     cited = sorted({source["label"] for source in result["sources"] if source["cited"]})
     cited += sorted(figure["label"] for figure in result["figures"] if figure["cited"])
-    yield {"type": "done", "answer": result["answer"], "status": result["status"], "cited": cited}
+    yield {"type": "done", "answer": result["answer"], "status": result["status"], "cited": cited,
+           "chart": result["chart"], "chart_note": result["chart_note"]}

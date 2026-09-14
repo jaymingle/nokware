@@ -130,6 +130,31 @@ def breakdown(cases: list[dict[str, Any]], wanted: ReportFilter, by: str, now: d
     return counts.most_common()
 
 
+MONTHS_MAX = 24  # a breakdown by month covers at most the last two years
+
+
+def month_key(moment: datetime) -> str:
+    return f"{moment:%Y-%m}"
+
+
+def by_month(cases: list[dict[str, Any]], wanted: ReportFilter, now: datetime) -> list[tuple[str, int]]:
+    """Counts per calendar month ("2026-09"), oldest first, with the months that had none, up to the last 24:
+    from the period's start, but never before Nokware's first report (a month before it began isn't a month
+    with none)."""
+    dates = [d for d in (parse_datetime(c.get("createdAt")) for c in cases if matches(c, wanted, now)) if d]
+    counts = Counter(month_key(d) for d in dates)
+    first_ever = min((d for d in (parse_datetime(c.get("createdAt")) for c in cases) if d), default=now)
+    start = max(period_start(wanted.period, now) or first_ever, first_ever)
+    first, last = start.year * 12 + start.month - 1, now.year * 12 + now.month - 1
+    months = [f"{m // 12}-{m % 12 + 1:02d}" for m in range(max(first, last - MONTHS_MAX + 1), last + 1)]
+    return [(month, counts.get(month, 0)) for month in months]
+
+
+def month_label(key: str) -> str:
+    """"2026-09" as "Sep 2026"."""
+    return datetime.strptime(key, "%Y-%m").strftime("%b %Y")
+
+
 def topic_label(topic: str) -> str:
     return TOPICS_BY_ID[topic].label if topic in TOPICS_BY_ID else topic
 

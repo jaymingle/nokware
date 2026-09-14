@@ -36,7 +36,7 @@ MAX_FIGURES = 4
 # Only a question that might want figures pays for the planning call.
 FIGURE_WORDS = re.compile(
     r"\b(how many|how much|number of|count|figures?|statistics|stats|totals?|most|reports?|reported|cases?|"
-    r"complaints?|open|resolved|escalated|filed|pending|outstanding)\b",
+    r"complaints?|open|resolved|escalated|filed|pending|outstanding|charts?|graphs?|plot)\b",
     re.IGNORECASE,
 )
 _PUBLIC_TOPICS = [t for t in TOPICS if t.category != Category.PERSONAL_SAFETY]
@@ -57,7 +57,8 @@ class CountReports(BaseModel):
     sub_metro: SubMetroId | None = Field(None, description="A sub-metro: " + "; ".join(f"{s.id} ({s.name})" for s in sub_metros().values()))
     department: RecipientId | None = Field(None, description="Who the reports went to: " + "; ".join(f"{k} ({v})" for k, v in RECIPIENT_NAMES.items()))
     period: Literal["today", "this_week", "this_month", "last_30_days", "this_year", "all_time"] = "all_time"
-    group_by: Literal["none", "topic", "sub_metro"] = Field("none", description="Also break the count down.")
+    group_by: Literal["none", "topic", "sub_metro", "month"] = Field(
+        "none", description="Also break the count down: by topic, by sub-metro, or by month (for change over time).")
 
 
 class PersonalSafetyFigures(BaseModel):
@@ -81,6 +82,9 @@ _PLAN_PROMPT = ChatPromptTemplate.from_messages(
             "- If the resident names a place, pass it as electoral_area exactly as they wrote it, even if you don't "
             "recognise it.\n"
             "- For which topic or sub-metro has the most reports, call CountReports once with group_by.\n"
+            "- If the resident asks for a chart or graph of reports, give it something to plot: a group_by (topic or "
+            "sub-metro to compare, month for change over time), or one CountReports per status or topic to compare "
+            "(with the same group_by, to compare them across topics, sub-metros or months).\n"
             "- Questions about budgets, fees, bye-laws, plans or what documents say need no tool: call nothing.",
         ),
         ("human", "{question}"),
@@ -97,6 +101,7 @@ class Figure:
     value: str
     rows: list[tuple[str, str]]  # a breakdown: (name, count as shown)
     counted_at: str
+    grouped_by: str = "none"  # what the rows break the count down by: topic, sub_metro or month (oldest first)
 
 
 @dataclass(frozen=True)
@@ -156,6 +161,8 @@ def _rows(cases: list[dict[str, Any]], call: CountReports, wanted: ReportFilter,
     """The breakdown, shown counts first and the "fewer than 5" ones after by name, so their order says nothing."""
     if call.group_by == "none":
         return []
+    if call.group_by == "month":  # in time order, which says nothing about size
+        return [(stats.month_label(key), stats.display(n)) for key, n in stats.by_month(cases, wanted, now)]
     name = stats.topic_label if call.group_by == "topic" else (lambda s: sub_metros()[s].name if s in sub_metros() else s)
     rows = [(name(key), n) for key, n in stats.breakdown(cases, wanted, call.group_by, now)]
     rows.sort(key=lambda r: (stats.shown(r[1]) is None, -r[1] if stats.shown(r[1]) else 0, r[0]))
@@ -169,7 +176,8 @@ def count_figure(call: CountReports, label: str, cases: list[dict[str, Any]], no
         return Figure(label, f"Reports in \"{call.electoral_area}\"", "no electoral area by that name in Nokware's list", [], counted_at)
     wanted = _filter(call, ward.id if ward else None)
     value = stats.display(stats.count(cases, wanted, now))
-    return Figure(label, _describe(call, ward.name if ward else None), value, _rows(cases, call, wanted, now), counted_at)
+    rows = _rows(cases, call, wanted, now)
+    return Figure(label, _describe(call, ward.name if ward else None), value, rows, counted_at, call.group_by if rows else "none")
 
 
 def _tool_calls(question: str, now: datetime) -> list[dict[str, Any]]:

@@ -35,3 +35,4 @@ SUBMISSIONS = RateLimit(limit=5, window_seconds=600)
 LOOKUPS = RateLimit(limit=30, window_seconds=60)
 ESCALATIONS = RateLimit(limit=5, window_seconds=3600)
 VOICES = RateLimit(limit=20, window_seconds=3600)
+EXPORTS = RateLimit(limit=30, window_seconds=3600)  # each renders a PDF, a Word file or a CSV

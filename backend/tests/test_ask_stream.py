@@ -65,7 +65,8 @@ def test_stream_sends_progress_then_the_checked_answer(pipeline) -> None:
     assert [e.get("stage") for e in events if e["type"] == "stage"] == ["searching", "writing"]
     assert not any(source["cited"] for source in events[1]["sources"])  # nothing is cited before it is written
     done = events[-1]
-    assert done == {"type": "done", "answer": "Fees rise [S1] and.", "status": "answered", "cited": ["S1"]}
+    assert done == {"type": "done", "answer": "Fees rise [S1] and.", "status": "answered", "cited": ["S1"],
+                    "chart": None, "chart_note": None}
 
 
 def test_the_model_is_told_todays_date_so_this_year_means_this_year(pipeline, monkeypatch: pytest.MonkeyPatch) -> None:
