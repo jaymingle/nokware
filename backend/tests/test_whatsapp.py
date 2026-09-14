@@ -440,3 +440,20 @@ def test_someone_ill_gets_the_ambulance_numbers_and_nothing_is_filed(monkeypatch
     say("My father has collapsed and isn't breathing properly")
     assert chat[-1].startswith("This isn't something the Assembly can act on") and "193" in chat[-1]
     assert channel_sessions.load("whatsapp", NUMBER) is None
+
+
+def test_a_session_from_an_older_version_starts_again_instead_of_failing(monkeypatch: pytest.MonkeyPatch, chat: list[str]) -> None:
+    channel_sessions.save("whatsapp", NUMBER, {"step": "updates", "reference": "OLD1-OLD1"}, 3600)
+    _reads(monkeypatch, "unclear")
+    say("hello there, is anyone reading this")
+    assert chat[-1] == ASK_KIND and channel_sessions.load("whatsapp", NUMBER) == {"step": "kind", "text": "hello there, is anyone reading this"}
+
+
+def test_the_hourly_report_limit_never_turns_away_someone_in_danger(monkeypatch: pytest.MonkeyPatch, chat: list[str]) -> None:
+    monkeypatch.setattr(channel_limits, "REPORTS", channel_limits.NumberLimit("reports", 0, 3600))  # already used up
+    _reads(monkeypatch, "report")
+    filed = _filing(monkeypatch, SAFETY, topic="abuse")
+    say("My husband beats me every night")
+    say("0")
+    say("1")
+    assert len(filed) == 1 and chat[-1].startswith("This has gone to")

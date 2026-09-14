@@ -297,7 +297,8 @@ def _confirm(dial: Dial, state: State, later: Later) -> tuple[Reply, State | Non
         return end("Cancelled. Nothing was filed."), None
     if choice not in ("1", "2"):
         return con("Choose 1, 2 or 0.\n" + CONFIRM), state
-    if not channel_limits.REPORTS.allow(dial.msisdn, utc_now().timestamp()):
+    # Someone in danger is never turned away by the hourly report limit.
+    if not _private(state) and not channel_limits.REPORTS.allow(dial.msisdn, utc_now().timestamp()):
         return end("You've filed several reports this hour. Please try again later."), None
     return _file(dial, state, choice == "1", later)
 

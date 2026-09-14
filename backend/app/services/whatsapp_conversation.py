@@ -202,11 +202,12 @@ def _receipt_text(receipt: Receipt) -> str:
 
 
 def _file(number: str, state: State) -> None:
-    if not channel_limits.REPORTS.allow(number, utc_now().timestamp()):
+    private = _private(state)
+    # Someone in danger is never turned away by the hourly report limit (the message cap still holds).
+    if not private and not channel_limits.REPORTS.allow(number, utc_now().timestamp()):
         _drop_draft(number)
         whatsapp_reply.reply(number, "You've filed several reports this hour. Please try again later.")
         return
-    private = _private(state)
     submission = ReportSubmission(
         description=state["description"], ward=None if private else state["ward"],
         sub_metro=state.get("sub_metro") if private else None, safety_topic=None, phone=None,
