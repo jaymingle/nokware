@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnswerSources } from "@/components/ask/answer-sources";
 import { AnswerText } from "@/components/ask/answer-text";
 import { AskProgress } from "@/components/ask/ask-progress";
+import { FigureCard } from "@/components/ask/figure-card";
 import { NoInformation } from "@/components/ask/no-information";
 import { ErrorNote } from "@/components/documents/panels";
 import { Button } from "@/components/ui/button";
@@ -35,13 +36,37 @@ function useSourceJump(turnId: string) {
   return { highlighted, anchorFor, jump };
 }
 
-function Attribution({ count }: { count: number }) {
-  if (count === 0) return null;
+function plural(count: number, one: string, many: string): string {
+  return `${count} ${count === 1 ? one : many}`;
+}
+
+/** What the answer rests on: documents, live report figures, or both, said apart. */
+function Attribution({ documents, figures }: { documents: number; figures: number }) {
+  const parts = [
+    documents ? `${plural(documents, "document", "documents")} in the Ledger` : null,
+    figures ? `${plural(figures, "live report figure", "live report figures")}` : null,
+  ].filter(Boolean);
+  if (parts.length === 0) return null;
   return (
-    <p className="flex items-center gap-2 text-[12.5px] text-ink-soft">
+    <p className="flex items-center gap-2 text-[12.5px] text-ink-soft" data-testid="ask-attribution">
       <span aria-hidden className="size-1.5 rounded-full bg-teal" />
-      Answered from {count} {count === 1 ? "document" : "documents"} in the Ledger
+      Answered from {parts.join(" and ")}
     </p>
+  );
+}
+
+function AnswerFigures({ turn, anchorFor, highlighted, testId }: {
+  turn: Turn; anchorFor: (label: string) => string; highlighted: string | null; testId: string;
+}) {
+  const cited = turn.figures.filter((figure) => figure.cited);
+  if (cited.length === 0) return null;
+  return (
+    <section aria-label="Live report data" className="flex flex-col gap-3">
+      <h3 className="text-[12.5px] font-medium tracking-wide text-ink-soft uppercase">Live report data</h3>
+      {cited.map((figure) => (
+        <FigureCard key={figure.label} figure={figure} anchorId={anchorFor(figure.label)} highlighted={highlighted === figure.label} testIdPrefix={testId} />
+      ))}
+    </section>
   );
 }
 
@@ -66,15 +91,19 @@ function TurnError({ message, onRetry, testId }: { message: string; onRetry: () 
 
 function Answer({ turn, testId }: { turn: Turn; testId: string }) {
   const { highlighted, anchorFor, jump } = useSourceJump(turn.id);
-  const titles = useMemo(() => Object.fromEntries(turn.documents.map((doc) => [doc.label, doc.title])), [turn.documents]);
+  const titles = useMemo(
+    () => Object.fromEntries([...turn.documents.map((doc) => [doc.label, doc.title]), ...turn.figures.map((f) => [f.label, f.description])]),
+    [turn.documents, turn.figures],
+  );
   const done = turn.stage === "done";
   const cited = citedDocuments(turn);
   return (
     <>
-      {done ? <Attribution count={cited.length} /> : null}
+      {done ? <Attribution documents={cited.length} figures={turn.figures.filter((f) => f.cited).length} /> : null}
       {done && turn.text.includes(DISAGREEMENT_LEAD) ? <Disagreement /> : null}
       {turn.text ? <AnswerText markdown={turn.text} titles={titles} onCite={jump} testIdPrefix={testId} /> : null}
-      {done ? (
+      {done ? <AnswerFigures turn={turn} anchorFor={anchorFor} highlighted={highlighted} testId={testId} /> : null}
+      {done && turn.documents.length ? (
         <AnswerSources cited={cited} uncited={turn.documents.filter((doc) => !doc.cited)} anchorFor={anchorFor} highlighted={highlighted} testIdPrefix={testId} />
       ) : null}
     </>
@@ -84,7 +113,7 @@ function Answer({ turn, testId }: { turn: Turn; testId: string }) {
 /** One question and everything that comes back for it. */
 export function AskTurn({ turn, onRetry }: { turn: Turn; onRetry: (turn: Turn) => void }) {
   const testId = `ask-${turn.id}`;
-  const working = turn.stage === "searching" || turn.stage === "writing";
+  const working = turn.stage === "searching" || turn.stage === "counting" || turn.stage === "writing";
   const noInformation = turn.stage === "done" && turn.status === "no_information";
   return (
     <section id={turn.id} aria-labelledby={`${turn.id}-question`} className="flex scroll-mt-6 flex-col gap-4" data-testid={testId}>

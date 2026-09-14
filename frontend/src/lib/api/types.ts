@@ -44,3 +44,4 @@ export type ContactDirectory = Schemas["ContactDirectory"];
 export type Representation = Schemas["Representation"];
 export type SubMetroRepresentation = Schemas["SubMetroRepresentation"];
 export type ElectoralArea = Schemas["ElectoralArea"];
+export type AskFigure = Schemas["AskFigure"];

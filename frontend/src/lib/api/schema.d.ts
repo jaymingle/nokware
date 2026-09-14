@@ -594,6 +594,24 @@ export interface components {
             /** Note */
             note?: string | null;
         };
+        /**
+         * AskFigure
+         * @description A live count of reports residents filed with Nokware: a source, but not a document.
+         */
+        AskFigure: {
+            /** Label */
+            label: string;
+            /** Cited */
+            cited: boolean;
+            /** Description */
+            description: string;
+            /** Value */
+            value: string;
+            /** Rows */
+            rows: components["schemas"]["FigureRow"][];
+            /** Counted At */
+            counted_at: string;
+        };
         /** AskRequest */
         AskRequest: {
             /** Question */
@@ -610,6 +628,8 @@ export interface components {
             status: "answered" | "no_information";
             /** Sources */
             sources: components["schemas"]["AskSource"][];
+            /** Figures */
+            figures: components["schemas"]["AskFigure"][];
         };
         /**
          * AskSource
@@ -900,9 +920,9 @@ export interface components {
             /** Period Start */
             period_start: string;
             /** Received */
-            received: number;
+            received: number | null;
             /** Resolved */
-            resolved: number;
+            resolved: number | null;
             /** Median Days */
             median_days: number | null;
             /** Months */
@@ -1078,6 +1098,13 @@ export interface components {
             /** Note */
             note: string;
         };
+        /** FigureRow */
+        FigureRow: {
+            /** Name */
+            name: string;
+            /** Value */
+            value: string;
+        };
         /** FileLink */
         FileLink: {
             /** Url */
@@ -1149,9 +1176,9 @@ export interface components {
             /** Month */
             month: string;
             /** Received */
-            received: number;
+            received: number | null;
             /** Resolved */
-            resolved: number;
+            resolved: number | null;
         };
         /** NoteRequest */
         NoteRequest: {
@@ -1384,6 +1411,11 @@ export interface components {
             type: "sources";
             /** Sources */
             sources: components["schemas"]["AskSource"][];
+            /**
+             * Figures
+             * @default []
+             */
+            figures: components["schemas"]["AskFigure"][];
         };
         /** StageEvent */
         StageEvent: {
@@ -1396,16 +1428,16 @@ export interface components {
              * Stage
              * @enum {string}
              */
-            stage: "searching" | "writing";
+            stage: "searching" | "counting" | "writing";
         };
         /** SubMetroFigures */
         SubMetroFigures: {
             /** Name */
             name: string;
             /** Reports */
-            reports: number;
+            reports: number | null;
             /** Resolved */
-            resolved: number;
+            resolved: number | null;
             /** Median Days */
             median_days: number | null;
         };
@@ -1438,7 +1470,7 @@ export interface components {
             /** Label */
             label: string;
             /** Count */
-            count: number;
+            count: number | null;
         };
         /** ValidationError */
         ValidationError: {

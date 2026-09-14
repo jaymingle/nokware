@@ -80,10 +80,10 @@ export function describeProvenance(doc: Pick<SourceDocument, "provenance" | "dep
   return null;
 }
 
-const CITATION = /\[(S\d+)\]/g;
+const CITATION = /\[([SR]\d+)\]/g; // S: a document; R: a live report figure
 export const CITATION_HREF_PREFIX = "#cite-";
 
-/** Turns each [S1] into a markdown link the renderer shows as a citation tag. */
+/** Turns each [S1] or [R1] into a markdown link the renderer shows as a citation tag. */
 export function linkCitations(markdown: string): string {
   return markdown.replace(CITATION, (_, label: string) => `[${label}](${CITATION_HREF_PREFIX}${label})`);
 }

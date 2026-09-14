@@ -14,7 +14,7 @@ describe("applyEvent", () => {
   it("builds the answer from the stream, then replaces it with the checked answer", () => {
     const turn = play([
       { type: "stage", stage: "searching" },
-      { type: "sources", sources: [source("S1"), source("S2")] },
+      { type: "sources", sources: [source("S1"), source("S2")], figures: [] },
       { type: "stage", stage: "writing" },
       { type: "delta", text: "Yes [S1]" },
       { type: "delta", text: " and [S7]." },

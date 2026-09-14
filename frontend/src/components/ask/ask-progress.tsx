@@ -29,20 +29,27 @@ function Step({ state, label, detail }: { state: "active" | "done" | "waiting"; 
   );
 }
 
-/** Real progress from the stream: the search, what it found, then the writing. */
-export function AskProgress({ turn, testId }: { turn: Turn; testId: string }) {
-  const searching = turn.stage === "searching";
+function foundLabel(turn: Turn): string {
   const found = turn.documents.length;
-  const status = searching ? "Searching the Ledger" : "Writing the answer";
+  const counted = turn.figures.length;
+  const documents = `Found ${found} ${found === 1 ? "document" : "documents"}`;
+  return counted ? `${documents} and counted ${counted} live ${counted === 1 ? "figure" : "figures"}` : documents;
+}
+
+/** Real progress from the stream: the search (and any counting), what it found, then the writing. */
+export function AskProgress({ turn, testId }: { turn: Turn; testId: string }) {
+  const searching = turn.stage === "searching" || turn.stage === "counting";
+  const lookingFor = turn.stage === "counting" ? "Searching the Ledger and counting reports" : "Searching the Ledger";
+  const status = searching ? lookingFor : "Writing the answer";
   return (
     <div className="flex flex-col gap-3 rounded-xl border bg-paper-subtle px-4 py-3.5" data-testid={testId} data-stage={turn.stage}>
       <p className="sr-only" aria-live="polite">
-        {searching ? `${status}…` : `Found ${found} ${found === 1 ? "document" : "documents"}. ${status}…`}
+        {searching ? `${status}…` : `${foundLabel(turn)}. ${status}…`}
       </p>
       <ol className="flex flex-col gap-2.5">
         <Step
           state={searching ? "active" : "done"}
-          label={searching ? "Searching the Ledger…" : `Found ${found} ${found === 1 ? "document" : "documents"}`}
+          label={searching ? `${lookingFor}…` : foundLabel(turn)}
           detail={searching ? undefined : foundSummary(turn.documents.map((doc) => doc.title))}
         />
         <Step state={searching ? "waiting" : "active"} label="Writing the answer…" />
