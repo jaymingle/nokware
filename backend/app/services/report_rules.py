@@ -150,6 +150,15 @@ def new_reference() -> str:
     return f"{code[:4]}-{code[4:]}"
 
 
+PUBLIC_ID_LENGTH = 10
+
+
+def new_public_id() -> str:
+    """A civic issue's public ID, e.g. "k7qm4txp2a": for the public issue list. Unlike the reference or the
+    case ID, it opens no status page, so it can be shown to anyone."""
+    return "".join(secrets.choice(REFERENCE_ALPHABET.lower()) for _ in range(PUBLIC_ID_LENGTH))
+
+
 def normalise_reference(typed: str) -> str | None:
     """A reference as a citizen might type it ("k7qm 4txp"), in canonical form; None if it can't be one."""
     code = re.sub(r"[\s-]", "", typed).upper()

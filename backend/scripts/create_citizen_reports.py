@@ -189,11 +189,11 @@ def wait_for_attributes(collection: str, keys: list[str]) -> None:
     raise TimeoutError(f"{collection}: attributes not available after {ATTRIBUTE_WAIT_SECONDS}s")
 
 
-def ensure_indexes(collection: str) -> None:
+def ensure_indexes(collection: str, indexes: dict[str, tuple[DatabasesIndexType, list[str]]] | None = None) -> None:
     # Appwrite reports a duplicate index as a 400, not a 409, so check first.
     db = get_databases()
     existing = {index.key for index in db.list_indexes(DATABASE_ID, collection).indexes}
-    for key, (kind, attributes) in INDEXES[collection].items():
+    for key, (kind, attributes) in (indexes or INDEXES[collection]).items():
         if key in existing:
             print(f"exists    index {collection}.{key}")
             continue
