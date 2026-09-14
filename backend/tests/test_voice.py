@@ -95,6 +95,8 @@ def test_the_spoken_script_is_the_gist_without_tags_markup_or_links_and_points_t
     long = voice_speech.spoken_script({**ANSWER, "answer": "This is one sentence of the answer. " * 60})
     assert len(long) < voice_speech.SPOKEN_MAX_CHARS + 60 and long.endswith("sentence of the answer. The sources are in the message above.")
     assert voice_speech.spoken_script({**ANSWER, "status": "no_information"}).startswith("I don't have information")
+    assert voice_speech.spoken_script({**ANSWER, "answer": "Outer stalls: 30.00. Lock-up: GHS 40.50 a month."}).startswith(
+        "Outer stalls: 30. Lock-up: 40.50 Ghana cedis a month.")
 
 
 class _Genai:

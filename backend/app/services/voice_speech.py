@@ -3,7 +3,8 @@
 The spoken reply follows the text answer, which carries the sources, so the
 voice gives the gist in about a minute: the answer's own opening, cut at a
 sentence, without citation tags, markdown or links, and ending "The sources
-are in the message above." Cedi amounts are said as cedis. English only.
+are in the message above." Cedi amounts are said as cedis, and whole amounts
+without their ".00" (else "thirty point zero zero"). English only.
 
 The speech model is a preview (GEMINI_TTS_MODEL), so it is a setting; it returns
 raw 16-bit PCM, which voice_audio makes into OGG/Opus.
@@ -29,6 +30,7 @@ _LINK = re.compile(r"\(?https?://\S+\)?")
 _MARKUP = re.compile(r"\*\*|__|^#+\s*|`", re.MULTILINE)
 _BULLET = re.compile(r"^\s*(?:[*•-]|\d+\.)\s+(.+?)\s*$", re.MULTILINE)
 _CEDIS = re.compile(r"(?:GHS|GH¢|GH₵|₵)\s?(\d[\d,]*(?:\.\d+)?)")
+_WHOLE = re.compile(r"(\d)\.00\b")
 _RATE = re.compile(r"rate=(\d+)")
 
 
@@ -50,7 +52,7 @@ def spoken_script(answer: RagAnswer) -> str:
     if answer["status"] == "no_information":
         return f"{NO_INFO_ANSWER} {NOTHING_FOUND}"
     text = _BULLET.sub(lambda m: m[1] if m[1].endswith((".", "?", "!", ":")) else m[1] + ".", answer["answer"])
-    text = _CEDIS.sub(r"\1 Ghana cedis", _MARKUP.sub("", _LINK.sub("", _TAG.sub("", text))))
+    text = _WHOLE.sub(r"\1", _CEDIS.sub(r"\1 Ghana cedis", _MARKUP.sub("", _LINK.sub("", _TAG.sub("", text)))))
     text = " ".join(text.split())
     return f"{_cut(text, SPOKEN_MAX_CHARS)} {SOURCES_ABOVE}"
 
