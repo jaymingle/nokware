@@ -90,6 +90,10 @@ def test_the_model_reads_the_rest_and_a_failure_means_ask(monkeypatch: pytest.Mo
     monkeypatch.setattr(channel_intent, "_model_kind", lambda text, has_photo: Intent.QUESTION)
     long_text = "What does the Assembly charge for a market stall, and is K7QM-4TXP my case number?"
     assert read_message(long_text).intent == Intent.QUESTION  # a reference inside a long message: the model decides
+    monkeypatch.setattr(channel_intent, "_model_kind", lambda text, has_photo: Intent.STATUS)
+    asked = "What is happening with my report XYHN-6A5T? I sent it last week."  # as a voice note says it
+    assert read_message(asked) == channel_intent.Reading(Intent.STATUS, "XYHN-6A5T")
+    assert read_message("What is happening with the report I sent last week?").intent == Intent.HELP  # which report?
 
     class Broken:
         def with_structured_output(self, schema: Any) -> Any:

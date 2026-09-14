@@ -47,13 +47,14 @@ class Reading:
 
 
 class _Kind(BaseModel):
-    kind: Literal["question", "report", "medical", "unclear"]
+    kind: Literal["question", "report", "status", "medical", "unclear"]
 
 
 _SYSTEM = (
     "Residents of Accra message Nokware, the Accra Metropolitan Assembly's public record. Decide what a message is:\n"
     "- question: asks for information: the Assembly's budgets, fees, rules, plans, services or contacts, "
     "or how many reports residents have made.\n"
+    "- status: asks how the sender's own report is going, or what has happened to it.\n"
     "- report: tells of a problem for the Assembly, the police or the fire service to deal with (rubbish, "
     "a broken road or streetlight, flooding, a fire, a crime, abuse, or a threat to someone), whether or not "
     "it asks for anything. A message saying someone is in danger is always a report.\n"
@@ -103,4 +104,7 @@ def read_message(text: str, has_photo: bool = False) -> Reading:
         return Reading(Intent.HELP)
     if said in THANKS:
         return Reading(Intent.THANKS)
-    return Reading(_model_kind(stripped, has_photo))
+    kind = _model_kind(stripped, has_photo)
+    if kind == Intent.STATUS:  # "what's happening with my report K7QM-4TXP?"; without a reference, say how to ask
+        return Reading(Intent.STATUS, reference) if reference else Reading(Intent.HELP)
+    return Reading(kind)
