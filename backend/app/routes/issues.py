@@ -9,11 +9,12 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, Query
 
 from app.dependencies import rate_limited
+from app.schemas.documents import Option
 from app.schemas.issues import Issue, IssuePage, VoiceRequest, VoiceResult
 from app.services import issue_voices, rate_limit
 from app.services.case_workflow import CaseStatus
 from app.services.ledger_documents import utc_now
-from app.services.report_taxonomy import TOPICS_BY_ID
+from app.services.report_taxonomy import TOPICS_BY_ID, Category, topics_in
 from app.teams import RECIPIENT_NAMES
 from app.wards import sub_metros, wards
 
@@ -46,7 +47,12 @@ def issues(
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> IssuePage:
     found, total = issue_voices.list_issues(sub_metro, topic, limit, offset)
-    return IssuePage(issues=[_issue(case) for case in found if issue_voices.is_public_issue(case)], total=total)
+    return IssuePage(
+        issues=[_issue(case) for case in found if issue_voices.is_public_issue(case)],
+        total=total,
+        topics=[Option(id=t.id, name=t.label) for t in topics_in(Category.CIVIC_SERVICE)],
+        sub_metros=[Option(id=s.id, name=s.name) for s in sub_metros().values()],
+    )
 
 
 @router.post("/{public_id}/voices", response_model=VoiceResult, dependencies=[Voices])

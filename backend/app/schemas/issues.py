@@ -4,6 +4,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from app.schemas.documents import Option
 from app.services.citizen_reports import VOICE_NAME_MAX
 
 
@@ -21,6 +22,8 @@ class Issue(BaseModel):
 class IssuePage(BaseModel):
     issues: list[Issue]
     total: int
+    topics: list[Option]  # the civic-service topics, to filter by
+    sub_metros: list[Option]
 
 
 class VoiceRequest(BaseModel):
