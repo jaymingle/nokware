@@ -25,15 +25,15 @@ function NavLink({ href, testId, children }: { href: string; testId: string; chi
   );
 }
 
-/** The public site's header: Ask, reporting, the dashboard, and the way in for staff. On a phone the links take a second row. */
+/** The public site's header: Ask, reporting, the dashboard, and the way in for staff. On a phone or tablet the links take a second row. */
 export function PublicHeader() {
   return (
     <header className="border-b bg-paper-raised">
-      <div className="mx-auto flex w-full max-w-[1360px] flex-wrap items-center justify-between gap-x-3 gap-y-2 px-5 py-3.5 sm:flex-nowrap sm:px-7">
+      <div className="mx-auto flex w-full max-w-[1360px] flex-wrap items-center justify-between gap-x-3 gap-y-2 px-5 py-3.5 sm:px-7 md:flex-nowrap">
         <Link href="/" aria-label="Nokware home" className="min-w-0" data-testid="public-home">
           <Brand />
         </Link>
-        <nav aria-label="Main" className="-mx-3 flex w-[calc(100%+1.5rem)] items-center overflow-x-auto sm:mx-0 sm:w-auto sm:shrink-0">
+        <nav aria-label="Main" className="-mx-3 flex w-[calc(100%+1.5rem)] items-center overflow-x-auto md:mx-0 md:w-auto md:shrink-0">
           <NavLink href="/ask" testId="public-ask-link">
             Ask
           </NavLink>
@@ -44,9 +44,12 @@ export function PublicHeader() {
           <NavLink href="/dashboard" testId="public-dashboard-link">
             Dashboard
           </NavLink>
+          <NavLink href="/contacts" testId="public-contacts-link">
+            Contacts
+          </NavLink>
           <NavLink href="/login" testId="public-portal-link">
-            <span className="sm:hidden">Portal</span>
-            <span className="hidden sm:inline">Institution portal</span>
+            <span className="lg:hidden">Portal</span>
+            <span className="hidden lg:inline">Institution portal</span>
           </NavLink>
         </nav>
       </div>

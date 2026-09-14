@@ -3,6 +3,7 @@ import { ApiError, UNREACHABLE, errorMessage } from "@/lib/api/errors";
 import { env } from "@/lib/env";
 
 import type {
+  ContactDirectory,
   Dashboard,
   PreferencesResult,
   ReportOptions,
@@ -61,4 +62,8 @@ export function setReportPreferences(reference: string, token: string, choice: R
 
 export function getDashboard(): Promise<Dashboard> {
   return publicRequest<Dashboard>("/api/dashboard");
+}
+
+export function getContacts(): Promise<ContactDirectory> {
+  return publicRequest<ContactDirectory>("/api/contacts");
 }

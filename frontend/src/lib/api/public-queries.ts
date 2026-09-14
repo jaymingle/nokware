@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
   escalateReport,
+  getContacts,
   fileReport,
   getDashboard,
   getReportOptions,
@@ -19,6 +20,7 @@ export const publicKeys = {
   reportOptions: ["report-options"] as const,
   reportStatus: (reference: string) => ["report-status", reference] as const,
   dashboard: ["dashboard"] as const,
+  contacts: ["contacts"] as const,
 };
 
 export function useReportOptions() {
@@ -64,4 +66,8 @@ export function useDashboard() {
 export function useForgetStatus(): (reference: string) => void {
   const queryClient = useQueryClient();
   return (reference) => queryClient.removeQueries({ queryKey: publicKeys.reportStatus(reference) });
+}
+
+export function useContacts() {
+  return useQuery({ queryKey: publicKeys.contacts, queryFn: getContacts, staleTime: Infinity });
 }

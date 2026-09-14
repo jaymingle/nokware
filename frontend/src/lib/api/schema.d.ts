@@ -546,6 +546,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/contacts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Directory */
+        get: operations["directory_api_contacts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -823,6 +840,34 @@ export interface components {
             phone: string | null;
             /** Whatsapp */
             whatsapp: string | null;
+        };
+        /** ContactDirectory */
+        ContactDirectory: {
+            /** About */
+            about: string;
+            /** Checked */
+            checked: string;
+            /** Services */
+            services: components["schemas"]["Service"][];
+        };
+        /** ContactNumber */
+        ContactNumber: {
+            /** Number */
+            number: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "call" | "whatsapp";
+        };
+        /** ContactSource */
+        ContactSource: {
+            /** Label */
+            label: string;
+            /** Url */
+            url: string;
+            /** Checked */
+            checked: string;
         };
         /** Dashboard */
         Dashboard: {
@@ -1114,6 +1159,37 @@ export interface components {
          * @enum {string}
          */
         Provenance: "ama_website" | "department_portal" | "contributor";
+        /**
+         * PublicContact
+         * @description One office or line. Tier 1: a national emergency line. Tier 2: on an official site (source).
+         *     Tier 3: reported on social media only (reported_via), not independently verified.
+         */
+        PublicContact: {
+            /** Id */
+            id: string;
+            /** Service */
+            service: string;
+            /**
+             * Tier
+             * @enum {integer}
+             */
+            tier: 1 | 2 | 3;
+            /** Name */
+            name: string;
+            /** Detail */
+            detail?: string | null;
+            /** Numbers */
+            numbers: components["schemas"]["ContactNumber"][];
+            /** Email */
+            email?: string | null;
+            source?: components["schemas"]["ContactSource"] | null;
+            /** Reported Via */
+            reported_via?: string | null;
+            /** Reported By */
+            reported_by?: string | null;
+            /** Press Url */
+            press_url?: string | null;
+        };
         /** ReassignRequest */
         ReassignRequest: {
             /** From Recipient */
@@ -1148,6 +1224,8 @@ export interface components {
             description_min: number;
             /** Description Max */
             description_max: number;
+            /** Safety Contacts */
+            safety_contacts: components["schemas"]["PublicContact"][];
         };
         /** ReportReceipt */
         ReportReceipt: {
@@ -1167,6 +1245,8 @@ export interface components {
             held_for_consent: boolean;
             /** Preferences Token */
             preferences_token: string | null;
+            /** Contacts */
+            contacts: components["schemas"]["PublicContact"][];
         };
         /**
          * ReportStatus
@@ -1201,6 +1281,8 @@ export interface components {
             resolved_at?: string | null;
             /** Resolution Notes */
             resolution_notes?: components["schemas"]["ResolutionNote"][];
+            /** Contacts */
+            contacts?: components["schemas"]["PublicContact"][];
         };
         /** ResolutionNote */
         ResolutionNote: {
@@ -1224,6 +1306,15 @@ export interface components {
             guide: string;
             /** Recipients */
             recipients: string[];
+        };
+        /** Service */
+        Service: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Contacts */
+            contacts: components["schemas"]["PublicContact"][];
         };
         /**
          * SourceType
@@ -2185,6 +2276,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Dashboard"];
+                };
+            };
+        };
+    };
+    directory_api_contacts_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContactDirectory"];
                 };
             };
         };

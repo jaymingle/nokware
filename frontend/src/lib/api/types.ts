@@ -38,3 +38,6 @@ export type MonthFigures = Schemas["MonthFigures"];
 export type TopicFigures = Schemas["TopicFigures"];
 export type SubMetroFigures = Schemas["SubMetroFigures"];
 export type RecentDocument = Schemas["RecentDocument"];
+export type PublicContact = Schemas["PublicContact"];
+export type ContactNumber = Schemas["ContactNumber"];
+export type ContactDirectory = Schemas["ContactDirectory"];
