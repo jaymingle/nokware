@@ -3,7 +3,8 @@
 A message is a POST to Arkesel's v2 send endpoint with the api-key header. In
 sandbox mode (ARKESEL_SANDBOX, on by default) Arkesel accepts the request but
 delivers nothing and spends no credits. Outside it, a daily page limit
-(SMS_DAILY_LIMIT) guards the credits. Text is made plain GSM-7 first, so a page
+(SMS_DAILY_LIMIT) guards the credits, counted in Redis when there is one (and
+if Redis can't be reached, nothing is sent rather than sent uncounted). Text is made plain GSM-7 first, so a page
 holds 160 characters, and an error never carries the key or a whole number.
 When the API has a public address and Arkesel's webhook secret, each message
 asks for signed delivery reports (routes/channels.py).
@@ -18,9 +19,11 @@ from functools import lru_cache
 from typing import Any
 
 import httpx
+import redis
 
 from app.config import get_settings
 from app.services.ledger_documents import utc_now
+from app.services.redis_store import RedisUnavailable, get_redis, key
 from app.services.sms_text import is_gsm7, pages, plain
 
 logger = logging.getLogger(__name__)
@@ -50,26 +53,48 @@ def _scrub(text: str) -> str:
     return _NUMBERS.sub("[number]", text)[:300]
 
 
-class DailyBudget:
-    """SMS pages sent today (UTC) outside the sandbox. Kept in this process: a restart resets it."""
+class _MemoryCount:
+    """The day's pages in this process: used only when there is no Redis, and reset by a restart."""
 
-    def __init__(self, limit: int) -> None:
-        self.limit = limit
-        self._day: date | None = None
-        self._used = 0
+    def __init__(self) -> None:
+        self._counts: dict[date, int] = {}
         self._lock = threading.Lock()
 
-    def take(self, count: int, today: date) -> None:
+    def add(self, today: date, count: int) -> int:
         with self._lock:
-            if self._day != today:
-                self._day, self._used = today, 0
-            if self._used + count > self.limit:
-                raise SmsLimitReached(f"Today's limit of {self.limit} SMS pages is reached.")
-            self._used += count
+            self._counts = {today: self._counts.get(today, 0) + count}
+            return self._counts[today]
 
-    def give_back(self, count: int) -> None:
-        with self._lock:
-            self._used = max(0, self._used - count)
+
+class _RedisCount:
+    """The day's pages in Redis: shared by every worker and kept across restarts, for two days."""
+
+    def add(self, today: date, count: int) -> int:
+        counter = key("sms", "pages", today.isoformat())
+        try:
+            pipe = get_redis().pipeline()
+            pipe.incrby(counter, count)
+            pipe.expire(counter, 2 * 86400)
+            used, _ = pipe.execute()
+        except (redis.RedisError, RedisUnavailable) as error:  # can't count: don't spend
+            raise SmsError(f"The SMS limit can't be checked ({type(error).__name__}), so nothing was sent.") from None
+        return int(used)
+
+
+class DailyBudget:
+    """SMS pages sent today (UTC) outside the sandbox, against SMS_DAILY_LIMIT."""
+
+    def __init__(self, limit: int, counter: "_MemoryCount | _RedisCount | None" = None) -> None:
+        self.limit = limit
+        self._counter = counter or _MemoryCount()
+
+    def take(self, count: int, today: date) -> None:
+        if self._counter.add(today, count) > self.limit:
+            self._counter.add(today, -count)
+            raise SmsLimitReached(f"Today's limit of {self.limit} SMS pages is reached.")
+
+    def give_back(self, count: int, today: date) -> None:
+        self._counter.add(today, -count)
 
 
 def _body(response: httpx.Response) -> dict[str, Any]:
@@ -120,8 +145,9 @@ class ArkeselSms:
         count = pages(text)
         if not is_gsm7(text):
             logger.warning("An SMS goes as Unicode: %d pages instead of GSM-7's fewer", count)
+        today = utc_now().date()
         if not self.sandbox:
-            self.budget.take(count, utc_now().date())
+            self.budget.take(count, today)
         payload = {"sender": self.sender, "message": text, "recipients": [to.lstrip("+")], "sandbox": self.sandbox}
         if self.callback_url:
             payload["callback_url"] = self.callback_url
@@ -129,7 +155,7 @@ class ArkeselSms:
             return _message_id(self._request("POST", SEND_URL, json=payload).get("data"))
         except SmsError:
             if not self.sandbox:
-                self.budget.give_back(count)
+                self.budget.give_back(count, today)
             raise
 
     def balance(self) -> dict[str, Any]:
@@ -150,7 +176,7 @@ def arkesel() -> ArkeselSms:
         api_key=settings.arkesel_api_key,
         sender=settings.arkesel_sender_id,
         sandbox=settings.arkesel_sandbox,
-        budget=DailyBudget(settings.sms_daily_limit),
+        budget=DailyBudget(settings.sms_daily_limit, _RedisCount() if settings.redis_url else _MemoryCount()),
         callback_url=delivery_report_url(),
     )
 

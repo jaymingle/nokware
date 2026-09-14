@@ -72,6 +72,10 @@ class Settings(BaseSettings):
     # The API's public HTTPS address, which Arkesel and Twilio call back.
     # Empty means no callbacks are asked for.
     public_api_url: str = ""
+    # Redis, for short-lived channel state (USSD menus, WhatsApp drafts),
+    # per-number limits and the SMS page count. Empty: channels are off and the
+    # SMS count is kept in this process.
+    redis_url: str = ""
     # Where citizens follow their reports; used in the links messages carry.
     public_site_url: str = "http://localhost:3000"
 

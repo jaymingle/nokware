@@ -2,8 +2,8 @@
 
 The environment wins over .env in pydantic-settings, so the messaging settings
 are pinned here, before any app module reads them. A test that needs a
-provider builds one with a mock transport. Only this machine (a test's own
-local server) can be reached.
+provider builds one with a mock transport, and one that needs Redis uses
+fakeredis. Only this machine (a test's own local server) can be reached.
 """
 
 import os
@@ -15,7 +15,7 @@ import pytest
 import requests
 
 for _name in ("ARKESEL_API_KEY", "ARKESEL_SENDER_ID", "ARKESEL_WEBHOOK_SECRET", "PUBLIC_API_URL",
-              "TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN"):
+              "TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "REDIS_URL"):
     os.environ[_name] = ""
 os.environ["SMS_PROVIDER"] = "log"
 os.environ["WHATSAPP_PROVIDER"] = "log"

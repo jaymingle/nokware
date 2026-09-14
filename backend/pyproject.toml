@@ -25,10 +25,11 @@ dependencies = [
     "python-multipart>=0.0.32,<0.1",
     "pillow>=12,<13",
     "httpx>=0.28,<1",
+    "redis>=5,<8",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=9,<10"]
+dev = ["pytest>=9,<10", "fakeredis>=2,<3"]
 
 [tool.setuptools.packages.find]
 include = ["app*"]
