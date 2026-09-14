@@ -66,6 +66,7 @@ membership.
 | `GET /api/reports/{reference}` (by reference or case ID; personal safety shows only its stage) | public, 30 a minute |
 | `POST /api/reports/{reference}/escalate` (`note`; once, within 14 days of resolution) | public |
 | `POST /api/reports/{reference}/preferences` (`X-Receipt-Token`; after a safety reclassification, once, within the hour) | public |
+| `GET /api/contacts` (who to call, grouped by service; each number with its tier and source) | public |
 | `GET /api/dashboard` (twelve months of report figures, no personal safety; Ledger counts and latest documents; cached a minute) | public |
 | `GET /api/me` | anyone signed in |
 | `GET /api/departments`, `GET /api/categories` | anyone signed in |
@@ -141,6 +142,18 @@ Police and GNFS receive safety reports as agency teams (`agency-police`,
 Ledger. `scripts/create_citizen_reports.py` creates those teams and the report
 collections (citizen phone numbers are encrypted at rest); add their liaison
 accounts to `scripts/seed_users.toml` and re-run `scripts/seed_users.py`.
+
+## Contact numbers
+
+`app/data/contacts.json` holds the numbers a citizen is shown, by how well each
+is sourced: national emergency lines (tier 1), numbers on an official site,
+cited and checked against that page on a given date (tier 2), and numbers
+reported only on social media or in the press, marked not independently
+verified (tier 3). A number whose stated source didn't hold up stays in the
+file's `held` list and is never shown. Offices are listed by desk: no civil
+servant is named beside a number. `app/contacts.py` picks the numbers for a
+report's route; a personal-safety report gets the Social Welfare desk for its
+sub-metro, and its public status page shows no numbers at all.
 
 ## Departments
 
