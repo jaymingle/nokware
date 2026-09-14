@@ -3,17 +3,20 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
+  addVoice,
   escalateReport,
   getContacts,
+  getIssues,
   fileReport,
   getDashboard,
   getReportOptions,
   getReportStatus,
   getRepresentatives,
   setReportPreferences,
+  type IssueFilters,
 } from "@/lib/api/public";
 
-import type { PreferencesResult, ReportPreferences, ReportReceipt, ReportStatus } from "@/lib/api/types";
+import type { PreferencesResult, ReportPreferences, ReportReceipt, ReportStatus, VoiceResult } from "@/lib/api/types";
 
 const DASHBOARD_STALE_MS = 60_000; // the API recomputes the figures at most once a minute
 
@@ -23,6 +26,7 @@ export const publicKeys = {
   dashboard: ["dashboard"] as const,
   contacts: ["contacts"] as const,
   representatives: ["representatives"] as const,
+  issues: (filters: IssueFilters) => ["issues", filters] as const,
 };
 
 export function useReportOptions() {
@@ -76,4 +80,18 @@ export function useContacts() {
 
 export function useRepresentatives() {
   return useQuery({ queryKey: publicKeys.representatives, queryFn: getRepresentatives, staleTime: Infinity });
+}
+
+export function useIssues(filters: IssueFilters) {
+  return useQuery({ queryKey: publicKeys.issues(filters), queryFn: () => getIssues(filters), placeholderData: (previous) => previous });
+}
+
+type VoiceInput = { publicId: string; deviceToken: string; name: string | null };
+
+export function useAddVoice() {
+  const queryClient = useQueryClient();
+  return useMutation<VoiceResult, Error, VoiceInput>({
+    mutationFn: ({ publicId, deviceToken, name }) => addVoice(publicId, deviceToken, name),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["issues"] }),
+  });
 }

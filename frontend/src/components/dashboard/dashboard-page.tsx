@@ -3,6 +3,7 @@
 import { AskPrompt, Panel, RecentDocuments, SubMetroTable, TopicShares } from "@/components/dashboard/dashboard-panels";
 import { TrendChart } from "@/components/dashboard/trend-chart";
 import { ErrorPanel, LoadingPanel } from "@/components/documents/panels";
+import { IssueList } from "@/components/issues/issue-list";
 import { useDashboard } from "@/lib/api/public-queries";
 import { formatCount, formatDays, percent, periodLabel } from "@/lib/report/dashboard";
 import { formatDateTime } from "@/lib/time";
@@ -98,6 +99,7 @@ export function DashboardPage() {
       {dashboard.isPending ? <LoadingPanel label="Loading the figures…" /> : null}
       {dashboard.error ? <ErrorPanel message={dashboard.error.message} onRetry={() => dashboard.refetch()} /> : null}
       {dashboard.data ? <Figures figures={dashboard.data} /> : null}
+      <IssueList />
     </div>
   );
 }

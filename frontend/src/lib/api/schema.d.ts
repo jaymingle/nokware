@@ -580,6 +580,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/issues": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Issues */
+        get: operations["issues_api_issues_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/issues/{public_id}/voices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add Voice */
+        post: operations["add_voice_api_issues__public_id__voices_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -792,6 +826,8 @@ export interface components {
             needs_routing: boolean;
             /** Allowed Actions */
             allowed_actions: components["schemas"]["CaseAction"][];
+            /** Voices */
+            voices: number;
             /** Description */
             description: string | null;
             /** Photos */
@@ -805,6 +841,8 @@ export interface components {
             assignments: components["schemas"]["CaseAssignment"][];
             /** History */
             history: components["schemas"]["CaseEvent"][];
+            /** Voice Names */
+            voice_names: string[] | null;
         };
         /** CaseEvent */
         CaseEvent: {
@@ -867,6 +905,8 @@ export interface components {
             needs_routing: boolean;
             /** Allowed Actions */
             allowed_actions: components["schemas"]["CaseAction"][];
+            /** Voices */
+            voices: number;
         };
         /**
          * Contact
@@ -1141,6 +1181,39 @@ export interface components {
          * @enum {string}
          */
         IngestionState: "processing" | "searchable" | "not_searchable" | "failed";
+        /** Issue */
+        Issue: {
+            /** Public Id */
+            public_id: string;
+            /** Topic */
+            topic: string;
+            /** Ward */
+            ward: string | null;
+            /** Sub Metro */
+            sub_metro: string | null;
+            /** Departments */
+            departments: string[];
+            /**
+             * Stage
+             * @enum {string}
+             */
+            stage: "received" | "in_progress" | "escalated";
+            /** Filed At */
+            filed_at: string;
+            /** Voices */
+            voices: number;
+        };
+        /** IssuePage */
+        IssuePage: {
+            /** Issues */
+            issues: components["schemas"]["Issue"][];
+            /** Total */
+            total: number;
+            /** Topics */
+            topics: components["schemas"]["Option"][];
+            /** Sub Metros */
+            sub_metros: components["schemas"]["Option"][];
+        };
         /** JobResult */
         JobResult: {
             /** Published */
@@ -1345,6 +1418,8 @@ export interface components {
             resolution_notes?: components["schemas"]["ResolutionNote"][];
             /** Contacts */
             contacts?: components["schemas"]["PublicContact"][];
+            /** Voices */
+            voices?: number | null;
         };
         /** Representation */
         Representation: {
@@ -1484,6 +1559,20 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /** VoiceRequest */
+        VoiceRequest: {
+            /** Device Token */
+            device_token: string;
+            /** Name */
+            name?: string | null;
+        };
+        /** VoiceResult */
+        VoiceResult: {
+            /** Voices */
+            voices: number;
+            /** Added */
+            added: boolean;
         };
     };
     responses: never;
@@ -2416,6 +2505,75 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Representation"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    issues_api_issues_get: {
+        parameters: {
+            query?: {
+                sub_metro?: string | null;
+                topic?: string | null;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IssuePage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_voice_api_issues__public_id__voices_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                public_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VoiceRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VoiceResult"];
                 };
             };
             /** @description Validation Error */

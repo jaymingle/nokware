@@ -5,12 +5,14 @@ import { env } from "@/lib/env";
 import type {
   ContactDirectory,
   Dashboard,
+  IssuePage,
   PreferencesResult,
   ReportOptions,
   ReportPreferences,
   ReportReceipt,
   ReportStatus,
   Representation,
+  VoiceResult,
 } from "@/lib/api/types";
 
 async function publicRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
@@ -72,4 +74,19 @@ export function getContacts(): Promise<ContactDirectory> {
 /** Every sub-metro with its chairperson, office and electoral areas. */
 export function getRepresentatives(): Promise<Representation> {
   return publicRequest<Representation>("/api/representatives");
+}
+
+export type IssueFilters = { subMetro: string; topic: string; limit: number; offset: number };
+
+/** Open civic issues, most supported first. */
+export function getIssues({ subMetro, topic, limit, offset }: IssueFilters): Promise<IssuePage> {
+  const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+  if (subMetro) params.set("sub_metro", subMetro);
+  if (topic) params.set("topic", topic);
+  return publicRequest<IssuePage>(`/api/issues?${params}`);
+}
+
+/** Add this browser's voice to an issue: anonymous unless a name is given. */
+export function addVoice(publicId: string, deviceToken: string, name: string | null): Promise<VoiceResult> {
+  return postJson<VoiceResult>(`/api/issues/${encodeURIComponent(publicId)}/voices`, { device_token: deviceToken, name });
 }

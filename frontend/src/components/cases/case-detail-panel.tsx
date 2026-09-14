@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { PhoneIcon } from "lucide-react";
+import { PhoneIcon, UsersIcon } from "lucide-react";
 
 import { CaseActions } from "@/components/cases/case-actions";
 import { ErrorNote } from "@/components/documents/panels";
@@ -9,6 +9,7 @@ import { Tag } from "@/components/documents/tag";
 import { useCase } from "@/lib/api/queries";
 import { caseEventText, caseStatusTag, SEVERITY_LABELS } from "@/lib/cases";
 import { formatDateTime } from "@/lib/time";
+import { voicesTally } from "@/lib/voices";
 
 import type { CaseDetail, Option } from "@/lib/api/types";
 
@@ -101,6 +102,25 @@ function Body({ detail }: { detail: CaseDetail }) {
   );
 }
 
+/** How many residents said this civic issue affects them; the handling department also sees the names given. */
+function Voices({ detail }: { detail: CaseDetail }) {
+  if (!detail.voices) return null;
+  const names = detail.voice_names ?? [];
+  return (
+    <div className="flex flex-col gap-1 rounded-lg border px-3.5 py-3 text-[13px]" data-testid={`case-voices-${detail.case_id}`}>
+      <p className="flex items-center gap-1.5 font-medium">
+        <UsersIcon aria-hidden className="size-4 text-teal" />
+        {voicesTally(detail.voices)}: it affects them too
+      </p>
+      {detail.voice_names !== null ? (
+        <p className="text-ink-soft">
+          {names.length ? `${names.length} gave a name: ${names.join(", ")}.` : "No one gave a name."} Names are deleted 30 days after the case closes.
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 function Loaded({ detail, recipients }: { detail: CaseDetail; recipients?: Option[] }) {
   const tag = caseStatusTag(detail);
   return (
@@ -112,6 +132,7 @@ function Loaded({ detail, recipients }: { detail: CaseDetail; recipients?: Optio
       </div>
       <h2 className="text-[22px] leading-snug">{detail.topic}</h2>
       <Body detail={detail} />
+      <Voices detail={detail} />
       <Facts detail={detail} />
       <CaseActions detail={detail} recipients={recipients} />
       <Trail detail={detail} />

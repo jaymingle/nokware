@@ -85,6 +85,11 @@ export function CivicStatus({ status }: { status: ReportStatus }) {
         <Detail label="Sent to">{joinNames(status.recipients ?? [])}</Detail>
         {status.resolved_at && status.status === "resolved" ? <Detail label="Resolved">{formatDate(status.resolved_at)}</Detail> : null}
       </dl>
+      {status.voices ? (
+        <p className="text-[13.5px]" data-testid="status-voices">
+          {status.voices.toLocaleString()} other {status.voices === 1 ? "resident says" : "residents say"} this affects them too.
+        </p>
+      ) : null}
       <ResolutionNotes status={status} />
       <CivicFollowUp status={status} />
       <ContactList title="Numbers for this report" contacts={status.contacts ?? []} testId="status-contacts" />

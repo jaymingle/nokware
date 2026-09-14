@@ -38,7 +38,8 @@ export function CivicForm({ options, onFiled, onBack }: ReportFormProps) {
           </FormSection>
           <Note testId="report-civic-routing">
             An AI model reads your description to choose the department responsible, and Nokware sends it there. The
-            department sees what you write and your photos, never your number.
+            department sees what you write and your photos, never your number. Other residents will see that a report
+            about this topic in this area exists and can add their voice; your words, photos and number are never shown.
           </Note>
           <FormActions busy={filing.isPending} error={filing.error} onBack={onBack} />
         </form>

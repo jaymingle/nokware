@@ -4,6 +4,7 @@ import { Tag } from "@/components/documents/tag";
 import { useNow } from "@/hooks/use-now";
 import { caseAge, caseStatusTag } from "@/lib/cases";
 import { cn } from "@/lib/utils";
+import { voicesTally } from "@/lib/voices";
 
 import type { CaseSummary } from "@/lib/api/types";
 
@@ -30,7 +31,12 @@ function Row({ summary, selected, onSelect, showRecipients, now }: { summary: Ca
             {summary.excerpt ?? (summary.view === "oversight" ? "Private: only its recipients can read it." : "")}
           </span>
           <span className="block text-[12px] text-ink-soft">
-            {[summary.place, `Severity ${summary.severity}`, showRecipients ? summary.recipients.join(" and ") : null].filter(Boolean).join(" · ")}
+            {[
+              summary.place,
+              `Severity ${summary.severity}`,
+              showRecipients ? summary.recipients.join(" and ") : null,
+              summary.voices ? voicesTally(summary.voices) : null,
+            ].filter(Boolean).join(" · ")}
             <span className="md:hidden"> · {summary.reference}</span>
           </span>
         </button>
