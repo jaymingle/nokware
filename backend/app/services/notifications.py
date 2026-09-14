@@ -19,11 +19,14 @@ handed to the channel's provider: Arkesel for SMS (SMS_PROVIDER=arkesel), or
 """
 
 import logging
+import re
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any, Protocol
 
 from appwrite.id import ID
+from appwrite.query import Query
 
 from app.config import get_settings
 from app.services import case_history
@@ -187,6 +190,19 @@ def notify(case: dict[str, Any], event: NotificationEvent) -> None:
         note = _history_note(event, channel, outcome, provider)
         entry = CaseEntry(CaseHistoryAction.NOTIFIED, SYSTEM, note=note, channel=channel.value)
         case_history.record(case["$id"], entry)
+
+
+def record_delivery(provider_message_id: str, status: str, now: datetime) -> bool:
+    """A provider's delivery report, on the outbox row it is about. False if no message has that ID."""
+    rows = get_databases().list_documents(
+        DATABASE_ID, NOTIFICATIONS_COLLECTION, queries=[Query.equal("providerMessageId", provider_message_id), Query.limit(1)]
+    ).documents
+    if not rows:
+        return False
+    delivery = re.sub(r"[^A-Za-z_ -]", "", status).upper()[:32]
+    changes = {"deliveryStatus": delivery, **({"deliveredAt": now.isoformat()} if delivery == "DELIVERED" else {})}
+    get_databases().update_document(DATABASE_ID, NOTIFICATIONS_COLLECTION, rows[0].id, changes)
+    return True
 
 
 def notify_quietly(case: dict[str, Any], event: NotificationEvent) -> None:

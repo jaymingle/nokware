@@ -10,6 +10,7 @@ from app.config import get_settings
 from app.routes import (
     ask,
     cases,
+    channels,
     contacts,
     dashboard,
     documents,
@@ -135,3 +136,4 @@ app.include_router(dashboard.router)
 app.include_router(contacts.router)
 app.include_router(representatives.router)
 app.include_router(issues.router)
+app.include_router(channels.router)

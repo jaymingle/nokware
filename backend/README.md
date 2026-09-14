@@ -135,6 +135,24 @@ day (counted in the API process, so a restart resets it). A provider named but
 missing its settings stops the API at startup. `scripts/sms_balance.py` shows
 the credits left without spending any. WhatsApp (Twilio) is still `log`.
 
+Callbacks from the providers (`app/routes/channels.py`) are verified before
+they are trusted. Arkesel signs SMS and Voice callbacks; `arkesel_signatures.py`
+implements its guide (`docs/Guide-SE-client-webhook-signature-verification.md`)
+exactly: an HMAC-SHA256 hex digest of `{timestamp}.{canonical JSON}` with
+`ARKESEL_WEBHOOK_SECRET`, keys sorted at every depth and non-ASCII escaped as
+PHP does, either of two `v1=` values accepted during a secret rotation,
+compared in constant time, and refused when the timestamp is more than 5
+minutes off. Each SMS asks for a delivery report only when `PUBLIC_API_URL` and
+the secret are both set; the report sets the outbox row's `deliveryStatus`
+(`scripts/add_delivery_reports.py` adds the fields and the index it needs).
+Arkesel's sandbox records a message as `SANDBOXED` and sends no report.
+
+Known limitation: Arkesel does not sign USSD callbacks yet (its guide says
+USSD signing waits on gateway work). Until it does, the USSD callback is
+protected only by a secret token in its URL, which anyone who learns the URL
+(from a log or a proxy, say) could use to post fake sessions. When Arkesel
+signs USSD, it moves to the same verification.
+
 Staff work cases through `app/services/case_actions.py` (under a per-case
 lock, like Ledger documents). What each caller sees is decided in one place
 (`case_workflow.case_view`): recipients see everything; the MCE sees a

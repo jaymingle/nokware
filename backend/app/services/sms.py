@@ -5,6 +5,8 @@ sandbox mode (ARKESEL_SANDBOX, on by default) Arkesel accepts the request but
 delivers nothing and spends no credits. Outside it, a daily page limit
 (SMS_DAILY_LIMIT) guards the credits. Text is made plain GSM-7 first, so a page
 holds 160 characters, and an error never carries the key or a whole number.
+When the API has a public address and Arkesel's webhook secret, each message
+asks for signed delivery reports (routes/channels.py).
 """
 
 import logging
@@ -26,6 +28,7 @@ logger = logging.getLogger(__name__)
 SEND_URL = "https://sms.arkesel.com/api/v2/sms/send"
 BALANCE_URL = "https://sms.arkesel.com/api/v2/clients/balance-details"
 TIMEOUT_SECONDS = 10.0
+DELIVERY_REPORT_PATH = "/api/channels/sms/delivery"
 SENDER_MAX = 11  # an alphanumeric sender ID is at most 11 characters
 _NUMBERS = re.compile(r"\+?\d{7,}")
 
@@ -89,6 +92,7 @@ class ArkeselSms:
     sender: str
     sandbox: bool
     budget: DailyBudget
+    callback_url: str | None = None  # where Arkesel sends signed delivery reports
     client: httpx.Client = field(default_factory=lambda: httpx.Client(timeout=TIMEOUT_SECONDS))
 
     @property
@@ -119,6 +123,8 @@ class ArkeselSms:
         if not self.sandbox:
             self.budget.take(count, utc_now().date())
         payload = {"sender": self.sender, "message": text, "recipients": [to.lstrip("+")], "sandbox": self.sandbox}
+        if self.callback_url:
+            payload["callback_url"] = self.callback_url
         try:
             return _message_id(self._request("POST", SEND_URL, json=payload).get("data"))
         except SmsError:
@@ -145,4 +151,13 @@ def arkesel() -> ArkeselSms:
         sender=settings.arkesel_sender_id,
         sandbox=settings.arkesel_sandbox,
         budget=DailyBudget(settings.sms_daily_limit),
+        callback_url=delivery_report_url(),
     )
+
+
+def delivery_report_url() -> str | None:
+    """Delivery reports are asked for only when they can reach the API and be verified."""
+    settings = get_settings()
+    if not settings.public_api_url or not settings.arkesel_webhook_secret:
+        return None
+    return f"{settings.public_api_url.rstrip('/')}{DELIVERY_REPORT_PATH}"

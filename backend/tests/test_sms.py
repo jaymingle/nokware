@@ -117,7 +117,7 @@ def test_the_daily_limit_counts_pages_and_only_outside_the_sandbox(monkeypatch: 
 
 def test_a_failed_send_gives_its_pages_back() -> None:
     budget = DailyBudget(2)
-    failing = ArkeselSms("key-1", "Nokware", False, budget, _client(lambda r: httpx.Response(500, json={})))
+    failing = ArkeselSms("key-1", "Nokware", sandbox=False, budget=budget, client=_client(lambda r: httpx.Response(500, json={})))
     for _ in range(3):
         with pytest.raises(SmsError):
             failing.send("+233241234567", "Hello there")

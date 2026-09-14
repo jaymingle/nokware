@@ -67,6 +67,11 @@ class Settings(BaseSettings):
     arkesel_sandbox: bool = True
     # The most SMS pages (credits) sent in a day outside the sandbox.
     sms_daily_limit: int = 50
+    # Arkesel's webhook secret: verifies the signed delivery reports it sends.
+    arkesel_webhook_secret: str = ""
+    # The API's public HTTPS address, which Arkesel and Twilio call back.
+    # Empty means no callbacks are asked for.
+    public_api_url: str = ""
     # Where citizens follow their reports; used in the links messages carry.
     public_site_url: str = "http://localhost:3000"
 
