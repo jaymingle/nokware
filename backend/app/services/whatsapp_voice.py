@@ -17,6 +17,11 @@ number and VOICE_DAILY_LIMIT across everyone; past either, the text answer stand
 
 Twilio fetches the voice note from the API's public address, at a random link
 held in Redis for 10 minutes and deleted as soon as Twilio reports on the message.
+Twilio keeps its own copy in its media store, which would tie the answer (and so
+the question) to the citizen's number: that copy is deleted once Twilio reports
+the message delivered (or read), or failed or undelivered, since then it is going
+nowhere; never on sent or queued. One Twilio never reports on is swept from
+Twilio a day after it was sent, by the hourly purge job.
 """
 
 import base64
@@ -46,7 +51,10 @@ WORDS_PER_SECOND = 4  # brisk speech is about 3; more than this, and the words w
 HOLD_SECONDS = 10 * 60
 AUDIO_PATH = "/api/channels/whatsapp/audio"
 AUDIO_TYPES = {"ogg": "audio/ogg", "mp3": "audio/mpeg"}
-FINAL_STATUSES = frozenset({"sent", "delivered", "read", "failed", "undelivered"})  # Twilio has fetched the file by then
+FETCHED = frozenset({"sent", "delivered", "read", "failed", "undelivered"})  # Twilio has the file by then
+FINISHED = frozenset({"delivered", "read", "failed", "undelivered"})  # it has arrived, or never will: Twilio's copy can go
+SWEEP_AFTER_SECONDS = 24 * 3600
+SPOKEN = ("wa-spoken",)  # a sorted set: each spoken reply's message SID, by when it was sent
 TOO_MANY = "You've sent a lot of voice notes this hour. Please type your message, or try again later."
 TOO_LONG = "Voice notes can be up to 3 minutes. Please send a shorter one, or type your message."
 NOT_HEARD = "I couldn't make out that voice note. Please try again somewhere quieter, or type your message."
@@ -157,7 +165,10 @@ def speak_answer(number: str, answer: RagAnswer, heard: Heard) -> None:
         token, url = _hold(note)
         sid = whatsapp_reply.reply_audio(number, url, f"{note.seconds:.0f} s, {len(note.data) // 1024} KB {note.content_type}")
         if sid:
-            get_redis().set(key("wa-audio-sid", sid), token, ex=HOLD_SECONDS)
+            pipe = get_redis().pipeline()
+            pipe.set(key("wa-audio-sid", sid), token, ex=HOLD_SECONDS)
+            pipe.zadd(key(*SPOKEN), {sid: utc_now().timestamp()})
+            pipe.execute()
     except (voice_speech.SpeechFailed, redis.RedisError, RedisUnavailable):
         logger.warning("No spoken reply for %s: it couldn't be made", masked(number), exc_info=True)
 
@@ -172,13 +183,39 @@ def held(name: str) -> tuple[bytes, str] | None:
     return (base64.b64decode(data), AUDIO_TYPES[extension]) if extension == match[2] else None
 
 
-def release(message_sid: str, status: str) -> None:
-    """Twilio has reported on a voice note it sent, so it has the file: delete the held copy."""
-    if status not in FINAL_STATUSES:
-        return
+def _forget_at_twilio(message_sid: str) -> None:
+    """Delete a spoken reply's file from Twilio's media store; it stays listed for the sweep until that works."""
     try:
-        token = get_redis().getdel(key("wa-audio-sid", message_sid))
-        if token:
-            get_redis().delete(key("wa-audio", str(token)))
+        deleted = twilio().delete_sent_media(message_sid)
+    except WhatsAppNotConfigured:
+        deleted = False
+    if deleted:
+        get_redis().zrem(key(*SPOKEN), message_sid)
+
+
+def release(message_sid: str, status: str) -> None:
+    """Twilio has reported on a voice note it sent: once it has the file, delete the held copy; once the message
+    has arrived, or never will, delete Twilio's copy too."""
+    try:
+        if status in FETCHED:
+            token = get_redis().getdel(key("wa-audio-sid", message_sid))
+            if token:
+                get_redis().delete(key("wa-audio", str(token)))
+        if status in FINISHED and get_redis().zscore(key(*SPOKEN), message_sid) is not None:
+            _forget_at_twilio(message_sid)
     except (redis.RedisError, RedisUnavailable):
-        logger.warning("Couldn't delete a held voice note", exc_info=True)
+        logger.warning("Couldn't delete a spoken reply's copies", exc_info=True)
+
+
+def sweep(now: datetime) -> int:
+    """Spoken replies Twilio never reported on within a day: delete their files from Twilio anyway. How many."""
+    try:
+        stale = get_redis().zrangebyscore(key(*SPOKEN), 0, now.timestamp() - SWEEP_AFTER_SECONDS)
+        for message_sid in stale:
+            _forget_at_twilio(str(message_sid))
+    except RedisUnavailable:
+        return 0  # no Redis, no spoken replies
+    except redis.RedisError:
+        logger.warning("Couldn't sweep spoken replies from Twilio", exc_info=True)
+        return 0
+    return len(stale)

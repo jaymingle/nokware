@@ -2,7 +2,8 @@
 
 Gemini 2.5 Flash listens to the recording itself (no separate speech service),
 at temperature 0, told the Assembly's place names so "Kaneshie" isn't heard as
-"Canashy", and how a case reference is spelled. It also says whether the speech
+"Canashy", its common terms ("market stall", not "market store"), and how a
+case reference is spelled. It also says whether the speech
 was clear enough to act on, and whether it is about harm to a person: such a
 note never gets a spoken reply, which could play aloud near the person it is about.
 
@@ -25,6 +26,9 @@ from app.services.voice_audio import voice_note
 from app.wards import sub_metros, wards
 
 TIMEOUT_MS = 30_000
+# Words a resident uses about the Assembly that a listener can mishear ("market stall" was heard as "market store").
+ASSEMBLY_TERMS = ("market stall", "levy", "property rate", "business operating permit", "fee-fixing", "rates", "tolls",
+                  "permit")
 # What Gemini reads directly; anything else (AMR, 3GP, M4A) is re-encoded as OGG/Opus first.
 READABLE = frozenset({"audio/ogg", "audio/mpeg", "audio/mp3", "audio/wav", "audio/aac", "audio/flac", "audio/aiff"})
 
@@ -66,6 +70,7 @@ def _instructions() -> str:
         "Transcribe only speech that is really in the recording. If it is silent, very short, noisy or can't be "
         "made out, set clear to false. Never guess, complete or invent words.\n"
         f"Places you may hear, to be written exactly as spelled here: {places}.\n"
+        f"Assembly terms you may hear: {', '.join(ASSEMBLY_TERMS)}.\n"
         "A case reference is four characters, a dash, then four more, from these: "
         f"{REFERENCE_ALPHABET}. If one is spelled out letter by letter, write it joined, like K7QM-4TXP.\n"
         'A lone number said as a choice ("one", "zero") is written as a digit.\n'

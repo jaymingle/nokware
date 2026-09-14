@@ -5,6 +5,7 @@ import io
 import logging
 import math
 import wave
+from datetime import datetime, timedelta, timezone
 from typing import Any
 from urllib.parse import parse_qsl
 
@@ -140,6 +141,7 @@ def test_a_voice_note_is_transcribed_with_the_place_names_and_a_failure_is_repor
     assert heard == Heard("Me ho yɛ", "I am fine", "Twi", True, False) and not heard.in_english
     audio, prompt = client.asked[0]["contents"]
     assert audio.inline_data.mime_type == "audio/ogg" and "Kaneshie" in prompt and "K7QM-4TXP" in prompt
+    assert all(term in prompt for term in ("market stall", "levy", "property rate", "business operating permit", "fee-fixing"))
     assert client.asked[0]["config"].temperature == 0.0
     monkeypatch.setattr(voice_transcribe, "get_genai_client", lambda: _Genai(httpx.ReadTimeout("slow")))
     with pytest.raises(voice_transcribe.TranscriptionFailed):
@@ -183,6 +185,13 @@ def _settings(monkeypatch: pytest.MonkeyPatch, **update: Any) -> None:
 class _Twilio:
     def __init__(self) -> None:
         self.deleted: list[str] = []
+        self.sent_deleted: list[str] = []
+        self.can_delete = True
+
+    def delete_sent_media(self, message_sid: str) -> bool:
+        if self.can_delete:
+            self.sent_deleted.append(message_sid)
+        return self.can_delete
 
     def download(self, url: str) -> tuple[bytes, str]:
         return b"OggS-voice-note", "audio/ogg"
@@ -238,10 +247,47 @@ def test_twilio_fetches_the_spoken_reply_once_and_it_is_deleted_when_twilio_repo
     assert fetched.status_code == 200 and fetched.content == NOTE.data and fetched.headers["content-type"] == "audio/ogg"
     assert client.get(path.replace(".ogg", ".mp3")).status_code == 404 and client.get(f"{path[:-12]}x.ogg").status_code == 404
     monkeypatch.setattr(notifications, "record_delivery", lambda sid, status, now: True)
-    form = {"MessageSid": "MMspoken", "MessageStatus": "sent"}
+    _report(client, "MMspoken", "sent")
+    assert client.get(path).status_code == 404  # Twilio has the file: our copy is gone
+    assert phone["twilio"].sent_deleted == []  # but Twilio's copy stays until the message has arrived
+    _report(client, "MMspoken", "delivered")
+    assert phone["twilio"].sent_deleted == ["MMspoken"]
+    _report(client, "MMspoken", "read")
+    assert phone["twilio"].sent_deleted == ["MMspoken"]  # once is enough
+
+
+def _report(client: TestClient, message_sid: str, status: str) -> None:
+    form = {"MessageSid": message_sid, "MessageStatus": status}
     signature = RequestValidator(TOKEN).compute_signature(f"{PUBLIC}/api/channels/whatsapp/status", form)
     client.post("/api/channels/whatsapp/status", data=form, headers={"X-Twilio-Signature": signature})
-    assert client.get(path).status_code == 404
+
+
+@pytest.mark.parametrize(("statuses", "deleted"), [
+    (["queued", "sent"], []), (["sent", "failed"], ["MMspoken"]), (["undelivered"], ["MMspoken"]),
+])
+def test_twilios_copy_goes_once_the_message_has_arrived_or_never_will(
+    monkeypatch: pytest.MonkeyPatch, phone: dict[str, Any], statuses: list[str], deleted: list[str]
+) -> None:
+    _reads(monkeypatch, "question")
+    speak_note()
+    for status in statuses:
+        whatsapp_voice.release("MMspoken", status)
+    assert phone["twilio"].sent_deleted == deleted
+    whatsapp_voice.release("SM-some-text-reply", "delivered")  # not a spoken reply: nothing to delete
+    assert phone["twilio"].sent_deleted == deleted
+
+
+def test_a_spoken_reply_twilio_never_reports_on_is_swept_after_a_day(
+    monkeypatch: pytest.MonkeyPatch, phone: dict[str, Any], redis_server: fakeredis.FakeRedis
+) -> None:
+    now = datetime(2026, 9, 15, 12, 0, tzinfo=timezone.utc)
+    spoken = redis_store.key(*whatsapp_voice.SPOKEN)
+    redis_server.zadd(spoken, {"MMold": (now - timedelta(hours=25)).timestamp(), "MMnew": (now - timedelta(hours=2)).timestamp()})
+    phone["twilio"].can_delete = False
+    assert whatsapp_voice.sweep(now) == 1 and redis_server.zscore(spoken, "MMold") is not None  # kept to try again
+    phone["twilio"].can_delete = True
+    whatsapp_voice.sweep(now)
+    assert phone["twilio"].sent_deleted == ["MMold"] and redis_server.zrange(spoken, 0, -1) == ["MMnew"]
 
 
 def test_a_question_in_another_language_is_shown_back_translated_and_answered_in_english(monkeypatch: pytest.MonkeyPatch, phone: dict[str, Any]) -> None:
@@ -384,3 +430,22 @@ def test_a_spoken_replys_link_is_kept_out_of_the_access_log() -> None:
 def test_the_wav_wrapper_is_16_bit_mono() -> None:
     with wave.open(io.BytesIO(voice_audio.wav(_pcm(0.5), 24_000))) as file:
         assert (file.getnchannels(), file.getsampwidth(), file.getframerate(), file.getnframes()) == (1, 2, 24_000, 12_000)
+
+
+def test_a_sent_file_is_deleted_from_twilios_media_store() -> None:
+    seen: list[tuple[str, str]] = []
+    listing = {"media_list": [{"sid": "ME1"}]}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append((request.method, request.url.path))
+        if request.url.path.endswith("/MMgone/Media.json"):
+            return httpx.Response(404, json={"code": 20404})
+        if request.url.path.endswith("/MMstuck/Media.json"):
+            return httpx.Response(500)
+        return httpx.Response(200, json=listing) if request.method == "GET" else httpx.Response(204)
+
+    client = TwilioWhatsApp("AC1", TOKEN, "whatsapp:+14155238886", client=httpx.Client(transport=httpx.MockTransport(handler)))
+    assert client.delete_sent_media("MM1")
+    assert seen == [("GET", "/2010-04-01/Accounts/AC1/Messages/MM1/Media.json"),
+                    ("DELETE", "/2010-04-01/Accounts/AC1/Messages/MM1/Media/ME1.json")]
+    assert client.delete_sent_media("MMgone") and not client.delete_sent_media("MMstuck")

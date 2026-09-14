@@ -24,7 +24,7 @@ from app.routes import (
     reports,
     representatives,
 )
-from app.services import notifications, scheduler
+from app.services import notifications, scheduler, whatsapp_voice
 from app.services.appwrite_client import quiet_sdk_deprecation_warnings
 from app.services.issue_voices import InvalidVoice, IssueNotFound, purge_expired_voice_names
 from app.services.ledger_documents import utc_now
@@ -79,7 +79,8 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     # Documents publish when their clock runs out, without cron: the deadline
     # job runs in this process every DEADLINE_JOB_INTERVAL_SECONDS.
     task = scheduler.start(settings.deadline_job_interval_seconds, run_deadline_job, "Deadline job")
-    # Citizens' numbers, and names given with voices, are deleted 30 days after their case closes.
+    # Citizens' numbers, and names given with voices, are deleted 30 days after their case closes; spoken
+    # replies Twilio never reported on are deleted from Twilio a day after they were sent.
     purge = scheduler.start(settings.contact_purge_interval_seconds, run_contact_purge, "Contact purge")
     yield
     await scheduler.stop(task)
@@ -90,6 +91,7 @@ def run_contact_purge() -> None:
     now = utc_now()
     purge_expired_contacts(now)
     purge_expired_voice_names(now)
+    whatsapp_voice.sweep(now)
 
 
 app = FastAPI(title="Nokware Backend", version="0.1.0", lifespan=lifespan)

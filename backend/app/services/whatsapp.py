@@ -100,6 +100,21 @@ class TwilioWhatsApp:
         except httpx.HTTPError as error:
             logger.warning("Couldn't delete a WhatsApp message from Twilio's log (%s)", type(error).__name__)
 
+    def delete_sent_media(self, message_sid: str) -> bool:
+        """Remove the files of a message we sent from Twilio's media store. True once none is left there."""
+        base = f"{API}/Accounts/{self.account_sid}/Messages/{message_sid}/Media"
+        try:
+            listed = self.client.get(f"{base}.json", auth=(self.account_sid, self.auth_token))
+            if listed.status_code == 404:
+                return True  # the message, and so its files, are already gone
+            listed.raise_for_status()
+            for media in listed.json().get("media_list", []):
+                self.client.delete(f"{base}/{media['sid']}.json", auth=(self.account_sid, self.auth_token)).raise_for_status()
+        except (httpx.HTTPError, ValueError, KeyError) as error:
+            logger.warning("Couldn't delete a sent file from Twilio's media store (%s)", type(error).__name__)
+            return False
+        return True
+
     def delete_media(self, url: str) -> None:
         """Remove an incoming file from Twilio once it has been used. A failure is logged, not raised."""
         try:

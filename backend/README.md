@@ -263,8 +263,10 @@ Voice notes (`whatsapp_voice.py`, `voice_transcribe.py`, `voice_speech.py`,
 `voice_audio.py`). A voice note is fetched from Twilio once and deleted there at
 once; the recording is never stored. Up to 3 minutes, 10 an hour per number.
 Gemini 2.5 Flash listens to it directly, at temperature 0, told the AMA's
-electoral areas and sub-metros (so "Kaneshie" isn't heard as "Canashy") and how
-a reference is spelled, and returns what was said, in the language spoken and
+electoral areas and sub-metros (so "Kaneshie" isn't heard as "Canashy"), its
+common terms (market stall, levy, property rate, business operating permit,
+fee-fixing, rates, tolls, permit: a live test heard "market stall" as "market
+store" before they were added) and how a reference is spelled, and returns what was said, in the language spoken and
 in English, and whether it was clear. Any language is accepted: the English is
 what Nokware acts on, exactly as if typed, through every step of the chat, and
 a lone spoken choice ("one", "yes", "remove") or a spelled-out reference reads
@@ -275,8 +277,8 @@ transcription is caught by the person who said it; the audit trail records that
 a description is a confirmed machine transcription. A transcript with more
 words than the note's length could hold is taken as unheard: on a half-second
 note Gemini invented a whole sentence. Only a question's answer is also spoken:
-after the text answer (which carries the sources), a voice note of about a
-minute of its gist, in English, ending "The sources are in the message above."
+after the text answer (which carries the sources), a voice note of about 50
+seconds of its gist, in English, ending "The sources are in the message above."
 It is never spoken when Gemini or the report rules' danger words say the note
 is about harm to a person, nor for a report, a status, a safety or a medical
 reply: a voice note about abuse could play aloud near the abuser. Speech is
@@ -285,7 +287,11 @@ with PyAV (FFmpeg bundled in its wheel, so nothing to install on the server) as
 OGG/Opus, the only OGG Twilio takes, which WhatsApp plays as a voice note; MP3
 is the fallback. Twilio fetches it from `GET /api/channels/whatsapp/audio/{name}`:
 a random link, held in Redis for 10 minutes, deleted when Twilio reports on the
-message and kept out of the access log. A spoken reply is a second WhatsApp
+message and kept out of the access log. Twilio keeps its own copy in its media
+store, which would tie the answer, and so the question, to the citizen's number:
+it is deleted when Twilio reports the message delivered (or read), failed or
+undelivered, never on sent or queued; one Twilio never reports on is deleted a
+day after it was sent by the hourly purge job (`CONTACT_PURGE_INTERVAL_SECONDS`). A spoken reply is a second WhatsApp
 message (WhatsApp drops text sent with audio), so there are 10 a day per number
 and `VOICE_DAILY_LIMIT` (default 20) across everyone; past either, or on any
 failure, the text answer stands alone.
@@ -315,8 +321,9 @@ Known limitations:
   approved templates exists (a production step), those updates go by SMS to
   Ghanaian numbers and are not delivered to others.
 - Twilio keeps its own log of message bodies. The API deletes incoming photos
-  and voice notes from Twilio, but what a citizen typed stays in Twilio's
-  message log until deleted there.
+  and voice notes, and the spoken replies it sent, from Twilio's media store,
+  but what a citizen typed, and the text replies, stay in Twilio's message log
+  until deleted there.
 - Voice in languages other than English is untested. Twi, Ga and Ewe haven't
   been tried with real speakers. In testing, a clear French note was heard as
   Twi-sounding words and marked unclear (so the citizen was asked to try again

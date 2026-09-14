@@ -1,7 +1,7 @@
 """An answer read aloud: the words to say, Gemini's speech, and a WhatsApp voice note of it.
 
 The spoken reply follows the text answer, which carries the sources, so the
-voice gives the gist in about a minute: the answer's own opening, cut at a
+voice gives the gist in about 50 seconds: the answer's own opening, cut at a
 sentence, without citation tags, markdown or links, and ending "The sources
 are in the message above." Cedi amounts are said as cedis, and whole amounts
 without their ".00" (else "thirty point zero zero"). English only.
@@ -20,7 +20,7 @@ from app.services.llm import get_genai_client
 from app.services.rag import NO_INFO_ANSWER, RagAnswer
 from app.services.voice_audio import AudioRejected, Encoded, voice_note, wav
 
-SPOKEN_MAX_CHARS = 900  # about a minute at an unhurried pace
+SPOKEN_MAX_CHARS = 620  # with the closing sentence, about 50 seconds: Gemini reads about 13 characters a second
 TIMEOUT_MS = 45_000
 PCM_RATE = 24_000  # Gemini's speech, unless its MIME type says otherwise
 SOURCES_ABOVE = "The sources are in the message above."
