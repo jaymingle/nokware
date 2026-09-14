@@ -1,0 +1,216 @@
+"""Ask's live figures: counts of citizen reports, through tools the model can call.
+
+When a question looks like it wants figures, a quick planning call offers the
+model two tools. CountReports asks for one count (by topic, area, department,
+status and period, optionally broken down); PersonalSafetyFigures is what it
+calls when a resident asks for figures on reports about someone's safety, which
+Nokware does not publish. The counting is stats.py's, so its rules hold here:
+personal safety is never counted, and 1 to 4 reads "fewer than 5".
+
+Each count becomes a source under an R label ([R1], [R2], ...) beside the
+documents' S labels, so an answer says which figures are live report data and
+which come from a document.
+"""
+
+import logging
+import re
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from typing import Any, Literal
+
+from langchain_core.prompts import ChatPromptTemplate
+from pydantic import BaseModel, Field
+
+from app.services import stats
+from app.services.llm import get_quick_model
+from app.services.report_taxonomy import TOPICS, Category
+from app.services.stats import Period, ReportFilter, StatusGroup
+from app.teams import RECIPIENT_NAMES
+from app.wards import find_ward, sub_metros
+
+logger = logging.getLogger(__name__)
+
+SAFETY_FIGURES_ANSWER = "Nokware doesn't publish figures on reports about someone's safety."
+FIGURE_LABEL_PREFIX = "R"
+MAX_FIGURES = 4
+# Only a question that might want figures pays for the planning call.
+FIGURE_WORDS = re.compile(
+    r"\b(how many|how much|number of|count|figures?|statistics|stats|totals?|most|reports?|reported|cases?|"
+    r"complaints?|open|resolved|escalated|filed|pending|outstanding)\b",
+    re.IGNORECASE,
+)
+_PUBLIC_TOPICS = [t for t in TOPICS if t.category != Category.PERSONAL_SAFETY]
+TopicId = Literal[tuple(t.id for t in _PUBLIC_TOPICS)]  # type: ignore[valid-type]
+SubMetroId = Literal[tuple(sub_metros())]  # type: ignore[valid-type]
+RecipientId = Literal[tuple(RECIPIENT_NAMES)]  # type: ignore[valid-type]
+
+
+class CountReports(BaseModel):
+    """Count reports residents have filed with Nokware about problems in Accra. Returns a number only.
+
+    Reports about someone's personal safety are never counted."""
+
+    topic: TopicId | None = Field(None, description="The report topic, one of: " + "; ".join(f"{t.id} ({t.label})" for t in _PUBLIC_TOPICS))
+    category: Literal["civic_service", "public_safety"] | None = Field(None, description="Everyday services, or dangers to the public.")
+    status: Literal["open", "resolved", "escalated", "any"] = Field("any", description="open: not yet resolved.")
+    electoral_area: str | None = Field(None, description="An electoral area (ward) as the resident named it, e.g. Kaneshie.")
+    sub_metro: SubMetroId | None = Field(None, description="A sub-metro: " + "; ".join(f"{s.id} ({s.name})" for s in sub_metros().values()))
+    department: RecipientId | None = Field(None, description="Who the reports went to: " + "; ".join(f"{k} ({v})" for k, v in RECIPIENT_NAMES.items()))
+    period: Literal["today", "this_week", "this_month", "last_30_days", "this_year", "all_time"] = "all_time"
+    group_by: Literal["none", "topic", "sub_metro"] = Field("none", description="Also break the count down.")
+
+
+class PersonalSafetyFigures(BaseModel):
+    """Call this when the resident asks for figures on reports about someone's safety: abuse or violence against
+    a person, a child at risk, sexual violence, or a threat to someone's life. Nokware does not publish these."""
+
+    asked_about: str = Field(description="What the resident asked for figures on, in a few words.")
+
+
+_PLAN_PROMPT = ChatPromptTemplate.from_messages(
+    [
+        (
+            "system",
+            "You decide whether a resident's question needs live counts of the reports residents have filed with "
+            "Nokware, Accra's civic reporting service. Today is {today} (GMT).\n"
+            "- For how many reports, cases or complaints were filed, are open, resolved or escalated (overall, or "
+            "for a topic, electoral area, sub-metro, department or period), call CountReports once for each figure "
+            "the answer needs (at most four).\n"
+            "- If it asks for figures on reports about someone's personal safety (abuse, violence against a person, "
+            "a child at risk, sexual violence, a threat to life), call PersonalSafetyFigures instead.\n"
+            "- If the resident names a place, pass it as electoral_area exactly as they wrote it, even if you don't "
+            "recognise it.\n"
+            "- For which topic or sub-metro has the most reports, call CountReports once with group_by.\n"
+            "- Questions about budgets, fees, bye-laws, plans or what documents say need no tool: call nothing.",
+        ),
+        ("human", "{question}"),
+    ]
+)
+
+
+@dataclass(frozen=True)
+class Figure:
+    """One count as a citable source: what was counted, the result as it may be shown, and when."""
+
+    label: str
+    description: str
+    value: str
+    rows: list[tuple[str, str]]  # a breakdown: (name, count as shown)
+    counted_at: str
+
+
+@dataclass(frozen=True)
+class FigurePlan:
+    figures: list[Figure]
+    safety_asked: bool  # the resident asked for personal-safety figures
+
+    @property
+    def empty(self) -> bool:
+        return not self.figures and not self.safety_asked
+
+
+NO_FIGURES = FigurePlan([], False)
+
+
+def wants_figures(question: str) -> bool:
+    return bool(FIGURE_WORDS.search(question))
+
+
+_STATUS_WORDS = {"open": "Open reports", "resolved": "Resolved reports", "escalated": "Escalated reports", "any": "Reports"}
+_PERIOD_WORDS = {
+    "today": "today", "this_week": "this week", "this_month": "this month",
+    "last_30_days": "in the last 30 days", "this_year": "this year", "all_time": "since Nokware began",
+}
+
+
+def _describe(call: CountReports, ward_name: str | None) -> str:
+    """What was counted, in words: "Open reports · Solid waste and dumping · Ablekuma South sub-metro · this month"."""
+    parts = [_STATUS_WORDS[call.status]]
+    if call.topic:
+        parts.append(stats.topic_label(call.topic))
+    elif call.category:
+        parts.append("everyday services" if call.category == "civic_service" else "dangers to the public")
+    if ward_name:
+        parts.append(ward_name)
+    if call.sub_metro:
+        parts.append(f"{sub_metros()[call.sub_metro].name} sub-metro")
+    if call.department:
+        parts.append(f"sent to {RECIPIENT_NAMES[call.department]}")
+    parts.append(_PERIOD_WORDS[call.period])
+    return " · ".join(parts)
+
+
+def _filter(call: CountReports, ward: str | None) -> ReportFilter:
+    return ReportFilter(
+        topic=call.topic,
+        category=Category(call.category) if call.category else None,
+        status=StatusGroup(call.status),
+        ward=ward,
+        sub_metro=call.sub_metro,
+        recipient=call.department,
+        period=Period(call.period),
+    )
+
+
+def _rows(cases: list[dict[str, Any]], call: CountReports, wanted: ReportFilter, now: datetime) -> list[tuple[str, str]]:
+    """The breakdown, shown counts first and the "fewer than 5" ones after by name, so their order says nothing."""
+    if call.group_by == "none":
+        return []
+    name = stats.topic_label if call.group_by == "topic" else (lambda s: sub_metros()[s].name if s in sub_metros() else s)
+    rows = [(name(key), n) for key, n in stats.breakdown(cases, wanted, call.group_by, now)]
+    rows.sort(key=lambda r: (stats.shown(r[1]) is None, -r[1] if stats.shown(r[1]) else 0, r[0]))
+    return [(label, stats.display(n)) for label, n in rows]
+
+
+def count_figure(call: CountReports, label: str, cases: list[dict[str, Any]], now: datetime, counted_at: str) -> Figure:
+    """Run one CountReports call against the shared case list."""
+    ward = find_ward(call.electoral_area) if call.electoral_area else None
+    if call.electoral_area and ward is None:
+        return Figure(label, f"Reports in \"{call.electoral_area}\"", "no electoral area by that name in Nokware's list", [], counted_at)
+    wanted = _filter(call, ward.id if ward else None)
+    value = stats.display(stats.count(cases, wanted, now))
+    return Figure(label, _describe(call, ward.name if ward else None), value, _rows(cases, call, wanted, now), counted_at)
+
+
+def _tool_calls(question: str, now: datetime) -> list[dict[str, Any]]:
+    model = get_quick_model().bind_tools([CountReports, PersonalSafetyFigures])
+    message = (_PLAN_PROMPT | model).invoke({"question": question, "today": f"{now:%A %d %B %Y}"})
+    return list(getattr(message, "tool_calls", []) or [])
+
+
+def plan(question: str, now: datetime) -> FigurePlan:
+    """The live figures a question needs, counted. A planning failure means no figures, never a failed answer."""
+    if not wants_figures(question):
+        return NO_FIGURES
+    try:
+        calls = _tool_calls(question, now)
+    except Exception:
+        logger.exception("Planning Ask's live figures failed; answering from documents only")
+        return NO_FIGURES
+    safety = any(c["name"] == PersonalSafetyFigures.__name__ for c in calls)
+    counts = [CountReports.model_validate(c["args"]) for c in calls if c["name"] == CountReports.__name__][:MAX_FIGURES]
+    if not counts:
+        return FigurePlan([], safety)
+    cases = stats.public_cases()
+    at = datetime.fromtimestamp(stats.counted_at(), tz=timezone.utc).isoformat()
+    figures = [count_figure(call, f"{FIGURE_LABEL_PREFIX}{i}", cases, now, at) for i, call in enumerate(counts, 1)]
+    return FigurePlan(figures, safety)
+
+
+def _when(iso: str) -> str:
+    """"14 September 2026, 02:30 GMT" (Accra keeps GMT all year)."""
+    moment = datetime.fromisoformat(iso)
+    return f"{moment.day} {moment:%B %Y, %H:%M} GMT"
+
+
+def figure_context(figure: Figure) -> str:
+    """One figure as the answering model sees it."""
+    breakdown = "; ".join(f"{name}: {value}" for name, value in figure.rows)
+    lines = [
+        f"[{figure.label}] Live report data (reports residents filed with Nokware, counted {_when(figure.counted_at)}): "
+        f"{figure.description}",
+        f"Result: {figure.value}",
+        *([f"Breakdown: {breakdown}"] if breakdown else []),
+        "(Reports about someone's safety are never counted. Counts from 1 to 4 are given as \"fewer than 5\".)",
+    ]
+    return "\n".join(lines)

@@ -47,6 +47,7 @@ def pipeline(monkeypatch: pytest.MonkeyPatch):
         chain = FakeChain(pieces)
         monkeypatch.setattr(rag, "retrieve", lambda question: Retrieval(queries=[question], chunks=chunks))
         monkeypatch.setattr(rag, "_answer_chain", lambda: chain)
+        monkeypatch.setattr(rag, "plan_figures", lambda question, now: rag.NO_FIGURES)  # never a live model call
         return chain
 
     return configure

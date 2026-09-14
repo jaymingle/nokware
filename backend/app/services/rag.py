@@ -10,12 +10,19 @@ are returned together, so every citation resolves to a real document.
 Years come from ``documentYear`` (the year of the document itself), never
 ``publishedAt``, which is when the document was added to the Ledger.
 
+A question about reports residents have filed also gets live figures
+(ask_figures.py), counted while retrieval runs. Each figure is a source under an
+R label ([R1]) beside the documents, and the model is told to say when a figure
+is live report data rather than a document. Personal-safety figures are never
+given: the answer says so in fixed words.
+
 answer_question() returns the whole answer at once; stream_answer() yields the
 same pipeline's progress as events (searching, the sources found, the answer
 text as it is written, then the checked answer), so a reader sees it working.
 """
 
 from collections.abc import Iterator
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Any, Literal, TypedDict
 
@@ -23,8 +30,17 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import Runnable
 
+from app.services.ask_figures import (
+    NO_FIGURES,
+    SAFETY_FIGURES_ANSWER,
+    Figure,
+    FigurePlan,
+    figure_context,
+    wants_figures,
+)
+from app.services.ask_figures import plan as plan_figures
 from app.services.citations import make_label, sanitize_citations
-from app.services.ledger_documents import Provenance, provenance
+from app.services.ledger_documents import Provenance, provenance, utc_now
 from app.services.llm import get_chat_model
 from app.services.retrieval import RetrievedChunk, retrieve
 from app.teams import DEPARTMENT_NAMES
@@ -57,7 +73,16 @@ _SYSTEM_PROMPT = (
     f'"{DISAGREEMENT_LEAD}" and give each version with the document it comes from, '
     f'named by title, e.g. "{DISAGREEMENT_LEAD} on 2023 revenue: the 2023 Monitoring and '
     'Evaluation Report gives X [S1]; the AMA Biweekly Newsletter gives Y [S2]."\n'
-    f'- If the sources do not contain the answer, reply exactly: "{NO_INFO_ANSWER}"'
+    f'- If the sources do not contain the answer, reply exactly: "{NO_INFO_ANSWER}"\n\n'
+    "Some sources may be live report data rather than documents: counts of the reports residents have "
+    "filed with Nokware, labelled [R1], [R2]. When you use one:\n"
+    "- Say in words that the figure comes from Nokware's live report data as of the time given, not from "
+    "a document, and cite its label.\n"
+    '- Give each figure exactly as written, including "fewer than 5" and "none".\n'
+    "- Never work out a new figure from others: no adding, subtracting or comparing counts to get a number.\n"
+    "- Keep document figures and live report data apart; one never confirms or corrects the other.\n"
+    "- If the live figures can't settle the question (for example every count it needs is \"fewer than 5\"), say "
+    "so plainly and cite them. Don't give the no-information reply when live figures were provided."
 )
 
 _PROMPT = ChatPromptTemplate.from_messages(
@@ -83,10 +108,20 @@ class Source(TypedDict):
     document_year: int | None
 
 
+class FigureSource(TypedDict):
+    label: str  # "R1"
+    cited: bool
+    description: str  # what was counted
+    value: str  # the count as it may be shown: "12", "fewer than 5", "none"
+    rows: list[dict[str, str]]  # a breakdown: {"name", "value"}
+    counted_at: str
+
+
 class RagAnswer(TypedDict):
     answer: str
     status: AnswerStatus
     sources: list[Source]
+    figures: list[FigureSource]
     search_queries: list[str]
 
 
@@ -98,6 +133,11 @@ class Prepared:
     chunks: list[RetrievedChunk]
     labels: dict[str, str]  # {document_id: "S1", ...}
     queries: list[str]
+    figures: FigurePlan = NO_FIGURES
+
+    @property
+    def has_sources(self) -> bool:
+        return bool(self.chunks or self.figures.figures)
 
 
 def _assign_labels(chunks: list[RetrievedChunk]) -> dict[str, str]:
@@ -143,6 +183,21 @@ def _source(retrieved: RetrievedChunk, label: str, cited: bool) -> Source:
     )
 
 
+def _figure_source(figure: Figure, cited: set[str]) -> FigureSource:
+    return FigureSource(
+        label=figure.label,
+        cited=figure.label in cited,
+        description=figure.description,
+        value=figure.value,
+        rows=[{"name": name, "value": value} for name, value in figure.rows],
+        counted_at=figure.counted_at,
+    )
+
+
+def _to_figures(prepared: Prepared, cited: set[str]) -> list[FigureSource]:
+    return [_figure_source(f, cited) for f in prepared.figures.figures]
+
+
 def _to_sources(chunks: list[RetrievedChunk], labels: dict[str, str], cited: set[str]) -> list[Source]:
     order = {document_id: position for position, document_id in enumerate(labels)}
     ordered = sorted(chunks, key=lambda c: order[c.chunk.document_id])  # stable: rank order within a document
@@ -155,8 +210,12 @@ def answer_status(answer: str) -> AnswerStatus:
 
 
 def prepare(question: str) -> Prepared:
-    retrieval = retrieve(question)
-    return Prepared(question, retrieval.chunks, _assign_labels(retrieval.chunks), retrieval.queries)
+    """Retrieve documents and, while that runs, count any live figures the question needs."""
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        planned = pool.submit(plan_figures, question, utc_now())
+        retrieval = retrieve(question)
+        figures = planned.result()
+    return Prepared(question, retrieval.chunks, _assign_labels(retrieval.chunks), retrieval.queries, figures)
 
 
 def _answer_chain() -> Runnable[dict[str, str], str]:
@@ -164,18 +223,29 @@ def _answer_chain() -> Runnable[dict[str, str], str]:
 
 
 def _prompt_input(prepared: Prepared) -> dict[str, str]:
-    return {"context": _format_context(prepared.chunks, prepared.labels), "question": prepared.question}
+    blocks = [_format_context(prepared.chunks, prepared.labels), *map(figure_context, prepared.figures.figures)]
+    return {"context": "\n\n".join(b for b in blocks if b), "question": prepared.question}
+
+
+def _with_safety_notice(answer: str, prepared: Prepared) -> str:
+    """Personal-safety figures are refused in fixed words, whatever else the answer says."""
+    if not prepared.figures.safety_asked or SAFETY_FIGURES_ANSWER in answer:
+        return answer
+    if answer_status(answer) == "no_information":
+        return SAFETY_FIGURES_ANSWER
+    return f"{SAFETY_FIGURES_ANSWER}\n\n{answer}"
 
 
 def finish(prepared: Prepared, raw_answer: str) -> RagAnswer:
-    """The checked answer: only real citations kept, sources marked cited or not."""
-    if not prepared.chunks:
-        return RagAnswer(answer=NO_INFO_ANSWER, status="no_information", sources=[], search_queries=prepared.queries)
-    answer, cited = sanitize_citations(raw_answer, set(prepared.labels.values()))
+    """The checked answer: only real citations kept, sources and figures marked cited or not."""
+    valid = set(prepared.labels.values()) | {f.label for f in prepared.figures.figures}
+    answer, cited = sanitize_citations(raw_answer if prepared.has_sources else NO_INFO_ANSWER, valid)
+    answer = _with_safety_notice(answer, prepared)
     return RagAnswer(
         answer=answer,
         status=answer_status(answer),
         sources=_to_sources(prepared.chunks, prepared.labels, cited),
+        figures=_to_figures(prepared, cited),
         search_queries=prepared.queries,
     )
 
@@ -183,7 +253,7 @@ def finish(prepared: Prepared, raw_answer: str) -> RagAnswer:
 def answer_question(question: str) -> RagAnswer:
     """Answer from the Ledger. Every [S#] left in the answer maps to a returned source."""
     prepared = prepare(question)
-    if not prepared.chunks:
+    if not prepared.has_sources:
         return finish(prepared, NO_INFO_ANSWER)
     return finish(prepared, _answer_chain().invoke(_prompt_input(prepared)))
 
@@ -195,15 +265,17 @@ def stream_answer(question: str) -> Iterator[dict[str, Any]]:
     event carries the sanitized answer that replaces them, so a citation the
     checker removes never survives.
     """
-    yield {"type": "stage", "stage": "searching"}
+    yield {"type": "stage", "stage": "counting" if wants_figures(question) else "searching"}
     prepared = prepare(question)
-    yield {"type": "sources", "sources": _to_sources(prepared.chunks, prepared.labels, set())}
+    sources = _to_sources(prepared.chunks, prepared.labels, set())
+    yield {"type": "sources", "sources": sources, "figures": _to_figures(prepared, set())}
     parts: list[str] = []
-    if prepared.chunks:
+    if prepared.has_sources:
         yield {"type": "stage", "stage": "writing"}
         for piece in _answer_chain().stream(_prompt_input(prepared)):
             parts.append(piece)
             yield {"type": "delta", "text": piece}
     result = finish(prepared, "".join(parts))
     cited = sorted({source["label"] for source in result["sources"] if source["cited"]})
+    cited += sorted(figure["label"] for figure in result["figures"] if figure["cited"])
     yield {"type": "done", "answer": result["answer"], "status": result["status"], "cited": cited}

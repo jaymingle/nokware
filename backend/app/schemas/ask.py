@@ -35,15 +35,32 @@ class AskSource(BaseModel):
     document_year: int | None  # the year of the document itself
 
 
+class FigureRow(BaseModel):
+    name: str
+    value: str
+
+
+class AskFigure(BaseModel):
+    """A live count of reports residents filed with Nokware: a source, but not a document."""
+
+    label: str  # "R1": the citation label used in the answer text
+    cited: bool
+    description: str  # what was counted, e.g. "Open reports · Solid waste and dumping · Kinka · this month"
+    value: str  # as it may be shown: "12", "fewer than 5", "none"
+    rows: list[FigureRow]  # a breakdown by topic or sub-metro, if asked for
+    counted_at: str
+
+
 class AskResponse(BaseModel):
     answer: str
     status: AnswerStatus
     sources: list[AskSource]
+    figures: list[AskFigure]
 
 
 class StageEvent(BaseModel):
     type: Literal["stage"]
-    stage: Literal["searching", "writing"]
+    stage: Literal["searching", "counting", "writing"]  # counting: searching and counting live report data
 
 
 class SourcesEvent(BaseModel):
@@ -51,6 +68,7 @@ class SourcesEvent(BaseModel):
 
     type: Literal["sources"]
     sources: list[AskSource]
+    figures: list[AskFigure] = []
 
 
 class DeltaEvent(BaseModel):
