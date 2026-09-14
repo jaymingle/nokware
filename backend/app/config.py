@@ -55,10 +55,18 @@ class Settings(BaseSettings):
     # (and retries stalled ingestion). 0 turns the built-in runner off.
     deadline_job_interval_seconds: int = 120
 
-    # Citizen notifications. "log" records each message without sending it; the
-    # Arkesel (SMS) and Twilio (WhatsApp) providers are wired in later.
+    # Citizen notifications. "log" records each message without sending it.
+    # SMS_PROVIDER=arkesel sends SMS through Arkesel; the Twilio (WhatsApp)
+    # provider is wired in later.
     sms_provider: str = "log"
     whatsapp_provider: str = "log"
+    # Arkesel SMS. In sandbox mode (the default) Arkesel accepts each message
+    # without delivering it or spending credits.
+    arkesel_api_key: str = ""
+    arkesel_sender_id: str = ""
+    arkesel_sandbox: bool = True
+    # The most SMS pages (credits) sent in a day outside the sandbox.
+    sms_daily_limit: int = 50
     # Where citizens follow their reports; used in the links messages carry.
     public_site_url: str = "http://localhost:3000"
 

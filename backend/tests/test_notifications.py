@@ -15,7 +15,7 @@ SAFETY = {"$id": "c2", "reference": "M3RD-8WQA", "category": "personal_safety", 
 def test_everyday_messages_name_the_department_and_how_to_follow_up() -> None:
     body = compose(NotificationEvent.SUBMITTED, CIVIC).body
     assert "K7QM-4TXP" in body and "Works" in body and "/report/status" in body
-    assert "escalate it within 14 days" in compose(NotificationEvent.RESOLVED, CIVIC).body
+    assert "Escalate within 14 days" in compose(NotificationEvent.RESOLVED, CIVIC).body
 
 
 @pytest.mark.parametrize("event", list(NotificationEvent))

@@ -121,9 +121,19 @@ so no GPS), numbers are validated and stored apart (`report_contacts.py`),
 and the model's verdict (`report_classifier.py`, 15-second limit) goes through
 the filing rules. Messages (`notifications.py`) go only on submission,
 resolution and escalation, content-neutral for personal safety; each is
-written to the outbox and, until Arkesel and Twilio are wired in
-(`SMS_PROVIDER`, `WHATSAPP_PROVIDER`), recorded as not sent. Numbers are
-deleted by an hourly job 30 days after their case closes.
+written to the outbox, then sent. Numbers are deleted by an hourly job 30 days
+after their case closes.
+
+SMS goes through Arkesel (`sms.py`) when `SMS_PROVIDER=arkesel`; `log`, the
+default, records each message as not sent. Every message fits one SMS page
+(one credit): text is made plain GSM-7 (`sms_text.py`), since one curly
+apostrophe would send it as Unicode at 70 characters a page, and office names
+give way to "2 offices" when they would not fit. `ARKESEL_SANDBOX=true` (the
+default) goes through Arkesel without delivering or spending credits, and the
+case history says so; outside it, `SMS_DAILY_LIMIT` caps the pages sent in a
+day (counted in the API process, so a restart resets it). A provider named but
+missing its settings stops the API at startup. `scripts/sms_balance.py` shows
+the credits left without spending any. WhatsApp (Twilio) is still `log`.
 
 Staff work cases through `app/services/case_actions.py` (under a per-case
 lock, like Ledger documents). What each caller sees is decided in one place

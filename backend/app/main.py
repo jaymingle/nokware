@@ -22,7 +22,7 @@ from app.routes import (
     reports,
     representatives,
 )
-from app.services import scheduler
+from app.services import notifications, scheduler
 from app.services.appwrite_client import quiet_sdk_deprecation_warnings
 from app.services.issue_voices import InvalidVoice, IssueNotFound, purge_expired_voice_names
 from app.services.ledger_documents import utc_now
@@ -57,6 +57,8 @@ show_app_logs()
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    # A messaging provider that is named but missing its settings stops the API here.
+    notifications.check_providers()
     # Documents publish when their clock runs out, without cron: the deadline
     # job runs in this process every DEADLINE_JOB_INTERVAL_SECONDS.
     task = scheduler.start(settings.deadline_job_interval_seconds, run_deadline_job, "Deadline job")
