@@ -6,10 +6,10 @@ import { EscalateForm } from "@/components/report/escalate-form";
 import { Card, CardContent } from "@/components/ui/card";
 import { STAGES, stageLabels, stageOf, statusTag } from "@/lib/report/status";
 import { joinNames } from "@/lib/text";
-import { formatDate } from "@/lib/time";
+import { formatDate, formatDateTime } from "@/lib/time";
 import { cn } from "@/lib/utils";
 
-import type { ReportStatus } from "@/lib/api/types";
+import type { LocationViewNote, ReportStatus } from "@/lib/api/types";
 
 function Steps({ status }: { status: ReportStatus }) {
   const labels = stageLabels(status.private);
@@ -97,11 +97,24 @@ export function CivicStatus({ status }: { status: ReportStatus }) {
   );
 }
 
+/** Each time a service opened the location the citizen shared: they gave it for a reason and should know it was used. */
+function LocationViews({ views }: { views: LocationViewNote[] }) {
+  if (views.length === 0) return null;
+  return (
+    <ul className="flex flex-col gap-1.5 rounded-lg bg-paper-subtle px-3.5 py-3 text-[13.5px]" data-testid="status-location-views">
+      {views.map((view) => (
+        <li key={view.at}>Your location was viewed by {view.by} on {formatDateTime(view.at)}.</li>
+      ))}
+    </ul>
+  );
+}
+
 /** A personal-safety report: how far along it is, and nothing else. Anyone with the reference can open this. */
 export function PrivateStatus({ status }: { status: ReportStatus }) {
   return (
     <StatusFrame status={status}>
       <p className="text-[13.5px] text-ink-soft">This page shows only how far along the case is. Nothing about what was reported appears here.</p>
+      <LocationViews views={status.location_views ?? []} />
       {status.escalate_until ? (
         <EscalateForm reference={status.reference} until={status.escalate_until} intro="Not satisfied with how this was handled? You can ask for a review." action="Ask for a review" />
       ) : null}

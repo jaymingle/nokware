@@ -4,6 +4,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient, type QueryClie
 
 import {
   getCase,
+  openSharedLocation,
   getCaseOversight,
   getCaseQueue,
   getCategories,
@@ -22,7 +23,7 @@ import {
 
 import { anyPublishingNow } from "@/lib/documents";
 
-import type { CaseAction, CaseDetail, DocumentOut, ReviewAction } from "@/lib/api/types";
+import type { CaseAction, CaseDetail, DocumentOut, ReviewAction, SharedLocationView } from "@/lib/api/types";
 
 export const LIBRARY_PAGE_SIZE = 25;
 const QUEUE_REFRESH_MS = 60_000; // keeps queues current as clocks run out elsewhere
@@ -160,5 +161,14 @@ export function useCaseAction() {
       queryClient.setQueryData(queryKeys.case(detail.case_id), detail);
       return queryClient.invalidateQueries({ queryKey: ["cases"] });
     },
+  });
+}
+
+/** Opening a shared location is an act, not a read: it goes to the audit trail, so the case is refetched after. */
+export function useOpenLocation() {
+  const queryClient = useQueryClient();
+  return useMutation<SharedLocationView, Error, string>({
+    mutationFn: openSharedLocation,
+    onSuccess: (_, id) => queryClient.invalidateQueries({ queryKey: queryKeys.case(id) }),
   });
 }

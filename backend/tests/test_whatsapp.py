@@ -23,6 +23,8 @@ from app.services import (
     report_intake,
     whatsapp,
     whatsapp_conversation,
+    whatsapp_reply,
+    whatsapp_safety,
 )
 from app.services.channel_intent import Intent, Reading
 from app.services.citizen_reports import IntakeChannel, NotificationChannel, NotificationEvent
@@ -169,7 +171,7 @@ def test_the_status_callback_records_delivery_and_falls_back_on_the_window_error
 @pytest.fixture
 def chat(monkeypatch: pytest.MonkeyPatch, redis_server: fakeredis.FakeRedis) -> list[str]:
     replies: list[str] = []
-    monkeypatch.setattr(whatsapp_conversation, "reply", lambda number, text: replies.append(text))
+    monkeypatch.setattr(whatsapp_reply, "reply", lambda number, text: replies.append(text))
     return replies
 
 
@@ -285,12 +287,13 @@ def test_personal_safety_gets_every_number_first_and_only_a_sub_metro_question(m
     assert first.index("0800 800 800") < first.index("Which sub-metro are you in?")  # the numbers come before any question
     assert "electoral area" not in first and "Assembly Member" not in first
     say("2")  # Okaikoi South
-    assert chat[-1].startswith("Ready to send your report.")
+    assert chat[-1].startswith("Ready to send your report to Ghana Police Service and Social Welfare. You can send photos first: only they will see them.")
     say("1")
     submission = filed[0][0]
     assert (submission.ward, submission.sub_metro, submission.whatsapp) == (None, "okaikoi-south", NUMBER)
     receipt = chat[-1]
-    assert receipt.startswith("Your reference is *M3RD-8WQA*.") and "Reply *YES*" in receipt
+    assert receipt.startswith("This has gone to Ghana Police Service and Social Welfare. Your reference is *M3RD-8WQA*.")
+    assert "*CALL*" in receipt and "*PLACE*" in receipt and "*YES*" in receipt and "Assembly" not in receipt
     say("yes")
     assert chosen == [("M3RD-8WQA", "one-time", True)] and chat[-1] == "Updates are on for M3RD-8WQA."
 
@@ -351,11 +354,89 @@ def test_replies_go_by_twilio_in_pieces_of_1600(monkeypatch: pytest.MonkeyPatch)
             sent.append(body)
             return "SM"
 
-    monkeypatch.setattr(whatsapp_conversation, "provider_for", lambda channel: Provider() if channel == NotificationChannel.WHATSAPP else None)
-    whatsapp_conversation.reply(NUMBER, "\n\n".join("word " * 100 for _ in range(6)))
+    monkeypatch.setattr(whatsapp_reply, "provider_for", lambda channel: Provider() if channel == NotificationChannel.WHATSAPP else None)
+    whatsapp_reply.reply(NUMBER, "\n\n".join("word " * 100 for _ in range(6)))
     assert len(sent) == 2 and all(len(piece) <= 1600 for piece in sent)
 
 
 def test_thanks_gets_no_reply(chat: list[str]) -> None:
     say("Thank you!")
     assert chat == []
+
+
+@pytest.fixture
+def filed_safety(monkeypatch: pytest.MonkeyPatch, chat: list[str]) -> dict[str, Any]:
+    """A personal-safety report just filed on WhatsApp; the contact record and Twilio's log faked."""
+    _reads(monkeypatch, "report")
+    _filing(monkeypatch, SAFETY, token="one-time", topic="abuse")
+    effects: dict[str, Any] = {"contact": {}, "shared": [], "deleted": [], "removed": True}
+    monkeypatch.setattr(whatsapp_safety, "update_contact", lambda case_id, changes: effects["contact"].update(changes))
+    monkeypatch.setattr(whatsapp_safety.report_locations, "share", lambda *args: effects["shared"].append(args[:4]))
+    monkeypatch.setattr(whatsapp_safety.report_locations, "remove", lambda case_id: effects["removed"])
+
+    class FakeTwilio:
+        def delete_message(self, sid: str) -> None:
+            effects["deleted"].append(sid)
+
+    monkeypatch.setattr(whatsapp_safety, "twilio", lambda: FakeTwilio())
+    say("My husband beats me every night")
+    say("0")
+    say("1")
+    return effects
+
+
+def test_call_lets_the_responders_phone_and_is_apart_from_updates(filed_safety: dict[str, Any], chat: list[str]) -> None:
+    say("CALL")
+    assert filed_safety["contact"] == {"callbackConsent": True}
+    assert chat[-1] == "Done. Ghana Police Service or Social Welfare may phone you on this number about this report."
+
+
+def test_place_takes_a_pin_stores_it_apart_and_deletes_the_message_from_twilio(filed_safety: dict[str, Any], chat: list[str]) -> None:
+    say("PLACE")
+    assert "location button" in chat[-1] and "never the MCE" in chat[-1] and "deleted 30 days after" in chat[-1]
+    whatsapp_conversation.handle(Inbound(NUMBER, "", None, "SM-pin", latitude=5.567, longitude=-0.235, place="Kaneshie clinic"))
+    assert filed_safety["shared"] == [("c2", "Kaneshie clinic", 5.567, -0.235)] and filed_safety["deleted"] == ["SM-pin"]
+    assert chat[-1].startswith("Saved. Only the Police and Social Welfare handling your report can see it")
+    assert "Kaneshie" not in str(channel_sessions.load("whatsapp", NUMBER))  # never kept in Redis
+
+
+def test_place_takes_a_typed_address_or_can_be_left(filed_safety: dict[str, Any], chat: list[str]) -> None:
+    say("PLACE")
+    say("0")
+    assert chat[-1] == "No location was shared." and not filed_safety["shared"]
+    say("PLACE")
+    say("House 12, behind the market clinic")
+    assert filed_safety["shared"] == [("c2", "House 12, behind the market clinic", None, None)]
+
+
+def test_remove_confirms_only_when_the_location_is_gone(filed_safety: dict[str, Any], chat: list[str]) -> None:
+    say("REMOVE")
+    assert chat[-1] == "Your location has been deleted. The Police and Social Welfare can no longer see it."
+    filed_safety["removed"] = False
+    say("remove")
+    assert "couldn't be deleted" in chat[-1]
+
+
+def test_after_the_hour_the_choices_are_gone(filed_safety: dict[str, Any], chat: list[str], monkeypatch: pytest.MonkeyPatch) -> None:
+    channel_sessions.clear("whatsapp", NUMBER)  # the hour's state has expired
+    _reads(monkeypatch, "unclear")
+    say("CALL")
+    assert chat[-1] == ASK_KIND and filed_safety["contact"] == {}
+
+
+def test_a_location_from_whatsapps_button_arrives_as_a_pin(monkeypatch: pytest.MonkeyPatch) -> None:
+    _settings(monkeypatch)
+    handled: list[Inbound] = []
+    monkeypatch.setattr(whatsapp_conversation, "handle", handled.append)
+    form = {"From": f"whatsapp:{NUMBER}", "Body": "", "MessageSid": "SM-loc", "NumMedia": "0",
+            "Latitude": "5.567", "Longitude": "-0.235", "Address": "Kaneshie clinic"}
+    assert _signed_post(TestClient(app), "/api/channels/whatsapp", form).status_code == 200
+    assert (handled[0].latitude, handled[0].longitude, handled[0].place) == (5.567, -0.235, "Kaneshie clinic")
+
+
+def test_someone_ill_gets_the_ambulance_numbers_and_nothing_is_filed(monkeypatch: pytest.MonkeyPatch, chat: list[str]) -> None:
+    _reads(monkeypatch, "medical")
+    monkeypatch.setattr(report_intake, "submit", lambda *args: pytest.fail("filed"))
+    say("My father has collapsed and isn't breathing properly")
+    assert chat[-1].startswith("This isn't something the Assembly can act on") and "193" in chat[-1]
+    assert channel_sessions.load("whatsapp", NUMBER) is None

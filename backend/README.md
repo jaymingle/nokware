@@ -144,9 +144,32 @@ reporting lines (marked, as everywhere, as reported via X and not
 independently verified), the Helpline of Hope and Social Welfare (the
 citizen's sub-metro desk, or every desk, and the head office). The web and
 WhatsApp show the full list; an SMS or a USSD screen, which can't hold it,
-gives two numbers per service and points to the contacts page. A
-personal-safety SMS never carries numbers: it says only the reference. Safety
-reporters are never pointed to an Assembly Member.
+gives two numbers per service and points to `/contacts/emergency`, a page of
+emergency numbers only (no "Who represents you": safety reporters are never
+pointed to an Assembly Member, an elected politician who in a small area may
+know the abuser). A personal-safety SMS never carries numbers: it says only the
+reference. A road accident is a public-safety report to the Police with Police
+and ambulance numbers. A medical emergency (someone ill or hurt, no one else
+involved) isn't the Assembly's to act on: WhatsApp and USSD (menu 4) say so
+plainly, file nothing, and give the ambulance numbers.
+
+A precise location (`report_locations.py`) is the one exception to the
+coarse-location rule, and only on the citizen's explicit opt-in. After a
+personal-safety report is filed on WhatsApp, the receipt names who has it and
+offers, for an hour, CALL (the responders may phone; apart from updates),
+PLACE (say exactly where they are, so help can come), REMOVE and YES
+(updates). A location, a pin or a typed address, goes straight into the
+citizen's contact record, encrypted, never through Redis; the message that
+carried it is deleted from Twilio's log; and it is deleted with the numbers 30
+days after the case closes, or at once on REMOVE, which is confirmed only after
+a fresh read shows it gone. Only a Police or Social Welfare account actively on
+that case can open it (`GET /api/cases/{id}/location`), never the MCE or another
+department, even after a reassignment. The case page says a location exists;
+each opening is a deliberate act recorded in the audit trail (the service and
+the time, never the place), and the citizen's status page says "Your location
+was viewed by Ghana Police Service on ...". USSD offers CALL but not a location:
+an address can't practically be typed on a keypad. Run
+`scripts/add_exact_location.py --yes` before an API with this code takes one.
 
 Callbacks from the providers (`app/routes/channels.py`) are verified before
 they are trusted. Arkesel signs SMS and Voice callbacks, and

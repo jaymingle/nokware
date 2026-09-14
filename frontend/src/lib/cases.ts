@@ -52,6 +52,9 @@ const EVENT_LABELS: Record<string, string> = {
   reclassified: "Refiled",
   notified: "Message to the citizen",
   contact_deleted: "The citizen's numbers were deleted",
+  location_shared: "The citizen shared a precise location",
+  location_viewed: "The shared location was viewed",
+  location_removed: "The citizen removed the location they shared",
 };
 
 /** What an audit entry says: its note, or a plain label for the step. */

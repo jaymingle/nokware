@@ -111,6 +111,7 @@ def test_the_mce_reopens_or_confirms_an_escalated_case(fake: Fake) -> None:
 def test_recipients_see_everything_and_the_mce_sees_a_safety_case_only_in_outline(
     fake: Fake, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    monkeypatch.setattr(case_presenters.report_locations, "contact_for", lambda case_id: None)  # no location shared
     monkeypatch.setattr(case_presenters.case_history, "entries_for", lambda case_id: [
         {"action": "classified", "actorName": "Nokware", "actorRole": "system", "note": "Filed by the citizen as personal safety: Sexual violence.", "timestamp": NOW.isoformat()},
     ])

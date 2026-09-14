@@ -30,7 +30,8 @@ def test_an_everyday_case_shows_what_where_who_and_the_resolution() -> None:
     assert view["escalate_until"] == (NOW - timedelta(days=2) + timedelta(days=14)).isoformat()
 
 
-def test_a_personal_safety_case_shows_only_how_far_along_it_is() -> None:
+def test_a_personal_safety_case_shows_only_how_far_along_it_is(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(report_followups.report_locations, "views", lambda case_id: [])
     view = public_status(SAFETY, [], NOW)
     assert view["private"] and view["stage"] == "in_progress"
     for hidden in ("topic", "recipients", "ward", "sub_metro", "resolution_notes", "status", "description"):

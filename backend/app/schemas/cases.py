@@ -64,6 +64,17 @@ class CaseDetail(CaseSummary):
     assignments: list[CaseAssignment]
     history: list[CaseEvent]
     voice_names: list[str] | None  # names residents gave with their voices; the handling department only
+    # When a personal-safety reporter shared a precise location: for the Police or Social Welfare handling it only.
+    location_shared_at: str | None = None
+
+
+class SharedLocationView(BaseModel):
+    """A shared location, opened on purpose. The view is recorded and the citizen is told."""
+
+    address: str | None
+    latitude: float | None
+    longitude: float | None
+    shared_at: str
 
 
 class CaseQueue(BaseModel):

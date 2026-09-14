@@ -8,6 +8,8 @@
     POST /api/cases/{id}/reassign             the MCE moves a recipient's part (reason required)
     POST /api/cases/{id}/reopen               the MCE sends an escalated case back (note required)
     POST /api/cases/{id}/confirm-resolution   the MCE upholds an escalated case's resolution (note required)
+    GET  /api/cases/{id}/location             a shared precise location: Police or Social Welfare on the case only;
+                                              each view is recorded, and the citizen sees it on their status page
 """
 
 from typing import Annotated
@@ -16,9 +18,9 @@ from fastapi import APIRouter, BackgroundTasks, Depends
 
 from app.dependencies import require_roles
 from app.routes.case_presenters import detail, summary
-from app.schemas.cases import CaseDetail, CaseOversight, CaseQueue, NoteRequest, OversightStats, ReassignRequest
+from app.schemas.cases import CaseDetail, CaseOversight, CaseQueue, NoteRequest, OversightStats, ReassignRequest, SharedLocationView
 from app.schemas.documents import Option
-from app.services import case_actions, case_queries
+from app.services import case_actions, case_queries, report_locations
 from app.services.auth import Principal, Role
 from app.services.case_actions import Outcome
 from app.services.case_workflow import CaseView, Reassignment, case_view
@@ -95,3 +97,16 @@ def reopen(principal: Mce, case_id: str, request: NoteRequest, tasks: Background
 def confirm_resolution(principal: Mce, case_id: str, request: NoteRequest, tasks: BackgroundTasks) -> CaseDetail:
     outcome = case_actions.confirm_resolution(principal, case_id, request.note.strip() or None, utc_now())
     return _after(principal, outcome, tasks)
+
+
+@router.get("/{case_id}/location", response_model=SharedLocationView)
+def shared_location(principal: Recipient, case_id: str) -> SharedLocationView:
+    """Opened on purpose, never listed: the view goes to the audit trail and to the citizen's status page."""
+    found = case_queries.load(case_id)
+    if found is None or case_view(principal, found[0]) == CaseView.NONE:
+        raise CaseNotFound(case_id)
+    try:
+        shared = report_locations.open_location(principal, *found)
+    except report_locations.NoLocation:
+        raise CaseNotFound(case_id) from None
+    return SharedLocationView(address=shared.address, latitude=shared.latitude, longitude=shared.longitude, shared_at=shared.shared_at)

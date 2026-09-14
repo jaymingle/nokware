@@ -33,6 +33,9 @@ class CaseHistoryAction(StrEnum):
     RECLASSIFIED = "reclassified"  # a person changed the category, e.g. out of personal safety
     NOTIFIED = "notified"  # "SMS sent", never the number
     CONTACT_DELETED = "contact_deleted"
+    LOCATION_SHARED = "location_shared"  # a personal-safety reporter chose to share where they are; never the place
+    LOCATION_VIEWED = "location_viewed"  # a responder opened it: the service and the time, shown to the citizen
+    LOCATION_REMOVED = "location_removed"
 
 
 class ActorRole(StrEnum):

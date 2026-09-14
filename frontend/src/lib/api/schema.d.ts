@@ -529,6 +529,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/cases/{case_id}/location": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Shared Location
+         * @description Opened on purpose, never listed: the view goes to the audit trail and to the citizen's status page.
+         */
+        get: operations["shared_location_api_cases__case_id__location_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/dashboard": {
         parameters: {
             query?: never;
@@ -608,6 +628,90 @@ export interface paths {
         put?: never;
         /** Add Voice */
         post: operations["add_voice_api_issues__public_id__voices_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/channels/sms/delivery": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Sms Delivery
+         * @description Record whether an SMS reached the phone. Unsigned, stale or forged reports are refused.
+         *
+         *     A report is idempotent (it sets the row's delivery status), so a repeat of a
+         *     valid one changes nothing and needs no duplicate check.
+         */
+        get: operations["sms_delivery_api_channels_sms_delivery_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/channels/ussd/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ussd Session
+         * @description The next screen. Arkesel doesn't sign USSD callbacks yet, so the URL's secret is the only check:
+         *     a wrong one looks like no route at all.
+         */
+        post: operations["ussd_session_api_channels_ussd__token__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/channels/whatsapp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Whatsapp Message
+         * @description Twilio gets an empty answer at once; the reply (an answer can take 13 seconds) follows by the API.
+         */
+        post: operations["whatsapp_message_api_channels_whatsapp_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/channels/whatsapp/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Whatsapp Status
+         * @description A WhatsApp message's delivery; one refused because WhatsApp's window had closed goes by SMS instead.
+         */
+        post: operations["whatsapp_status_api_channels_whatsapp_status_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -843,6 +947,8 @@ export interface components {
             history: components["schemas"]["CaseEvent"][];
             /** Voice Names */
             voice_names: string[] | null;
+            /** Location Shared At */
+            location_shared_at?: string | null;
         };
         /** CaseEvent */
         CaseEvent: {
@@ -1226,6 +1332,13 @@ export interface components {
          * @enum {string}
          */
         LedgerStatus: "held" | "published" | "disputed" | "withdrawn";
+        /** LocationViewNote */
+        LocationViewNote: {
+            /** By */
+            by: string;
+            /** At */
+            at: string;
+        };
         /** MeResponse */
         MeResponse: {
             /** User Id */
@@ -1420,6 +1533,8 @@ export interface components {
             contacts?: components["schemas"]["PublicContact"][];
             /** Voices */
             voices?: number | null;
+            /** Location Views */
+            location_views?: components["schemas"]["LocationViewNote"][];
         };
         /** Representation */
         Representation: {
@@ -1468,6 +1583,20 @@ export interface components {
             name: string;
             /** Contacts */
             contacts: components["schemas"]["PublicContact"][];
+        };
+        /**
+         * SharedLocationView
+         * @description A shared location, opened on purpose. The view is recorded and the citizen is told.
+         */
+        SharedLocationView: {
+            /** Address */
+            address: string | null;
+            /** Latitude */
+            latitude: number | null;
+            /** Longitude */
+            longitude: number | null;
+            /** Shared At */
+            shared_at: string;
         };
         /**
          * SourceType
@@ -1546,6 +1675,31 @@ export interface components {
             label: string;
             /** Count */
             count: number | null;
+        };
+        /**
+         * UssdRequest
+         * @description Arkesel's USSD callback, as its sample application reads it.
+         */
+        UssdRequest: {
+            /** Sessionid */
+            sessionID: string;
+            /**
+             * Userid
+             * @default
+             */
+            userID: string;
+            /**
+             * Newsession
+             * @default false
+             */
+            newSession: boolean;
+            /** Msisdn */
+            msisdn: string;
+            /**
+             * Userdata
+             * @default
+             */
+            userData: string;
         };
         /** ValidationError */
         ValidationError: {
@@ -2447,6 +2601,37 @@ export interface operations {
             };
         };
     };
+    shared_location_api_cases__case_id__location_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SharedLocationView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     dashboard_api_dashboard_get: {
         parameters: {
             query?: never;
@@ -2583,6 +2768,107 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sms_delivery_api_channels_sms_delivery_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: boolean;
+                    };
+                };
+            };
+        };
+    };
+    ussd_session_api_channels_ussd__token__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UssdRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    whatsapp_message_api_channels_whatsapp_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    whatsapp_status_api_channels_whatsapp_status_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: boolean;
+                    };
                 };
             };
         };

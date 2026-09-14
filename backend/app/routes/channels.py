@@ -107,7 +107,16 @@ def _inbound(form: dict[str, str]) -> whatsapp_conversation.Inbound | None:
     media = None
     if form.get("NumMedia", "0") != "0" and form.get("MediaUrl0"):
         media = whatsapp_conversation.Media(form["MediaUrl0"], form.get("MediaContentType0", ""))
-    return whatsapp_conversation.Inbound(number, form.get("Body", ""), media, form.get("MessageSid", ""))
+    latitude, longitude = _coordinate(form.get("Latitude")), _coordinate(form.get("Longitude"))
+    place = form.get("Address") or form.get("Label") or None
+    return whatsapp_conversation.Inbound(number, form.get("Body", ""), media, form.get("MessageSid", ""), latitude, longitude, place)
+
+
+def _coordinate(value: str | None) -> float | None:
+    try:
+        return float(value) if value else None
+    except ValueError:
+        return None
 
 
 @router.post("/whatsapp")

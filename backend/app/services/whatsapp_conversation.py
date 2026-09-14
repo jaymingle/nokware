@@ -28,12 +28,11 @@ from app.config import get_settings
 from app.services import channel_limits, channel_sessions, report_followups, report_intake, report_store
 from app.contacts import EMERGENCY_TOPICS
 from app.services.channel_answers import for_chat
-from app.services.channel_contacts import numbers_text
+from app.services.channel_contacts import medical_text, numbers_text
 from app.services.channel_intent import Intent, read_message
 from app.services.channel_status import status_text
-from app.services.citizen_reports import MAX_PHOTOS, IntakeChannel, NotificationChannel
+from app.services.citizen_reports import MAX_PHOTOS, IntakeChannel
 from app.services.ledger_documents import utc_now
-from app.services.notifications import provider_for
 from app.services.rag import AnswerLength, answer_question
 from app.services.redis_store import get_redis, key, subject_key
 from app.services.report_contacts import InvalidNumber, masked
@@ -41,15 +40,14 @@ from app.services.report_intake import DESCRIPTION_MIN, Receipt, ReportSubmissio
 from app.services.report_photos import PhotoRejected, clean_photo
 from app.services.report_rules import Classification, ClassificationMethod, InvalidReport
 from app.services.report_taxonomy import Category
-from app.services.whatsapp import WhatsAppError, WhatsAppNotConfigured, first_delivery, open_window, split, twilio
-from app.services.workflow import NotAllowed
+from app.services import whatsapp_reply, whatsapp_safety
+from app.services.whatsapp import WhatsAppError, WhatsAppNotConfigured, first_delivery, open_window, twilio
 from app.teams import short_name
 from app.wards import find_ward, sub_metros, ward_mentioned, wards
 
 logger = logging.getLogger(__name__)
 
 DRAFT_SECONDS = 15 * 60
-UPDATES_SECONDS = 60 * 60  # the one-time updates choice after a safety filing: an hour, as on the web
 PHOTO_TYPES = frozenset({"image/jpeg", "image/png", "image/webp"})
 EMERGENCY_ABOVE = "If you need help now, the numbers above are there to try."
 HELP = (
@@ -74,22 +72,12 @@ class Inbound:
     text: str
     media: Media | None
     message_sid: str
+    latitude: float | None = None  # a location sent with WhatsApp's location button
+    longitude: float | None = None
+    place: str | None = None  # the place name or address WhatsApp sent with the pin
 
 
 State = dict[str, Any]
-
-
-def reply(number: str, text: str) -> None:
-    """Send a reply in the chat (the citizen just wrote, so the 24-hour window is open)."""
-    provider = provider_for(NotificationChannel.WHATSAPP)
-    if provider is None:
-        logger.info("WhatsApp reply to %s not sent (no provider is configured): %s", masked(number), text)
-        return
-    try:
-        for piece in split(text):  # WhatsApp takes 1,600 characters a message
-            provider.send(number, piece)
-    except WhatsAppError:
-        logger.exception("WhatsApp reply to %s failed", masked(number))
 
 
 def _site() -> str:
@@ -155,7 +143,9 @@ def _confirm_question(number: str, state: State) -> str:
     photos = get_redis().llen(_photos_key(number))
     with_photos = f" with {photos} photo{'s' if photos != 1 else ''}" if photos else ""
     if _private(state):
-        return f"Ready to send your report{with_photos}.\nReply *1* to send it or *2* to cancel. You can send photos first."
+        who = " and ".join(short_name(r) for r in state["filed"]["recipients"])
+        return (f"Ready to send your report{with_photos} to {who}. You can send photos first: only they will see them.\n"
+                "Reply *1* to send it or *2* to cancel.")
     place = wards()[state["ward"]].name
     return f"Ready to file your report about {place}{with_photos}.\nReply *1* to file it or *2* to cancel. You can send photos first."
 
@@ -180,7 +170,7 @@ def _prompt(number: str, state: State) -> None:
         numbers, state = numbers_text(state["filed"]["topic"], state.get("sub_metro")), {**state, "numbers_sent": True}
     channel_sessions.save("whatsapp", number, state, DRAFT_SECONDS)
     get_redis().expire(_photos_key(number), DRAFT_SECONDS)
-    reply(number, "\n\n".join(part for part in (numbers, question) if part))
+    whatsapp_reply.reply(number, "\n\n".join(part for part in (numbers, question) if part))
 
 
 def _with_description(state: State, text: str) -> State:
@@ -198,16 +188,13 @@ def start_report(inbound: Inbound) -> None:
     if inbound.media:
         problem = _keep_photo(inbound.number, inbound.media)
         if problem:
-            reply(inbound.number, problem)
+            whatsapp_reply.reply(inbound.number, problem)
     text = inbound.text.strip()
     _prompt(inbound.number, _with_description({}, text) if len(text) >= DESCRIPTION_MIN else {})
 
 
 def _receipt_text(receipt: Receipt) -> str:
     case = receipt.case
-    if case["isSensitive"]:
-        wanted = "\nReply *YES* within the hour if you want updates here. They never say what the report is about." if receipt.preferences_token else ""
-        return f"Your reference is *{case['reference']}*. {EMERGENCY_ABOVE}{wanted}"
     who = " and ".join(short_name(r) for r in case["recipients"])
     emergency = f"\n{EMERGENCY_ABOVE}" if case["topic"] in EMERGENCY_TOPICS else ""
     return (f"Filed. Your reference is *{case['reference']}*.\nIt is with {who}. We'll message you here when it's resolved."
@@ -217,7 +204,7 @@ def _receipt_text(receipt: Receipt) -> str:
 def _file(number: str, state: State) -> None:
     if not channel_limits.REPORTS.allow(number, utc_now().timestamp()):
         _drop_draft(number)
-        reply(number, "You've filed several reports this hour. Please try again later.")
+        whatsapp_reply.reply(number, "You've filed several reports this hour. Please try again later.")
         return
     private = _private(state)
     submission = ReportSubmission(
@@ -228,33 +215,33 @@ def _file(number: str, state: State) -> None:
     try:
         receipt = report_intake.submit(submission, draft_photos(number), utc_now(), _classification(state))
     except (InvalidReport, InvalidNumber, PhotoRejected) as error:
-        reply(number, f"{error} Reply *2* to cancel.")
+        whatsapp_reply.reply(number, f"{error} Reply *2* to cancel.")
         return
     _drop_draft(number)
-    if receipt.case["isSensitive"] and receipt.preferences_token:
-        updates = {"step": "updates", "reference": receipt.case["reference"], "token": receipt.preferences_token}
-        channel_sessions.save("whatsapp", number, updates, UPDATES_SECONDS)
-    reply(number, _receipt_text(receipt))
+    if receipt.case["isSensitive"]:
+        whatsapp_safety.after_filing(number, receipt)  # who has it, and CALL, PLACE and YES for an hour
+    else:
+        whatsapp_reply.reply(number, _receipt_text(receipt))
 
 
 def answer(number: str, question: str) -> None:
     if not channel_limits.QUESTIONS.allow(number, utc_now().timestamp()):
-        reply(number, "You've asked a lot of questions this hour. Please try again later.")
+        whatsapp_reply.reply(number, "You've asked a lot of questions this hour. Please try again later.")
         return
-    reply(number, for_chat(answer_question(question, AnswerLength.CHAT), _site()))
+    whatsapp_reply.reply(number, for_chat(answer_question(question, AnswerLength.CHAT), _site()))
 
 
 def status(number: str, reference: str) -> None:
     if not channel_limits.LOOKUPS.allow(number, utc_now().timestamp()):
-        reply(number, "Too many lookups this hour. Please try again later.")
+        whatsapp_reply.reply(number, "Too many lookups this hour. Please try again later.")
         return
     try:
         case = report_followups.find(reference)
     except report_followups.CaseNotFound:
-        reply(number, f"No case has the reference {reference}. Check it and send it again.")
+        whatsapp_reply.reply(number, f"No case has the reference {reference}. Check it and send it again.")
         return
     found = report_followups.public_status(case, report_store.assignments_for(case["$id"]), utc_now())
-    reply(number, status_text(found, _site()))
+    whatsapp_reply.reply(number, status_text(found, _site()))
 
 
 def _sub_metro_named(text: str) -> str | None:
@@ -285,10 +272,10 @@ def _draft_step(inbound: Inbound, state: State) -> bool:
     number, text, step = inbound.number, inbound.text.strip(), state["step"]
     problem = _keep_photo(number, inbound.media) if inbound.media else None
     if problem:
-        reply(number, problem)
+        whatsapp_reply.reply(number, problem)
     if text.lower() == "cancel" or (step in ("area", "confirm") and text in ("0", "2")):
         _drop_draft(number)
-        reply(number, CANCELLED)
+        whatsapp_reply.reply(number, CANCELLED)
     elif step == "confirm" and text == "1":
         _file(number, state)
     elif step == "describe" and len(text) >= DESCRIPTION_MIN:
@@ -296,7 +283,7 @@ def _draft_step(inbound: Inbound, state: State) -> bool:
     elif step in ("area", "sub_metro") and text:
         placed = _place_reply(state, text)
         if isinstance(placed, str):
-            reply(number, placed)
+            whatsapp_reply.reply(number, placed)
         else:
             _prompt(number, placed)
     else:
@@ -318,25 +305,9 @@ def _kind_step(inbound: Inbound, state: State) -> bool:
     return True
 
 
-def _updates_step(inbound: Inbound, state: State) -> bool:
-    """YES turns on updates for a personal-safety report; anything else leaves them off."""
-    channel_sessions.clear("whatsapp", inbound.number)
-    wanted = inbound.text.strip().lower() in ("yes", "y")
-    if not wanted and inbound.text.strip().lower() not in ("no", "n"):
-        return False
-    try:
-        choice = report_followups.Preferences(notify=wanted, callback_consent=False)
-        report_followups.set_preferences(state["reference"], state["token"], choice, utc_now())
-    except NotAllowed:
-        reply(inbound.number, "That choice can't be changed now.")
-        return True
-    reply(inbound.number, f"Updates are on for {state['reference']}." if wanted else "No updates will be sent.")
-    return True
-
-
 STEPS: dict[str, Callable[[Inbound, State], bool]] = {
     "describe": _draft_step, "area": _draft_step, "sub_metro": _draft_step, "confirm": _draft_step,
-    "kind": _kind_step, "updates": _updates_step,
+    "kind": _kind_step, "after": whatsapp_safety.after_step, "place": whatsapp_safety.place_step,
 }
 
 
@@ -348,13 +319,15 @@ def _fresh(inbound: Inbound) -> None:
         answer(inbound.number, inbound.text.strip())
     elif reading.intent == Intent.REPORT:
         start_report(inbound)
+    elif reading.intent == Intent.MEDICAL:
+        whatsapp_reply.reply(inbound.number, medical_text())
     elif reading.intent == Intent.THANKS:
         return  # "thanks" or "ok" needs no reply, and every reply costs money
     elif reading.intent == Intent.UNCLEAR:
         channel_sessions.save("whatsapp", inbound.number, {"step": "kind", "text": inbound.text.strip()}, DRAFT_SECONDS)
-        reply(inbound.number, ASK_KIND)
+        whatsapp_reply.reply(inbound.number, ASK_KIND)
     else:
-        reply(inbound.number, HELP)
+        whatsapp_reply.reply(inbound.number, HELP)
 
 
 def _media_problem(media: Media | None) -> str | None:
@@ -373,11 +346,11 @@ def handle(inbound: Inbound) -> None:
     try:
         problem = _media_problem(inbound.media)
         if problem:
-            reply(inbound.number, problem)
+            whatsapp_reply.reply(inbound.number, problem)
             return
         state = channel_sessions.load("whatsapp", inbound.number)
         if not (state and STEPS[state["step"]](inbound, state)):
             _fresh(inbound)
     except Exception:
         logger.exception("A WhatsApp message from %s couldn't be handled", masked(inbound.number))
-        reply(inbound.number, "Sorry, something went wrong. Please try again.")
+        whatsapp_reply.reply(inbound.number, "Sorry, something went wrong. Please try again.")

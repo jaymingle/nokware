@@ -83,10 +83,6 @@ class TwilioWhatsApp:
             raise WhatsAppError(f"Twilio refused the message ({response.status_code}, code {payload.get('code')}): {payload.get('message', '')[:200]}")
         return str(payload.get("sid", ""))
 
-    def send_text(self, to: str, text: str) -> list[str]:
-        """A reply of any length, as as many messages as it takes."""
-        return [self.send(to, piece) for piece in split(text)]
-
     def download(self, url: str) -> tuple[bytes, str]:
         """An incoming media file and its content type (Twilio's link redirects to storage)."""
         response = self.client.get(url, auth=(self.account_sid, self.auth_token), follow_redirects=True)
@@ -94,6 +90,14 @@ class TwilioWhatsApp:
         if len(response.content) > MEDIA_MAX_BYTES:
             raise WhatsAppError("The file is larger than 10 MB.")
         return response.content, response.headers.get("content-type", "")
+
+    def delete_message(self, message_sid: str) -> None:
+        """Remove an incoming message from Twilio's log (one that carried a location). Logged, not raised, on failure."""
+        url = f"{API}/Accounts/{self.account_sid}/Messages/{message_sid}.json"
+        try:
+            self.client.delete(url, auth=(self.account_sid, self.auth_token)).raise_for_status()
+        except httpx.HTTPError as error:
+            logger.warning("Couldn't delete a WhatsApp message from Twilio's log (%s)", type(error).__name__)
 
     def delete_media(self, url: str) -> None:
         """Remove an incoming file from Twilio once it has been used. A failure is logged, not raised."""

@@ -3,7 +3,7 @@
 from typing import Any
 
 from app.schemas.cases import CaseAssignment, CaseDetail, CaseEvent, CaseSummary, Contact
-from app.services import case_history, issue_voices
+from app.services import case_history, issue_voices, report_locations
 from app.services.case_history import CaseHistoryAction
 from app.services.auth import Principal
 from app.services.case_workflow import CaseView, allowed_case_actions, assignment_for, case_view, may_see_contact
@@ -99,4 +99,5 @@ def detail(principal: Principal, case: dict[str, Any], assignments: list[dict[st
         assignments=[_assignment(a, full) for a in assignments],
         history=history,
         voice_names=_voice_names(principal, case, assignments),
+        location_shared_at=report_locations.shared_at(principal, case, assignments) if full else None,
     )

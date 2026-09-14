@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 from app.main import app
 from app.routes import case_presenters
 from app.routes import issues as issue_routes
-from app.services import issue_voices, rate_limit
+from app.services import issue_voices, rate_limit, report_followups
 from app.services.auth import Principal, Role
 from app.services.issue_voices import InvalidVoice, add_voice, device_hash, is_public_issue
 from app.services.report_followups import public_status
@@ -72,7 +72,8 @@ def test_names_reach_the_handling_department_only(monkeypatch: pytest.MonkeyPatc
     assert summary.voices == 3  # the MCE sees the count
 
 
-def test_the_reporter_sees_the_count_and_a_safety_case_shows_none() -> None:
+def test_the_reporter_sees_the_count_and_a_safety_case_shows_none(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(report_followups.report_locations, "views", lambda case_id: [])
     assert public_status(ISSUE, [], NOW)["voices"] == 3
     private = {**ISSUE, "category": "personal_safety", "isSensitive": True, "topic": "abuse"}
     assert "voices" not in public_status(private, [], NOW)

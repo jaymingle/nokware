@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-from app.services import case_history, report_store
+from app.services import case_history, report_locations, report_store
 from app.services.case_history import CITIZEN, SYSTEM, CaseEntry, CaseHistoryAction
 from app.services.case_workflow import (
     ESCALATION_WINDOW,
@@ -90,7 +90,8 @@ def public_status(case: dict[str, Any], assignments: list[dict[str, Any]], now: 
         "escalate_until": _escalate_until(case, now),
     }
     if case.get("isSensitive"):
-        return {**common, "private": True, "stage": PRIVATE_STAGES[CaseStatus(case["status"])]}
+        stage = PRIVATE_STAGES[CaseStatus(case["status"])]
+        return {**common, "private": True, "stage": stage, "location_views": report_locations.views(case["$id"])}
     ward, sub_metro = wards().get(case.get("wardLocation") or ""), sub_metros().get(case.get("subMetro") or "")
     return {
         **common,

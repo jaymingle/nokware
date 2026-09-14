@@ -48,7 +48,7 @@ def keys(later: list[tuple[Any, ...]], *presses: str, session_id: str = "s1") ->
 
 
 def test_every_fixed_screen_fits_one_plain_screen() -> None:
-    screens = [MENU, CONFIRM, sub_metro_screen(), *(ward_screen(i) for i in sub_metros())]
+    screens = [MENU, CONFIRM, ussd.MEDICAL, sub_metro_screen(), *(ward_screen(i) for i in sub_metros())]
     for screen in screens:
         assert len(screen) <= ussd.SCREEN_MAX and is_gsm7(screen), screen
 
@@ -138,9 +138,15 @@ def test_personal_safety_shows_numbers_first_asks_only_the_sub_metro_and_updates
     assert screen.more and screen.message.startswith("Reference M3RD-8WQA received. More numbers:")
     for giveaway in ("Police", "Social Welfare", "abuse", "safety"):
         assert giveaway not in screen.message
-    done = ussd.respond(Dial("s1", PHONE, "1", False), lambda *args: session.append(args))
-    assert done.message == "Updates are on. Keep your reference." and chosen[0][:2] == ("M3RD-8WQA", "one-time")
+    call = ussd.respond(Dial("s1", PHONE, "1", False), lambda *args: session.append(args))
+    assert call.more and call.message == "Updates are on.\nMay Ghana Police Service or Social Welfare phone you on this number about it?\n1 Yes\n2 No"
+    assert chosen[0][:2] == ("M3RD-8WQA", "one-time") and not chosen[0][2].callback_consent  # updates alone
     assert session == [(ussd.notify_quietly, SAFETY, NotificationEvent.SUBMITTED)]
+    consented: list[Any] = []
+    monkeypatch.setattr(ussd, "update_contact", lambda case_id, changes: consented.append((case_id, changes)))
+    done = ussd.respond(Dial("s1", PHONE, "1", False), lambda *a: None)
+    assert done.message.startswith("Done. Ghana Police Service or Social Welfare may phone you.")
+    assert consented == [("c2", {"callbackConsent": True})]
 
 
 def test_a_safety_reporter_can_skip_the_sub_metro(session: list[tuple[Any, ...]], monkeypatch: pytest.MonkeyPatch) -> None:
@@ -205,3 +211,14 @@ def test_the_ussd_secret_never_reaches_the_access_log() -> None:
                                ("127.0.0.1:5000", "POST", f"/api/channels/ussd/{TOKEN}", "1.1", 200), None)
     assert RedactUssdSecret().filter(record) and TOKEN not in record.getMessage()
     assert "/api/channels/ussd/[secret]" in record.getMessage()
+
+
+def test_a_medical_emergency_gets_numbers_and_nothing_is_filed(session: list[tuple[Any, ...]], monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(report_intake, "submit", lambda *args: pytest.fail("filed"))
+    reply = keys(session, "4")
+    assert not reply.more and reply.message.startswith("Nokware can't file this: it isn't an Assembly matter.")
+    assert "193" in reply.message and "112" in reply.message
+
+
+def test_more_numbers_point_to_the_emergency_page_not_the_directory() -> None:
+    assert ussd.numbers_screen("fire").split("More numbers: ")[1].startswith("http://localhost:3000/contacts/emergency")

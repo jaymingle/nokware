@@ -34,7 +34,7 @@ from app.services.citizen_reports import IntakeChannel, NotificationEvent
 from app.services.ledger_documents import utc_now
 from app.services.notifications import notify_quietly
 from app.services.rag import AnswerLength, answer_question
-from app.services.report_contacts import InvalidNumber, masked
+from app.services.report_contacts import InvalidNumber, masked, update_contact
 from app.services.report_intake import DESCRIPTION_MIN, Receipt, ReportSubmission
 from app.services.report_rules import Classification, ClassificationMethod, InvalidReport, classify, normalise_reference
 from app.services.report_taxonomy import Category
@@ -52,7 +52,8 @@ CONTINUE = "\n1 Continue"
 SCREEN_MAX = 160
 QUESTION_MIN = 5
 WHO_MAX = 40  # longer office names give way to a count, so the receipt keeps its last words
-MENU = "Nokware - Accra Assembly\n1 Ask a question\n2 Report an issue\n3 Check a case"
+MENU = "Nokware - Accra Assembly\n1 Ask a question\n2 Report an issue\n3 Check a case\n4 Medical emergency"
+MEDICAL = "Nokware can't file this: it isn't an Assembly matter. Ambulance: 193, 0501 614 877, 0505 982 870. Or call 112."
 CONFIRM = "File this report?\n1 File, and SMS me updates\n2 File, no SMS\n0 Cancel"
 _filing = ThreadPoolExecutor(max_workers=4, thread_name_prefix="ussd-filing")
 
@@ -135,7 +136,9 @@ def _menu(dial: Dial, state: State, later: Later) -> tuple[Reply, State | None]:
         return con("Describe the problem and where it is (a street or a landmark):"), {"step": "describe"}
     if choice == "3":
         return con("Enter your case reference, e.g. K7QM-4TXP:"), {"step": "check"}
-    return con("Choose 1, 2 or 3.\n" + MENU), state
+    if choice == "4":  # not the Assembly's to act on, but the numbers cost nothing to give
+        return end(MEDICAL), None
+    return con("Choose 1 to 4.\n" + MENU), state
 
 
 def _ask(dial: Dial, state: State, later: Later) -> tuple[Reply, State | None]:
@@ -176,7 +179,7 @@ def _private(state: State) -> bool:
 def numbers_screen(topic: str) -> str:
     """Two numbers per service to try now, and where the rest are, then a key to go on."""
     numbers = short_line(topic, None)
-    more = f"\nMore numbers: {_site()}/contacts"
+    more = f"\nMore numbers: {_site()}/contacts/emergency"
     body = numbers + more if len(numbers + more + CONTINUE) <= SCREEN_MAX else numbers
     return body + CONTINUE
 
@@ -239,7 +242,7 @@ def _receipt(receipt: Receipt, later: Later) -> tuple[Reply, State | None]:
     if receipt.messages_on:
         later(notify_quietly, case, NotificationEvent.SUBMITTED)
     if case["isSensitive"]:  # the numbers came first; the rest of them are on the contacts page
-        more = f"More numbers: {_site()}/contacts"
+        more = f"More numbers: {_site()}/contacts/emergency"
         if receipt.preferences_token:  # a number was given: ask about updates, once
             question = f"Reference {reference} received. {more}\nSMS updates on it? They never say what it is about.\n1 Yes\n2 No"
             return con(question), {"step": "updates", "reference": reference, "token": receipt.preferences_token}
@@ -311,7 +314,21 @@ def _updates(dial: Dial, state: State, later: Later) -> tuple[Reply, State | Non
         return end("That choice can't be changed now. Keep your reference."), None
     if messages_on:
         later(notify_quietly, case, NotificationEvent.SUBMITTED)
-    return end("Updates are on. Keep your reference." if wanted else "No updates will be sent. Keep your reference."), None
+    who = " or ".join(short_name(r) for r in case["recipients"])
+    said = "Updates are on." if wanted else "No updates will be sent."
+    question = f"{said}\nMay {who} phone you on this number about it?\n1 Yes\n2 No"
+    return con(question), {"step": "call", "case_id": case["$id"], "who": who}
+
+
+def _call(dial: Dial, state: State, later: Later) -> tuple[Reply, State | None]:
+    """A separate, explicit choice from updates: whether the responders may phone the citizen."""
+    choice = dial.text.strip()
+    if choice not in ("1", "2"):
+        return con("Choose 1 if they may phone you, or 2 if not."), state
+    if choice == "1":
+        update_contact(state["case_id"], {"callbackConsent": True})
+        return end(f"Done. {state['who']} may phone you. Keep your reference."), None
+    return end("No one will phone you. Keep your reference."), None
 
 
 def _check(dial: Dial, state: State, later: Later) -> tuple[Reply, State | None]:
@@ -330,7 +347,7 @@ def _check(dial: Dial, state: State, later: Later) -> tuple[Reply, State | None]
 
 STEPS: dict[str, Callable[[Dial, State, Later], tuple[Reply, State | None]]] = {
     "menu": _menu, "ask": _ask, "describe": _describe, "help": _help, "sub_metro": _sub_metro, "ward": _ward,
-    "safety_sub_metro": _safety_sub_metro, "confirm": _confirm, "updates": _updates, "check": _check,
+    "safety_sub_metro": _safety_sub_metro, "confirm": _confirm, "updates": _updates, "call": _call, "check": _check,
 }
 
 

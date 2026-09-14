@@ -46,6 +46,11 @@ class ResolutionNote(BaseModel):
     note: str
 
 
+class LocationViewNote(BaseModel):
+    by: str  # "Ghana Police Service"
+    at: str
+
+
 class ReportStatus(BaseModel):
     """A case's status. For personal safety, only the stage: no category, service, place or note."""
 
@@ -65,6 +70,8 @@ class ReportStatus(BaseModel):
     resolution_notes: list[ResolutionNote] = Field(default_factory=list)
     contacts: list[PublicContact] = Field(default_factory=list)  # everyday reports only: numbers for where it went
     voices: int | None = None  # civic reports only: other residents who said it affects them too
+    # Personal safety only: each time a service opened the location the citizen shared (the service, never a person).
+    location_views: list[LocationViewNote] = Field(default_factory=list)
 
 
 class EscalationRequest(BaseModel):

@@ -4,6 +4,7 @@ import Image from "next/image";
 import { PhoneIcon, UsersIcon } from "lucide-react";
 
 import { CaseActions } from "@/components/cases/case-actions";
+import { SharedLocation } from "@/components/cases/shared-location";
 import { ErrorNote } from "@/components/documents/panels";
 import { Tag } from "@/components/documents/tag";
 import { useCase } from "@/lib/api/queries";
@@ -98,6 +99,7 @@ function Body({ detail }: { detail: CaseDetail }) {
         <p className="rounded-lg bg-brick-tint px-3.5 py-3 text-[13px]"><span className="font-medium text-brick">The citizen escalated it: </span>{detail.escalation_note}</p>
       ) : null}
       <Callback detail={detail} />
+      <SharedLocation key={detail.case_id} detail={detail} />
     </>
   );
 }

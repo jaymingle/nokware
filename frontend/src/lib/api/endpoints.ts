@@ -5,6 +5,7 @@ import type {
   CaseDetail,
   CaseOversight,
   CaseSummary,
+  SharedLocationView,
   DocumentDetail,
   DocumentOut,
   DocumentPage,
@@ -82,6 +83,11 @@ export function getCaseOversight(): Promise<CaseOversight> {
 
 export function getCase(id: string): Promise<CaseDetail> {
   return apiRequest<CaseDetail>(casePath(id));
+}
+
+/** A shared precise location, opened on purpose: the view is recorded and the citizen is told. */
+export function openSharedLocation(id: string): Promise<SharedLocationView> {
+  return apiRequest<SharedLocationView>(`${casePath(id)}/location`);
 }
 
 /** A note for resolve / reopen / confirm-resolution; from, to and reason for reassign. */
