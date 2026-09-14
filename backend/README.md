@@ -186,7 +186,14 @@ A personal-safety report shows only its reference and "In danger now? Call
 112." and asks about updates once, which stay off unless the citizen says yes;
 any SMS about it says only the reference. `scripts/ussd_simulator.py` plays a
 phone against the API (Arkesel's request format, from its sample application),
-so the menu can be tried before a shortcode exists.
+so the menu can be tried locally.
+
+USSD is proven against Arkesel's real gateway, not only the simulator: the
+"Test My Service" tool in Arkesel's dashboard dials the endpoint exactly as the
+live gateway does (free, no shortcode needed). On 14 September 2026 a full
+report went through it (menu, description, Okaikoi South, Kaneshie, "File, and
+SMS me updates", reference S288-VG6C filed with the Works Department): the
+request format matched, the session held across 7 turns, and every screen fit.
 
 WhatsApp (`whatsapp.py`, `whatsapp_conversation.py`) runs through Twilio.
 Every webhook is checked with Twilio's own `RequestValidator` against
