@@ -1,0 +1,277 @@
+"""USSD (Arkesel): the keypad menu. Ask a question, report an issue, check a case.
+
+A screen holds 160 characters and a session lasts seconds, so:
+- the menu's place is kept in Redis under the session ID, for 3 minutes;
+- an answer takes 6 to 13 seconds, longer than a screen can wait, so the
+  session ends with "your answer is on its way by SMS";
+- a report is filed while the citizen waits, for up to 8 seconds. If it takes
+  longer, the reference follows by SMS, even if they chose no updates: they
+  would otherwise lose it.
+Reports carry no photos. A personal-safety report gets the reference and the
+emergency number on screen, and updates only if the citizen then says yes; an
+SMS about it says nothing but the reference. The same services as the web:
+report_intake.submit() and rag.answer_question().
+"""
+
+import logging
+from collections.abc import Callable
+from concurrent.futures import Future, ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FilingTimeout
+from dataclasses import dataclass
+from typing import Any
+
+from app.config import get_settings
+from app.services import channel_limits, channel_sessions, report_followups, report_intake, report_store
+from app.services.channel_answers import for_sms
+from app.services.channel_messages import send_sms
+from app.services.channel_status import status_text
+from app.services.citizen_reports import IntakeChannel, NotificationEvent
+from app.services.ledger_documents import utc_now
+from app.services.notifications import notify_quietly
+from app.services.rag import AnswerLength, answer_question
+from app.services.report_contacts import InvalidNumber, masked
+from app.services.report_intake import DESCRIPTION_MIN, Receipt, ReportSubmission
+from app.services.report_rules import InvalidReport, normalise_reference
+from app.services.report_taxonomy import Category
+from app.services.sms_text import plain
+from app.services.workflow import NotAllowed
+from app.teams import short_name
+from app.wards import sub_metros, wards
+
+logger = logging.getLogger(__name__)
+
+SESSION_SECONDS = 180
+FILING_WAIT_SECONDS = 8.0
+SCREEN_MAX = 160
+QUESTION_MIN = 5
+WHO_MAX = 40  # longer office names give way to a count, so the receipt keeps its last words
+EMERGENCY = "In danger now? Call 112."
+MENU = "Nokware - Accra Assembly\n1 Ask a question\n2 Report an issue\n3 Check a case"
+CONFIRM = "File this report?\n1 File, and SMS me updates\n2 File, no SMS\n0 Cancel"
+_filing = ThreadPoolExecutor(max_workers=4, thread_name_prefix="ussd-filing")
+
+Later = Callable[..., None]  # runs work after the screen is sent (FastAPI's BackgroundTasks.add_task)
+State = dict[str, Any]
+
+
+@dataclass(frozen=True)
+class Reply:
+    message: str
+    more: bool  # Arkesel's continueSession: another screen follows
+
+
+@dataclass(frozen=True)
+class Dial:
+    session_id: str
+    msisdn: str  # +233...
+    text: str
+    new: bool
+
+
+def _screen(text: str) -> str:
+    text = plain(text)
+    return text if len(text) <= SCREEN_MAX else text[: SCREEN_MAX - 3].rstrip() + "..."
+
+
+def con(text: str) -> Reply:
+    return Reply(_screen(text), True)
+
+
+def end(text: str) -> Reply:
+    return Reply(_screen(text), False)
+
+
+def _numbered(title: str, names: list[str]) -> str:
+    return title + "\n" + "\n".join(f"{position} {name}" for position, name in enumerate(names, 1))
+
+
+def _pick(text: str, count: int) -> int | None:
+    """The 0-based choice from a numbered list, or None if the reply isn't one of its numbers."""
+    choice = text.strip()
+    return int(choice) - 1 if choice.isdigit() and 1 <= int(choice) <= count else None
+
+
+def _sub_metro_ids() -> list[str]:
+    return list(sub_metros())
+
+
+def _ward_ids(sub_metro: str) -> list[str]:
+    return [ward.id for ward in wards().values() if ward.sub_metro == sub_metro]
+
+
+def sub_metro_screen() -> str:
+    return _numbered("Which sub-metro is it in?", [sub_metros()[i].name for i in _sub_metro_ids()])
+
+
+def ward_screen(sub_metro: str) -> str:
+    return _numbered("Which electoral area?", [wards()[i].name for i in _ward_ids(sub_metro)])
+
+
+def _site() -> str:
+    return get_settings().public_site_url.rstrip("/")
+
+
+def answer_by_sms(msisdn: str, question: str) -> None:
+    """After the screen has closed: answer the question and send it as one SMS of two pages at most."""
+    try:
+        text = for_sms(answer_question(question, AnswerLength.SMS), _site())
+    except Exception:
+        logger.exception("Answering a USSD question for %s failed", masked(msisdn))
+        text = "Nokware: sorry, we couldn't answer your question just now. Please try again later."
+    send_sms(msisdn, text)
+
+
+def _menu(dial: Dial, state: State, later: Later) -> tuple[Reply, State | None]:
+    choice = dial.text.strip()
+    if choice == "1":
+        return con("Type your question. The answer comes by SMS."), {"step": "ask"}
+    if choice == "2":
+        return con("Describe the problem and where it is (a street or a landmark):"), {"step": "describe"}
+    if choice == "3":
+        return con("Enter your case reference, e.g. K7QM-4TXP:"), {"step": "check"}
+    return con("Choose 1, 2 or 3.\n" + MENU), state
+
+
+def _ask(dial: Dial, state: State, later: Later) -> tuple[Reply, State | None]:
+    question = dial.text.strip()
+    if len(question) < QUESTION_MIN:
+        return con("Type your question in a few words:"), state
+    if not channel_limits.SMS_ANSWERS.allow(dial.msisdn, utc_now().timestamp()):
+        return end(f"You've had today's answers by SMS. Ask again tomorrow, or at {_site()}/ask"), None
+    later(answer_by_sms, dial.msisdn, question)
+    return end("Thank you. Your answer is on its way by SMS."), None
+
+
+def _describe(dial: Dial, state: State, later: Later) -> tuple[Reply, State | None]:
+    description = dial.text.strip()
+    if len(description) < DESCRIPTION_MIN:
+        return con("Please describe it in a few more words, with where it is:"), state
+    return con(sub_metro_screen()), {"step": "sub_metro", "description": description}
+
+
+def _sub_metro(dial: Dial, state: State, later: Later) -> tuple[Reply, State | None]:
+    ids = _sub_metro_ids()
+    index = _pick(dial.text, len(ids))
+    if index is None:
+        return con("Choose a number from the list.\n" + sub_metro_screen()), state
+    return con(ward_screen(ids[index])), {**state, "step": "ward", "sub_metro": ids[index]}
+
+
+def _ward(dial: Dial, state: State, later: Later) -> tuple[Reply, State | None]:
+    ids = _ward_ids(state["sub_metro"])
+    index = _pick(dial.text, len(ids))
+    if index is None:
+        return con("Choose a number from the list.\n" + ward_screen(state["sub_metro"])), state
+    return con(CONFIRM), {**state, "step": "confirm", "ward": ids[index]}
+
+
+def _receipt(receipt: Receipt, later: Later) -> tuple[Reply, State | None]:
+    """The screen after filing: the reference, who has it, and what happens next."""
+    case = receipt.case
+    reference = case["reference"]
+    if receipt.messages_on:
+        later(notify_quietly, case, NotificationEvent.SUBMITTED)
+    if case["isSensitive"]:
+        if receipt.preferences_token:  # a number was given: ask about updates, once
+            question = f"Reference {reference} received. {EMERGENCY}\nSMS updates on it? They never say what it is about.\n1 Yes\n2 No"
+            return con(question), {"step": "updates", "reference": reference, "token": receipt.preferences_token}
+        return end(f"Reference {reference} received. {EMERGENCY}"), None
+    names = [short_name(r) for r in case["recipients"]]
+    who = " and ".join(names) if len(" and ".join(names)) <= WHO_MAX else f"{len(names)} offices"
+    emergency = f" {EMERGENCY}" if case["category"] == Category.PUBLIC_SAFETY else ""
+    updates = " We'll SMS you when it's resolved." if receipt.messages_on else ""
+    return end(f"Report {reference} filed with {who}.{emergency}{updates} Keep this reference."), None
+
+
+def _reference_later(filing: "Future[Receipt]", msisdn: str) -> None:
+    """A filing that outlasted the screen: send its reference (neutral for personal safety) or say it failed."""
+    try:
+        receipt = filing.result()
+    except Exception:
+        logger.exception("A slow USSD filing for %s failed", masked(msisdn))
+        send_sms(msisdn, "Nokware: sorry, your report couldn't be filed. Please dial again.")
+        return
+    if receipt.messages_on:  # the "received" message carries the reference
+        notify_quietly(receipt.case, NotificationEvent.SUBMITTED)
+        return
+    reference = receipt.case["reference"]
+    private = receipt.case["isSensitive"]
+    send_sms(msisdn, f"Nokware: reference {reference} received." if private else f"Nokware: your report is filed. Reference {reference}.")
+
+
+def _file(dial: Dial, state: State, updates: bool, later: Later) -> tuple[Reply, State | None]:
+    submission = ReportSubmission(
+        description=state["description"], ward=state["ward"], sub_metro=None, safety_topic=None,
+        phone=dial.msisdn if updates else None, whatsapp=None, notify=updates, callback_consent=False,
+        channel=IntakeChannel.USSD,
+    )
+    filing = _filing.submit(report_intake.submit, submission, [], utc_now())
+    try:
+        return _receipt(filing.result(timeout=FILING_WAIT_SECONDS), later)
+    except FilingTimeout:
+        filing.add_done_callback(lambda done: _reference_later(done, dial.msisdn))
+        return end("Your report is being filed. Your reference will come by SMS."), None
+    except (InvalidReport, InvalidNumber) as error:
+        return end(str(error)), None
+
+
+def _confirm(dial: Dial, state: State, later: Later) -> tuple[Reply, State | None]:
+    choice = dial.text.strip()
+    if choice == "0":
+        return end("Cancelled. Nothing was filed."), None
+    if choice not in ("1", "2"):
+        return con("Choose 1, 2 or 0.\n" + CONFIRM), state
+    if not channel_limits.REPORTS.allow(dial.msisdn, utc_now().timestamp()):
+        return end("You've filed several reports this hour. Please try again later."), None
+    return _file(dial, state, choice == "1", later)
+
+
+def _updates(dial: Dial, state: State, later: Later) -> tuple[Reply, State | None]:
+    choice = dial.text.strip()
+    if choice not in ("1", "2"):
+        return con("Choose 1 for updates or 2 for none."), state
+    wanted = choice == "1"
+    preferences = report_followups.Preferences(notify=wanted, callback_consent=False)
+    try:
+        case, messages_on = report_followups.set_preferences(state["reference"], state["token"], preferences, utc_now())
+    except NotAllowed:  # the one-time choice was already made, or its hour is up
+        return end("That choice can't be changed now. Keep your reference."), None
+    if messages_on:
+        later(notify_quietly, case, NotificationEvent.SUBMITTED)
+    return end("Updates are on. Keep your reference." if wanted else "No updates will be sent. Keep your reference."), None
+
+
+def _check(dial: Dial, state: State, later: Later) -> tuple[Reply, State | None]:
+    reference = normalise_reference(dial.text)
+    if reference is None:
+        return con("That isn't a reference. It looks like K7QM-4TXP. Try again:"), state
+    if not channel_limits.LOOKUPS.allow(dial.msisdn, utc_now().timestamp()):
+        return end("Too many lookups this hour. Please try again later."), None
+    try:
+        case = report_followups.find(reference)
+    except report_followups.CaseNotFound:
+        return end(f"No case has the reference {reference}. Check it and dial again."), None
+    status = report_followups.public_status(case, report_store.assignments_for(case["$id"]), utc_now())
+    return end(status_text(status, _site(), compact=True)), None
+
+
+STEPS: dict[str, Callable[[Dial, State, Later], tuple[Reply, State | None]]] = {
+    "menu": _menu, "ask": _ask, "describe": _describe, "sub_metro": _sub_metro, "ward": _ward,
+    "confirm": _confirm, "updates": _updates, "check": _check,
+}
+
+
+def respond(dial: Dial, later: Later) -> Reply:
+    """The next screen for one keypress (or the opening dial) in a USSD session."""
+    if dial.new:
+        channel_sessions.save("ussd", dial.session_id, {"step": "menu"}, SESSION_SECONDS)
+        return con(MENU)
+    state = channel_sessions.load("ussd", dial.session_id)
+    if state is None:
+        return end("Your session ended. Please dial again.")
+    reply, next_state = STEPS[state["step"]](dial, state, later)
+    if reply.more and next_state is not None:
+        channel_sessions.save("ussd", dial.session_id, next_state, SESSION_SECONDS)
+    else:
+        channel_sessions.clear("ussd", dial.session_id)
+    return reply

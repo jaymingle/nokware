@@ -1,4 +1,5 @@
 import logging
+import re
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -54,6 +55,20 @@ def show_app_logs() -> None:
 
 
 show_app_logs()
+
+
+class RedactUssdSecret(logging.Filter):
+    """The USSD callback's address carries its secret (Arkesel doesn't sign USSD yet): keep it out of access logs."""
+
+    PATH = re.compile(r"(/api/channels/ussd/)[^/?\s]+")
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if isinstance(record.args, tuple):
+            record.args = tuple(self.PATH.sub(r"\1[secret]", a) if isinstance(a, str) else a for a in record.args)
+        return True
+
+
+logging.getLogger("uvicorn.access").addFilter(RedactUssdSecret())
 
 
 @asynccontextmanager

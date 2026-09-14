@@ -173,11 +173,35 @@ through the same `report_intake.submit()` and `rag.answer_question()` as the web
   it. The day's SMS page count lives there too, so a restart can't reset it,
   and if Redis can't be reached no SMS is sent rather than sent uncounted.
 
-Known limitation: Arkesel does not sign USSD callbacks yet (its guide says
-USSD signing waits on gateway work). Until it does, the USSD callback is
-protected only by a secret token in its URL, which anyone who learns the URL
-(from a log or a proxy, say) could use to post fake sessions. When Arkesel
-signs USSD, it moves to the same verification.
+USSD (`ussd.py`, `POST /api/channels/ussd/{token}`) is a keypad menu: 1 Ask
+a question, 2 Report an issue, 3 Check a case. Each screen fits 160 plain
+characters, and the menu's place is kept in Redis under the session ID for 3
+minutes. An answer takes longer than a screen can wait, so the session ends
+with "your answer is on its way by SMS" and the answer follows as one SMS of
+two pages at most (5 a day per number). A report is described by keypad,
+placed by sub-metro and electoral area from numbered lists, confirmed (with or
+without SMS updates), and filed while the citizen waits for up to 8 seconds;
+if filing takes longer the reference follows by SMS. Reports have no photos.
+A personal-safety report shows only its reference and "In danger now? Call
+112." and asks about updates once, which stay off unless the citizen says yes;
+any SMS about it says only the reference. `scripts/ussd_simulator.py` plays a
+phone against the API (Arkesel's request format, from its sample application),
+so the menu can be tried before a shortcode exists.
+
+Known limitations:
+
+- Arkesel does not sign USSD callbacks yet (its signing guide says USSD waits
+  on gateway work). Until it does, the USSD callback is protected only by the
+  secret token in its URL (`ARKESEL_USSD_TOKEN`), which anyone who learns the
+  URL (from a log or a proxy, say) could use to post fake sessions. The API
+  redacts it from its own access log (`RedactUssdSecret` in `main.py`), but a
+  proxy in front of it, or ngrok's inspector in development, still records
+  it. When Arkesel signs USSD, it moves to the same verification as SMS.
+- While the sender ID is unregistered (the account sends as "Jay" meanwhile),
+  Arkesel holds each real SMS for approval: in testing, about 15 minutes
+  before delivery. Notifications and USSD answers therefore don't arrive
+  promptly until the sender ID is registered; registration (a letter of
+  authorization, approved over some days) is the fix.
 
 Staff work cases through `app/services/case_actions.py` (under a per-case
 lock, like Ledger documents). What each caller sees is decided in one place

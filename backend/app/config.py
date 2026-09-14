@@ -69,6 +69,9 @@ class Settings(BaseSettings):
     sms_daily_limit: int = 50
     # Arkesel's webhook secret: verifies the signed delivery reports it sends.
     arkesel_webhook_secret: str = ""
+    # The secret in Arkesel's USSD callback address. Arkesel doesn't sign USSD
+    # callbacks yet, so this is their only protection. Empty: USSD is off.
+    arkesel_ussd_token: str = ""
     # The API's public HTTPS address, which Arkesel and Twilio call back.
     # Empty means no callbacks are asked for.
     public_api_url: str = ""
