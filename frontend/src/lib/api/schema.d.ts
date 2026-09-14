@@ -563,6 +563,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/representatives": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Representatives */
+        get: operations["representatives_api_representatives_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1035,6 +1052,17 @@ export interface components {
             /** Cited */
             cited: string[];
         };
+        /** ElectoralArea */
+        ElectoralArea: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Alternates */
+            alternates: string[];
+            /** Note */
+            note?: string | null;
+        };
         /** ErrorEvent */
         ErrorEvent: {
             /**
@@ -1291,6 +1319,22 @@ export interface components {
             /** Contacts */
             contacts?: components["schemas"]["PublicContact"][];
         };
+        /** Representation */
+        Representation: {
+            source: components["schemas"]["RepresentationSource"];
+            switchboard: components["schemas"]["PublicContact"];
+            /** Sub Metros */
+            sub_metros: components["schemas"]["SubMetroRepresentation"][];
+            /** Matched */
+            matched?: string | null;
+        };
+        /** RepresentationSource */
+        RepresentationSource: {
+            /** Label */
+            label: string;
+            /** Url */
+            url: string;
+        };
         /** ResolutionNote */
         ResolutionNote: {
             /** Recipient */
@@ -1373,6 +1417,21 @@ export interface components {
             name: string;
             /** Wards */
             wards: components["schemas"]["Option"][];
+        };
+        /** SubMetroRepresentation */
+        SubMetroRepresentation: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Chairperson */
+            chairperson: string;
+            /** Chairperson Area */
+            chairperson_area: string;
+            /** Office */
+            office: string;
+            /** Electoral Areas */
+            electoral_areas: components["schemas"]["ElectoralArea"][];
         };
         /** TopicFigures */
         TopicFigures: {
@@ -2303,6 +2362,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ContactDirectory"];
+                };
+            };
+        };
+    };
+    representatives_api_representatives_get: {
+        parameters: {
+            query?: {
+                area?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Representation"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

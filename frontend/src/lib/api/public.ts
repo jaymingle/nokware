@@ -10,6 +10,7 @@ import type {
   ReportPreferences,
   ReportReceipt,
   ReportStatus,
+  Representation,
 } from "@/lib/api/types";
 
 async function publicRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
@@ -66,4 +67,9 @@ export function getDashboard(): Promise<Dashboard> {
 
 export function getContacts(): Promise<ContactDirectory> {
   return publicRequest<ContactDirectory>("/api/contacts");
+}
+
+/** Every sub-metro with its chairperson, office and electoral areas. */
+export function getRepresentatives(): Promise<Representation> {
+  return publicRequest<Representation>("/api/representatives");
 }

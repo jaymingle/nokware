@@ -9,6 +9,7 @@ import {
   getDashboard,
   getReportOptions,
   getReportStatus,
+  getRepresentatives,
   setReportPreferences,
 } from "@/lib/api/public";
 
@@ -21,6 +22,7 @@ export const publicKeys = {
   reportStatus: (reference: string) => ["report-status", reference] as const,
   dashboard: ["dashboard"] as const,
   contacts: ["contacts"] as const,
+  representatives: ["representatives"] as const,
 };
 
 export function useReportOptions() {
@@ -70,4 +72,8 @@ export function useForgetStatus(): (reference: string) => void {
 
 export function useContacts() {
   return useQuery({ queryKey: publicKeys.contacts, queryFn: getContacts, staleTime: Infinity });
+}
+
+export function useRepresentatives() {
+  return useQuery({ queryKey: publicKeys.representatives, queryFn: getRepresentatives, staleTime: Infinity });
 }

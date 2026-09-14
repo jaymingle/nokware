@@ -1,6 +1,7 @@
 "use client";
 
 import { ContactItem } from "@/components/contacts/contact-item";
+import { WhoRepresentsYou } from "@/components/contacts/who-represents-you";
 import { ErrorPanel, LoadingPanel } from "@/components/documents/panels";
 import { PageIntro } from "@/components/portal/page-intro";
 import { EmergencyNote } from "@/components/report/notes";
@@ -54,10 +55,11 @@ export function DirectoryPage() {
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-7">
       <PageIntro eyebrow="Contacts" title="Who to call">
-        Emergency lines, the Assembly and the services that act on reports. Every number shows where it comes from,
-        the same way Ask shows the source of every answer.
+        Emergency lines, the Assembly, the services that act on reports, and who represents your area. Every number
+        shows where it comes from, the same way Ask shows the source of every answer.
       </PageIntro>
       <EmergencyNote />
+      <WhoRepresentsYou />
       <TierKey />
       {directory.isPending ? <LoadingPanel label="Loading the numbers…" /> : null}
       {directory.error ? <ErrorPanel message={directory.error.message} onRetry={() => directory.refetch()} /> : null}
