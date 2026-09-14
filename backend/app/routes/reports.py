@@ -7,10 +7,11 @@
     POST /api/reports/{reference}/preferences answer the messages question after a safety reclassification
 """
 
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, Header, UploadFile
 
+from app import contacts
 from app.dependencies import rate_limited
 from app.schemas.documents import Option
 from app.schemas.reports import (
@@ -59,6 +60,7 @@ def options() -> ReportOptions:
         max_photo_bytes=MAX_PHOTO_BYTES,
         description_min=DESCRIPTION_MIN,
         description_max=DESCRIPTION_MAX,
+        safety_contacts=contacts.safety_contacts(None),
     )
 
 
@@ -106,6 +108,7 @@ def _receipt(receipt: report_intake.Receipt) -> ReportReceipt:
         messages_on=receipt.messages_on,
         held_for_consent=receipt.held_for_consent,
         preferences_token=receipt.preferences_token,
+        contacts=contacts.for_report(case["topic"], case.get("subMetro")),
     )
 
 
@@ -121,19 +124,24 @@ def file_report(
     return _receipt(receipt)
 
 
+def _status(case: dict[str, Any]) -> ReportStatus:
+    assignments = report_store.assignments_for(case["$id"])
+    view = ReportStatus.model_validate(report_followups.public_status(case, assignments, utc_now()))
+    if not view.private:  # anyone with the reference sees this; a safety case shows no hint of what it is
+        view.contacts = contacts.for_report(case["topic"], case.get("subMetro"))
+    return view
+
+
 @router.get("/{reference}", response_model=ReportStatus, dependencies=[Lookups])
 def status(reference: str) -> ReportStatus:
-    case = report_followups.find(reference)
-    view = report_followups.public_status(case, report_store.assignments_for(case["$id"]), utc_now())
-    return ReportStatus.model_validate(view)
+    return _status(report_followups.find(reference))
 
 
 @router.post("/{reference}/escalate", response_model=ReportStatus, dependencies=[Escalations])
 def escalate(reference: str, request: EscalationRequest, tasks: BackgroundTasks) -> ReportStatus:
     case = report_followups.escalate_case(reference, request.note, utc_now())
     tasks.add_task(notify_quietly, case, NotificationEvent.ESCALATED)
-    view = report_followups.public_status(case, report_store.assignments_for(case["$id"]), utc_now())
-    return ReportStatus.model_validate(view)
+    return _status(case)
 
 
 @router.post("/{reference}/preferences", response_model=PreferencesResult, dependencies=[Escalations])

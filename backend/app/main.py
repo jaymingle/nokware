@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.config import get_settings
-from app.routes import ask, cases, dashboard, documents, jobs, ledger, me, options, queues, reports
+from app.routes import ask, cases, contacts, dashboard, documents, jobs, ledger, me, options, queues, reports
 from app.services import scheduler
 from app.services.appwrite_client import quiet_sdk_deprecation_warnings
 from app.services.ledger_documents import utc_now
@@ -107,3 +107,4 @@ app.include_router(jobs.router)
 app.include_router(reports.router)
 app.include_router(cases.router)
 app.include_router(dashboard.router)
+app.include_router(contacts.router)

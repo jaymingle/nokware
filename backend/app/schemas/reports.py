@@ -2,6 +2,7 @@
 
 from pydantic import BaseModel, Field
 
+from app.schemas.contacts import PublicContact
 from app.schemas.documents import Option
 
 
@@ -25,6 +26,7 @@ class ReportOptions(BaseModel):
     max_photo_bytes: int
     description_min: int
     description_max: int
+    safety_contacts: list[PublicContact]  # shown on the safety form: emergency lines, the helpline, Social Welfare
 
 
 class ReportReceipt(BaseModel):
@@ -36,6 +38,7 @@ class ReportReceipt(BaseModel):
     messages_on: bool  # the citizen will get the received / resolved / escalated messages
     held_for_consent: bool  # filed as personal safety by the classifier: ask about messages and calls
     preferences_token: str | None  # send back as X-Receipt-Token to answer that question, once, within the hour
+    contacts: list[PublicContact]  # numbers for where the report went
 
 
 class ResolutionNote(BaseModel):
@@ -60,6 +63,7 @@ class ReportStatus(BaseModel):
     sub_metro: str | None = None
     resolved_at: str | None = None
     resolution_notes: list[ResolutionNote] = Field(default_factory=list)
+    contacts: list[PublicContact] = Field(default_factory=list)  # everyday reports only: numbers for where it went
 
 
 class EscalationRequest(BaseModel):
