@@ -23,3 +23,6 @@ export const TIERS: { tier: 1 | 2 | 3; title: string; body: string }[] = [
   { tier: 2, title: "Official sources", body: "Listed on a government website, which is linked beside the number with the date we checked it." },
   { tier: 3, title: "Not independently verified", body: "Reported on social media or in the press only. Included because they may help, but use them with care." },
 ];
+
+/** The services on the emergency page: whoever can help a person in danger, and no one else. */
+export const EMERGENCY_SERVICES = ["emergency", "police", "fire", "ambulance", "disaster", "welfare"];

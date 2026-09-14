@@ -6,7 +6,7 @@ web: in an emergency a number worth trying beats none. An earlier listing of a
 number is kept too, marked as one that may not connect.
 """
 
-from app.contacts import SERVICE_NAMES, emergency_groups
+from app.contacts import MEDICAL_SERVICES, SERVICE_NAMES, emergency_groups, service_groups
 from app.schemas.contacts import ContactNumber, PublicContact
 from app.wards import sub_metros
 
@@ -41,7 +41,17 @@ def _block(service: str, group: list[PublicContact]) -> str:
     return heading + "\n" + "\n".join(lines)
 
 
+def _text(groups: list[tuple[str, list[PublicContact]]], heading: str = HEADING) -> str:
+    return "\n\n".join([heading, *(_block(service, group) for service, group in groups)]) if groups else ""
+
+
 def numbers_text(topic: str, sub_metro: str | None) -> str:
     """Every emergency number for the topic, grouped by service. Empty for everyday topics."""
-    groups = emergency_groups(topic, sub_metro)
-    return "\n\n".join([HEADING, *(_block(service, group) for service, group in groups)]) if groups else ""
+    return _text(emergency_groups(topic, sub_metro))
+
+
+def medical_text() -> str:
+    """For someone ill or hurt: said plainly that it isn't the Assembly's to act on, then who to call."""
+    heading = ("This isn't something the Assembly can act on, so Nokware won't file it. But here's who to call, "
+               "and if a number doesn't connect, try the next one:")
+    return _text(service_groups(MEDICAL_SERVICES, None), heading)

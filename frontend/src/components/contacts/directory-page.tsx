@@ -11,7 +11,7 @@ import { formatDate } from "@/lib/time";
 
 import type { ContactDirectory } from "@/lib/api/types";
 
-function TierKey() {
+export function TierKey() {
   return (
     <section aria-labelledby="tiers" className="flex flex-col gap-3">
       <h2 id="tiers" className="text-[19px]">How far each number can be trusted</h2>
@@ -28,7 +28,7 @@ function TierKey() {
   );
 }
 
-function Services({ directory }: { directory: ContactDirectory }) {
+export function Services({ directory }: { directory: ContactDirectory }) {
   return (
     <div className="flex flex-col gap-5">
       {directory.services.map((service) => (

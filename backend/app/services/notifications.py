@@ -119,7 +119,7 @@ def compose(event: NotificationEvent, case: dict[str, Any]) -> Message:
         return Message(event.value, f"Nokware: we've received your escalation of report {reference}. The MCE's office will review it.")
     if event == NotificationEvent.SUBMITTED and case.get("topic") in EMERGENCY_TOPICS:  # worth a second page
         site = get_settings().public_site_url.rstrip("/")
-        numbers = f"If anyone is in danger: {short_line(case['topic'], None)} More numbers: {site}/contacts"
+        numbers = f"If anyone is in danger: {short_line(case['topic'], None)} More numbers: {site}/contacts/emergency"
         return Message("submitted_emergency", _one_page(lambda who: f"Nokware: report {reference} is with {who}. {numbers}", case, pages_allowed=2))
     renders: dict[NotificationEvent, Callable[[str], str]] = {
         NotificationEvent.SUBMITTED: lambda who: f"Nokware: report {reference} is with {who}. "

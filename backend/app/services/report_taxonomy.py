@@ -82,6 +82,8 @@ TOPICS: tuple[Topic, ...] = (
           ("dept-works",)),
     Topic("public_crime", Category.PUBLIC_SAFETY, "Crime in public places",
           "Robbery, violence or other crime in a public place, not aimed at the person reporting.", (POLICE,)),
+    Topic("road_accident", Category.PUBLIC_SAFETY, "Road accidents",
+          "A crash on the road, especially with people hurt or trapped, or a wrecked vehicle blocking traffic.", (POLICE,)),
     # Personal safety: chosen by the citizen from these, never by the classifier's
     # judgement of urgency. Always private; always severity 5.
     Topic("abuse", Category.PERSONAL_SAFETY, "Abuse or violence against a person",

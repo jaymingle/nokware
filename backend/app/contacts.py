@@ -59,6 +59,7 @@ EMERGENCY_TOPICS: dict[str, tuple[str, ...]] = {
     "disaster": ("disaster", "ambulance"),
     "structural_danger": ("fire", "ambulance"),  # rescue from a collapse is the fire service's
     "public_crime": ("police", "ambulance"),
+    "road_accident": ("police", "ambulance"),
     **{t.id: SAFETY_SERVICES for t in TOPICS_BY_ID.values() if t.category == Category.PERSONAL_SAFETY},
 }
 # Numbers for a topic, after its emergency numbers. The waste route will add AMA
@@ -115,9 +116,17 @@ def _welfare(sub_metro: str | None) -> list[str]:
     return [desks[sub_metro] if sub_metro in desks else None, *([] if sub_metro in desks else desks.values()), SAFETY_DESK_FALLBACK]
 
 
+# A medical emergency isn't the Assembly's to act on: nothing is filed, but the numbers are given.
+MEDICAL_SERVICES = ("ambulance",)
+
+
 def emergency_groups(topic: str, sub_metro: str | None) -> list[tuple[str, list[PublicContact]]]:
     """Every number for each service an emergency topic needs, by service, 112 first. Empty for everyday topics."""
-    services = EMERGENCY_TOPICS.get(topic)
+    return service_groups(EMERGENCY_TOPICS.get(topic, ()), sub_metro)
+
+
+def service_groups(services: tuple[str, ...], sub_metro: str | None) -> list[tuple[str, list[PublicContact]]]:
+    """112, then every number of each service, in the order to try them."""
     if not services:
         return []
     groups = [("emergency", [PUBLIC_EMERGENCY])]

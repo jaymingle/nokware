@@ -11,8 +11,8 @@ from app import contacts
 from app.main import app
 from app.routes import reports as routes
 from app.services import rate_limit
-from app.services.channel_contacts import numbers_text
-from app.services.report_taxonomy import TOPICS, Category
+from app.services.channel_contacts import medical_text, numbers_text
+from app.services.report_taxonomy import TOPICS, TOPICS_BY_ID, Category
 
 client = TestClient(app)
 
@@ -105,10 +105,24 @@ def lookup(monkeypatch: pytest.MonkeyPatch) -> Callable[[dict[str, Any]], None]:
     return found
 
 
-def test_an_everyday_status_shows_its_numbers_and_a_safety_status_shows_none(lookup: Callable[[dict[str, Any]], None]) -> None:
+def test_an_everyday_status_shows_its_numbers_and_a_safety_status_shows_none(
+    lookup: Callable[[dict[str, Any]], None], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(routes.report_followups.report_locations, "views", lambda case_id: [])
     base = {"$id": "c1", "reference": "K7QM-4TXP", "createdAt": "2026-09-01T10:00:00+00:00", "status": "assigned",
             "recipients": ["dept-waste-management"], "wardLocation": "kinka", "subMetro": "ashiedu-keteke"}
     lookup({**base, "topic": "solid_waste", "category": "civic_service", "isSensitive": False})
     assert [c["id"] for c in client.get("/api/reports/K7QM-4TXP").json()["contacts"]] == ["ama-sanitation-whatsapp", "ama-general"]
     lookup({**base, "topic": "abuse", "category": "personal_safety", "isSensitive": True, "recipients": ["agency-police"]})
     assert client.get("/api/reports/K7QM-4TXP").json()["contacts"] == []
+
+
+def test_a_road_accident_goes_to_the_police_with_police_and_ambulance_numbers() -> None:
+    assert TOPICS_BY_ID["road_accident"].recipients == ("agency-police",)
+    assert ids(contacts.for_report("road_accident", None)) == ["emergency-112", *POLICE, *AMBULANCE]
+
+
+def test_a_medical_emergency_gets_the_ambulance_and_is_told_plainly_it_isnt_the_assemblys() -> None:
+    text = medical_text()
+    assert text.startswith("This isn't something the Assembly can act on, so Nokware won't file it.")
+    assert all(number in text for number in ("112", "193", "0501 614 877", "0505 982 870"))
