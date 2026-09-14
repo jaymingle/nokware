@@ -151,6 +151,28 @@ the secret are both set; the report sets the outbox row's `deliveryStatus`
 (`scripts/add_delivery_reports.py` adds the fields and the index it needs).
 Arkesel's sandbox records a message as `SANDBOXED` and sends no report.
 
+The messaging channels share one layer, so WhatsApp and USSD file and answer
+through the same `report_intake.submit()` and `rag.answer_question()` as the web:
+
+- `channel_intent.py` reads a message: a short one holding a case reference
+  asks for its status and a greeting asks for help, with no model call; the
+  quick model sorts the rest into question, report or unclear, and a failure
+  means "unclear", so nothing is filed or answered on a guess.
+- `rag.answer_question(question, length)` answers at the channel's length (the
+  web in full, a chat in about 1,000 characters, an SMS in 240); only a length
+  line in the prompt changes, so sources, live figures, "fewer than 5" and the
+  safety refusal hold everywhere. `channel_answers.py` lays the answer out:
+  numbered sources for WhatsApp, and for SMS one plain GSM-7 message of two
+  pages at most with its first source.
+- `channel_status.py` gives a case's status from the same `public_status()` as
+  the web: a personal-safety case says only its stage.
+- `redis_store.py`, `channel_sessions.py` and `channel_limits.py` keep
+  short-lived state in Redis (`REDIS_URL`): USSD menus and WhatsApp drafts
+  that expire when a conversation goes quiet, and per-number limits in fixed
+  windows. A phone number never appears in Redis: keys hold a keyed hash of
+  it. The day's SMS page count lives there too, so a restart can't reset it,
+  and if Redis can't be reached no SMS is sent rather than sent uncounted.
+
 Known limitation: Arkesel does not sign USSD callbacks yet (its guide says
 USSD signing waits on gateway work). Until it does, the USSD callback is
 protected only by a secret token in its URL, which anyone who learns the URL

@@ -24,6 +24,7 @@ text as it is written, then the checked answer), so a reader sees it working.
 from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
+from enum import StrEnum
 from typing import Any, Literal, TypedDict
 
 from langchain_core.output_parsers import StrOutputParser
@@ -88,8 +89,30 @@ _SYSTEM_PROMPT = (
 )
 
 _PROMPT = ChatPromptTemplate.from_messages(
-    [("system", _SYSTEM_PROMPT), ("human", "Sources:\n\n{context}\n\nToday's date: {today}\n\nQuestion: {question}")]
+    [("system", _SYSTEM_PROMPT), ("human", "Sources:\n\n{context}\n\nToday's date: {today}\n\nQuestion: {question}{length}")]
 )
+
+
+class AnswerLength(StrEnum):
+    """How long an answer may be: in full on the web, shorter in a chat, a sentence or two by SMS."""
+
+    WEB = "web"
+    CHAT = "chat"
+    SMS = "sms"
+
+
+# Only the length changes between channels: the same sources, figures, citation and safety rules apply.
+_LENGTH_RULES = {
+    AnswerLength.WEB: "",
+    AnswerLength.CHAT: (
+        "\n\nThis answer goes to a phone chat: keep it under 1,000 characters. Give the most important points "
+        "only, as short paragraphs or a few bullets, and still cite each one."
+    ),
+    AnswerLength.SMS: (
+        "\n\nThis answer goes by SMS: at most 240 characters of plain text, one or two sentences with the single "
+        "most important point, cited. No lists and no formatting."
+    ),
+}
 
 
 AnswerStatus = Literal["answered", "no_information"]
@@ -224,9 +247,14 @@ def _answer_chain() -> Runnable[dict[str, str], str]:
     return _PROMPT | get_chat_model(ANSWER_TEMPERATURE, thinking_budget=ANSWER_THINKING_BUDGET) | StrOutputParser()
 
 
-def _prompt_input(prepared: Prepared) -> dict[str, str]:
+def _prompt_input(prepared: Prepared, length: AnswerLength = AnswerLength.WEB) -> dict[str, str]:
     blocks = [_format_context(prepared.chunks, prepared.labels), *map(figure_context, prepared.figures.figures)]
-    return {"context": "\n\n".join(b for b in blocks if b), "today": f"{utc_now():%A %d %B %Y}", "question": prepared.question}
+    return {
+        "context": "\n\n".join(b for b in blocks if b),
+        "today": f"{utc_now():%A %d %B %Y}",
+        "question": prepared.question,
+        "length": _LENGTH_RULES[length],
+    }
 
 
 def _with_safety_notice(answer: str, prepared: Prepared) -> str:
@@ -252,12 +280,12 @@ def finish(prepared: Prepared, raw_answer: str) -> RagAnswer:
     )
 
 
-def answer_question(question: str) -> RagAnswer:
-    """Answer from the Ledger. Every [S#] left in the answer maps to a returned source."""
+def answer_question(question: str, length: AnswerLength = AnswerLength.WEB) -> RagAnswer:
+    """Answer from the Ledger, at the length the channel allows. Every [S#] left maps to a returned source."""
     prepared = prepare(question)
     if not prepared.has_sources:
         return finish(prepared, NO_INFO_ANSWER)
-    return finish(prepared, _answer_chain().invoke(_prompt_input(prepared)))
+    return finish(prepared, _answer_chain().invoke(_prompt_input(prepared, length)))
 
 
 def stream_answer(question: str) -> Iterator[dict[str, Any]]:
