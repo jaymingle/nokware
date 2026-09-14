@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type RefObject } from "react";
 
-import { chartScale, longMonth, monthLabel } from "@/lib/report/dashboard";
+import { FEWER_THAN_FIVE, chartScale, drawnValue, longMonth, monthLabel, shownRuns, type Count } from "@/lib/report/dashboard";
 
 import type { MonthFigures } from "@/lib/api/types";
 
@@ -27,6 +27,10 @@ function useWidth(fallback: number): [RefObject<HTMLDivElement | null>, number] 
   return [ref, width];
 }
 
+function spoken(count: Count): string {
+  return count === null ? FEWER_THAN_FIVE : String(count);
+}
+
 function MonthsTable({ months }: { months: MonthFigures[] }) {
   return (
     <table className="sr-only">
@@ -36,7 +40,7 @@ function MonthsTable({ months }: { months: MonthFigures[] }) {
       </thead>
       <tbody>
         {months.map((m) => (
-          <tr key={m.month}><th scope="row">{longMonth(m.month)}</th><td>{m.received}</td><td>{m.resolved}</td></tr>
+          <tr key={m.month}><th scope="row">{longMonth(m.month)}</th><td>{spoken(m.received)}</td><td>{spoken(m.resolved)}</td></tr>
         ))}
       </tbody>
     </table>
@@ -52,7 +56,8 @@ export function TrendChart({ months }: { months: MonthFigures[] }) {
   const barWidth = Math.min(24, step * 0.46);
   const x = (i: number) => PAD.l + step * i + step / 2;
   const labelled = (i: number) => step >= LABEL_ROOM || i % 2 === (months.length - 1) % 2; // the latest month always
-  const line = months.map((m, i) => `${x(i)},${y(m.resolved)}`).join(" ");
+  // The line breaks at a "fewer than 5" month rather than guess where it would be.
+  const lines = shownRuns(months.map((m) => m.resolved)).map((run) => run.map((i) => `${x(i)},${y(months[i].resolved ?? 0)}`).join(" "));
   return (
     <div ref={box} data-testid="dashboard-trend">
       <svg viewBox={`0 0 ${W} ${H}`} className="block h-auto w-full font-sans" aria-hidden>
@@ -64,14 +69,17 @@ export function TrendChart({ months }: { months: MonthFigures[] }) {
         ))}
         {months.map((m, i) => (
           <g key={m.month}>
-            <rect x={x(i) - barWidth / 2} y={y(m.received)} width={barWidth} height={PAD.t + INNER_H - y(m.received)} rx={2} className="fill-hairline" />
+            <rect x={x(i) - barWidth / 2} y={y(drawnValue(m.received))} width={barWidth} height={PAD.t + INNER_H - y(drawnValue(m.received))} rx={2}
+              className={m.received === null ? "fill-none stroke-ink-muted" : "fill-hairline"} strokeDasharray={m.received === null ? "3 2" : undefined} />
             {labelled(i) ? <text x={x(i)} y={H - 8} textAnchor="middle" fontSize={FONT} className="fill-ink-soft">{monthLabel(m.month)}</text> : null}
           </g>
         ))}
-        <polyline points={line} fill="none" className="stroke-teal" strokeWidth={1.5} strokeLinejoin="round" />
-        {months.map((m, i) => (
-          <circle key={m.month} cx={x(i)} cy={y(m.resolved)} r={2.5} className="fill-card stroke-teal" strokeWidth={1.5} />
+        {lines.map((points) => (
+          <polyline key={points} points={points} fill="none" className="stroke-teal" strokeWidth={1.5} strokeLinejoin="round" />
         ))}
+        {months.map((m, i) => (m.resolved === null ? null : (
+          <circle key={m.month} cx={x(i)} cy={y(m.resolved)} r={2.5} className="fill-card stroke-teal" strokeWidth={1.5} />
+        )))}
       </svg>
       <MonthsTable months={months} />
     </div>

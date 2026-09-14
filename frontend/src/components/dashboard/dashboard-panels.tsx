@@ -1,9 +1,10 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { CountValue } from "@/components/dashboard/count";
 import { Button } from "@/components/ui/button";
 import { ledgerFileUrl } from "@/lib/api/public";
-import { formatDays, percent } from "@/lib/report/dashboard";
+import { formatDays, percent, type Count } from "@/lib/report/dashboard";
 import { formatDate } from "@/lib/time";
 import { cn } from "@/lib/utils";
 
@@ -22,19 +23,22 @@ export function Panel({ title, lead, children, className, testId }: {
 }
 
 /** Each topic's share of the period's reports, most reported first. */
-export function TopicShares({ topics, total }: { topics: TopicFigures[]; total: number }) {
+export function TopicShares({ topics, total }: { topics: TopicFigures[]; total: Count }) {
   if (topics.length === 0) return <p className="text-[13.5px] text-ink-soft">No reports in this period yet.</p>;
-  const top = topics[0].count;
+  const top = Math.max(1, ...topics.map((t) => t.count ?? 0));
   return (
     <ul className="flex flex-col" data-testid="dashboard-topics">
       {topics.map((topic) => (
         <li key={topic.label} className="py-2.5">
           <div className="flex justify-between gap-3 text-[13.5px]">
             <span>{topic.label}</span>
-            <span className="whitespace-nowrap text-ink-soft tabular-nums">{topic.count.toLocaleString()} · {percent(topic.count, total)}</span>
+            <span className="whitespace-nowrap text-ink-soft tabular-nums">
+              <CountValue value={topic.count} />
+              {percent(topic.count, total) ? ` · ${percent(topic.count, total)}` : null}
+            </span>
           </div>
           <div className="mt-2 h-1 overflow-hidden rounded-sm bg-paper">
-            <div className="h-1 rounded-sm bg-teal" style={{ width: `${(topic.count / top) * 100}%` }} />
+            {topic.count === null ? null : <div className="h-1 rounded-sm bg-teal" style={{ width: `${(topic.count / top) * 100}%` }} />}
           </div>
         </li>
       ))}
@@ -60,8 +64,8 @@ export function SubMetroTable({ rows }: { rows: SubMetroFigures[] }) {
           {rows.map((row) => (
             <tr key={row.name} className="border-b last:border-0">
               <th scope="row" className="px-5 py-3 text-[13.5px] font-normal">{row.name}</th>
-              <td className={cn(cell, "text-ink-soft")}>{row.reports.toLocaleString()}</td>
-              <td className={cn(cell, "text-ink-soft")}>{row.resolved.toLocaleString()}</td>
+              <td className={cn(cell, "text-ink-soft")}><CountValue value={row.reports} /></td>
+              <td className={cn(cell, "text-ink-soft")}><CountValue value={row.resolved} /></td>
               <td className={cn(cell, "text-ink-soft")}>{row.median_days === null ? "–" : formatDays(row.median_days)}</td>
             </tr>
           ))}

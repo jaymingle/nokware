@@ -30,9 +30,37 @@ export function periodLabel(months: MonthFigures[]): string {
   return `${longMonth(months[0].month)} to ${longMonth(months[months.length - 1].month)}`;
 }
 
-/** Share of a total as "72%"; "0%" of nothing. */
-export function percent(count: number, total: number): string {
+// A report count of null means 1 to 4, shown as "fewer than 5" (the API's rule, as in Ask).
+export type Count = number | null;
+export const FEWER_THAN_FIVE = "fewer than 5";
+const SUPPRESSED_MAX = 4; // the most a "fewer than 5" count can be
+
+/** A count as shown: "1,204", or "<5" for fewer than 5. */
+export function formatCount(count: Count): string {
+  return count === null ? "<5" : count.toLocaleString();
+}
+
+/** Share of a total as "72%"; "0%" of nothing; null when either is "fewer than 5". */
+export function percent(count: Count, total: Count): string | null {
+  if (count === null || total === null) return null;
   return total > 0 ? `${Math.round((count / total) * 100)}%` : "0%";
+}
+
+/** The height a count may be drawn to: "fewer than 5" is drawn as at most 4. */
+export function drawnValue(count: Count): number {
+  return count ?? SUPPRESSED_MAX;
+}
+
+/** Runs of consecutive shown values, as index lists, so a line breaks at "fewer than 5" instead of guessing. */
+export function shownRuns(values: Count[]): number[][] {
+  const runs: number[][] = [];
+  values.forEach((value, i) => {
+    if (value === null) return;
+    const last = runs[runs.length - 1];
+    if (last && last[last.length - 1] === i - 1) last.push(i);
+    else runs.push([i]);
+  });
+  return runs;
 }
 
 /** Median days to resolve, as shown: under a day reads "under 1". */
@@ -42,8 +70,8 @@ export function formatDays(days: number): string {
 }
 
 /** The chart's top value and gridlines: whole numbers in four even steps. */
-export function chartScale(values: number[]): { max: number; ticks: number[] } {
-  const highest = Math.max(0, ...values);
+export function chartScale(values: Count[]): { max: number; ticks: number[] } {
+  const highest = Math.max(0, ...values.map(drawnValue));
   const rough = highest / CHART_STEPS;
   const magnitude = 10 ** Math.floor(Math.log10(Math.max(rough, 1)));
   const step = Math.max(1, (NICE.find((n) => n * magnitude >= rough) ?? 10) * magnitude);

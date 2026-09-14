@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { chartScale, formatDays, monthLabel, percent, periodLabel } from "@/lib/report/dashboard";
+import { chartScale, formatCount, formatDays, monthLabel, percent, periodLabel, shownRuns } from "@/lib/report/dashboard";
 import { reportFormData, type ReportDraft } from "@/lib/report/form";
 import { addPhotos } from "@/lib/report/photos";
 import { normaliseReference } from "@/lib/report/reference";
@@ -102,5 +102,14 @@ describe("dashboard figures", () => {
     expect(chartScale([0, 2, 1])).toEqual({ max: 4, ticks: [0, 1, 2, 3, 4] });
     expect(chartScale([])).toEqual({ max: 4, ticks: [0, 1, 2, 3, 4] });
     expect(chartScale([668, 412]).max).toBe(800);
+  });
+});
+
+describe("counts of fewer than 5", () => {
+  it("reads <5, hides shares it would reveal, and breaks the chart's line", () => {
+    expect([formatCount(null), formatCount(1204)]).toEqual(["<5", (1204).toLocaleString()]);
+    expect([percent(null, 12), percent(3, null), percent(6, 12)]).toEqual([null, null, "50%"]);
+    expect(shownRuns([5, 6, null, 7, null, null, 8, 9])).toEqual([[0, 1], [3], [6, 7]]);
+    expect(chartScale([null, 2]).max).toBe(4);
   });
 });
