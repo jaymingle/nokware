@@ -1,93 +1,409 @@
 {
-  "about": "Numbers a citizen can call about a report, grouped by how well each is sourced. Tier 1: national emergency lines, which need no citation. Tier 2: listed on an official government site, cited, and checked against that page on the date given. Tier 3: reported on social media or in the press only, shown as not independently verified. No civil servant is named beside a number: desk numbers only.",
+  "about": "Numbers a citizen can call about a report, grouped by how well each is sourced. Tier 1: national emergency lines, which need no citation. Tier 2: listed on an official government site, cited, and checked against that page on the date given. Tier 3: reported on social media or in the press only, shown as not independently verified. No civil servant is named beside a number: desk numbers only. Where a number given to Nokware differs from the one on the official page, both are shown and the official one is marked current.",
   "checked": "2026-09-14",
   "sources": {
-    "ama-contact": {"label": "ama.gov.gh", "url": "https://ama.gov.gh/contactus.php"},
-    "ama-social-welfare": {"label": "ama.gov.gh", "url": "https://ama.gov.gh/department-details.php?d=MjM%3D"},
-    "mint": {"label": "mint.gov.gh", "url": "https://www.mint.gov.gh/agencies/ghana-police-service/"},
-    "nas": {"label": "nas.gov.gh", "url": "https://nas.gov.gh/contact.php"},
-    "nadmo": {"label": "nadmo.gov.gh", "url": "https://nadmo.gov.gh"},
-    "epa": {"label": "epa.gov.gh", "url": "https://www.epa.gov.gh/new/contact-us/"},
+    "ama-contact": {
+      "label": "ama.gov.gh",
+      "url": "https://ama.gov.gh/contactus.php"
+    },
+    "ama-social-welfare": {
+      "label": "ama.gov.gh",
+      "url": "https://ama.gov.gh/department-details.php?d=MjM%3D"
+    },
+    "mint": {
+      "label": "mint.gov.gh",
+      "url": "https://www.mint.gov.gh/agencies/ghana-police-service/"
+    },
+    "nas": {
+      "label": "nas.gov.gh",
+      "url": "https://nas.gov.gh/contact.php"
+    },
+    "nadmo": {
+      "label": "nadmo.gov.gh",
+      "url": "https://nadmo.gov.gh"
+    },
+    "epa": {
+      "label": "epa.gov.gh",
+      "url": "https://www.epa.gov.gh/new/contact-us/"
+    },
     "isd-helpline": {
       "label": "isd.gov.gh",
       "url": "https://isd.gov.gh/ministry-of-gender-children-and-social-protection-intensifies-awareness-on-grievance-redress/"
     }
   },
   "services": [
-    {"id": "emergency", "name": "Emergency lines"},
-    {"id": "police", "name": "Police"},
-    {"id": "fire", "name": "Fire"},
-    {"id": "ambulance", "name": "Ambulance"},
-    {"id": "disaster", "name": "Floods and disasters"},
-    {"id": "welfare", "name": "Social welfare and child protection"},
-    {"id": "assembly", "name": "Accra Metropolitan Assembly"},
-    {"id": "environment", "name": "Environment"}
+    {
+      "id": "emergency",
+      "name": "Emergency lines"
+    },
+    {
+      "id": "police",
+      "name": "Police"
+    },
+    {
+      "id": "fire",
+      "name": "Fire"
+    },
+    {
+      "id": "ambulance",
+      "name": "Ambulance"
+    },
+    {
+      "id": "disaster",
+      "name": "Floods and disasters"
+    },
+    {
+      "id": "welfare",
+      "name": "Social welfare and child protection"
+    },
+    {
+      "id": "assembly",
+      "name": "Accra Metropolitan Assembly"
+    },
+    {
+      "id": "environment",
+      "name": "Environment"
+    }
   ],
   "contacts": [
-    {"id": "emergency-112", "service": "emergency", "tier": 1, "name": "National emergency",
-     "detail": "Police, fire and ambulance, free from any network.", "numbers": [{"number": "112", "kind": "call"}]},
-    {"id": "police-191", "service": "emergency", "tier": 1, "name": "Police emergency",
-     "detail": "Free from any network.", "numbers": [{"number": "191", "kind": "call"}]},
-    {"id": "police-18555", "service": "emergency", "tier": 1, "name": "Police emergency",
-     "detail": "Free from MTN and Telecel.", "numbers": [{"number": "18555", "kind": "call"}]},
-    {"id": "fire-192", "service": "emergency", "tier": 1, "name": "Fire emergency",
-     "detail": "Ghana National Fire Service, free from any network.", "numbers": [{"number": "192", "kind": "call"}]},
-    {"id": "ambulance-193", "service": "emergency", "tier": 1, "name": "Ambulance emergency",
-     "detail": "National Ambulance Service.", "numbers": [{"number": "193", "kind": "call"}]},
-
-    {"id": "police-main", "service": "police", "tier": 2, "name": "Ghana Police Service main line",
-     "detail": "Not for emergencies: call 191 or 112.", "numbers": [{"number": "0302 779 300", "kind": "call"}], "source": "mint"},
-    {"id": "police-mobile", "service": "police", "tier": 3, "name": "Police mobile reporting lines",
-     "numbers": [{"number": "0551 625 567", "kind": "call"}, {"number": "0591 476 893", "kind": "call"}], "reported_via": null},
-    {"id": "police-whatsapp", "service": "police", "tier": 3, "name": "Police WhatsApp reporting line",
-     "numbers": [{"number": "0591 476 884", "kind": "whatsapp"}], "reported_via": null},
-
-    {"id": "gnfs", "service": "fire", "tier": 2, "name": "Ghana National Fire Service",
-     "detail": "Office line. In a fire, call 192 or 112.", "numbers": [{"number": "0299 340 383", "kind": "call"}], "source": "mint"},
-
-    {"id": "nas", "service": "ambulance", "tier": 2, "name": "National Ambulance Service office",
-     "detail": "In an emergency, call 193 or 112.",
-     "numbers": [{"number": "0501 614 877", "kind": "call"}, {"number": "0505 982 870", "kind": "call"}], "source": "nas"},
-
-    {"id": "nadmo-emergency", "service": "disaster", "tier": 2, "name": "NADMO national emergency line",
-     "detail": "National Disaster Management Organisation.", "numbers": [{"number": "0302 964 884", "kind": "call"}], "source": "nadmo"},
-    {"id": "nadmo-whatsapp", "service": "disaster", "tier": 2, "name": "NADMO WhatsApp",
-     "numbers": [{"number": "0204 833 556", "kind": "whatsapp"}], "source": "nadmo"},
-
-    {"id": "helpline-of-hope", "service": "welfare", "tier": 2, "name": "Helpline of Hope",
-     "detail": "Ministry of Gender, Children and Social Protection. Free: report the abuse of a child or anyone else, day or night.",
-     "numbers": [{"number": "0800 800 800", "kind": "call"}, {"number": "0800 900 900", "kind": "call"}], "source": "isd-helpline"},
-    {"id": "sw-head-office", "service": "welfare", "tier": 2, "name": "AMA Social Welfare, head office",
-     "numbers": [{"number": "0550 006 688", "kind": "call"}], "source": "ama-social-welfare"},
-    {"id": "sw-ashiedu-keteke", "service": "welfare", "tier": 2, "name": "AMA Social Welfare, Ashiedu Keteke sub-metro desk",
-     "numbers": [{"number": "0553 260 046", "kind": "call"}], "source": "ama-social-welfare", "sub_metro": "ashiedu-keteke"},
-    {"id": "sw-ablekuma-south", "service": "welfare", "tier": 2, "name": "AMA Social Welfare, Ablekuma South sub-metro desk",
-     "numbers": [{"number": "0242 703 957", "kind": "call"}], "source": "ama-social-welfare", "sub_metro": "ablekuma-south"},
-    {"id": "sw-okaikoi-south", "service": "welfare", "tier": 2, "name": "AMA Social Welfare, Okaikoi South sub-metro desk",
-     "numbers": [{"number": "0303 935 397", "kind": "call"}], "source": "ama-social-welfare", "sub_metro": "okaikoi-south"},
-    {"id": "sw-ussher", "service": "welfare", "tier": 2, "name": "Ussher Polyclinic social welfare desk",
-     "numbers": [{"number": "0544 067 692", "kind": "call"}], "source": "ama-social-welfare"},
-
-    {"id": "ama-general", "service": "assembly", "tier": 2, "name": "Accra Metropolitan Assembly",
-     "detail": "The Assembly's switchboard, for any department.",
-     "numbers": [{"number": "0302 665 951", "kind": "call"}, {"number": "0243 211 345", "kind": "call"}],
-     "email": "info@ama.gov.gh", "source": "ama-contact"},
-    {"id": "ama-sanitation-whatsapp", "service": "assembly", "tier": 3, "name": "AMA sanitation WhatsApp",
-     "detail": "For reporting refuse and sanitation offences.", "numbers": [{"number": "0544 914 628", "kind": "whatsapp"}],
-     "reported_via": "Facebook", "reported_by": "the Mayor of Accra",
-     "press_url": "https://rainbowradioonline.com/2026/07/02/mayor-of-accra-launches-whatsapp-line-for-waste-reporting/"},
-
-    {"id": "epa", "service": "environment", "tier": 2, "name": "Environmental Protection Authority",
-     "numbers": [{"number": "050 669 4760", "kind": "call"}, {"number": "050 669 9466", "kind": "call"}], "source": "epa"}
+    {
+      "id": "emergency-112",
+      "service": "emergency",
+      "tier": 1,
+      "name": "National emergency",
+      "detail": "Police, fire and ambulance, free from any network.",
+      "numbers": [
+        {
+          "number": "112",
+          "kind": "call"
+        }
+      ]
+    },
+    {
+      "id": "police-191",
+      "service": "emergency",
+      "tier": 1,
+      "name": "Police emergency",
+      "detail": "Free from any network.",
+      "numbers": [
+        {
+          "number": "191",
+          "kind": "call"
+        }
+      ]
+    },
+    {
+      "id": "police-18555",
+      "service": "emergency",
+      "tier": 1,
+      "name": "Police emergency",
+      "detail": "Free from MTN and Telecel.",
+      "numbers": [
+        {
+          "number": "18555",
+          "kind": "call"
+        }
+      ]
+    },
+    {
+      "id": "fire-192",
+      "service": "emergency",
+      "tier": 1,
+      "name": "Fire emergency",
+      "detail": "Ghana National Fire Service, free from any network.",
+      "numbers": [
+        {
+          "number": "192",
+          "kind": "call"
+        }
+      ]
+    },
+    {
+      "id": "ambulance-193",
+      "service": "emergency",
+      "tier": 1,
+      "name": "Ambulance emergency",
+      "detail": "National Ambulance Service.",
+      "numbers": [
+        {
+          "number": "193",
+          "kind": "call"
+        }
+      ]
+    },
+    {
+      "id": "police-main",
+      "service": "police",
+      "tier": 2,
+      "name": "Ghana Police Service main line",
+      "detail": "Not for emergencies: call 191 or 112.",
+      "numbers": [
+        {
+          "number": "0302 779 300",
+          "kind": "call"
+        },
+        {
+          "number": "0302 773 900",
+          "kind": "call",
+          "current": false,
+          "note": "Given to Nokware as the Accra headquarters line; not on mint.gov.gh when checked."
+        }
+      ],
+      "source": "mint"
+    },
+    {
+      "id": "police-mobile",
+      "service": "police",
+      "tier": 3,
+      "name": "Police mobile reporting lines",
+      "numbers": [
+        {
+          "number": "0551 625 567",
+          "kind": "call"
+        },
+        {
+          "number": "0591 476 893",
+          "kind": "call"
+        }
+      ],
+      "reported_via": "X",
+      "reported_by": "the Ghana Police Service"
+    },
+    {
+      "id": "police-whatsapp",
+      "service": "police",
+      "tier": 3,
+      "name": "Police WhatsApp reporting line",
+      "numbers": [
+        {
+          "number": "0591 476 884",
+          "kind": "whatsapp"
+        }
+      ],
+      "reported_via": "X",
+      "reported_by": "the Ghana Police Service"
+    },
+    {
+      "id": "gnfs",
+      "service": "fire",
+      "tier": 2,
+      "name": "Ghana National Fire Service",
+      "detail": "Office line. In a fire, call 192 or 112.",
+      "numbers": [
+        {
+          "number": "0299 340 383",
+          "kind": "call"
+        },
+        {
+          "number": "0302 772 446",
+          "kind": "call",
+          "current": false,
+          "note": "Given to Nokware as the Greater Accra headquarters line; not on mint.gov.gh when checked."
+        }
+      ],
+      "source": "mint"
+    },
+    {
+      "id": "nas",
+      "service": "ambulance",
+      "tier": 2,
+      "name": "National Ambulance Service office",
+      "detail": "In an emergency, call 193 or 112.",
+      "numbers": [
+        {
+          "number": "0501 614 877",
+          "kind": "call"
+        },
+        {
+          "number": "0505 982 870",
+          "kind": "call"
+        }
+      ],
+      "source": "nas"
+    },
+    {
+      "id": "nadmo-emergency",
+      "service": "disaster",
+      "tier": 2,
+      "name": "NADMO national emergency line",
+      "detail": "National Disaster Management Organisation.",
+      "numbers": [
+        {
+          "number": "0302 964 884",
+          "kind": "call"
+        }
+      ],
+      "source": "nadmo"
+    },
+    {
+      "id": "nadmo-whatsapp",
+      "service": "disaster",
+      "tier": 2,
+      "name": "NADMO WhatsApp",
+      "numbers": [
+        {
+          "number": "0204 833 556",
+          "kind": "whatsapp"
+        }
+      ],
+      "source": "nadmo"
+    },
+    {
+      "id": "helpline-of-hope",
+      "service": "welfare",
+      "tier": 2,
+      "name": "Helpline of Hope",
+      "detail": "Ministry of Gender, Children and Social Protection. Free: report the abuse of a child or anyone else, day or night.",
+      "numbers": [
+        {
+          "number": "0800 800 800",
+          "kind": "call"
+        },
+        {
+          "number": "0800 900 900",
+          "kind": "call"
+        }
+      ],
+      "source": "isd-helpline"
+    },
+    {
+      "id": "sw-head-office",
+      "service": "welfare",
+      "tier": 2,
+      "name": "AMA Social Welfare, head office",
+      "numbers": [
+        {
+          "number": "0550 006 688",
+          "kind": "call"
+        }
+      ],
+      "source": "ama-social-welfare"
+    },
+    {
+      "id": "sw-ashiedu-keteke",
+      "service": "welfare",
+      "tier": 2,
+      "name": "AMA Social Welfare, Ashiedu Keteke sub-metro desk",
+      "numbers": [
+        {
+          "number": "0553 260 046",
+          "kind": "call"
+        }
+      ],
+      "source": "ama-social-welfare",
+      "sub_metro": "ashiedu-keteke"
+    },
+    {
+      "id": "sw-ablekuma-south",
+      "service": "welfare",
+      "tier": 2,
+      "name": "AMA Social Welfare, Ablekuma South sub-metro desk",
+      "numbers": [
+        {
+          "number": "0242 703 957",
+          "kind": "call"
+        }
+      ],
+      "source": "ama-social-welfare",
+      "sub_metro": "ablekuma-south"
+    },
+    {
+      "id": "sw-okaikoi-south",
+      "service": "welfare",
+      "tier": 2,
+      "name": "AMA Social Welfare, Okaikoi South sub-metro desk",
+      "numbers": [
+        {
+          "number": "0303 935 397",
+          "kind": "call"
+        }
+      ],
+      "source": "ama-social-welfare",
+      "sub_metro": "okaikoi-south"
+    },
+    {
+      "id": "sw-ussher",
+      "service": "welfare",
+      "tier": 2,
+      "name": "Ussher Polyclinic social welfare desk",
+      "numbers": [
+        {
+          "number": "0544 067 692",
+          "kind": "call"
+        }
+      ],
+      "source": "ama-social-welfare"
+    },
+    {
+      "id": "ama-general",
+      "service": "assembly",
+      "tier": 2,
+      "name": "Accra Metropolitan Assembly",
+      "detail": "The Assembly's switchboard, for any department.",
+      "numbers": [
+        {
+          "number": "0302 665 951",
+          "kind": "call"
+        },
+        {
+          "number": "0243 211 345",
+          "kind": "call"
+        }
+      ],
+      "email": "info@ama.gov.gh",
+      "source": "ama-contact"
+    },
+    {
+      "id": "ama-sanitation-whatsapp",
+      "service": "assembly",
+      "tier": 3,
+      "name": "AMA sanitation WhatsApp",
+      "detail": "For reporting refuse and sanitation offences.",
+      "numbers": [
+        {
+          "number": "0544 914 628",
+          "kind": "whatsapp"
+        }
+      ],
+      "reported_via": "Facebook",
+      "reported_by": "the Mayor of Accra",
+      "press_url": "https://rainbowradioonline.com/2026/07/02/mayor-of-accra-launches-whatsapp-line-for-waste-reporting/"
+    },
+    {
+      "id": "epa",
+      "service": "environment",
+      "tier": 2,
+      "name": "Environmental Protection Authority",
+      "numbers": [
+        {
+          "number": "050 669 4760",
+          "kind": "call"
+        },
+        {
+          "number": "050 669 9466",
+          "kind": "call"
+        },
+        {
+          "number": "0302 664 697",
+          "kind": "call",
+          "current": false,
+          "note": "Given to Nokware; epa.gov.gh's contact page now lists the numbers above."
+        },
+        {
+          "number": "0302 664 698",
+          "kind": "call",
+          "current": false,
+          "note": "Given to Nokware; epa.gov.gh's contact page now lists the numbers above."
+        }
+      ],
+      "source": "epa"
+    }
   ],
   "held": [
-    {"number": "0302 681 051", "for": "AMA Waste Management",
-     "why": "Not on ama.gov.gh's Waste Management department or services pages, which list only the Assembly's general lines (checked 2026-09-14)."},
-    {"number": "0302 773 900", "for": "Ghana Police Service HQ, Accra",
-     "why": "Not on mint.gov.gh's Ghana Police Service page, which lists 0302 779 300 as the main line (checked 2026-09-14)."},
-    {"number": "0302 772 446", "for": "GNFS Greater Accra headquarters",
-     "why": "No source page given, and gnfs.gov.gh's contact pages would not load (checked 2026-09-14)."},
-    {"number": "0302 664 697 / 0302 664 698", "for": "EPA Ghana",
-     "why": "epa.gov.gh's current contact page lists 050 669 4760 / 050 669 9466; the 0302 numbers appear only in older documents."}
+    {
+      "number": "0302 681 051",
+      "for": "AMA Waste Management",
+      "why": "Not on ama.gov.gh's Waste Management department or services pages, which list only the Assembly's general lines (checked 2026-09-14)."
+    }
   ]
 }

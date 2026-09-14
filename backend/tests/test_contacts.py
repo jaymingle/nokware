@@ -11,6 +11,7 @@ from app import contacts
 from app.main import app
 from app.routes import reports as routes
 from app.services import rate_limit
+from app.services.report_taxonomy import TOPICS, Category
 
 client = TestClient(app)
 
@@ -28,8 +29,25 @@ def test_a_safety_report_gets_emergency_lines_the_helpline_and_its_sub_metros_we
 def test_other_reports_get_the_numbers_for_where_they_went() -> None:
     assert ids(contacts.for_report("fire", "kinka")) == ["emergency-112", "fire-192", "gnfs"]
     assert ids(contacts.for_report("disaster", None)) == ["emergency-112", "nadmo-emergency"]
+    assert ids(contacts.for_report("public_crime", None)) == ["emergency-112", "police-191"]
+    assert ids(contacts.for_report("structural_danger", None)) == ["emergency-112", "ama-general"]
     assert ids(contacts.for_report("solid_waste", None)) == ["ama-sanitation-whatsapp", "ama-general"]
     assert ids(contacts.for_report("roads", None)) == ids(contacts.for_report("revenue", None)) == ["ama-general"]
+
+
+def test_every_danger_to_the_public_starts_with_112_and_every_agency_report_gets_its_line() -> None:
+    for topic in TOPICS:
+        shown = ids(contacts.for_report(topic.id, None))
+        if topic.category != Category.CIVIC_SERVICE:
+            assert shown[0] == "emergency-112", topic.id
+        for recipient, line in contacts.AGENCY_LINES.items():
+            assert recipient not in topic.recipients or line in shown, topic.id
+
+
+def test_a_number_given_to_nokware_that_differs_is_shown_beside_the_current_one() -> None:
+    police = contacts.contacts()["police-main"].numbers
+    assert [(n.number, n.current) for n in police] == [("0302 779 300", True), ("0302 773 900", False)]
+    assert all(n.note for c in contacts.contacts().values() for n in c.numbers if not n.current)
 
 
 def test_every_official_number_is_cited_and_only_those_are() -> None:

@@ -10,6 +10,9 @@ Tier = Literal[1, 2, 3]
 class ContactNumber(BaseModel):
     number: str  # as written, e.g. "0302 665 951"
     kind: Literal["call", "whatsapp"]
+    # False for a number given to Nokware that differs from the one on the cited page; shown, but not as current.
+    current: bool = True
+    note: str | None = None  # why a number isn't current
 
 
 class ContactSource(BaseModel):

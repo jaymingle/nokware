@@ -3,11 +3,15 @@
 The numbers live in data/contacts.json, each with where it comes from: a
 national emergency line (tier 1), an official site checked on a given date
 (tier 2), or a social-media report shown as not independently verified
-(tier 3). Numbers whose stated source didn't hold up are kept in its "held"
-list and never shown.
+(tier 3). Where a number given to Nokware differs from the one on the cited
+page, both are shown and the cited one is marked current. A number with no
+source at all is kept in the file's "held" list and never shown.
 
-A report's confirmation shows the numbers for where it went (ROUTES below). A
-personal-safety report also gets the Social Welfare desk for the sub-metro the
+A report's confirmation shows the numbers for where it went. A public-safety
+report starts with 112, and a report for the Police or the Fire Service gets
+that service's emergency line; then any numbers for the topic (ROUTES), or the
+Assembly's switchboard if there are none. A personal-safety report gets the
+emergency lines, the helpline and the Social Welfare desk for the sub-metro the
 citizen gave, or the head office if they gave none.
 """
 
@@ -17,18 +21,22 @@ from pathlib import Path
 from typing import Any
 
 from app.schemas.contacts import ContactDirectory, ContactSource, PublicContact, Service
-from app.services.report_taxonomy import TOPICS_BY_ID, Category
+from app.services.report_taxonomy import GNFS, POLICE, TOPICS_BY_ID, Category
 from app.wards import sub_metros
 
 CONTACTS_FILE = Path(__file__).resolve().parent / "data" / "contacts.json"
 
 SAFETY = ("emergency-112", "police-191", "police-18555", "helpline-of-hope")
 SAFETY_DESK_FALLBACK = "sw-head-office"
-# By topic; any topic not listed gets DEFAULT. The waste route will add AMA
+PUBLIC_EMERGENCY = "emergency-112"
+# The emergency line of each agency a report can go to.
+AGENCY_LINES = {POLICE: "police-191", GNFS: "fire-192"}
+# Numbers for a topic, after its emergency lines. The waste route will add AMA
 # Waste Management's own line once a source for it is found.
 ROUTES = {
-    "fire": ("emergency-112", "fire-192", "gnfs"),
-    "disaster": ("emergency-112", "nadmo-emergency"),
+    "fire": ("gnfs",),
+    "disaster": ("nadmo-emergency",),
+    "structural_danger": ("ama-general",),
     "solid_waste": ("ama-sanitation-whatsapp", "ama-general"),
     "sanitation_facilities": ("ama-sanitation-whatsapp", "ama-general"),
 }
@@ -41,6 +49,8 @@ def _contact(raw: dict[str, Any], sources: dict[str, Any], checked: str) -> Publ
     contact = PublicContact(**fields, source=ContactSource(**sources[source], checked=checked) if source else None)
     if (contact.tier == 2) != (contact.source is not None):
         raise ValueError(f"contact {contact.id}: tier 2 needs a source, and only tier 2 has one")
+    if not any(n.current for n in contact.numbers) or any(not n.current and not n.note for n in contact.numbers):
+        raise ValueError(f"contact {contact.id}: needs a current number, and a note on any that isn't")
     return contact
 
 
@@ -75,17 +85,27 @@ def safety_contacts(sub_metro: str | None) -> list[PublicContact]:
     return [contacts()[i] for i in (*SAFETY, desk)]
 
 
+def emergency_lines(topic: str) -> list[str]:
+    """112 for anything that endangers the public, and the line of each agency the report goes to."""
+    found = TOPICS_BY_ID[topic]
+    lines = [PUBLIC_EMERGENCY] if found.category == Category.PUBLIC_SAFETY else []
+    return lines + [AGENCY_LINES[r] for r in found.recipients if r in AGENCY_LINES]
+
+
 def for_report(topic: str, sub_metro: str | None) -> list[PublicContact]:
     """The numbers to show a citizen for where their report went."""
     if TOPICS_BY_ID[topic].category == Category.PERSONAL_SAFETY:
         return safety_contacts(sub_metro)
-    return [contacts()[i] for i in ROUTES.get(topic, DEFAULT)]
+    lines = emergency_lines(topic)
+    extra = ROUTES.get(topic, () if lines else DEFAULT)
+    return [contacts()[i] for i in dict.fromkeys([*lines, *extra])]
 
 
 def _check() -> None:
     """Fail at import if a route names a contact or topic that doesn't exist."""
     known = contacts()
-    named = {*SAFETY, SAFETY_DESK_FALLBACK, *DEFAULT, *(i for ids in ROUTES.values() for i in ids)}
+    named = {*SAFETY, SAFETY_DESK_FALLBACK, *DEFAULT, PUBLIC_EMERGENCY, *AGENCY_LINES.values(),
+             *(i for ids in ROUTES.values() for i in ids)}
     missing = named - set(known)
     if missing or not set(ROUTES) <= set(TOPICS_BY_ID):
         raise ValueError(f"contact routes name unknown contacts {sorted(missing)} or topics")
