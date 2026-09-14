@@ -1,51 +1,64 @@
 {
   "source": {
+    "label": "ama.gov.gh",
+    "url": "https://ama.gov.gh/theassemblymembers.php",
+    "note": "Electoral areas, their sub-metros and each sub-metro's chairperson and office, as given to Nokware from ama.gov.gh. Where AMA's 2023 Monitoring and Evaluation Report (Annex 1b) spells an area differently, that spelling is kept as an alternate, so either finds the area. Mukose is listed only in that report."
+  },
+  "earlier_source": {
     "document_id": "ama-c2c83b4f002baf9ad287d2859ba1292f",
     "title": "2023 Monitoring and Evaluation Report",
     "section": "Annex 1b, Honourable Assembly Monitoring Team (electoral areas by sub-metro)",
-    "url": "https://ama.gov.gh/documents/AMA_2023_Mon._and_Eva_Report(1).pdf",
-    "note": "The same 20 electoral areas appear in the first and second quarter reports of 2023 and the 2022 monitoring report. Names use their common spelling; the report's spelling, where it differs, is kept in aliases."
+    "url": "https://ama.gov.gh/documents/AMA_2023_Mon._and_Eva_Report(1).pdf"
   },
   "sub_metros": [
     {
       "id": "ashiedu-keteke",
       "name": "Ashiedu Keteke",
-      "aliases": [],
+      "alternates": [],
+      "chairperson": "Hon. Peter Quaye",
+      "chairperson_area": "Korle Woko",
+      "office": "Near Ussher Polyclinic / James Town",
       "wards": [
-        {"id": "ngleshie", "name": "Ngleshie", "aliases": []},
-        {"id": "mudor", "name": "Mudor", "aliases": []},
-        {"id": "kinka", "name": "Kinka", "aliases": []},
-        {"id": "nmlitsagonno", "name": "Nmlitsagonno", "aliases": ["Nmlitse Gonno"]},
-        {"id": "amamomo", "name": "Amamomo", "aliases": []},
-        {"id": "korle-wokon", "name": "Korle Wokon", "aliases": []},
-        {"id": "korle-dudor", "name": "Korle Dudor", "aliases": []}
+        {"id": "kinka", "name": "Kinka", "alternates": []},
+        {"id": "ngleshie", "name": "Ngleshi", "alternates": ["Ngleshie"]},
+        {"id": "mudor", "name": "Mudor", "alternates": []},
+        {"id": "korle-wokon", "name": "Korle Wonkon", "alternates": ["Korle Wokon", "Korle Woko"]},
+        {"id": "korle-dudor", "name": "Korle Dudor", "alternates": []},
+        {"id": "amamomo", "name": "Amamomo", "alternates": []}
       ]
     },
     {
       "id": "okaikoi-south",
       "name": "Okaikoi South",
-      "aliases": ["Okaikwei South"],
+      "alternates": ["Okaikwei South"],
+      "chairperson": "Hon. David Abalo",
+      "chairperson_area": "Bubui",
+      "office": "Kaneshie",
       "wards": [
-        {"id": "kaneshie", "name": "Kaneshie", "aliases": []},
-        {"id": "awudome", "name": "Awudome", "aliases": []},
-        {"id": "avenor", "name": "Avenor", "aliases": []},
-        {"id": "mukose", "name": "Mukose", "aliases": []},
-        {"id": "bubui", "name": "Bubui", "aliases": []},
-        {"id": "bubuashie", "name": "Bubuashie", "aliases": ["Bubuiashie"]},
-        {"id": "kantsian", "name": "Kantsian", "aliases": ["Kantesean"]},
-        {"id": "gonten", "name": "Gonten", "aliases": ["Goten"]}
+        {"id": "avenor", "name": "Avenor", "alternates": []},
+        {"id": "bubuashie", "name": "Bubiashie", "alternates": ["Bubuashie", "Bubuiashie"]},
+        {"id": "bubui", "name": "Bubui", "alternates": []},
+        {"id": "kantsian", "name": "Kantesian", "alternates": ["Kantsian", "Kantesean"]},
+        {"id": "kaneshie", "name": "Kaneshie", "alternates": []},
+        {"id": "gonten", "name": "Gonten", "alternates": ["Goten"]},
+        {"id": "awudome", "name": "Awudome", "alternates": []},
+        {"id": "mukose", "name": "Mukose", "alternates": [], "note": "Listed in AMA's 2023 Monitoring and Evaluation Report, not in the list from ama.gov.gh."}
       ]
     },
     {
       "id": "ablekuma-south",
       "name": "Ablekuma South",
-      "aliases": [],
+      "alternates": [],
+      "chairperson": "Hon. Theophilus Isaac Quaye",
+      "chairperson_area": "Chorkor",
+      "office": "Near Korle Bu / Mamprobi",
       "wards": [
-        {"id": "korle-gonno", "name": "Korle Gonno", "aliases": ["Korle Gonna"]},
-        {"id": "korle-bu", "name": "Korle Bu", "aliases": []},
-        {"id": "mamprobi", "name": "Mamprobi", "aliases": []},
-        {"id": "chorkor", "name": "Chorkor", "aliases": ["Chokor"]},
-        {"id": "new-mamprobi", "name": "New Mamprobi", "aliases": []}
+        {"id": "nmlitsagonno", "name": "Nmlitsa-Gonno", "alternates": ["Nmlitsagonno", "Nmlitse Gonno"]},
+        {"id": "new-mamprobi", "name": "New Mamprobi", "alternates": []},
+        {"id": "korle-bu", "name": "Korle Bu", "alternates": []},
+        {"id": "chorkor", "name": "Chorkor", "alternates": ["Chokor"]},
+        {"id": "korle-gonno", "name": "Korle Gonno", "alternates": ["Korle Gonna"]},
+        {"id": "mamprobi", "name": "Mamprobi", "alternates": []}
       ]
     }
   ]
