@@ -859,6 +859,13 @@ export interface components {
              * @enum {string}
              */
             kind: "call" | "whatsapp";
+            /**
+             * Current
+             * @default true
+             */
+            current: boolean;
+            /** Note */
+            note?: string | null;
         };
         /** ContactSource */
         ContactSource: {

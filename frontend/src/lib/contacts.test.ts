@@ -10,9 +10,9 @@ const contact = (fields: Partial<PublicContact>): PublicContact => ({
 
 describe("numberHref", () => {
   it("dials calls as written and opens WhatsApp in international form", () => {
-    expect(numberHref({ number: "112", kind: "call" })).toBe("tel:112");
-    expect(numberHref({ number: "0302 665 951", kind: "call" })).toBe("tel:0302665951");
-    expect(numberHref({ number: "0204 833 556", kind: "whatsapp" })).toBe("https://wa.me/233204833556");
+    expect(numberHref({ number: "112", kind: "call", current: true })).toBe("tel:112");
+    expect(numberHref({ number: "0302 665 951", kind: "call", current: true })).toBe("tel:0302665951");
+    expect(numberHref({ number: "0204 833 556", kind: "whatsapp", current: true })).toBe("https://wa.me/233204833556");
   });
 });
 
@@ -23,5 +23,8 @@ describe("tierNote", () => {
       "Reported via Facebook by the Mayor of Accra, not independently verified",
     );
     expect(tierNote(contact({ tier: 3 }))).toBe("Reported on social media, not independently verified");
+    expect(tierNote(contact({ tier: 3, reported_via: "X", reported_by: "the Ghana Police Service" }))).toBe(
+      "Reported via X by the Ghana Police Service, not independently verified",
+    );
   });
 });

@@ -3,10 +3,11 @@ import { ExternalLinkIcon, MailIcon, MessageCircleIcon, PhoneIcon } from "lucide
 import { Tag } from "@/components/documents/tag";
 import { numberHref, tierNote } from "@/lib/contacts";
 import { formatDate } from "@/lib/time";
+import { cn } from "@/lib/utils";
 
 import type { ContactNumber, PublicContact } from "@/lib/api/types";
 
-function NumberLink({ number, testId }: { number: ContactNumber; testId: string }) {
+function NumberLink({ number, testId, marked = false }: { number: ContactNumber; testId: string; marked?: boolean }) {
   const whatsapp = number.kind === "whatsapp";
   const Icon = whatsapp ? MessageCircleIcon : PhoneIcon;
   return (
@@ -14,13 +15,31 @@ function NumberLink({ number, testId }: { number: ContactNumber; testId: string 
       href={numberHref(number)}
       target={whatsapp ? "_blank" : undefined}
       rel={whatsapp ? "noopener" : undefined}
-      className="inline-flex items-center gap-1.5 rounded-lg border bg-card px-2.5 py-1.5 text-[14px] font-medium tabular-nums hover:border-teal"
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[14px] tabular-nums hover:border-teal",
+        number.current ? "bg-card font-medium" : "bg-transparent text-ink-soft",
+      )}
       data-testid={testId}
     >
-      <Icon aria-hidden className="size-3.5 text-teal" />
+      <Icon aria-hidden className={cn("size-3.5", number.current ? "text-teal" : "text-ink-soft")} />
       {number.number}
       {whatsapp ? <span className="text-[12px] font-normal text-ink-soft">WhatsApp</span> : null}
+      {marked ? <span className="rounded bg-teal-tint px-1.5 text-[11.5px] font-normal text-teal">Current</span> : null}
     </a>
+  );
+}
+
+/** Numbers given to Nokware that differ from the cited page: shown, with why they aren't current. */
+function EarlierNumbers({ contactId, numbers }: { contactId: string; numbers: ContactNumber[] }) {
+  return (
+    <ul className="flex flex-col gap-1.5">
+      {numbers.map((number, i) => (
+        <li key={number.number} className="flex flex-wrap items-center gap-2">
+          <NumberLink number={number} testId={`contact-${contactId}-earlier-${i}`} />
+          <span className="text-[12px] text-ink-soft">{number.note}</span>
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -52,6 +71,8 @@ export function SourceLine({ contact }: { contact: PublicContact }) {
 
 /** One office or line: its name, what it's for, its numbers, and where they come from. */
 export function ContactItem({ contact }: { contact: PublicContact }) {
+  const current = contact.numbers.filter((n) => n.current);
+  const earlier = contact.numbers.filter((n) => !n.current);
   return (
     <li className="flex flex-col gap-2 py-3" data-testid={`contact-${contact.id}`}>
       <div>
@@ -59,8 +80,8 @@ export function ContactItem({ contact }: { contact: PublicContact }) {
         {contact.detail ? <p className="text-[13px] text-ink-soft">{contact.detail}</p> : null}
       </div>
       <div className="flex flex-wrap gap-2">
-        {contact.numbers.map((number, i) => (
-          <NumberLink key={number.number} number={number} testId={`contact-${contact.id}-number-${i}`} />
+        {current.map((number, i) => (
+          <NumberLink key={number.number} number={number} testId={`contact-${contact.id}-number-${i}`} marked={earlier.length > 0} />
         ))}
         {contact.email ? (
           <a href={`mailto:${contact.email}`} className="inline-flex items-center gap-1.5 rounded-lg border bg-card px-2.5 py-1.5 text-[14px] hover:border-teal" data-testid={`contact-${contact.id}-email`}>
@@ -69,6 +90,7 @@ export function ContactItem({ contact }: { contact: PublicContact }) {
           </a>
         ) : null}
       </div>
+      {earlier.length ? <EarlierNumbers contactId={contact.id} numbers={earlier} /> : null}
       <SourceLine contact={contact} />
     </li>
   );
