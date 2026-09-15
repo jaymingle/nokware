@@ -5,6 +5,7 @@ import { env } from "@/lib/env";
 import type {
   ContactDirectory,
   Dashboard,
+  ExportView,
   Issue,
   IssuePage,
   PreferencesResult,
@@ -18,7 +19,7 @@ import type {
   VoiceResult,
 } from "@/lib/api/types";
 
-export async function publicRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
+async function publicFetch(path: string, init: RequestInit): Promise<Response> {
   let response: Response;
   try {
     response = await fetch(`${env.apiUrl}${path}`, init);
@@ -26,7 +27,30 @@ export async function publicRequest<T>(path: string, init: RequestInit = {}): Pr
     throw new ApiError(0, UNREACHABLE);
   }
   if (!response.ok) throw new ApiError(response.status, await errorMessage(response));
-  return (await response.json()) as T;
+  return response;
+}
+
+export async function publicRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
+  return (await (await publicFetch(path, init)).json()) as T;
+}
+
+/** One part of a reading, and how many parts the whole reading has. */
+export type SpokenPart = { audio: Blob; parts: number };
+
+async function postForAudio(path: string, body: unknown): Promise<SpokenPart> {
+  const init = { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) };
+  const response = await publicFetch(path, init);
+  return { audio: await response.blob(), parts: Number(response.headers.get("X-Speech-Parts") ?? 1) };
+}
+
+/** Part of an Ask answer spoken: the API reads only an answer it gave, sent back as its signed export view. */
+export function answerAudio(view: ExportView, part: number): Promise<SpokenPart> {
+  return postForAudio("/api/speech/answer", { view, part });
+}
+
+/** Part of a report's confirmation or status spoken, by its reference (in the body, never the address). */
+export function reportAudio(reference: string, kind: "receipt" | "status", part: number): Promise<SpokenPart> {
+  return postForAudio("/api/speech/report", { reference, kind, part });
 }
 
 export function postJson<T>(path: string, body: unknown, headers: Record<string, string> = {}): Promise<T> {

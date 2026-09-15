@@ -10,9 +10,13 @@ import { ExportMenu } from "@/components/ask/export-menu";
 import { FigureCard } from "@/components/ask/figure-card";
 import { NoInformation } from "@/components/ask/no-information";
 import { ErrorNote } from "@/components/documents/panels";
+import { ReadAloud } from "@/components/read-aloud/read-aloud";
 import { Button } from "@/components/ui/button";
+import { answerAudio } from "@/lib/api/public";
 import { DISAGREEMENT_LEAD } from "@/lib/ask/sources";
 import { citedDocuments, type Turn } from "@/lib/ask/turn";
+
+import type { ExportView } from "@/lib/api/types";
 
 const HIGHLIGHT_MS = 2400;
 
@@ -115,6 +119,16 @@ function Answer({ turn, testId }: { turn: Turn; testId: string }) {
 }
 
 /** One question and everything that comes back for it. */
+/** What can be done with a finished answer: hear it read aloud (unless it touches on someone's safety), or download it. */
+function AnswerTools({ turn, view, testId }: { turn: Turn; view: ExportView; testId: string }) {
+  return (
+    <div className="flex flex-wrap items-start gap-3">
+      {turn.speakable ? <ReadAloud load={(part) => answerAudio(view, part)} label="Listen to this answer" testId={`${testId}-listen`} /> : null}
+      <ExportMenu view={view} testId={testId} />
+    </div>
+  );
+}
+
 export function AskTurn({ turn, onRetry }: { turn: Turn; onRetry: (turn: Turn) => void }) {
   const testId = `ask-${turn.id}`;
   const working = turn.stage === "searching" || turn.stage === "counting" || turn.stage === "writing";
@@ -130,7 +144,7 @@ export function AskTurn({ turn, onRetry }: { turn: Turn; onRetry: (turn: Turn) =
       {working ? <AskProgress turn={turn} testId={`${testId}-progress`} /> : null}
       {noInformation ? <NoInformation testIdPrefix={testId} /> : null}
       {!noInformation && turn.stage !== "error" ? <Answer turn={turn} testId={testId} /> : null}
-      {turn.stage === "done" && turn.exportView ? <ExportMenu view={turn.exportView} testId={testId} /> : null}
+      {turn.stage === "done" && turn.exportView ? <AnswerTools turn={turn} view={turn.exportView} testId={testId} /> : null}
       {turn.stage === "error" && turn.error ? <TurnError message={turn.error} onRetry={() => onRetry(turn)} testId={testId} /> : null}
     </section>
   );

@@ -2,8 +2,10 @@ import type { ReactNode } from "react";
 
 import { ContactList } from "@/components/contacts/contact-list";
 import { Tag } from "@/components/documents/tag";
+import { ReadAloud } from "@/components/read-aloud/read-aloud";
 import { EscalateForm } from "@/components/report/escalate-form";
 import { Card, CardContent } from "@/components/ui/card";
+import { reportAudio } from "@/lib/api/public";
 import { STAGES, stageLabels, stageOf, statusTag } from "@/lib/report/status";
 import { joinNames } from "@/lib/text";
 import { formatDate, formatDateTime } from "@/lib/time";
@@ -79,6 +81,7 @@ export function CivicStatus({ status }: { status: ReportStatus }) {
   const where = [status.ward, status.sub_metro ? `${status.sub_metro} sub-metro` : null].filter(Boolean).join(", ");
   return (
     <StatusFrame status={status}>
+      <ReadAloud load={(part) => reportAudio(status.reference, "status", part)} label="Listen to this report's status" testId="status-listen" />
       <dl className="flex flex-col gap-3">
         <Detail label="What">{status.topic}</Detail>
         {where ? <Detail label="Where">{where}</Detail> : null}

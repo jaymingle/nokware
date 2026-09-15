@@ -6,9 +6,11 @@ import { CheckIcon, CopyIcon } from "lucide-react";
 
 import { ContactList } from "@/components/contacts/contact-list";
 import { Tag } from "@/components/documents/tag";
+import { ReadAloud } from "@/components/read-aloud/read-aloud";
 import { PreferencesForm } from "@/components/report/preferences-form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { reportAudio } from "@/lib/api/public";
 import { joinNames } from "@/lib/text";
 
 import type { ReportReceipt } from "@/lib/api/types";
@@ -77,6 +79,9 @@ export function ReportReceiptView({ receipt, onAnother }: { receipt: ReportRecei
           <Tag tone="teal">Report filed</Tag>
         </div>
         <Filed receipt={receipt} />
+        {!receipt.private ? (
+          <ReadAloud load={(part) => reportAudio(receipt.reference, "receipt", part)} label="Listen to your report's confirmation" testId="report-listen" />
+        ) : null}
         {messages ? <p className="text-[14px] text-ink-soft" data-testid="report-messages">{messages}</p> : null}
         {receipt.held_for_consent ? <HeldForConsent receipt={receipt} /> : null}
         <ContactList

@@ -24,12 +24,14 @@ export type Turn = {
   chartNote: string | null;
   /** The answer as the export route takes it back, signed by the API. */
   exportView: ExportView | null;
+  /** Whether the API will read it aloud: never an answer about someone's safety. */
+  speakable: boolean;
 };
 
 export function newTurn(id: string, question: string): Turn {
   return {
     id, question, stage: "searching", documents: [], figures: [], text: "", status: null, error: null,
-    chart: null, chartNote: null, exportView: null,
+    chart: null, chartNote: null, exportView: null, speakable: false,
   };
 }
 
@@ -53,6 +55,7 @@ export function applyEvent(turn: Turn, event: AskStreamEvent): Turn {
         chart: event.chart ?? null,
         chartNote: event.chart_note ?? null,
         exportView: event.export ?? null,
+        speakable: event.speakable ?? false,
       };
     case "error":
       return failTurn(turn, event.message);

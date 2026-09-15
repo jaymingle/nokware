@@ -1086,6 +1086,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/speech/answer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Answer */
+        post: operations["answer_api_speech_answer_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/speech/report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Report */
+        post: operations["report_api_speech_report_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/channels/sms/delivery": {
         parameters: {
             query?: never;
@@ -1182,7 +1216,7 @@ export interface paths {
          * @description A spoken reply, fetched by Twilio as it sends the voice note. The link is random and lasts 10 minutes, and
          *     the audio is an answer from public documents, never anything about a report.
          */
-        get: operations["whatsapp_audio_api_channels_whatsapp_audio__name__head"];
+        get: operations["whatsapp_audio_api_channels_whatsapp_audio__name__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1192,7 +1226,7 @@ export interface paths {
          * @description A spoken reply, fetched by Twilio as it sends the voice note. The link is random and lasts 10 minutes, and
          *     the audio is an answer from public documents, never anything about a report.
          */
-        head: operations["whatsapp_audio_api_channels_whatsapp_audio__name__head"];
+        head: operations["whatsapp_audio_api_channels_whatsapp_audio__name__get"];
         patch?: never;
         trace?: never;
     };
@@ -1305,6 +1339,11 @@ export interface components {
             /** Chart Note */
             chart_note?: string | null;
             export: components["schemas"]["ExportView"];
+            /**
+             * Speakable
+             * @default false
+             */
+            speakable: boolean;
         };
         /**
          * AskSource
@@ -1906,6 +1945,11 @@ export interface components {
             /** Chart Note */
             chart_note?: string | null;
             export?: components["schemas"]["ExportView"] | null;
+            /**
+             * Speakable
+             * @default false
+             */
+            speakable: boolean;
         };
         /** DraftRequest */
         DraftRequest: {
@@ -3001,6 +3045,31 @@ export interface components {
              * @default []
              */
             figures: components["schemas"]["AskFigure"][];
+        };
+        /** SpeechAnswerRequest */
+        SpeechAnswerRequest: {
+            view: components["schemas"]["ExportView"];
+            /**
+             * Part
+             * @default 0
+             */
+            part: number;
+        };
+        /** SpeechReportRequest */
+        SpeechReportRequest: {
+            /** Reference */
+            reference: string;
+            /**
+             * Kind
+             * @default status
+             * @enum {string}
+             */
+            kind: "receipt" | "status";
+            /**
+             * Part
+             * @default 0
+             */
+            part: number;
         };
         /** StageEvent */
         StageEvent: {
@@ -5027,6 +5096,72 @@ export interface operations {
             };
         };
     };
+    answer_api_speech_answer_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SpeechAnswerRequest"];
+            };
+        };
+        responses: {
+            /** @description The answer, spoken */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "audio/mpeg": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    report_api_speech_report_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SpeechReportRequest"];
+            };
+        };
+        responses: {
+            /** @description The report's status, spoken */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "audio/mpeg": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     sms_delivery_api_channels_sms_delivery_get: {
         parameters: {
             query?: never;
@@ -5128,7 +5263,7 @@ export interface operations {
             };
         };
     };
-    whatsapp_audio_api_channels_whatsapp_audio__name__head: {
+    whatsapp_audio_api_channels_whatsapp_audio__name__get: {
         parameters: {
             query?: never;
             header?: never;
@@ -5159,7 +5294,7 @@ export interface operations {
             };
         };
     };
-    whatsapp_audio_api_channels_whatsapp_audio__name__head: {
+    whatsapp_audio_api_channels_whatsapp_audio__name__get: {
         parameters: {
             query?: never;
             header?: never;
