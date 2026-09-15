@@ -20,6 +20,7 @@ from collections.abc import Callable
 
 from appwrite.enums.databases_index_type import DatabasesIndexType
 from appwrite.exception import AppwriteException
+from appwrite.query import Query
 
 from app.services.appwrite_client import DATABASE_ID, get_databases, get_teams, quiet_sdk_deprecation_warnings
 from app.services.case_history import COLLECTION_ID as HISTORY, NOTE_MAX, ActorRole, CaseHistoryAction
@@ -38,7 +39,10 @@ from app.services.report_rules import ClassificationMethod
 from app.services.report_taxonomy import Category
 from app.teams import AGENCY_TEAMS
 
-ATTRIBUTE_WAIT_SECONDS = 90
+ATTRIBUTE_WAIT_SECONDS = 300  # a collection of ~30 attributes can take minutes on this server
+# Appwrite lists 25 attributes or indexes unless asked for more: a collection with more than 25 would
+# otherwise look as if its later ones never became available.
+LISTING = [Query.limit(500)]
 ID = 36  # a UUID
 TEAM = 64
 ENCRYPTED_MIN = 150  # Appwrite's minimum size for an encrypted string; a phone number needs far less
@@ -104,7 +108,7 @@ def adjust_history() -> None:
 def adjust_notifications() -> None:
     """The outbox's status gains "not_sent" (recorded while no provider is wired in)."""
     db = get_databases()
-    existing = {a.key for a in db.list_attributes(DATABASE_ID, NOTIFICATIONS).attributes}
+    existing = {a.key for a in db.list_attributes(DATABASE_ID, NOTIFICATIONS, queries=LISTING).attributes}
     if "status" in existing:
         db.update_enum_attribute(DATABASE_ID, NOTIFICATIONS, "status", values(NotificationStatus), True, None)
         print("updated   notifications.status (the full set of outcomes)")
@@ -180,19 +184,21 @@ NEW_COLLECTIONS = {ASSIGNMENTS: "Case assignments", CONTACTS: "Report contacts",
 def wait_for_attributes(collection: str, keys: list[str]) -> None:
     """Indexes can only be built once their attributes are available."""
     deadline = time.monotonic() + ATTRIBUTE_WAIT_SECONDS
+    waiting = keys
     while time.monotonic() < deadline:
-        listing = get_databases().list_attributes(DATABASE_ID, collection)
+        listing = get_databases().list_attributes(DATABASE_ID, collection, queries=LISTING)
         statuses = {a.key: str(getattr(a.status, "value", a.status)) for a in listing.attributes}
-        if all(statuses.get(key) == "available" for key in keys):
+        waiting = [f"{key} ({statuses.get(key, 'missing')})" for key in keys if statuses.get(key) != "available"]
+        if not waiting:
             return
         time.sleep(2)
-    raise TimeoutError(f"{collection}: attributes not available after {ATTRIBUTE_WAIT_SECONDS}s")
+    raise TimeoutError(f"{collection}: not available after {ATTRIBUTE_WAIT_SECONDS}s: {', '.join(waiting)}")
 
 
 def ensure_indexes(collection: str, indexes: dict[str, tuple[DatabasesIndexType, list[str]]] | None = None) -> None:
     # Appwrite reports a duplicate index as a 400, not a 409, so check first.
     db = get_databases()
-    existing = {index.key for index in db.list_indexes(DATABASE_ID, collection).indexes}
+    existing = {index.key for index in db.list_indexes(DATABASE_ID, collection, queries=LISTING).indexes}
     for key, (kind, attributes) in (indexes or INDEXES[collection]).items():
         if key in existing:
             print(f"exists    index {collection}.{key}")
