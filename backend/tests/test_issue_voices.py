@@ -93,3 +93,12 @@ def test_the_routes_list_issues_without_content_and_limit_voices(monkeypatch: py
     assert codes[:20] == [200] * 20 and codes[20] == 429
     rate_limit.VOICES._hits.clear()
     assert client.post("/api/issues/k7qm4txp2a/voices", json={"device_token": "short"}).status_code == 422
+
+
+def test_one_open_issue_reads_as_the_list_shows_it_and_a_closed_one_says_so(monkeypatch: pytest.MonkeyPatch) -> None:
+    client = TestClient(app)
+    monkeypatch.setattr(issue_voices, "civic_issue", lambda public_id: ISSUE)
+    shown = client.get("/api/issues/k7qm4txp2a").json()
+    assert (shown["topic"], shown["ward"], shown["voices"]) == ("Roads and potholes", "Kaneshie", 3) and "description" not in shown
+    monkeypatch.setattr(issue_voices, "civic_issue", lambda public_id: {**ISSUE, "status": "resolved"})
+    assert client.get("/api/issues/k7qm4txp2a").status_code == 409

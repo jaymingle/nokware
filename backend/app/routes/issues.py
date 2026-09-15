@@ -1,6 +1,7 @@
 """Add your voice: open civic issues, and residents saying one affects them too. No sign-in.
 
     GET  /api/issues                        open civic issues, most supported first (?sub_metro, ?topic)
+    GET  /api/issues/{public_id}            one open civic issue, as the list shows it
     POST /api/issues/{public_id}/voices     add a voice, anonymous unless a name is given
 """
 
@@ -53,6 +54,11 @@ def issues(
         topics=[Option(id=t.id, name=t.label) for t in topics_in(Category.CIVIC_SERVICE)],
         sub_metros=[Option(id=s.id, name=s.name) for s in sub_metros().values()],
     )
+
+
+@router.get("/{public_id}", response_model=Issue)
+def issue(public_id: str) -> Issue:
+    return _issue(issue_voices.find_issue(public_id))
 
 
 @router.post("/{public_id}/voices", response_model=VoiceResult, dependencies=[Voices])
