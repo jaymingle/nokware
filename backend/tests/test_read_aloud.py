@@ -52,6 +52,14 @@ def test_a_reading_is_made_in_parts_that_end_at_sentences_the_first_short() -> N
     assert all(0 < len(part) <= read_aloud.PART_CHARS for part in read_aloud.parts(run_on))
 
 
+def test_a_fee_table_is_read_a_few_figures_at_a_time() -> None:
+    table = "Fees for 2026:\n" + "\n".join(f"* Makola Stores - {c}: {100 + i * 25}.00 [S1]" for i, c in enumerate("ABCDEFGH"))
+    made = read_aloud.parts(read_aloud.answer_script("What do stores cost?", table, "answered"))
+    assert all(read_aloud._figures(part) <= read_aloud.PART_FIGURES for part in made) and len(made) >= 3
+    assert made[1].startswith("Makola Stores") and made[1].endswith(".")  # a row is never cut in two
+    assert read_aloud._figures("31st December Market Stores - A: 800. The 2026 Resolution, K 7 Q M.") == 2  # 800 and 2026
+
+
 def test_nothing_about_someones_safety_is_read_aloud() -> None:
     for question, answer in (("My husband beats me, who can help?", "Call the Police."),
                              ("How many reports?", f"{SAFETY_FIGURES_ANSWER} The rest."),

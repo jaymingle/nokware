@@ -44,7 +44,11 @@ from app.services.voice_speech import SpeechFailed, cut, speak, speakable
 
 READ_MAX_CHARS = 1800  # about two and a half minutes: Gemini reads about 13 characters a second
 FIRST_PART_CHARS = 200  # about 15 seconds of speech, made in about 12
-PART_CHARS = 320  # about 25 seconds, made while the part before plays
+PART_CHARS = 320  # about 25 seconds of prose, made while the part before plays
+# A part holds at most this many figures, so a fee table is read a few rows at a time: figures take longer to say
+# than words (a 320-character part of a fee table ran 45 seconds), and the break between parts is the listener's
+# chance to take in a figure before the next.
+PART_FIGURES = 3
 CACHE_SECONDS = 6 * 3600
 REST_ON_SCREEN = "The rest of the answer is on the screen."
 SOURCES_ON_SCREEN = "The documents it comes from are listed with the answer."
@@ -52,6 +56,8 @@ NOTHING_FOUND = "The page says where else to look, and how to request a document
 KEEP_REFERENCE = "Keep your reference: it is the only way to follow your report."
 _REFERENCE = re.compile(r"\b([A-Z0-9]{4})-([A-Z0-9]{4})\b")
 _SENTENCE_END = re.compile(r"(?<=[.!?])\s+")
+# Two digits or more (an amount, a count, a year), but not an ordinal: "31st December" is quick to say.
+_FIGURE = re.compile(r"(?<![A-Za-z\d])\d[\d,]*\d(?:\.\d+)?(?![\d,]|st\b|nd\b|rd\b|th\b)")
 
 
 class NotReadAloud(Exception):
@@ -96,13 +102,19 @@ def _sentences(script: str) -> list[str]:
     return [piece for sentence in _SENTENCE_END.split(script.strip()) for piece in textwrap.wrap(sentence, PART_CHARS)]
 
 
+def _figures(text: str) -> int:
+    return len(_FIGURE.findall(text))
+
+
 def parts(script: str) -> list[str]:
-    """The script in parts that end at sentences, each spoken on its own: the first short, so the words start soon."""
+    """The script in parts that end at sentences, each spoken on its own: the first short, so the words start soon,
+    and none holding more than PART_FIGURES figures, unless one sentence does."""
     made: list[str] = []
     part = ""
     for sentence in _sentences(script):
         limit = PART_CHARS if made else FIRST_PART_CHARS
-        if part and len(part) + 1 + len(sentence) > limit:
+        full = len(part) + 1 + len(sentence) > limit or _figures(part) + _figures(sentence) > PART_FIGURES
+        if part and full:
             made.append(part)
             part = sentence
         else:
