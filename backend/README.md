@@ -153,6 +153,16 @@ left. Chunks matching "flood" went from 234 to 252, and the AMA newsletters,
 which weren't found for "flooding" before, now are: an Ask question about the
 newsletters' reports on flooding and desilting is answered from three of them.
 
+**Known limitation: Ga names can come out wrong.** Some PDFs set Ga letters
+such as ɔ and ɛ in fonts whose text layer maps them to other characters: one
+newsletter's "Nii Tetteh M)waam) I" has ")" where a Ga letter should be. Unlike
+the ligatures, the mapping isn't a fixed private character that can be
+restored: ")" is also real punctuation, so replacing it would corrupt other
+text, and which letter it stood for can't be known from the text alone. It is
+not fixed. For a civic tool for Accra, mangling Ga names is a real failing,
+not a cosmetic one; the fix needs the PDFs' fonts read glyph by glyph, or OCR
+of those pages, and comparison against the printed page.
+
 ### Exports and charts
 
 Every Ask answer can be downloaded as a PDF, a Word document or a CSV
