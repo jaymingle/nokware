@@ -2,6 +2,7 @@
 and the plain client for voice notes."""
 
 import logging
+import threading
 from functools import lru_cache
 
 from google import genai
@@ -53,7 +54,18 @@ def get_classifier_model() -> ChatGoogleGenerativeAI:
     return get_quick_model()
 
 
-@lru_cache
+_genai_client: genai.Client | None = None
+_genai_lock = threading.Lock()
+
+
 def get_genai_client() -> genai.Client:
-    """Gemini's own client, for what LangChain doesn't wrap simply: voice notes in, speech out."""
-    return genai.Client(api_key=get_settings().gemini_api_key)
+    """Gemini's own client, for what LangChain doesn't wrap simply: voice notes in, speech out.
+
+    Made once, under a lock. lru_cache isn't enough: two threads asking at once each build a client, only one is
+    kept, and the other is garbage-collected mid-request, closing its connection ("the client has been closed").
+    """
+    global _genai_client
+    with _genai_lock:
+        if _genai_client is None:
+            _genai_client = genai.Client(api_key=get_settings().gemini_api_key)
+        return _genai_client
