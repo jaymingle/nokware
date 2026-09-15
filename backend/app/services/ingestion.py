@@ -22,6 +22,7 @@ from pypdf import PdfReader
 
 from app.services import ledger_documents
 from app.services.ledger_documents import LedgerStatus
+from app.services.pdf_text import mend
 from app.services.storage import download_ledger_file
 from app.services.vectorstore import get_embeddings, replace_document_chunks
 
@@ -53,8 +54,8 @@ class IngestionResult:
 
 
 def clean_text(text: str) -> str:
-    """Make extracted PDF text safe for Postgres and useful for embeddings."""
-    return _SPACE_CHARS.sub(" ", _DROP_CHARS.sub("", text))
+    """Make extracted PDF text safe for Postgres and useful for embeddings, with what fonts left behind mended."""
+    return mend(_SPACE_CHARS.sub(" ", _DROP_CHARS.sub("", text)))
 
 
 def extract_pdf_pages(pdf_bytes: bytes) -> list[str]:

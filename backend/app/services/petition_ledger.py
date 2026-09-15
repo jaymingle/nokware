@@ -11,15 +11,14 @@ means a document touches the subject, not that it commits to what the petition
 asks. Published documents only.
 """
 
-import re
 import threading
 import time
-import unicodedata
 from dataclasses import dataclass
 from typing import Any
 
 from app.services import ledger_documents
 from app.services.ledger_documents import LedgerStatus, provenance
+from app.services.pdf_text import mend
 from app.services.publishing_record import year_and_source
 from app.services.retrieval import RetrievedChunk, collapse_near_duplicates, fuse, ranked_lists
 from app.teams import DEPARTMENT_NAMES
@@ -47,22 +46,9 @@ def query_for(title: str, body: str, topic_label: str) -> str:
 # Some of the Assembly's PDFs store ligatures and bullets in a font's private characters, which the extracted
 # text keeps: "\uf002ooding" for "flooding", "\uf0b7" for a bullet. Mended for reading here; the chunks
 # themselves are unchanged.
-_PRIVATE_LIGATURES = {"\uf001": "fi", "\uf002": "fl"}
-_PRIVATE_BULLET = re.compile(r"[\uf020-\uf0ff]")  # Symbol and Wingdings bullets, arrows and ticks
-_UNREADABLE = re.compile(r"[\ue000-\uf8ff\ufffd]")  # anything else private, and characters lost in extraction
-
-
-def readable(text: str) -> str:
-    """The text with ligatures spelled out, font bullets as bullets, and characters that can't be shown removed."""
-    for private, letters in _PRIVATE_LIGATURES.items():
-        text = text.replace(private, letters)
-    text = unicodedata.normalize("NFKC", _PRIVATE_BULLET.sub("•", text))  # NFKC also spells out ﬁ, ﬂ and ﬀ
-    return _UNREADABLE.sub("", text)
-
-
 def passage(text: str) -> str:
     """The matching passage, readable, cut at a word near PASSAGE_MAX."""
-    flat = " ".join(readable(text).split())
+    flat = " ".join(mend(text).split())  # chunks stored before mending, and any that slip through
     if len(flat) <= PASSAGE_MAX:
         return flat
     return flat[:PASSAGE_MAX].rsplit(" ", 1)[0].rstrip(",;:") + "…"

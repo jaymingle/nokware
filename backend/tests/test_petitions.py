@@ -285,8 +285,8 @@ def test_a_ledger_search_the_index_cannot_answer_says_so_plainly(monkeypatch: py
 def test_a_passage_from_the_ledger_reads_as_words_and_the_same_text_shows_once(monkeypatch: pytest.MonkeyPatch) -> None:
     from app.services.retrieval import Chunk
 
-    assert petition_ledger.readable("preventing ooding, signicant, ﬁre  one �") == \
-        "preventing flooding, significant, fire • one "
+    assert petition_ledger.passage("preventing \uf002ooding, signi\uf001cant, \ufb01re \uf0b7 one \ufffd") == \
+        "preventing flooding, significant, fire • one"
     plan = "FLOOD MITIGATION AND PREPAREDNESS MEASURES Identification of flood hotspots in the Accra Metropolis " * 3
     chunks = [Chunk(1, "plan", 0, plan), Chunk(2, "copy", 0, plan), Chunk(3, "budget", 4, "Desilting of drains, 2024 budget line.")]
     monkeypatch.setattr(petition_ledger, "ranked_lists", lambda queries: ([chunks], []))

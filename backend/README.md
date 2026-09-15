@@ -136,18 +136,18 @@ is short, so the first words come in about seven seconds. The same words are
 spoken once and kept in Redis for six hours; `READ_ALOUD_DAILY_LIMIT` (300) caps
 fresh parts a day.
 
-**Known limitation: characters some PDFs lost.** Some of the Assembly's PDFs
-store ligatures and bullets in a font's private characters, and extraction kept
-them: "flooding" is stored as a private character followed by "ooding", "fi" as
-U+F001, bullets as U+F0B7, and some characters were lost outright (U+FFFD).
-Measured on 15 September 2026: 740 of the Ledger's 7,539 chunks, across 42
-documents. It affects accuracy, not only looks: Ask's keyword search can't
-match "flooding" in those chunks (the meaning-based search still can), and a
-quoted passage can show boxes. Passages shown beside a petition are mended for
-reading (`petition_ledger.readable`), but the chunks themselves are unchanged.
-The fix, which is held for now, is to normalise the text at ingestion and
-re-index those 42 documents; that re-embeds them with Gemini, so it costs
-credits and time.
+**Characters some PDFs lost, mended at ingestion.** Some of the Assembly's
+PDFs store ligatures and bullets in a font's private characters: "flooding"
+came out as a private character followed by "ooding" ("fi" as U+F001, "fl" as
+U+F002), bullets as U+F0B7 and its neighbours, and one document's full stops
+were lost outright (U+FFFD). On 15 September 2026 that was 740 of the Ledger's
+7,537 chunks, across 42 documents, and it hurt accuracy, not only looks: Ask's
+keyword search couldn't match "flooding" in them. Ingestion now mends the text
+before it is chunked and embedded (`app/services/pdf_text.py`): a ligature
+becomes its letters and a font bullet "•"; a lost character becomes a space,
+never a guessed letter. Documents stored before the fix are re-indexed through
+the normal ingestion path by `scripts/reindex_mended.py` (a dry run by default,
+which lists them with the embedding cost).
 
 ### Exports and charts
 
