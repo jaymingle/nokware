@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
 import { CheckIcon, UsersIcon } from "lucide-react";
+import Link from "next/link";
+import { useState } from "react";
 
 import { ErrorNote } from "@/components/documents/panels";
 import { VoiceDialog } from "@/components/issues/voice-dialog";
@@ -32,13 +33,18 @@ function IssueCard({ issue, voiced, onVoiced, now }: { issue: Issue; voiced: boo
           {voicesLine(issue.voices)}
         </p>
       </div>
-      {voiced ? (
-        <span className="inline-flex items-center gap-1.5 text-[13px] text-teal" data-testid={`issue-${issue.public_id}-voiced`}>
-          <CheckIcon aria-hidden className="size-4" /> You added your voice
-        </span>
-      ) : (
-        <VoiceDialog issue={issue} onAdded={() => onVoiced(issue.public_id)} />
-      )}
+      <div className="flex flex-wrap items-center gap-2">
+        {voiced ? (
+          <span className="inline-flex items-center gap-1.5 text-[13px] text-teal" data-testid={`issue-${issue.public_id}-voiced`}>
+            <CheckIcon aria-hidden className="size-4" /> You added your voice
+          </span>
+        ) : (
+          <VoiceDialog issue={issue} onAdded={() => onVoiced(issue.public_id)} />
+        )}
+        <Button asChild variant="ghost" size="sm">
+          <Link href={`/petitions/new?issue=${issue.public_id}`} data-testid={`issue-${issue.public_id}-petition`}>Start a petition</Link>
+        </Button>
+      </div>
     </li>
   );
 }

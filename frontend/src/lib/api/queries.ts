@@ -3,7 +3,9 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 
 import {
+  decidePetition,
   getCase,
+  getPetitionReview,
   openSharedLocation,
   getCaseOversight,
   getCaseQueue,
@@ -23,7 +25,7 @@ import {
 
 import { anyPublishingNow } from "@/lib/documents";
 
-import type { CaseAction, CaseDetail, DocumentOut, ReviewAction, SharedLocationView } from "@/lib/api/types";
+import type { CaseAction, CaseDetail, DocumentOut, PetitionDecision, ReviewAction, ReviewQueue, SharedLocationView } from "@/lib/api/types";
 
 export const LIBRARY_PAGE_SIZE = 25;
 const QUEUE_REFRESH_MS = 60_000; // keeps queues current as clocks run out elsewhere
@@ -46,6 +48,7 @@ export const queryKeys = {
   case: (id: string) => ["cases", "detail", id] as const,
   categories: ["categories"] as const,
   departments: ["departments"] as const,
+  petitionReview: ["petition-review"] as const,
 };
 
 /** Every list or view of documents; refreshed after any change to one. */
@@ -170,5 +173,20 @@ export function useOpenLocation() {
   return useMutation<SharedLocationView, Error, string>({
     mutationFn: openSharedLocation,
     onSuccess: (_, id) => queryClient.invalidateQueries({ queryKey: queryKeys.case(id) }),
+  });
+}
+
+const PETITION_REVIEW_REFRESH_MS = 60_000; // petitions arrive, and publish themselves, at any time
+
+export function usePetitionReview() {
+  return useQuery({ queryKey: queryKeys.petitionReview, queryFn: getPetitionReview, refetchInterval: PETITION_REVIEW_REFRESH_MS });
+}
+
+/** The MCE's decision; the queue it returns replaces the one shown. */
+export function useDecidePetition() {
+  const queryClient = useQueryClient();
+  return useMutation<ReviewQueue, Error, { code: string; decision: PetitionDecision }>({
+    mutationFn: ({ code, decision }) => decidePetition(code, decision),
+    onSuccess: (queue) => queryClient.setQueryData(queryKeys.petitionReview, queue),
   });
 }

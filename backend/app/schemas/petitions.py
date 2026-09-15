@@ -5,6 +5,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from app.schemas.documents import Option
+from app.services.ledger_documents import Provenance
 from app.services.petition_rules import BODY_MAX, DOCUMENTS_MAX, NAME_MAX, NOTE_MAX, TITLE_MAX
 
 Status = Literal["in_review", "refused", "open", "closed", "withdrawn"]
@@ -48,7 +49,7 @@ class DocumentRef(BaseModel):
     title: str
     department_name: str | None
     year: int | None
-    provenance: str | None
+    provenance: Provenance | None
 
 
 class LedgerMatch(DocumentRef):

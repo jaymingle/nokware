@@ -688,6 +688,282 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/petitions/options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Options */
+        get: operations["options_api_petitions_options_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/petitions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Published */
+        get: operations["published_api_petitions_get"];
+        put?: never;
+        /** Submit */
+        post: operations["submit_api_petitions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/petitions/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Review */
+        get: operations["review_api_petitions_review_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/petitions/mine": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Mine */
+        get: operations["mine_api_petitions_mine_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/petitions/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Check */
+        post: operations["check_api_petitions_check_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/petitions/ledger": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Draft Ledger */
+        post: operations["draft_ledger_api_petitions_ledger_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/petitions/{code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Petition */
+        get: operations["petition_api_petitions__code__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/petitions/{code}/ledger": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Petition Ledger Matches */
+        get: operations["petition_ledger_matches_api_petitions__code__ledger_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/petitions/{code}/resubmit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Resubmit */
+        post: operations["resubmit_api_petitions__code__resubmit_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/petitions/{code}/withdraw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Withdraw */
+        post: operations["withdraw_api_petitions__code__withdraw_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/petitions/{code}/anonymous": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Anonymous */
+        post: operations["anonymous_api_petitions__code__anonymous_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/petitions/{code}/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Decide
+         * @description The decision, then the queue as it now stands.
+         */
+        post: operations["decide_api_petitions__code__decision_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/phone/challenges": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** New Challenge */
+        post: operations["new_challenge_api_phone_challenges_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/phone/challenges/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Challenge Status */
+        post: operations["challenge_status_api_phone_challenges_status_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/phone/challenges/sms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sms Code */
+        post: operations["sms_code_api_phone_challenges_sms_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/phone/challenges/sms/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sms Confirm */
+        post: operations["sms_confirm_api_phone_challenges_sms_confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/channels/sms/delivery": {
         parameters: {
             query?: never;
@@ -811,6 +1087,15 @@ export interface components {
         ActionRequest: {
             /** Note */
             note?: string | null;
+        };
+        /** AreaOption */
+        AreaOption: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Sub Metro */
+            sub_metro: string;
         };
         /**
          * AskChart
@@ -1144,6 +1429,40 @@ export interface components {
             /** Voices */
             voices: number;
         };
+        /** ChallengeRequest */
+        ChallengeRequest: {
+            /** Challenge */
+            challenge: string;
+        };
+        /** ChallengeResult */
+        ChallengeResult: {
+            /** Challenge */
+            challenge: string;
+            /** Code */
+            code: string;
+            /** Expires In */
+            expires_in: number;
+            /** Whatsapp Url */
+            whatsapp_url: string | null;
+            /** Ussd Code */
+            ussd_code: string | null;
+            /** Sms */
+            sms: boolean;
+        };
+        /** ChallengeStatus */
+        ChallengeStatus: {
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "waiting" | "proven" | "expired";
+            /** Proof */
+            proof: string | null;
+            /** Number */
+            number: string | null;
+            /** Expires At */
+            expires_at: string | null;
+        };
         /** ChartSeries */
         ChartSeries: {
             /** Name */
@@ -1229,6 +1548,20 @@ export interface components {
             departments_publishing: number;
             /** Recent Documents */
             recent_documents: components["schemas"]["RecentDocument"][];
+        };
+        /** DecisionRequest */
+        DecisionRequest: {
+            /**
+             * Decision
+             * @enum {string}
+             */
+            decision: "publish" | "refuse";
+            /** Reason */
+            reason?: string | null;
+            /** Note */
+            note?: string | null;
+            /** Duplicate Of */
+            duplicate_of?: string | null;
         };
         /**
          * DeltaEvent
@@ -1388,6 +1721,18 @@ export interface components {
             /** Total */
             total: number;
         };
+        /** DocumentRef */
+        DocumentRef: {
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+            /** Department Name */
+            department_name: string | null;
+            /** Year */
+            year: number | null;
+            provenance: components["schemas"]["Provenance"] | null;
+        };
         /**
          * DoneEvent
          * @description The checked answer, which replaces the streamed text, and the labels it cites.
@@ -1411,6 +1756,26 @@ export interface components {
             /** Chart Note */
             chart_note?: string | null;
             export?: components["schemas"]["ExportView"] | null;
+        };
+        /** DraftRequest */
+        DraftRequest: {
+            /** Title */
+            title: string;
+            /** Body */
+            body: string;
+            /** Topic */
+            topic: string;
+            /**
+             * Scope
+             * @enum {string}
+             */
+            scope: "metro" | "area";
+            /** Ward */
+            ward?: string | null;
+            /** Issue */
+            issue?: string | null;
+            /** Documents */
+            documents?: string[];
         };
         /** ElectoralArea */
         ElectoralArea: {
@@ -1568,11 +1933,50 @@ export interface components {
             /** Ingestion Queued */
             ingestion_queued: string[];
         };
+        /** LedgerMatch */
+        LedgerMatch: {
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+            /** Department Name */
+            department_name: string | null;
+            /** Year */
+            year: number | null;
+            provenance: components["schemas"]["Provenance"] | null;
+            /** Passage */
+            passage: string;
+        };
+        /** LedgerSearchRequest */
+        LedgerSearchRequest: {
+            /** Title */
+            title: string;
+            /** Body */
+            body: string;
+            /** Topic */
+            topic: string;
+        };
         /**
          * LedgerStatus
          * @enum {string}
          */
         LedgerStatus: "held" | "published" | "disputed" | "withdrawn";
+        /** LinkedIssue */
+        LinkedIssue: {
+            /** Public Id */
+            public_id: string;
+            /** Topic */
+            topic: string;
+            /** Ward */
+            ward: string | null;
+            /**
+             * Stage
+             * @enum {string}
+             */
+            stage: "received" | "in_progress" | "escalated" | "resolved";
+            /** Voices */
+            voices: number;
+        };
         /** LocationViewNote */
         LocationViewNote: {
             /** By */
@@ -1609,6 +2013,22 @@ export interface components {
             /** Agency Name */
             agency_name: string | null;
         };
+        /**
+         * Moderation
+         * @description How the MCE has handled petitions: shown exactly, since the count is of decisions, not of people.
+         */
+        Moderation: {
+            /** Awaiting */
+            awaiting: number;
+            /** Published By Mce */
+            published_by_mce: number;
+            /** Published Automatically */
+            published_automatically: number;
+            /** Refusals */
+            refusals: components["schemas"]["RefusalCount"][];
+            /** Refusals Total */
+            refusals_total: number;
+        };
         /** MonthFigures */
         MonthFigures: {
             /** Month */
@@ -1617,6 +2037,13 @@ export interface components {
             received: number | null;
             /** Resolved */
             resolved: number | null;
+        };
+        /** MyPetitions */
+        MyPetitions: {
+            /** Number */
+            number: string;
+            /** Petitions */
+            petitions: components["schemas"]["OwnPetition"][];
         };
         /** NoteRequest */
         NoteRequest: {
@@ -1640,6 +2067,179 @@ export interface components {
             resolved_30_days: number;
             /** Personal Safety Open */
             personal_safety_open: number | null;
+        };
+        /** OwnPetition */
+        OwnPetition: {
+            /** Code */
+            code: string;
+            /** Title */
+            title: string;
+            /** Topic */
+            topic: string;
+            /** Departments */
+            departments: string[];
+            /**
+             * Scope
+             * @enum {string}
+             */
+            scope: "metro" | "area";
+            /** Area */
+            area: string | null;
+            /** Sub Metro */
+            sub_metro: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "in_review" | "refused" | "open" | "closed" | "withdrawn";
+            /** Published At */
+            published_at: string | null;
+            /** Published By */
+            published_by: ("mce" | "automatic") | null;
+            /** Closes At */
+            closes_at: string | null;
+            /** Closed At */
+            closed_at: string | null;
+            /** Threshold */
+            threshold: number | null;
+            /** Signatures */
+            signatures: number;
+            /** Started By */
+            started_by: string | null;
+            /** Body */
+            body: string;
+            /** Topic Id */
+            topic_id: string;
+            /** Ward Id */
+            ward_id: string | null;
+            /** Issue Id */
+            issue_id: string | null;
+            /** Document Ids */
+            document_ids: string[];
+            /** Submitted At */
+            submitted_at: string | null;
+            /** Review Deadline */
+            review_deadline: string | null;
+            refusal: components["schemas"]["Refusal"] | null;
+            /** Resubmissions Left */
+            resubmissions_left: number;
+            /** Actions */
+            actions: ("withdraw" | "resubmit" | "make_anonymous")[];
+        };
+        /** PetitionCard */
+        PetitionCard: {
+            /** Code */
+            code: string;
+            /** Title */
+            title: string;
+            /** Topic */
+            topic: string;
+            /** Departments */
+            departments: string[];
+            /**
+             * Scope
+             * @enum {string}
+             */
+            scope: "metro" | "area";
+            /** Area */
+            area: string | null;
+            /** Sub Metro */
+            sub_metro: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "in_review" | "refused" | "open" | "closed" | "withdrawn";
+            /** Published At */
+            published_at: string | null;
+            /** Published By */
+            published_by: ("mce" | "automatic") | null;
+            /** Closes At */
+            closes_at: string | null;
+            /** Closed At */
+            closed_at: string | null;
+            /** Threshold */
+            threshold: number | null;
+            /** Signatures */
+            signatures: number;
+            /** Started By */
+            started_by: string | null;
+        };
+        /** PetitionDetail */
+        PetitionDetail: {
+            /** Code */
+            code: string;
+            /** Title */
+            title: string;
+            /** Topic */
+            topic: string;
+            /** Departments */
+            departments: string[];
+            /**
+             * Scope
+             * @enum {string}
+             */
+            scope: "metro" | "area";
+            /** Area */
+            area: string | null;
+            /** Sub Metro */
+            sub_metro: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "in_review" | "refused" | "open" | "closed" | "withdrawn";
+            /** Published At */
+            published_at: string | null;
+            /** Published By */
+            published_by: ("mce" | "automatic") | null;
+            /** Closes At */
+            closes_at: string | null;
+            /** Closed At */
+            closed_at: string | null;
+            /** Threshold */
+            threshold: number | null;
+            /** Signatures */
+            signatures: number;
+            /** Started By */
+            started_by: string | null;
+            /** Body */
+            body: string;
+            /** Timeline */
+            timeline: components["schemas"]["TimelineEntry"][];
+            issue: components["schemas"]["LinkedIssue"] | null;
+            /** Documents */
+            documents: components["schemas"]["DocumentRef"][];
+        };
+        /** PetitionOptions */
+        PetitionOptions: {
+            /** Topics */
+            topics: components["schemas"]["Option"][];
+            /** Areas */
+            areas: components["schemas"]["AreaOption"][];
+            /** Threshold Area */
+            threshold_area: number;
+            /** Threshold Metro */
+            threshold_metro: number;
+            /** Review Hours */
+            review_hours: number;
+            /** Open Days */
+            open_days: number;
+            /** Response Days */
+            response_days: number;
+            /** Refusal Reasons */
+            refusal_reasons: components["schemas"]["RefusalReason"][];
+            verification: components["schemas"]["Verification"];
+        };
+        /** PetitionPage */
+        PetitionPage: {
+            /** Petitions */
+            petitions: components["schemas"]["PetitionCard"][];
+            /** Total */
+            total: number;
+            moderation: components["schemas"]["Moderation"];
+            /** Topics */
+            topics: components["schemas"]["Option"][];
         };
         /** PreferencesRequest */
         PreferencesRequest: {
@@ -1780,6 +2380,37 @@ export interface components {
             missing: number;
             /** Not Due */
             not_due: number;
+        };
+        /** Refusal */
+        Refusal: {
+            /** Reason */
+            reason: string;
+            /** Label */
+            label: string;
+            /** Explanation */
+            explanation: string;
+            /** Note */
+            note: string | null;
+            /** Duplicate Of */
+            duplicate_of: string | null;
+        };
+        /** RefusalCount */
+        RefusalCount: {
+            /** Reason */
+            reason: string;
+            /** Label */
+            label: string;
+            /** Count */
+            count: number;
+        };
+        /** RefusalReason */
+        RefusalReason: {
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+            /** Explanation */
+            explanation: string;
         };
         /** ReportOptions */
         ReportOptions: {
@@ -1927,6 +2558,48 @@ export interface components {
             departments: components["schemas"]["DepartmentFigures"][];
             mce: components["schemas"]["MceFigures"];
         };
+        /** ReviewItem */
+        ReviewItem: {
+            /** Code */
+            code: string;
+            /** Title */
+            title: string;
+            /** Body */
+            body: string;
+            /** Topic */
+            topic: string;
+            /** Departments */
+            departments: string[];
+            /**
+             * Scope
+             * @enum {string}
+             */
+            scope: "metro" | "area";
+            /** Area */
+            area: string | null;
+            /** Sub Metro */
+            sub_metro: string | null;
+            /** Started By */
+            started_by: string | null;
+            /** Submitted At */
+            submitted_at: string;
+            /** Review Deadline */
+            review_deadline: string;
+            /** Resubmissions */
+            resubmissions: number;
+            /** Earlier Refusals */
+            earlier_refusals: components["schemas"]["Refusal"][];
+            issue: components["schemas"]["LinkedIssue"] | null;
+            /** Documents */
+            documents: components["schemas"]["DocumentRef"][];
+        };
+        /** ReviewQueue */
+        ReviewQueue: {
+            /** Petitions */
+            petitions: components["schemas"]["ReviewItem"][];
+            /** Refusal Reasons */
+            refusal_reasons: components["schemas"]["RefusalReason"][];
+        };
         /**
          * Role
          * @enum {string}
@@ -1942,6 +2615,20 @@ export interface components {
             guide: string;
             /** Recipients */
             recipients: string[];
+        };
+        /** ScreenRequest */
+        ScreenRequest: {
+            /** Title */
+            title: string;
+            /** Body */
+            body: string;
+        };
+        /** ScreenResult */
+        ScreenResult: {
+            /** Stop */
+            stop: string | null;
+            /** Warning */
+            warning: string | null;
         };
         /** Service */
         Service: {
@@ -1965,6 +2652,25 @@ export interface components {
             longitude: number | null;
             /** Shared At */
             shared_at: string;
+        };
+        /** SmsCodeRequest */
+        SmsCodeRequest: {
+            /** Challenge */
+            challenge: string;
+            /** Phone */
+            phone: string;
+        };
+        /** SmsCodeSent */
+        SmsCodeSent: {
+            /** Sent To */
+            sent_to: string;
+        };
+        /** SmsConfirmRequest */
+        SmsConfirmRequest: {
+            /** Challenge */
+            challenge: string;
+            /** Code */
+            code: string;
         };
         /**
          * SourceType
@@ -2037,6 +2743,45 @@ export interface components {
             /** Electoral Areas */
             electoral_areas: components["schemas"]["ElectoralArea"][];
         };
+        /** SubmitRequest */
+        SubmitRequest: {
+            /** Title */
+            title: string;
+            /** Body */
+            body: string;
+            /** Topic */
+            topic: string;
+            /**
+             * Scope
+             * @enum {string}
+             */
+            scope: "metro" | "area";
+            /** Ward */
+            ward?: string | null;
+            /** Issue */
+            issue?: string | null;
+            /** Documents */
+            documents?: string[];
+            /**
+             * Show Name
+             * @default false
+             */
+            show_name: boolean;
+            /** Name */
+            name?: string | null;
+        };
+        /** TimelineEntry */
+        TimelineEntry: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "submitted" | "resubmitted" | "published" | "auto_published" | "refused" | "withdrawn" | "closed";
+            /** At */
+            at: string;
+            /** Reason */
+            reason: string | null;
+        };
         /** TopicFigures */
         TopicFigures: {
             /** Label */
@@ -2081,6 +2826,18 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /**
+         * Verification
+         * @description The ways a number can be confirmed here: WhatsApp and USSD when set up; SMS only once switched on.
+         */
+        Verification: {
+            /** Whatsapp */
+            whatsapp: boolean;
+            /** Ussd Code */
+            ussd_code: string | null;
+            /** Sms */
+            sms: boolean;
         };
         /** VoiceRequest */
         VoiceRequest: {
@@ -3202,6 +3959,531 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["VoiceResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    options_api_petitions_options_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PetitionOptions"];
+                };
+            };
+        };
+    };
+    published_api_petitions_get: {
+        parameters: {
+            query?: {
+                group?: "open" | "closed";
+                topic?: string | null;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PetitionPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    submit_api_petitions_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-phone-proof"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SubmitRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnPetition"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    review_api_petitions_review_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewQueue"];
+                };
+            };
+        };
+    };
+    mine_api_petitions_mine_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-phone-proof"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyPetitions"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    check_api_petitions_check_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScreenRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreenResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    draft_ledger_api_petitions_ledger_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LedgerSearchRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LedgerMatch"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    petition_api_petitions__code__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PetitionDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    petition_ledger_matches_api_petitions__code__ledger_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LedgerMatch"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resubmit_api_petitions__code__resubmit_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-phone-proof"?: string | null;
+            };
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DraftRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnPetition"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    withdraw_api_petitions__code__withdraw_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-phone-proof"?: string | null;
+            };
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnPetition"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    anonymous_api_petitions__code__anonymous_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-phone-proof"?: string | null;
+            };
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnPetition"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    decide_api_petitions__code__decision_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DecisionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewQueue"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    new_challenge_api_phone_challenges_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChallengeResult"];
+                };
+            };
+        };
+    };
+    challenge_status_api_phone_challenges_status_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChallengeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChallengeStatus"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sms_code_api_phone_challenges_sms_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SmsCodeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SmsCodeSent"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sms_confirm_api_phone_challenges_sms_confirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SmsConfirmRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChallengeStatus"];
                 };
             };
             /** @description Validation Error */

@@ -1,7 +1,7 @@
 import type { Me, Role } from "@/lib/api/types";
 
 /** A live count shown on a nav item, e.g. documents awaiting review. */
-export type NavCountKind = "review" | "responses" | "escalations" | "cases" | "case-escalations";
+export type NavCountKind = "review" | "responses" | "escalations" | "cases" | "case-escalations" | "petitions";
 
 export type NavItem = { href: string; label: string; testId: string; count?: NavCountKind };
 
@@ -27,6 +27,7 @@ export const ROLE_NAV: Record<Role, NavItem[]> = {
   mce: [
     { href: "/portal/mce", label: "Disputes", testId: "portal-nav-escalations", count: "escalations" },
     { href: "/portal/mce/cases", label: "Cases", testId: "portal-nav-cases", count: "case-escalations" },
+    { href: "/portal/mce/petitions", label: "Petitions", testId: "portal-nav-petitions", count: "petitions" },
   ],
 };
 

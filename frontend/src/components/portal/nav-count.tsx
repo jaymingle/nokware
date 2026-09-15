@@ -1,7 +1,7 @@
 "use client";
 
 import { useNow } from "@/hooks/use-now";
-import { useCaseOversight, useCaseQueue, useEscalations, useReviewQueue, useSubmissions } from "@/lib/api/queries";
+import { useCaseOversight, useCaseQueue, useEscalations, usePetitionReview, useReviewQueue, useSubmissions } from "@/lib/api/queries";
 import { openForMe } from "@/lib/cases";
 import { awaitingResponse, splitByClock, splitHeld } from "@/lib/documents";
 import { cn } from "@/lib/utils";
@@ -58,11 +58,20 @@ function CaseEscalationsCount({ active }: { active: boolean }) {
   return <Count value={data?.stats.escalated ?? 0} active={active} testId="nav-count-case-escalations" />;
 }
 
+/** Petitions the MCE can still decide on: each will publish on its own. */
+function PetitionsCount({ active }: { active: boolean }) {
+  const now = useNow();
+  const { data } = usePetitionReview();
+  const open = data ? data.petitions.filter((p) => Date.parse(p.review_deadline) > now).length : 0;
+  return <Count value={open} active={active} testId="nav-count-petitions" />;
+}
+
 export function NavCount({ kind, active }: { kind: NavCountKind; active: boolean }) {
   if (kind === "review") return <ReviewCount active={active} />;
   if (kind === "responses") return <ResponsesCount active={active} />;
   if (kind === "escalations") return <EscalationsCount active={active} />;
   if (kind === "cases") return <CasesCount active={active} />;
   if (kind === "case-escalations") return <CaseEscalationsCount active={active} />;
+  if (kind === "petitions") return <PetitionsCount active={active} />;
   return null;
 }

@@ -33,6 +33,8 @@ type DeadlineNoticeProps = {
   /** What stops publication, e.g. "you dispute it". */
   unless: string;
   size?: "lg" | "sm";
+  /** What to say once the clock has run out; a document's wording by default. */
+  passed?: string;
   testId?: string;
 };
 
@@ -41,7 +43,7 @@ type DeadlineNoticeProps = {
  * automatically in 47h 12m unless you dispute it." Silence means publication,
  * so this is the most prominent thing on any document it applies to.
  */
-export function DeadlineNotice({ heldUntil, unless, size = "lg", testId }: DeadlineNoticeProps) {
+export function DeadlineNotice({ heldUntil, unless, size = "lg", passed, testId }: DeadlineNoticeProps) {
   const { label, urgency } = deadlineFrom(heldUntil, useNow());
   const large = size === "lg";
   return (
@@ -52,7 +54,7 @@ export function DeadlineNotice({ heldUntil, unless, size = "lg", testId }: Deadl
     >
       <ClockIcon aria-hidden className={cn("size-4 shrink-0", urgency === "urgent" ? "text-brick" : "text-gold")} />
       {urgency === "passed" ? (
-        <p className={large ? "text-[15px]" : "text-[13.5px]"}>The clock has run out: this document is being published automatically.</p>
+        <p className={large ? "text-[15px]" : "text-[13.5px]"}>{passed ?? "The clock has run out: this document is being published automatically."}</p>
       ) : (
         <p className={large ? "text-[15px]" : "text-[13.5px]"}>
           Publishes automatically in{" "}

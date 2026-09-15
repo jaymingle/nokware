@@ -12,7 +12,9 @@ import type {
   FileLink,
   Me,
   Option,
+  PetitionDecision,
   ReviewAction,
+  ReviewQueue,
 } from "@/lib/api/types";
 
 const documentPath = (id: string) => `/api/documents/${encodeURIComponent(id)}`;
@@ -98,5 +100,19 @@ export function takeCaseAction(id: string, action: CaseAction, body?: CaseAction
     method: "POST",
     headers: body ? { "Content-Type": "application/json" } : undefined,
     body: body ? JSON.stringify(body) : undefined,
+  });
+}
+
+/** Petitions waiting for the MCE, the one closest to publishing automatically first. */
+export function getPetitionReview(): Promise<ReviewQueue> {
+  return apiRequest<ReviewQueue>("/api/petitions/review");
+}
+
+/** Publish a petition, or refuse it for one of the fixed reasons; the queue as it then stands. */
+export function decidePetition(code: string, decision: PetitionDecision): Promise<ReviewQueue> {
+  return apiRequest<ReviewQueue>(`/api/petitions/${encodeURIComponent(code)}/decision`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(decision),
   });
 }

@@ -17,7 +17,7 @@ import type {
   VoiceResult,
 } from "@/lib/api/types";
 
-async function publicRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
+export async function publicRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
   let response: Response;
   try {
     response = await fetch(`${env.apiUrl}${path}`, init);
@@ -28,7 +28,7 @@ async function publicRequest<T>(path: string, init: RequestInit = {}): Promise<T
   return (await response.json()) as T;
 }
 
-function postJson<T>(path: string, body: unknown, headers: Record<string, string> = {}): Promise<T> {
+export function postJson<T>(path: string, body: unknown, headers: Record<string, string> = {}): Promise<T> {
   return publicRequest<T>(path, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...headers },
