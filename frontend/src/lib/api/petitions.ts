@@ -20,7 +20,7 @@ import type {
   SmsCodeSent,
 } from "@/lib/api/types";
 
-export type PetitionGroup = "open" | "awaiting" | "closed";
+export type PetitionGroup = "open" | "awaiting" | "responded" | "closed";
 export type PetitionFilters = { group: PetitionGroup; topic: string; limit: number; offset: number };
 
 const petitionPath = (code: string) => `/api/petitions/${encodeURIComponent(code)}`;

@@ -14,6 +14,7 @@ import type {
   Me,
   Option,
   PetitionDecision,
+  PetitionResponseRequest,
   ReviewAction,
   ReviewQueue,
 } from "@/lib/api/types";
@@ -121,4 +122,13 @@ export function decidePetition(code: string, decision: PetitionDecision): Promis
 /** Petitions that reached their threshold: the MCE owes each a public response within 30 days. */
 export function getAwaitingResponses(): Promise<AwaitingResponse[]> {
   return apiRequest<AwaitingResponse[]>("/api/petitions/responses");
+}
+
+/** The MCE's public response to a petition; the petitions still waiting for one. */
+export function respondToPetition(code: string, response: PetitionResponseRequest): Promise<AwaitingResponse[]> {
+  return apiRequest<AwaitingResponse[]>(`/api/petitions/${encodeURIComponent(code)}/response`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(response),
+  });
 }

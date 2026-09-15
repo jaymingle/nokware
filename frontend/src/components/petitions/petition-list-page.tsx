@@ -18,11 +18,13 @@ import type { PetitionPage } from "@/lib/api/types";
 
 const PAGE = 20;
 const GROUPS: { id: PetitionGroup; label: string }[] = [
-  { id: "open", label: "Open" }, { id: "awaiting", label: "With the MCE" }, { id: "closed", label: "Closed" },
+  { id: "open", label: "Open" }, { id: "awaiting", label: "With the MCE" }, { id: "responded", label: "Answered" },
+  { id: "closed", label: "Closed" },
 ];
 const EMPTY: Record<PetitionGroup, string> = {
   open: "No petitions are open yet.",
   awaiting: "No petition has reached its signatures yet.",
+  responded: "The MCE hasn't answered a petition yet.",
   closed: "No petitions have closed yet.",
 };
 

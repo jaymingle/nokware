@@ -5,6 +5,7 @@ import { useState, type ReactNode } from "react";
 
 import { ErrorPanel, LoadingPanel } from "@/components/documents/panels";
 import { DocumentLine, LedgerMatches } from "@/components/petitions/ledger-matches";
+import { MceResponse } from "@/components/petitions/mce-response";
 import { Progress } from "@/components/petitions/petition-card";
 import { SignPanel } from "@/components/petitions/sign-panel";
 import { Signers } from "@/components/petitions/signers";
@@ -132,6 +133,7 @@ function Petition({ petition }: { petition: PetitionDetail }) {
       </PageIntro>
       <p className="-mt-4 text-[13px] text-ink-soft" data-testid="petition-byline">{byline}</p>
       <Standing petition={petition} now={now} />
+      <MceResponse petition={petition} />
       {signable(petition, now) ? <SignPanel petition={petition} /> : null}
       <Share petition={petition} />
       <Section title="Why" testId="petition-body">

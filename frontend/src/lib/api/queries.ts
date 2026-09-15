@@ -8,6 +8,7 @@ import {
   getCase,
   getPetitionReview,
   openSharedLocation,
+  respondToPetition,
   getCaseOversight,
   getCaseQueue,
   getCategories,
@@ -26,7 +27,17 @@ import {
 
 import { anyPublishingNow } from "@/lib/documents";
 
-import type { CaseAction, CaseDetail, DocumentOut, PetitionDecision, ReviewAction, ReviewQueue, SharedLocationView } from "@/lib/api/types";
+import type {
+  AwaitingResponse,
+  CaseAction,
+  CaseDetail,
+  DocumentOut,
+  PetitionDecision,
+  PetitionResponseRequest,
+  ReviewAction,
+  ReviewQueue,
+  SharedLocationView,
+} from "@/lib/api/types";
 
 export const LIBRARY_PAGE_SIZE = 25;
 const QUEUE_REFRESH_MS = 60_000; // keeps queues current as clocks run out elsewhere
@@ -195,4 +206,13 @@ export function useDecidePetition() {
 
 export function useAwaitingResponses() {
   return useQuery({ queryKey: queryKeys.awaitingResponses, queryFn: getAwaitingResponses, refetchInterval: PETITION_REVIEW_REFRESH_MS });
+}
+
+/** The MCE's response; the list it returns replaces the one shown. */
+export function useRespondToPetition() {
+  const queryClient = useQueryClient();
+  return useMutation<AwaitingResponse[], Error, { code: string; response: PetitionResponseRequest }>({
+    mutationFn: ({ code, response }) => respondToPetition(code, response),
+    onSuccess: (waiting) => queryClient.setQueryData(queryKeys.awaitingResponses, waiting),
+  });
 }

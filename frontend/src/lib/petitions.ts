@@ -12,6 +12,7 @@ export const STATUS_LABELS: Record<PetitionStatus, string> = {
   refused: "Refused by the MCE",
   open: "Open",
   awaiting_response: "With the MCE for a response",
+  responded: "Answered by the MCE",
   closed: "Closed",
   withdrawn: "Withdrawn",
 };
@@ -65,19 +66,29 @@ export function daysLeft(iso: string, now: number): number {
   return Math.max(0, Math.ceil((Date.parse(iso) - now) / DAY_MS));
 }
 
+type Standing = Pick<PetitionCard, "status" | "threshold" | "threshold_reached_at" | "response_due" | "responded_at" | "unanswered_at">;
+
+/** When, and how late, the MCE responded: "N days after the 30-day deadline" if it passed first. */
+export function respondedLine(petition: Pick<PetitionCard, "responded_at" | "response_due">): string | null {
+  if (!petition.responded_at) return null;
+  const late = petition.response_due ? Math.ceil((Date.parse(petition.responded_at) - Date.parse(petition.response_due)) / DAY_MS) : 0;
+  const lateness = late > 0 ? `, ${late} ${late === 1 ? "day" : "days"} after the 30-day deadline` : "";
+  return `The MCE responded on ${formatDate(petition.responded_at)}${lateness}.`;
+}
+
 /** Once it reached its threshold: when, and the MCE's 30 days to respond, counted down, then said plainly if they pass. */
-export function responseLine(
-  petition: Pick<PetitionCard, "status" | "threshold" | "threshold_reached_at" | "response_due">, now: number, where = "on this page",
-): string | null {
+export function responseLine(petition: Standing, now: number, where = "on this page"): string | null {
+  if (petition.status === "responded") return respondedLine(petition);
   if (petition.status !== "awaiting_response" || !petition.threshold_reached_at || !petition.response_due) return null;
   const reached = `Reached ${petition.threshold?.toLocaleString()} signatures on ${formatDate(petition.threshold_reached_at)}.`;
   const left = daysLeft(petition.response_due, now);
-  if (left === 0) return `${reached} ${NO_RESPONSE}`;
+  if (left === 0 || petition.unanswered_at) return `${reached} ${NO_RESPONSE}`;
   return `${reached} The MCE has until ${formatDate(petition.response_due)} to respond publicly ${where}: ${left} ${left === 1 ? "day" : "days"} left.`;
 }
 
 /** Where the petition stands in time: open until when, or when and why it closed. */
 export function closingLine(petition: Pick<PetitionCard, "status" | "closes_at" | "closed_at" | "threshold">, now: number): string | null {
+  if (petition.status === "responded") return "It takes no more signatures: the MCE has responded.";
   if (petition.status === "awaiting_response" && petition.closes_at) {
     return Date.parse(petition.closes_at) > now ? `Signing stays open until ${formatDate(petition.closes_at)}` : "Signing has closed";
   }
@@ -100,6 +111,8 @@ const TIMELINE: Record<PetitionTimelineEntry["action"], string> = {
   withdrawn: "Withdrawn by the person who started it",
   closed: "Closed after 90 days",
   threshold_reached: "Reached its signatures and went to the MCE for a response",
+  responded: "The MCE responded",
+  no_response: "No response 30 days after the petition reached its threshold",
 };
 
 export function timelineText(entry: PetitionTimelineEntry): string {

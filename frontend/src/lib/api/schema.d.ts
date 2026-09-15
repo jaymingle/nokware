@@ -921,9 +921,29 @@ export interface paths {
         put?: never;
         /**
          * Decide
-         * @description The decision, then the queue as it now stands.
+         * @description The decision, then the queue as it now stands. The creator is told after the answer is sent.
          */
         post: operations["decide_api_petitions__code__decision_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/petitions/{code}/response": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Respond
+         * @description The MCE's public response; then the petitions still waiting for one.
+         */
+        post: operations["respond_api_petitions__code__response_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2246,7 +2266,7 @@ export interface components {
              * Status
              * @enum {string}
              */
-            status: "in_review" | "refused" | "open" | "awaiting_response" | "closed" | "withdrawn";
+            status: "in_review" | "refused" | "open" | "awaiting_response" | "responded" | "closed" | "withdrawn";
             /** Published At */
             published_at: string | null;
             /** Published By */
@@ -2265,6 +2285,12 @@ export interface components {
             threshold_reached_at: string | null;
             /** Response Due */
             response_due: string | null;
+            /** Responded At */
+            responded_at: string | null;
+            /** Response Label */
+            response_label: string | null;
+            /** Unanswered At */
+            unanswered_at: string | null;
             /** Body */
             body: string;
             /** Topic Id */
@@ -2308,7 +2334,7 @@ export interface components {
              * Status
              * @enum {string}
              */
-            status: "in_review" | "refused" | "open" | "awaiting_response" | "closed" | "withdrawn";
+            status: "in_review" | "refused" | "open" | "awaiting_response" | "responded" | "closed" | "withdrawn";
             /** Published At */
             published_at: string | null;
             /** Published By */
@@ -2327,6 +2353,12 @@ export interface components {
             threshold_reached_at: string | null;
             /** Response Due */
             response_due: string | null;
+            /** Responded At */
+            responded_at: string | null;
+            /** Response Label */
+            response_label: string | null;
+            /** Unanswered At */
+            unanswered_at: string | null;
         };
         /** PetitionDetail */
         PetitionDetail: {
@@ -2351,7 +2383,7 @@ export interface components {
              * Status
              * @enum {string}
              */
-            status: "in_review" | "refused" | "open" | "awaiting_response" | "closed" | "withdrawn";
+            status: "in_review" | "refused" | "open" | "awaiting_response" | "responded" | "closed" | "withdrawn";
             /** Published At */
             published_at: string | null;
             /** Published By */
@@ -2370,6 +2402,12 @@ export interface components {
             threshold_reached_at: string | null;
             /** Response Due */
             response_due: string | null;
+            /** Responded At */
+            responded_at: string | null;
+            /** Response Label */
+            response_label: string | null;
+            /** Unanswered At */
+            unanswered_at: string | null;
             /** Body */
             body: string;
             /** Timeline */
@@ -2377,6 +2415,33 @@ export interface components {
             issue: components["schemas"]["LinkedIssue"] | null;
             /** Documents */
             documents: components["schemas"]["DocumentRef"][];
+            response: components["schemas"]["PetitionResponse"] | null;
+        };
+        /**
+         * PetitionFigures
+         * @description The MCE's handling of petitions: exact counts, since they count decisions on public petitions, not residents.
+         */
+        PetitionFigures: {
+            /** Sent */
+            sent: number;
+            /** Published By Mce */
+            published_by_mce: number;
+            /** Published Automatically */
+            published_automatically: number;
+            /** Refused */
+            refused: number;
+            /** Refusals */
+            refusals: components["schemas"]["PetitionRefusals"][];
+            /** Reached Threshold */
+            reached_threshold: number;
+            /** Answered In Time */
+            answered_in_time: number;
+            /** Answered Late */
+            answered_late: number;
+            /** Unanswered */
+            unanswered: number;
+            /** Waiting */
+            waiting: number;
         };
         /** PetitionOptions */
         PetitionOptions: {
@@ -2407,6 +2472,38 @@ export interface components {
             moderation: components["schemas"]["Moderation"];
             /** Topics */
             topics: components["schemas"]["Option"][];
+        };
+        /** PetitionRefusals */
+        PetitionRefusals: {
+            /** Reason */
+            reason: string;
+            /** Label */
+            label: string;
+            /** Count */
+            count: number;
+        };
+        /**
+         * PetitionResponse
+         * @description The MCE's public response, as given. Never the name of the person who gave it.
+         */
+        PetitionResponse: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "will_act" | "referred" | "cannot_act";
+            /** Label */
+            label: string;
+            /** Text */
+            text: string;
+            /** Department */
+            department: string | null;
+            /** Documents */
+            documents: components["schemas"]["DocumentRef"][];
+            /** Responded At */
+            responded_at: string;
+            /** Days Late */
+            days_late: number;
         };
         /** PreferencesRequest */
         PreferencesRequest: {
@@ -2713,6 +2810,20 @@ export interface components {
             /** Note */
             note: string;
         };
+        /** ResponseRequest */
+        ResponseRequest: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "will_act" | "referred" | "cannot_act";
+            /** Text */
+            text: string;
+            /** Department */
+            department?: string | null;
+            /** Documents */
+            documents?: string[];
+        };
         /** Responsiveness */
         Responsiveness: {
             /** Generated At */
@@ -2724,6 +2835,7 @@ export interface components {
             /** Departments */
             departments: components["schemas"]["DepartmentFigures"][];
             mce: components["schemas"]["MceFigures"];
+            petitions: components["schemas"]["PetitionFigures"];
         };
         /** ReviewItem */
         ReviewItem: {
@@ -2844,7 +2956,7 @@ export interface components {
              * Status
              * @enum {string}
              */
-            status: "in_review" | "refused" | "open" | "awaiting_response" | "closed" | "withdrawn";
+            status: "in_review" | "refused" | "open" | "awaiting_response" | "responded" | "closed" | "withdrawn";
         };
         /** SmsCodeRequest */
         SmsCodeRequest: {
@@ -2969,7 +3081,7 @@ export interface components {
              * Action
              * @enum {string}
              */
-            action: "submitted" | "resubmitted" | "published" | "auto_published" | "refused" | "withdrawn" | "closed" | "threshold_reached";
+            action: "submitted" | "resubmitted" | "published" | "auto_published" | "refused" | "withdrawn" | "closed" | "threshold_reached" | "responded" | "no_response";
             /** At */
             at: string;
             /** Reason */
@@ -4219,7 +4331,7 @@ export interface operations {
     published_api_petitions_get: {
         parameters: {
             query?: {
-                group?: "open" | "awaiting" | "closed";
+                group?: "open" | "awaiting" | "responded" | "closed";
                 topic?: string | null;
                 limit?: number;
                 offset?: number;
@@ -4609,6 +4721,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReviewQueue"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    respond_api_petitions__code__response_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResponseRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AwaitingResponse"][];
                 };
             };
             /** @description Validation Error */

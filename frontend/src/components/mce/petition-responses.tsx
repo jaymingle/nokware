@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 
+import { RespondDialog } from "@/components/mce/respond-dialog";
 import { Card } from "@/components/ui/card";
 import { useNow } from "@/hooks/use-now";
 import { useAwaitingResponses } from "@/lib/api/queries";
@@ -31,6 +32,7 @@ function ResponseCard({ petition, now }: { petition: AwaitingResponse; now: numb
           {petition.title}
         </Link>
         <p className="text-[13px] text-ink-soft">{signaturesLine(petition.signatures, petition.threshold)} · reached on {formatDate(petition.threshold_reached_at)}</p>
+        <div className="pt-2"><RespondDialog petition={petition} late={left === 0} /></div>
       </div>
     </Card>
   );
@@ -46,7 +48,8 @@ export function PetitionResponses() {
       <div className="flex flex-col gap-1">
         <h2 id="responses-title" className="text-[21px]">Waiting for your public response</h2>
         <p className="max-w-[70ch] text-[13.5px] text-ink-soft">
-          These reached their signatures. Each petition&apos;s page counts down your 30 days to respond publicly.
+          These reached their signatures. Each petition&apos;s page counts down your 30 days to respond publicly: the
+          Assembly will act, it&apos;s referred to a department, or it can&apos;t act, and why.
         </p>
       </div>
       {data.map((petition) => <ResponseCard key={petition.code} petition={petition} now={now} />)}

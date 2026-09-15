@@ -2,6 +2,8 @@
 
 import type { ReactNode } from "react";
 
+import { Lines, type Line } from "@/components/accountability/figure-lines";
+import { PetitionFigures } from "@/components/accountability/petition-figures";
 import { CountValue } from "@/components/dashboard/count";
 import { ErrorPanel, LoadingPanel } from "@/components/documents/panels";
 import { PageIntro } from "@/components/portal/page-intro";
@@ -12,27 +14,9 @@ import { formatDate } from "@/lib/time";
 
 import type { DepartmentFigures, Responsiveness } from "@/lib/api/types";
 
-type Line = { label: string; value: ReactNode; testId: string };
-
 function median(value: number | null, unit: "days" | "hours"): ReactNode {
   if (value === null) return <span className="text-ink-soft">not enough to say</span>;
   return unit === "days" ? `${formatDays(value)} days` : `${value < 1 ? "under 1" : Math.round(value)} hours`;
-}
-
-function Lines({ title, lines }: { title: string; lines: Line[] }) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <h4 className="text-[12.5px] font-medium tracking-wide text-ink-soft uppercase">{title}</h4>
-      <dl className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1 text-[13.5px]">
-        {lines.map((line) => (
-          <div key={line.label} className="contents" data-testid={line.testId}>
-            <dt>{line.label}</dt>
-            <dd className="text-right tabular-nums">{line.value}</dd>
-          </div>
-        ))}
-      </dl>
-    </div>
-  );
 }
 
 function reportLines(department: DepartmentFigures, waitingDays: number): Line[] {
@@ -131,6 +115,7 @@ export function ResponsivenessPage() {
           <div className="grid gap-4 md:grid-cols-2">
             {active.map((department) => <DepartmentCard key={department.id} department={department} waitingDays={data.waiting_days} />)}
             <Mce figures={data} />
+            <PetitionFigures figures={data.petitions} />
           </div>
           {quiet.length ? (
             <p className="text-[13.5px] text-ink-soft" data-testid="responsiveness-quiet">

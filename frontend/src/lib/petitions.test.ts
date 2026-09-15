@@ -60,7 +60,7 @@ describe("how a petition reads in public", () => {
 describe("once a petition reaches its signatures", () => {
   const reached = {
     status: "awaiting_response" as const, threshold: 150, closes_at: "2026-12-14T09:00:00Z", closed_at: null,
-    threshold_reached_at: "2026-09-15T09:00:00Z", response_due: "2026-10-15T09:00:00Z",
+    threshold_reached_at: "2026-09-15T09:00:00Z", response_due: "2026-10-15T09:00:00Z", responded_at: null, unanswered_at: null,
   };
 
   it("counts down the MCE's 30 days, then says plainly that there was no response", () => {
@@ -69,6 +69,16 @@ describe("once a petition reaches its signatures", () => {
     expect(responseLine(reached, Date.parse("2026-10-15T09:00:00Z"))).toBe(`Reached 150 signatures on 15 Sept 2026. ${NO_RESPONSE}`);
     expect(NO_RESPONSE).toBe("No response 30 days after the petition reached its threshold.");
     expect(responseLine({ ...reached, status: "open" }, NOW)).toBeNull();
+  });
+
+  it("says once recorded that there was no response, and a late answer says how late it came", () => {
+    expect(responseLine({ ...reached, unanswered_at: "2026-10-15T09:02:00Z" }, NOW)).toContain(NO_RESPONSE);
+    const answered = { ...reached, status: "responded" as const };
+    expect(responseLine({ ...answered, responded_at: "2026-10-01T10:00:00Z" }, NOW)).toBe("The MCE responded on 1 Oct 2026.");
+    expect(responseLine({ ...answered, responded_at: "2026-10-18T10:00:00Z" }, NOW)).toBe(
+      "The MCE responded on 18 Oct 2026, 4 days after the 30-day deadline.");
+    expect(closingLine(answered, NOW)).toBe("It takes no more signatures: the MCE has responded.");
+    expect(timelineText({ action: "no_response", at: "t", reason: null })).toBe(NO_RESPONSE.replace(/\.$/, ""));
   });
 
   it("keeps taking signatures until its 90 days are up", () => {
