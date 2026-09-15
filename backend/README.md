@@ -282,8 +282,9 @@ hospital or 193 if hurt; don't confront the person when it's someone else):
 the web safety form and a private report's receipt, the first WhatsApp reply,
 and two USSD screens. A road accident is a public-safety report to the Police
 with Police and ambulance numbers. A medical emergency (someone ill or hurt, no
-one else involved) isn't the Assembly's to act on: WhatsApp and USSD (menu 4)
-say so plainly, file nothing, and give the ambulance numbers.
+one else involved) isn't the Assembly's to act on: WhatsApp, USSD menu 4 and a
+USSD report whose description reads as medical say so plainly, file nothing,
+and give the ambulance numbers.
 
 A precise location (`report_locations.py`) is the one exception to the
 coarse-location rule, and only on the citizen's explicit opt-in. After a
@@ -390,8 +391,11 @@ only the reference. Last it asks "Send these numbers by SMS? Anyone with your
 phone could see them." Yes sends one SMS of two pages at most (the citizen's
 desk included, nothing saying what happened; three a day per phone); no sends
 nothing. The session ends by saying the phone's call list may show the dial.
-Medical emergencies (menu 4) aren't filed; they get the ambulance numbers at
-once. `scripts/ussd_simulator.py` plays a
+Medical emergencies aren't filed; they get the ambulance numbers at once,
+from menu 4 or when a description under "Report an issue" reads as medical
+(the quick model, as on WhatsApp, run beside the reading within the same 4
+seconds; not knowing in time means not medical). Because the model can misread,
+that screen offers "1 File it as a report anyway". `scripts/ussd_simulator.py` plays a
 phone against the API (Arkesel's request format, from its sample application),
 so the menu can be tried locally.
 

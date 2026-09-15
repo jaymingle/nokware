@@ -91,6 +91,12 @@ def _model_kind(text: str, has_photo: bool) -> Intent:
     return Intent(verdict.kind) if isinstance(verdict, _Kind) else Intent.UNCLEAR
 
 
+def is_medical(text: str) -> bool:
+    """For text already offered as a report (USSD's "Report an issue"): whether it is medical instead.
+    A failure reads as not medical, so the report goes on as the citizen chose."""
+    return _model_kind(text, False) == Intent.MEDICAL
+
+
 def read_message(text: str, has_photo: bool = False) -> Reading:
     """What the citizen wants, from their message (and whether it came with a photo)."""
     stripped = text.strip()

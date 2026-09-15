@@ -12,7 +12,7 @@ from app.config import get_settings
 from app.main import RedactChannelSecrets, app
 from app.safety_steps import STEPS
 from app.routes import channels
-from app.services import channel_limits, channel_sessions, redis_store, report_followups, report_intake, ussd
+from app.services import channel_intent, channel_limits, channel_sessions, redis_store, report_followups, report_intake, ussd
 from app.services.channel_contacts import numbers_sms
 from app.services.citizen_reports import IntakeChannel, NotificationEvent
 from app.contacts import EMERGENCY_TOPICS
@@ -37,6 +37,7 @@ def session(monkeypatch: pytest.MonkeyPatch) -> list[tuple[Any, ...]]:
     server = fakeredis.FakeRedis(decode_responses=True)
     for module in (redis_store, channel_sessions, channel_limits):
         monkeypatch.setattr(module, "get_redis", lambda: server)
+    monkeypatch.setattr(channel_intent, "is_medical", lambda text: False)  # the quick model, unless a test says otherwise
     return []
 
 
@@ -51,7 +52,7 @@ def keys(later: list[tuple[Any, ...]], *presses: str, session_id: str = "s1") ->
 
 def test_every_fixed_screen_fits_one_plain_screen() -> None:
     screens = [MENU, CONFIRM, ussd.MEDICAL, sub_metro_screen(), *(ward_screen(i) for i in sub_metros()),
-               *(step + ussd.CONTINUE for step in ussd.help_pages("abuse", True)), f"Reference M3RD-8WQA received.\n{ussd.NUMBERS_OFFER}",
+               ussd.MEDICAL_REPORT, *(step + ussd.CONTINUE for step in ussd.help_pages("abuse", True)), f"Reference M3RD-8WQA received.\n{ussd.NUMBERS_OFFER}",
                f"The numbers were already sent to this phone today. Keep your reference M3RD-8WQA.\n{ussd.CALL_LIST}"]
     for screen in screens:
         assert len(screen) <= ussd.SCREEN_MAX and is_gsm7(screen), screen
@@ -305,3 +306,30 @@ def test_a_ussd_session_from_an_older_version_ends_cleanly(session: list[tuple[A
     assert ussd.respond(Dial("old", PHONE, "1", False), lambda *a: None) == ussd.Reply("Your session ended. Please dial again.", False)
     assert channel_sessions.load("ussd", "old") is None
 
+
+def test_a_medical_emergency_described_as_a_report_gets_the_ambulance_and_is_not_filed(
+    session: list[tuple[Any, ...]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(report_intake, "read_report", lambda description: _classified("public_health"))
+    monkeypatch.setattr(channel_intent, "is_medical", lambda text: "collapsed" in text)
+    monkeypatch.setattr(report_intake, "submit", lambda *args: pytest.fail("filed"))
+    screen = keys(session, "2", "A man has collapsed at Kaneshie market and is not breathing")
+    assert screen.more and screen.message == ussd.MEDICAL_REPORT and "193" in screen.message and "112" in screen.message
+    assert keys(session, "2", "A man has collapsed at Kaneshie market", "0").message.startswith("Nothing was filed.")
+
+
+def test_a_citizen_can_file_what_the_model_took_for_medical(session: list[tuple[Any, ...]], monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(channel_intent, "is_medical", lambda text: True)
+    submitted, submit = _filed(SAFETY, messages_on=False, monkeypatch=monkeypatch)
+    monkeypatch.setattr(report_intake, "submit", submit)
+    first = keys(session, "2", "My husband hit me and I am bleeding", "1")
+    assert first.message.startswith(ussd.HELP_HEADING)  # the emergency numbers, as for any danger to a person
+    keys(session, "2", "My husband hit me and I am bleeding", "1", *_through_help("abuse"), "0", "2", session_id="s2")
+    assert submitted and submitted[0].sub_metro is None
+
+
+def test_the_medical_check_waits_no_longer_than_the_reading(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(ussd, "CLASSIFY_WAIT_SECONDS", 0.05)
+    slow = ussd._filing.submit(lambda: time.sleep(0.3) or True)
+    assert ussd._medical_now(slow, time.monotonic()) is False  # unknown in time: the report goes on
+    assert ussd._medical_now(ussd._filing.submit(lambda: True), time.monotonic()) is True

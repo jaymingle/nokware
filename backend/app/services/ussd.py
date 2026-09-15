@@ -19,7 +19,9 @@ nothing but the reference. Last, the citizen may ask for the numbers by SMS,
 told first that anyone with the phone could see them: nobody gets them without
 choosing, and nobody who asks is refused (a phone that already had them three
 times today is told so; each is two SMS credits). Reports carry no photos.
-The same services as the web:
+Described text that reads as a medical emergency (someone ill or hurt, no one
+else to blame) gets the ambulance numbers and is not filed, as on WhatsApp and
+menu 4, unless the citizen says to file it anyway. The same services as the web:
 report_intake.submit() and rag.answer_question(). "Confirm a web code" proves the
 number to a Nokware page that asked for it (phone_proof): the network says who dialled.
 "Sign a petition" takes the petition's six-digit number and signs it from the
@@ -28,6 +30,7 @@ being told that anyone can see it, including the department it concerns.
 """
 
 import logging
+import time
 from collections.abc import Callable
 from concurrent.futures import Future, ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FilingTimeout
@@ -38,6 +41,7 @@ from app import safety_steps
 from app.config import get_settings
 from app.contacts import EMERGENCY_TOPICS, short_line
 from app.services import (
+    channel_intent,
     channel_limits,
     channel_sessions,
     petition_signatures,
@@ -80,9 +84,11 @@ MEDICAL = "Nokware can't file this: it isn't an Assembly matter. Ambulance: 193,
 CONFIRM = "File this report?\n1 File, and SMS me updates\n2 File, no SMS\n0 Cancel"
 NEXT = "\n1 Next"
 HELP_HEADING = "In danger now? Call 112. If it fails, try the next number."
+MEDICAL_REPORT = ("This sounds like a medical emergency, which Nokware can't send help for. Ambulance: 193, 0501 614 877, "
+                  "0505 982 870, or 112.\n1 File it as a report anyway\n0 End")
 NUMBERS_OFFER = "Send these numbers by SMS? Anyone with your phone could see them.\n1 Yes\n2 No"
 CALL_LIST = "Your call list may show you dialled Nokware: delete it if that is safer."
-_filing = ThreadPoolExecutor(max_workers=4, thread_name_prefix="ussd-filing")
+_filing = ThreadPoolExecutor(max_workers=8, thread_name_prefix="ussd-filing")  # a reading takes two
 
 Later = Callable[..., None]  # runs work after the screen is sent (FastAPI's BackgroundTasks.add_task)
 State = dict[str, Any]
@@ -252,7 +258,26 @@ def _describe(dial: Dial, state: State, later: Later) -> tuple[Reply, State | No
     description = dial.text.strip()
     if len(description) < DESCRIPTION_MIN:
         return con("Please describe it in a few more words, with where it is:"), state
-    return _help_page({"description": description, "filed": _saved(_read(description))}, 0)  # help first, filing second
+    started, check = time.monotonic(), _filing.submit(channel_intent.is_medical, description)
+    state = {"description": description, "filed": _saved(_read(description))}
+    if _medical_now(check, started):
+        return con(MEDICAL_REPORT), {**state, "step": "medical"}
+    return _help_page(state, 0)  # help first, filing second
+
+
+def _medical_now(check: "Future[bool]", started: float) -> bool:
+    """Whether the text reads as medical, if that is known within the same few seconds as the reading."""
+    try:
+        return check.result(timeout=max(0.0, started + CLASSIFY_WAIT_SECONDS - time.monotonic()))
+    except FilingTimeout:
+        return False
+
+
+def _medical(dial: Dial, state: State, later: Later) -> tuple[Reply, State | None]:
+    """The model can misread: a citizen who chose to report something can still file it."""
+    if dial.text.strip() == "1":
+        return _help_page(state, 0)
+    return end("Nothing was filed. Ambulance: 193, or call 112."), None
 
 
 def _help(dial: Dial, state: State, later: Later) -> tuple[Reply, State | None]:
@@ -491,7 +516,7 @@ def _sign_name(dial: Dial, state: State, later: Later) -> tuple[Reply, State | N
 
 
 STEPS: dict[str, Callable[[Dial, State, Later], tuple[Reply, State | None]]] = {
-    "menu": _menu, "ask": _ask, "describe": _describe, "help": _help, "sub_metro": _sub_metro,
+    "menu": _menu, "ask": _ask, "describe": _describe, "medical": _medical, "help": _help, "sub_metro": _sub_metro,
     "ward": _ward, "safety_sub_metro": _safety_sub_metro, "confirm": _confirm, "updates": _updates, "call": _call,
     "numbers_sms": _numbers_sms, "check": _check, "code": _code, "sign_code": _sign_code, "sign_choice": _sign_choice, "sign_name": _sign_name,
 }
