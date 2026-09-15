@@ -27,6 +27,7 @@ from app.routes import (
     options,
     petitions as petition_routes,
     phone,
+    speech,
     queues,
     reports,
     representatives,
@@ -37,6 +38,7 @@ from app.services.issue_voices import InvalidVoice, IssueNotFound, purge_expired
 from app.services.ledger_documents import utc_now
 from app.services.petition_rules import PetitionError
 from app.services.phone_proof import ProofError
+from app.services.read_aloud import NotReadAloud, ReadAloudUnavailable
 from app.services.redis_store import RedisUnavailable
 from app.services.portal_actions import run_deadline_job
 from app.services.portal_queries import DocumentNotFound
@@ -155,7 +157,9 @@ def issue_not_found(_: Request, __: IssueNotFound) -> JSONResponse:
 
 @app.exception_handler(PetitionError)
 @app.exception_handler(ProofError)
-def petition_error(_: Request, exc: PetitionError | ProofError) -> JSONResponse:
+@app.exception_handler(NotReadAloud)
+@app.exception_handler(ReadAloudUnavailable)
+def petition_error(_: Request, exc: PetitionError | ProofError | NotReadAloud | ReadAloudUnavailable) -> JSONResponse:
     return JSONResponse({"detail": str(exc)}, status_code=exc.status_code)
 
 
@@ -166,7 +170,7 @@ def petition_not_found(_: Request, __: petitions.PetitionNotFound) -> JSONRespon
 
 @app.exception_handler(RedisUnavailable)
 def redis_unavailable(_: Request, __: RedisUnavailable) -> JSONResponse:
-    return JSONResponse({"detail": "Confirming a phone number isn't available right now. Try again shortly."}, status_code=503)
+    return JSONResponse({"detail": "This isn't available right now. Try again shortly."}, status_code=503)
 
 
 @app.exception_handler(PoolTimeout)
@@ -204,4 +208,5 @@ app.include_router(representatives.router)
 app.include_router(issues.router)
 app.include_router(petition_routes.router)
 app.include_router(phone.router)
+app.include_router(speech.router)
 app.include_router(channels.router)

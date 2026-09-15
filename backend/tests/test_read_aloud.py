@@ -1,0 +1,111 @@
+"""Read aloud: only what the server produced, never anything about someone's safety, paid for once."""
+
+from datetime import datetime, timezone
+from typing import Any
+
+import fakeredis
+import pytest
+from fastapi.testclient import TestClient
+
+from app.main import app
+from app.routes import ask as ask_routes
+from app.services import ask_export, read_aloud, redis_store, report_followups, report_store
+from app.services.rag import NO_INFO_ANSWER, SAFETY_FIGURES_ANSWER
+from app.services.read_aloud import NotReadAloud, ReadAloudUnavailable
+from app.services.voice_audio import Encoded
+from app.services.voice_speech import SpeechFailed
+
+NOW = datetime(2026, 9, 15, 12, 0, tzinfo=timezone.utc)
+ANSWER = "**Market stall** fees are set in the Fee-Fixing Resolution [S1]: GH¢ 30.00 a month (https://ama.gov.gh/fees.pdf)."
+STATUS = {"private": False, "reference": "K7QM-4TXP", "status": "resolved", "topic": "Drainage and flooding", "ward": "Kaneshie",
+          "recipients": ["Works Department"], "resolution_notes": [{"recipient": "Works Department", "note": "Desilted on 12 September."}],
+          "voices": 3, "escalate_until": "2026-09-29T12:00:00+00:00"}
+
+
+@pytest.fixture
+def spoken(monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    """Redis faked, and Gemini's speech replaced by a counter of what it was asked to say."""
+    fake = fakeredis.FakeRedis(decode_responses=True)
+    monkeypatch.setattr(read_aloud, "get_redis", lambda: fake)
+    monkeypatch.setattr(redis_store, "get_redis", lambda: fake)
+    said: list[str] = []
+    monkeypatch.setattr(read_aloud, "speak", lambda script, for_web=False: said.append(script) or Encoded(b"ID3-mp3", "audio/mpeg", "mp3", 4.2))
+    return said
+
+
+def test_an_answer_is_read_as_words_with_where_its_sources_are() -> None:
+    script = read_aloud.answer_script("What does a market stall cost?", ANSWER, "answered")
+    assert script == ("Market stall fees are set in the Fee-Fixing Resolution: 30 Ghana cedis a month. "
+                      "The documents it comes from are listed with the answer.")
+    long = read_aloud.answer_script("Tell me everything", "The Assembly plans many things. " * 100, "answered")
+    assert len(long) < read_aloud.READ_MAX_CHARS + 120 and read_aloud.REST_ON_SCREEN in long
+    assert read_aloud.answer_script("Where is the rates office?", NO_INFO_ANSWER, "no_information").startswith(NO_INFO_ANSWER)
+
+
+def test_nothing_about_someones_safety_is_read_aloud() -> None:
+    for question, answer in (("My husband beats me, who can help?", "Call the Police."),
+                             ("How many reports?", f"{SAFETY_FIGURES_ANSWER} The rest."),
+                             ("Where do I go?", "If someone threatened to kill you, call 191.")):
+        assert not read_aloud.may_speak_answer(question, answer)
+        with pytest.raises(NotReadAloud):
+            read_aloud.answer_script(question, answer, "answered")
+    with pytest.raises(NotReadAloud):
+        read_aloud.status_script({**STATUS, "private": True, "stage": "received"})
+
+
+def test_a_status_is_read_as_its_page_shows_it_with_the_reference_spelled_out() -> None:
+    script = read_aloud.status_script(STATUS)
+    assert script.startswith("Report K 7 Q M, 4 T X P (Drainage and flooding in Kaneshie) was resolved by Works Department.")
+    assert 'Works Department said: "Desilted on 12 September."' in script and "3 other residents say it affects them too." in script
+    assert "escalate it until 29 Sep on this page" in script and "report/status" not in script
+    assert read_aloud.status_script(STATUS, receipt=True).endswith(read_aloud.KEEP_REFERENCE)
+
+
+def test_the_same_words_are_spoken_once_and_the_day_has_a_limit(spoken: list[str], monkeypatch: pytest.MonkeyPatch) -> None:
+    assert read_aloud.audio("Hello, Accra.", NOW).data == b"ID3-mp3"
+    assert read_aloud.audio("Hello, Accra.", NOW).content_type == "audio/mpeg" and spoken == ["Hello, Accra."]  # cached
+    settings = read_aloud.get_settings().model_copy(update={"read_aloud_daily_limit": 1})
+    monkeypatch.setattr(read_aloud, "get_settings", lambda: settings)
+    with pytest.raises(ReadAloudUnavailable, match="today's limit"):
+        read_aloud.audio("Something new.", NOW)
+
+
+def test_a_speech_failure_says_so_plainly(spoken: list[str], monkeypatch: pytest.MonkeyPatch) -> None:
+    def fail(script: str, for_web: bool = False) -> Encoded:
+        raise SpeechFailed("no audio")
+
+    monkeypatch.setattr(read_aloud, "speak", fail)
+    with pytest.raises(ReadAloudUnavailable, match="couldn't be made"):
+        read_aloud.audio("Hello.", NOW)
+
+
+def _view(question: str, answer: str) -> dict[str, Any]:
+    answered = ask_export.Answered(question, answer, "answered", [], [], None, None)
+    return ask_export.export_view(answered, NOW).model_dump(mode="json")
+
+
+def test_only_an_answer_the_api_gave_is_read_aloud(spoken: list[str]) -> None:
+    client = TestClient(app)
+    view = _view("What does a market stall cost?", ANSWER)
+    response = client.post("/api/speech/answer", json={"view": view})
+    assert response.status_code == 200 and response.headers["content-type"] == "audio/mpeg" and response.content == b"ID3-mp3"
+    forged = {**view, "answer": "Anything at all, read aloud for free."}
+    assert client.post("/api/speech/answer", json={"view": forged}).status_code == 403
+    unsafe = _view("Someone is beating my neighbour", "Call the Police on 191.")
+    assert client.post("/api/speech/answer", json={"view": unsafe}).status_code == 409
+
+
+def test_a_report_is_read_by_its_reference_never_a_private_one(spoken: list[str], monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(report_followups, "find", lambda reference: {"$id": "c1"})
+    monkeypatch.setattr(report_store, "assignments_for", lambda case_id: [])
+    monkeypatch.setattr(report_followups, "public_status", lambda case, assignments, now: STATUS)
+    client = TestClient(app)
+    assert client.post("/api/speech/report", json={"reference": "K7QM-4TXP", "kind": "receipt"}).status_code == 200
+    monkeypatch.setattr(report_followups, "public_status", lambda case, assignments, now: {**STATUS, "private": True, "stage": "received"})
+    assert client.post("/api/speech/report", json={"reference": "K7QM-4TXP"}).status_code == 409
+
+
+def test_the_answer_says_whether_it_can_be_read_aloud() -> None:
+    done = {"type": "done", "answer": ANSWER, "status": "answered", "cited": [], "chart": None, "chart_note": None}
+    assert ask_routes._signed("What does a market stall cost?", done, {})["speakable"] is True
+    assert ask_routes._signed("My uncle beats me", done, {})["speakable"] is False

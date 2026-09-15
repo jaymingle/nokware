@@ -1,9 +1,12 @@
-"""Audio for WhatsApp voice notes, through PyAV (FFmpeg bundled in its wheel: nothing to install on the server).
+"""Audio for WhatsApp voice notes and the web's read-aloud, through PyAV (FFmpeg bundled in its wheel: nothing to
+install on the server).
 
-A spoken reply goes as OGG/Opus, the format WhatsApp plays as a voice note (Twilio
-accepts OGG only with the Opus codec). If Opus can't be encoded, MP3 is the
-fallback: WhatsApp shows it as an audio file rather than a voice note. Incoming
-audio is only measured here, or re-encoded when Gemini can't read its format.
+A spoken reply on WhatsApp goes as OGG/Opus, the format WhatsApp plays as a voice
+note (Twilio accepts OGG only with the Opus codec). If Opus can't be encoded, MP3
+is the fallback: WhatsApp shows it as an audio file rather than a voice note. The
+web gets MP3 first, the one format every browser plays (Safari included), and
+OGG/Opus only if MP3 fails. Incoming audio is only measured here, or re-encoded
+when Gemini can't read its format.
 """
 
 import io
@@ -80,7 +83,16 @@ def _encode(source: bytes, container_format: str, codec: str, bitrate: int) -> b
 
 def voice_note(source: bytes) -> Encoded:
     """Any recording as a WhatsApp voice note: OGG/Opus, or MP3 if Opus fails. Raises AudioRejected."""
-    for container_format, codec, bitrate, content_type, extension in FORMATS:
+    return _first_that_encodes(source, FORMATS)
+
+
+def for_browser(source: bytes) -> Encoded:
+    """Any recording for a web page to play: MP3, or OGG/Opus if MP3 fails. Raises AudioRejected."""
+    return _first_that_encodes(source, tuple(reversed(FORMATS)))
+
+
+def _first_that_encodes(source: bytes, formats: tuple[tuple[str, str, int, str, str], ...]) -> Encoded:
+    for container_format, codec, bitrate, content_type, extension in formats:
         try:
             data = _encode(source, container_format, codec, bitrate)
         except (av.FFmpegError, OSError, ValueError):

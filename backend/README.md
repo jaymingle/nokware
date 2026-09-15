@@ -91,6 +91,7 @@ membership.
 | `POST /api/petitions/{number}/signatures` (`show_name`, `name`), `GET /api/petitions/{number}/signature`, `POST .../signature/anonymous` | the signer (`X-Phone-Proof`) |
 | `GET /api/petitions/{number}/names` (the names signers chose to show) | public |
 | `GET /api/petitions/review`, `POST /api/petitions/{number}/decision` (`publish`, or `refuse` with a fixed `reason`), `GET /api/petitions/responses`, `POST /api/petitions/{number}/response` (`kind`: `will_act`, `referred` or `cannot_act`; `text`; `department`; `documents`) | MCE |
+| `POST /api/speech/answer` (`view`: an Ask answer's signed export view), `POST /api/speech/report` (`reference`); MP3 audio | public, 30 an hour per client |
 | `GET /api/me` | anyone signed in |
 | `GET /api/departments`, `GET /api/categories` | anyone signed in |
 | `POST /api/documents` (multipart: `file`, `title`, `category`, `document_year`, `department`, `source_url`) | department (published), contributor (held 72h) |
@@ -113,6 +114,22 @@ from ama.gov.gh, submitted by a department through the portal, or from a
 verified contributor. It comes from each record's `origin` attribute, which
 `scripts/add_document_origin.py` added and backfilled; the AMA import and the
 portal set it on every new document.
+
+**Read aloud** (`app/services/read_aloud.py`, `app/routes/speech.py`): a speaker
+button on Ask answers, report confirmations and report status pages, the places
+where the content is prose someone needs to understand and not being able to
+read it locks them out. Not a whole-page reader: screen readers do that better.
+It reuses WhatsApp voice's Gemini speech, as MP3 (every browser plays it). It
+speaks only what the API produced, never text a browser sends: an Ask answer
+comes back as its signed export view, and a report is looked up by its
+reference (in the request body, never the address). So it can't be used as a
+free text-to-speech service. Nothing about someone's safety is read aloud,
+WhatsApp's rule: no personal-safety report, and no Ask answer whose question or
+answer carries words of danger to a person (each answer says whether it is
+`speakable`, so the page shows the button only where it works). An answer is
+read up to about two and a half minutes, then "The rest of the answer is on the
+screen." The same words are spoken once and kept in Redis for six hours;
+`READ_ALOUD_DAILY_LIMIT` (300) caps fresh readings a day.
 
 **Known limitation: characters some PDFs lost.** Some of the Assembly's PDFs
 store ligatures and bullets in a font's private characters, and extraction kept

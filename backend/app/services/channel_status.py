@@ -20,7 +20,7 @@ def _day(iso: str) -> str:
     return f"{datetime.fromisoformat(iso):%-d %b}"
 
 
-def _headline(status: dict[str, Any]) -> str:
+def headline(status: dict[str, Any]) -> str:
     what = status["topic"] + (f" in {status['ward']}" if status.get("ward") else "")
     who = " and ".join(status["recipients"]) or "the Assembly"
     reference = status["reference"]
@@ -33,7 +33,8 @@ def _headline(status: dict[str, Any]) -> str:
     return f"Report {reference} ({what}) was received and is with {who}."
 
 
-def _details(status: dict[str, Any], site: str) -> list[str]:
+def _details(status: dict[str, Any], site: str, where: str | None = None) -> list[str]:
+    """What else the status says. `where` is where to escalate: the status page's address in a message."""
     lines = []
     for note in status.get("resolution_notes") or []:
         text = note["note"] if len(note["note"]) <= NOTE_MAX else note["note"][: NOTE_MAX - 3].rstrip() + "..."
@@ -42,7 +43,7 @@ def _details(status: dict[str, Any], site: str) -> list[str]:
         voices = status["voices"]
         lines.append(f"{voices} other resident{'s say' if voices > 1 else ' says'} it affects them too.")
     if status.get("escalate_until"):
-        lines.append(f"Not fixed? You can escalate it until {_day(status['escalate_until'])} at {site}/report/status")
+        lines.append(f"Not fixed? You can escalate it until {_day(status['escalate_until'])} {where or f'at {site}/report/status'}")
     return lines
 
 
@@ -50,5 +51,10 @@ def status_text(status: dict[str, Any], site: str, compact: bool = False) -> str
     """The status as plain text: one sentence when compact, with the details otherwise."""
     if status["private"]:
         return f"Reference {status['reference']}: {PRIVATE_WORDS[status['stage']]}."
-    headline = _headline(status)
-    return plain(headline if compact else "\n".join([headline, *_details(status, site)]))
+    first = headline(status)
+    return plain(first if compact else "\n".join([first, *_details(status, site)]))
+
+
+def spoken_details(status: dict[str, Any]) -> list[str]:
+    """The details as read aloud on the status page: escalation is "on this page", not an address."""
+    return _details(status, "", where="on this page")

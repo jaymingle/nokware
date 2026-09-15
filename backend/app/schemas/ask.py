@@ -114,6 +114,7 @@ class AskResponse(BaseModel):
     chart: AskChart | None = None
     chart_note: str | None = None  # why the chart isn't the kind asked for, or why there is none
     export: ExportView
+    speakable: bool = False  # whether it can be read aloud: never an answer about someone's safety
 
 
 class AskExportRequest(BaseModel):
@@ -151,6 +152,7 @@ class DoneEvent(BaseModel):
     chart: AskChart | None = None
     chart_note: str | None = None
     export: ExportView | None = None  # what POST /api/ask/export takes back, signed
+    speakable: bool = False  # whether it can be read aloud: never an answer about someone's safety
 
 
 class ErrorEvent(BaseModel):
@@ -163,3 +165,12 @@ AnyStreamEvent = Annotated[StageEvent | SourcesEvent | DeltaEvent | DoneEvent | 
 
 class AskStreamEvent(RootModel[AnyStreamEvent]):
     """One line of POST /api/ask/stream's newline-delimited JSON."""
+
+
+class SpeechAnswerRequest(BaseModel):
+    view: ExportView  # the answer's signed export view, from the done event
+
+
+class SpeechReportRequest(BaseModel):
+    reference: str = Field(max_length=40)
+    kind: Literal["receipt", "status"] = "status"  # the confirmation just after filing, or the status page

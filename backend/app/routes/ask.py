@@ -18,7 +18,7 @@ from fastapi.responses import StreamingResponse
 from app.config import get_settings
 from app.dependencies import rate_limited
 from app.schemas.ask import AskExportRequest, AskRequest, AskResponse, AskStreamEvent, ExportView
-from app.services import ask_export, rate_limit
+from app.services import ask_export, rate_limit, read_aloud
 from app.services.ask_export import Answered, export_view
 from app.services.export_csv import csv_bytes
 from app.services.export_docx import docx
@@ -49,7 +49,8 @@ def ask(request: AskRequest) -> AskResponse:
     result = answer_question(request.question)
     answered = Answered(request.question, result["answer"], result["status"], list(result["sources"]), list(result["figures"]),
                         result["chart"], result["chart_note"])
-    return AskResponse.model_validate({**result, "export": export_view(answered, utc_now())})
+    speakable = read_aloud.may_speak_answer(request.question, result["answer"])
+    return AskResponse.model_validate({**result, "export": export_view(answered, utc_now()), "speakable": speakable})
 
 
 def error_message(error: Exception) -> str:
@@ -71,7 +72,8 @@ def _signed(question: str, event: dict[str, Any], seen: dict[str, Any]) -> dict[
     cited = set(event["cited"])
     marked = {name: [{**item, "cited": item["label"] in cited} for item in seen.get(name, [])] for name in ("sources", "figures")}
     answered = Answered(question, event["answer"], event["status"], marked["sources"], marked["figures"], event["chart"], event["chart_note"])
-    return {**event, "export": export_view(answered, utc_now())}
+    speakable = read_aloud.may_speak_answer(question, event["answer"])
+    return {**event, "export": export_view(answered, utc_now()), "speakable": speakable}
 
 
 def ndjson_events(question: str) -> Iterator[str]:

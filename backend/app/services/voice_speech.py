@@ -1,4 +1,5 @@
-"""An answer read aloud: the words to say, Gemini's speech, and a WhatsApp voice note of it.
+"""An answer read aloud: the words to say, Gemini's speech, and a WhatsApp voice note (or, for the web's
+read-aloud button, an MP3) of it.
 
 The spoken reply follows the text answer, which carries the sources, so the
 voice gives the gist in about 50 seconds: the answer's own opening, cut at a
@@ -18,7 +19,7 @@ from google.genai import errors, types
 from app.config import get_settings
 from app.services.llm import get_genai_client
 from app.services.rag import NO_INFO_ANSWER, RagAnswer
-from app.services.voice_audio import AudioRejected, Encoded, voice_note, wav
+from app.services.voice_audio import AudioRejected, Encoded, for_browser, voice_note, wav
 
 SPOKEN_MAX_CHARS = 620  # with the closing sentence, about 50 seconds: Gemini reads about 13 characters a second
 TIMEOUT_MS = 45_000
@@ -26,7 +27,7 @@ PCM_RATE = 24_000  # Gemini's speech, unless its MIME type says otherwise
 SOURCES_ABOVE = "The sources are in the message above."
 NOTHING_FOUND = "The message above says where else to look, and how to request a document."
 _TAG = re.compile(r"\s*\[[SR]\d+\]")
-_LINK = re.compile(r"\(?https?://\S+\)?")
+_LINK = re.compile(r"\(?https?://[^\s)]*[^\s).,;:!?]\)?")  # a link ends before the sentence's own punctuation
 _MARKUP = re.compile(r"\*\*|__|^#+\s*|`", re.MULTILINE)
 _BULLET = re.compile(r"^\s*(?:[*•-]|\d+\.)\s+(.+?)\s*$", re.MULTILINE)
 _CEDIS = re.compile(r"(?:GHS|GH¢|GH₵|₵)\s?(\d[\d,]*(?:\.\d+)?)")
@@ -47,14 +48,24 @@ def _cut(text: str, limit: int) -> str:
     return window[: end + 1] if end > limit // 3 else window.rsplit(" ", 1)[0] + "."
 
 
+def speakable(text: str) -> str:
+    """Text as it should be said: no citation tags, markdown or links; list items as sentences; cedis as cedis."""
+    text = _BULLET.sub(lambda m: m[1] if m[1].endswith((".", "?", "!", ":")) else m[1] + ".", text)
+    text = _WHOLE.sub(r"\1", _CEDIS.sub(r"\1 Ghana cedis", _MARKUP.sub("", _LINK.sub("", _TAG.sub("", text)))))
+    return re.sub(r"\s+([.,;:!?])", r"\1", " ".join(text.split()))  # no space left where a link stood before its full stop
+
+
+def cut(text: str, limit: int) -> tuple[str, bool]:
+    """At most limit characters, ending at a sentence; and whether anything was left out."""
+    shortened = _cut(text, limit)
+    return shortened, len(shortened) < len(text)
+
+
 def spoken_script(answer: RagAnswer) -> str:
     """What the voice note says: the gist of the answer, then a pointer to the text with the sources."""
     if answer["status"] == "no_information":
         return f"{NO_INFO_ANSWER} {NOTHING_FOUND}"
-    text = _BULLET.sub(lambda m: m[1] if m[1].endswith((".", "?", "!", ":")) else m[1] + ".", answer["answer"])
-    text = _WHOLE.sub(r"\1", _CEDIS.sub(r"\1 Ghana cedis", _MARKUP.sub("", _LINK.sub("", _TAG.sub("", text)))))
-    text = " ".join(text.split())
-    return f"{_cut(text, SPOKEN_MAX_CHARS)} {SOURCES_ABOVE}"
+    return f"{_cut(speakable(answer['answer']), SPOKEN_MAX_CHARS)} {SOURCES_ABOVE}"
 
 
 def _pcm(script: str) -> tuple[bytes, int]:
@@ -73,10 +84,10 @@ def _pcm(script: str) -> tuple[bytes, int]:
     return blob.data, int(rate[1]) if rate else PCM_RATE
 
 
-def speak(script: str) -> Encoded:
-    """The script as a WhatsApp voice note. Raises SpeechFailed."""
+def speak(script: str, for_web: bool = False) -> Encoded:
+    """The script as a WhatsApp voice note, or as an MP3 for a web page. Raises SpeechFailed."""
     try:
         pcm, rate = _pcm(script)
-        return voice_note(wav(pcm, rate))
+        return (for_browser if for_web else voice_note)(wav(pcm, rate))
     except (errors.APIError, httpx.HTTPError, AudioRejected, AttributeError, IndexError, OSError) as error:
         raise SpeechFailed(f"The spoken reply couldn't be made ({type(error).__name__}).") from None

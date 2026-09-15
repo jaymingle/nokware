@@ -41,3 +41,4 @@ PETITION_CHANGES = RateLimit(limit=20, window_seconds=3600)
 PHONE_CHALLENGES = RateLimit(limit=20, window_seconds=3600)
 PHONE_POLLS = RateLimit(limit=400, window_seconds=900)  # the page asks every few seconds while it waits
 SIGNING = RateLimit(limit=120, window_seconds=3600)  # generous: many phones share one address on a mobile network
+SPEECH = RateLimit(limit=30, window_seconds=3600)  # each fresh reading is made by Gemini's speech
