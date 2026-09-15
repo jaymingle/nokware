@@ -27,6 +27,13 @@ export function gapSentence(checked: string): string {
 export const ASSUMPTION_NOTE =
   "The “Expected…” dates under each document are our own conservative assumptions of when it is due, not statutory deadlines. The statutory dates under the Local Governance Act, 2016 (Act 936) should be confirmed before this record is used for real.";
 
+export const LEDGER_YEAR_NOTE = "The year comes from the Ledger's record of the document, not from the document's title.";
+
+/** Whether a held period rests on a year from the Ledger's record rather than the document itself: marked with a †. */
+export function yearFromLedger(period: RecordPeriod): boolean {
+  return period.state === "held" && period.documents.length > 0 && period.documents.every((doc) => doc.year_source === "ledger");
+}
+
 export function yearsOf(record: PublishingRecord): number[] {
   return Array.from({ length: record.last_year - record.first_year + 1 }, (_, i) => record.first_year + i);
 }

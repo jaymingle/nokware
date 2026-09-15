@@ -144,6 +144,13 @@ def replace_document_chunks(document_id: str, chunks: list[str], embeddings: lis
     return len(rows)
 
 
+def first_chunks() -> dict[str, str]:
+    """Every document's first chunk (its first page, roughly), by document ID: for checking what a document is."""
+    with connect() as conn:
+        rows = conn.execute(f'SELECT "{DOCUMENT_ID_COLUMN}", "{CONTENT_COLUMN}" FROM "{TABLE_NAME}" WHERE "{CHUNK_INDEX_COLUMN}" = 0').fetchall()
+    return {document_id: text for document_id, text in rows}
+
+
 def count_document_chunks(document_id: str) -> int:
     with connect() as conn:
         return conn.execute(_COUNT_SQL, (document_id,)).fetchone()[0]

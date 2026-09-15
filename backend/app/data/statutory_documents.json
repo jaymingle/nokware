@@ -1,5 +1,5 @@
 {
-  "about": "The documents the Accra Metropolitan Assembly is required to publish, as the publishing record checks them against the Ledger. The list and its four groups are the project's. 'expected' is our conservative assumption of when each is due, not a statutory deadline: confirm the dates under the Local Governance Act, 2016 (Act 936) before this is used for real. 'match' finds the document itself by title; 'related' finds documents about the same thing that are not it. 'confirmed' records a person's decision on a match the rules can't make, or make wrongly: document ID to [requirement, year], or to null to set it aside.",
+  "about": "The documents the Accra Metropolitan Assembly is required to publish, as the publishing record checks them against the Ledger. 'cover', where given, checks a document's own first page, which wins over its title: titles mislead (the file titled '2022 Composite Budget' is the budget's chart-of-account annex). The list and its four groups are the project's. 'expected' is our conservative assumption of when each is due, not a statutory deadline: confirm the dates under the Local Governance Act, 2016 (Act 936) before this is used for real. 'match' finds the document itself by title; 'related' finds documents about the same thing that are not it. 'confirmed' records a person's decision on a match the rules can't make, or make wrongly: document ID to [requirement, year], or to null to set it aside.",
   "documents_centre": "https://ama.gov.gh/documents-centre.php",
   "documents_centre_checked": "2026-09-12",
   "first_year": 2021,
@@ -29,6 +29,12 @@
       "id": "composite_budget", "group": "budget", "name": "Annual Composite Budget", "cadence": "annual",
       "match": "composite budget|programme[- ]base[d]? budget|budget estimates|^\\s*(19|20)\\d\\d AMA budget\\s*$",
       "related": "budget|narrative statement|revenue estimation|expenditure by program|funding source",
+      "cover": {
+        "match": "composite budget for (?:19|20)\\d\\d ?[-–] ?(?:19|20)?\\d\\d programme[- ]based budget estimates for ((?:19|20)\\d\\d)",
+        "related": "budget details by chart of account",
+        "held_note": "Its first page reads “Composite Budget … Programme Based Budget Estimates for {year}”.",
+        "related_note": "Its first page shows it is the budget details by chart of account: an annex to the budget, not the full Composite Budget."
+      },
       "expected": {"from": "start"},
       "departments": ["dept-budget-rating", "dept-finance"], "categories": ["Budget And Fee Fixing"]
     },

@@ -3,7 +3,7 @@ import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
 import { ledgerFileUrl } from "@/lib/api/public";
-import { ASSUMPTION_NOTE, STATE_LABELS, dateLabel, gapSentence, rtiHref } from "@/lib/accountability";
+import { ASSUMPTION_NOTE, LEDGER_YEAR_NOTE, STATE_LABELS, dateLabel, gapSentence, rtiHref } from "@/lib/accountability";
 
 import type { RecordDocument, RecordPeriod, RecordRequirement } from "@/lib/api/types";
 
@@ -16,7 +16,11 @@ function Documents({ documents, testId }: { documents: RecordDocument[]; testId:
             <FileTextIcon aria-hidden className="size-3.5 shrink-0" />
             {doc.title}
           </a>
-          <span className="text-[12.5px] text-ink-soft">{[doc.department_name, doc.year].filter(Boolean).join(" · ")}</span>
+          <span className="text-[12.5px] text-ink-soft">
+            {[doc.department_name, doc.year].filter(Boolean).join(" · ")}
+            {doc.year_source === "ledger" ? <sup title={LEDGER_YEAR_NOTE}> †</sup> : null}
+          </span>
+          {doc.note ? <span className="basis-full text-[12.5px] text-ink-soft" data-testid={`${testId}-note`}>{doc.note}</span> : null}
         </li>
       ))}
     </ul>
@@ -58,7 +62,19 @@ function Missing({ requirement, period, checked, testId }: { requirement: Record
 }
 
 function Explanation({ requirement, period, checked, testId }: { requirement: RecordRequirement; period: RecordPeriod; checked: string; testId: string }) {
-  if (period.state === "held") return <Documents documents={period.documents} testId={`${testId}-held`} />;
+  if (period.state === "held") {
+    return (
+      <div className="flex flex-col gap-3">
+        <Documents documents={period.documents} testId={`${testId}-held`} />
+        {period.related.length ? (
+          <div className="flex flex-col gap-1.5">
+            <p className="text-[13px] text-ink-soft">Also in The Ledger, related but not counted as the {requirement.name} itself:</p>
+            <Documents documents={period.related} testId={`${testId}-related`} />
+          </div>
+        ) : null}
+      </div>
+    );
+  }
   if (period.state === "not_due") {
     return (
       <p className="text-[14px]">
@@ -92,6 +108,9 @@ export function RecordDetail({ requirement, period, checked }: { requirement: Re
       {requirement.issued_by ? <p className="text-[13px] text-ink-soft">Issued by {requirement.issued_by}, not by the Assembly.</p> : null}
       <Explanation requirement={requirement} period={period} checked={checked} testId={testId} />
       {period.state !== "held" ? <Nearby requirement={requirement} period={period} testId={testId} /> : null}
+      {[...period.documents, ...period.related, ...period.nearby].some((doc) => doc.year_source === "ledger") ? (
+        <p className="text-[12px] text-ink-soft" data-testid={`${testId}-ledger-year`}>† {LEDGER_YEAR_NOTE}</p>
+      ) : null}
       {requirement.undated.length ? (
         <div className="flex flex-col gap-1.5">
           <p className="text-[13px] text-ink-soft">Also in The Ledger, with no year stated:</p>

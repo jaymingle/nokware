@@ -784,7 +784,7 @@ export interface paths {
          * @description A spoken reply, fetched by Twilio as it sends the voice note. The link is random and lasts 10 minutes, and
          *     the audio is an answer from public documents, never anything about a report.
          */
-        get: operations["whatsapp_audio_api_channels_whatsapp_audio__name__head"];
+        get: operations["whatsapp_audio_api_channels_whatsapp_audio__name__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -794,7 +794,7 @@ export interface paths {
          * @description A spoken reply, fetched by Twilio as it sends the voice note. The link is random and lasts 10 minutes, and
          *     the audio is an answer from public documents, never anything about a report.
          */
-        head: operations["whatsapp_audio_api_channels_whatsapp_audio__name__head"];
+        head: operations["whatsapp_audio_api_channels_whatsapp_audio__name__get"];
         patch?: never;
         trace?: never;
     };
@@ -1734,8 +1734,12 @@ export interface components {
             title: string;
             /** Year */
             year: number | null;
+            /** Year Source */
+            year_source: ("confirmed" | "cover" | "title" | "ledger") | null;
             /** Department Name */
             department_name: string | null;
+            /** Note */
+            note: string | null;
         };
         /**
          * RecordPeriod
@@ -3312,7 +3316,7 @@ export interface operations {
             };
         };
     };
-    whatsapp_audio_api_channels_whatsapp_audio__name__head: {
+    whatsapp_audio_api_channels_whatsapp_audio__name__get: {
         parameters: {
             query?: never;
             header?: never;
@@ -3343,7 +3347,7 @@ export interface operations {
             };
         };
     };
-    whatsapp_audio_api_channels_whatsapp_audio__name__head: {
+    whatsapp_audio_api_channels_whatsapp_audio__name__get: {
         parameters: {
             query?: never;
             header?: never;

@@ -11,7 +11,9 @@ class RecordDocument(BaseModel):
     id: str  # the Ledger document; its PDF is at /api/ledger/{id}/file
     title: str
     year: int | None
+    year_source: Literal["confirmed", "cover", "title", "ledger"] | None  # ledger: from the Ledger's record, not the document
     department_name: str | None
+    note: str | None  # why it counts as what it does, when its first page decided
 
 
 class RecordPeriod(BaseModel):

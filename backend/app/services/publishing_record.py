@@ -17,7 +17,14 @@ The Ledger", never "does not exist": it may exist and simply not be online. The
 Ledger holds everything imported from the Documents Centre, so absent from the
 Ledger means absent from the Documents Centre when it was last checked. Beside a
 gap, the record lists what the Ledger does hold from the same departments or
-categories that year. Documents issued by someone else (the Auditor-General,
+categories that year.
+
+Titles mislead: the file titled "2022 Composite Budget" is the budget's chart-of-
+account annex. Where the data file gives "cover" rules, a document's own first
+page decides what it is, and says why ("Its first page reads …"). Each document
+also says where its year came from (its first page, its title, the Ledger's
+record, or a person), so a year taken from the Ledger's record rather than the
+document can be marked as such. Documents issued by someone else (the Auditor-General,
 Parliament) say so; a Public Accounts Committee report has no fixed schedule, so
 no year of it is ever called missing.
 """
@@ -36,6 +43,7 @@ from app.services import ledger_documents
 from app.services.appwrite_client import every_record
 from app.services.ledger_documents import LedgerStatus, plausible_year, year_from_title
 from app.services.report_dashboard import _Cache
+from app.services.vectorstore import first_chunks
 from app.teams import DEPARTMENT_NAMES
 
 DATA = Path(__file__).resolve().parents[1] / "data" / "statutory_documents.json"
@@ -103,10 +111,18 @@ def expected_note(requirement: dict[str, Any]) -> str | None:
     return f"Expected by the end of the {unit}" if months == 0 else f"Expected {months} months after the {unit} ends"
 
 
+def year_and_source(document: dict[str, Any]) -> tuple[int | None, str | None]:
+    """The year a document covers, and where that came from: a person, its first page, its title (a report filed
+    later still covers its own year), or the Ledger's record."""
+    for source, year in (("confirmed", document.get("_confirmed_year")), ("cover", document.get("_cover_year")),
+                         ("title", year_from_title(document.get("title") or "")), ("ledger", plausible_year(document.get("documentYear")))):
+        if year:
+            return year, source
+    return None, None
+
+
 def document_year(document: dict[str, Any]) -> int | None:
-    """The year a document covers: a person's confirmed year, else its title's (a report filed later still covers
-    its own year), else the year the Ledger records."""
-    return document.get("_confirmed_year") or year_from_title(document.get("title") or "") or plausible_year(document.get("documentYear"))
+    return year_and_source(document)[0]
 
 
 def quarter_of(title: str) -> int | None:
@@ -114,8 +130,9 @@ def quarter_of(title: str) -> int | None:
 
 
 def _brief(document: dict[str, Any]) -> dict[str, Any]:
-    return {"id": document["$id"], "title": document["title"].strip(), "year": document_year(document),
-            "department_name": DEPARTMENT_NAMES.get(document.get("department") or "")}
+    year, source = year_and_source(document)
+    return {"id": document["$id"], "title": document["title"].strip(), "year": year, "year_source": source,
+            "department_name": DEPARTMENT_NAMES.get(document.get("department") or ""), "note": document.get("_note")}
 
 
 def _in_period(document: dict[str, Any], period: Period, requirement: dict[str, Any]) -> bool:
@@ -130,8 +147,25 @@ def _pattern(requirement: dict[str, Any], key: str) -> re.Pattern[str] | None:
     return re.compile(requirement[key], re.IGNORECASE) if requirement.get(key) else None
 
 
-def classify(requirement: dict[str, Any], documents: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    """The requirement's own documents and its related ones, with a person's confirmations applied."""
+def _by_cover(requirement: dict[str, Any], document: dict[str, Any], first_page: str | None) -> tuple[str, dict[str, Any]] | None:
+    """What the document's own first page says it is, where the requirement has cover rules: ("own" or "near",
+    the document with its year and why), or None to fall back on its title."""
+    cover = requirement.get("cover")
+    if not cover or not first_page:
+        return None
+    text = " ".join(first_page.split())
+    held = re.search(cover["match"], text, re.IGNORECASE)
+    if held:
+        return "own", {**document, "_cover_year": int(held.group(1)), "_note": cover["held_note"].format(year=held.group(1))}
+    if re.search(cover["related"], text, re.IGNORECASE):
+        return "near", {**document, "_note": cover["related_note"]}
+    return None
+
+
+def classify(requirement: dict[str, Any], documents: list[dict[str, Any]],
+             first_pages: dict[str, str] | None = None) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """The requirement's own documents and its related ones: a person's confirmation first, then the document's own
+    first page, then its title."""
     confirmed = rules()["confirmed"]
     match, related = _pattern(requirement, "match"), _pattern(requirement, "related")
     own, near = [], []
@@ -141,7 +175,10 @@ def classify(requirement: dict[str, Any], documents: list[dict[str, Any]]) -> tu
             if decided and decided[0] == requirement["id"]:
                 own.append({**document, "_confirmed_year": decided[1]})
             continue
-        if match and match.search(document["title"]):
+        by_cover = _by_cover(requirement, document, (first_pages or {}).get(document["$id"]))
+        if by_cover:
+            (own if by_cover[0] == "own" else near).append(by_cover[1])
+        elif match and match.search(document["title"]):
             own.append(document)
         elif related and related.search(document["title"]):
             near.append(document)
@@ -171,8 +208,9 @@ def _period_row(requirement: dict[str, Any], period: Period, own: list[dict[str,
     }
 
 
-def _requirement_row(requirement: dict[str, Any], documents: list[dict[str, Any]], now: datetime) -> dict[str, Any]:
-    own, near = classify(requirement, documents)
+def _requirement_row(requirement: dict[str, Any], documents: list[dict[str, Any]], now: datetime,
+                     first_pages: dict[str, str]) -> dict[str, Any]:
+    own, near = classify(requirement, documents, first_pages)
     rows = [_period_row(requirement, p, own, near, documents, now) for p in periods(requirement, now)]
     undated = [d for d in own if document_year(d) is None]
     return {
@@ -200,10 +238,11 @@ def published_documents() -> list[dict[str, Any]]:
     return [r for r in records if not (r.get("title") or "").lstrip().startswith("[TEST]")]
 
 
-def build(documents: list[dict[str, Any]], now: datetime) -> dict[str, Any]:
+def build(documents: list[dict[str, Any]], now: datetime, first_pages: dict[str, str] | None = None) -> dict[str, Any]:
     data = rules()
+    pages = first_pages or {}
     groups = [{"id": g["id"], "name": g["name"],
-               "requirements": [_requirement_row(r, documents, now) for r in data["requirements"] if r["group"] == g["id"]]}
+               "requirements": [_requirement_row(r, documents, now, pages) for r in data["requirements"] if r["group"] == g["id"]]}
               for g in data["groups"]]
     return {
         "generated_at": now.isoformat(), "documents_centre": data["documents_centre"],
@@ -214,4 +253,4 @@ def build(documents: list[dict[str, Any]], now: datetime) -> dict[str, Any]:
 
 def publishing_record(now: datetime) -> dict[str, Any]:
     """The record, at most ten minutes old."""
-    return CACHE.get(lambda: build(published_documents(), now))
+    return CACHE.get(lambda: build(published_documents(), now, first_chunks()))

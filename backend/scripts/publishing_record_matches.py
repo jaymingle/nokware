@@ -17,11 +17,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app.services.appwrite_client import quiet_sdk_deprecation_warnings  # noqa: E402
 from app.services.ledger_documents import utc_now  # noqa: E402
 from app.services.publishing_record import build, published_documents  # noqa: E402
+from app.services.vectorstore import first_chunks  # noqa: E402
 
 
 def main() -> None:
     quiet_sdk_deprecation_warnings()
-    record = build(published_documents(), utc_now())
+    record = build(published_documents(), utc_now(), first_chunks())
     for group in record["groups"]:
         print(f"\n=== {group['name']}")
         for requirement in group["requirements"]:
@@ -31,7 +32,10 @@ def main() -> None:
                 print(f"  {period['label']:12} {period['state'].upper()}")
                 for kind in ("documents", "related"):
                     for doc in period[kind]:
-                        print(f"      {'held   ' if kind == 'documents' else 'related'}  {doc['title'][:80]}  [{doc['id']}]")
+                        by = f" (year from {doc['year_source']})" if doc["year_source"] != "title" else ""
+                        print(f"      {'held   ' if kind == 'documents' else 'related'}  {doc['title'][:70]}{by}  [{doc['id']}]")
+                        if doc["note"]:
+                            print(f"               {doc['note']}")
             for doc in requirement["undated"] + requirement["held"]:
                 print(f"  {'no year' if requirement['undated'] else 'held':12} {doc['title'][:80]}  [{doc['id']}]")
     print("\nSummary:", record["summary"])

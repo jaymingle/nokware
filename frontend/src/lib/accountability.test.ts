@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { gapSentence, isActive, periodsIn, planSpan, requestWording, rtiHref, yearsOf } from "@/lib/accountability";
+import { gapSentence, isActive, periodsIn, planSpan, requestWording, rtiHref, yearFromLedger, yearsOf } from "@/lib/accountability";
 
 import type { DepartmentFigures, PublishingRecord, RecordPeriod, RecordRequirement } from "@/lib/api/types";
 
@@ -32,6 +32,18 @@ describe("the publishing record", () => {
     expect(requestWording("Auditor-General's Report", "2023", true)).toContain("the Auditor-General's Report on the Accra Metropolitan Assembly for 2023");
     expect(rtiHref(requirement("annual", []), period("2024", 2024))).toBe("/rti?document=Fee-Fixing+Resolution&period=2024");
     expect(rtiHref(requirement("annual", [], "the Auditor-General"), period("2023", 2023))).toContain("&elsewhere=1");
+  });
+});
+
+describe("where a year came from", () => {
+  const held = (...sources: ("title" | "ledger")[]): RecordPeriod => ({
+    ...period("2025", 2025), state: "held",
+    documents: sources.map((source, i) => ({ id: `d${i}`, title: "Plan", year: 2025, year_source: source, department_name: null, note: null })),
+  });
+
+  it("marks a held year only when it rests on the Ledger's record alone", () => {
+    expect([yearFromLedger(held("ledger")), yearFromLedger(held("ledger", "title")), yearFromLedger(held("title"))]).toEqual([true, false, false]);
+    expect(yearFromLedger(period("2025", 2025))).toBe(false);
   });
 });
 

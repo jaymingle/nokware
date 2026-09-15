@@ -107,6 +107,28 @@ def test_a_title_year_wins_and_a_person_can_confirm_or_set_aside_a_match(monkeyp
     assert period(requirement(record, "composite_budget"), "2026")["documents"] == []  # set aside by a person
 
 
+def test_a_documents_own_first_page_beats_its_title_and_says_why() -> None:
+    pages = {"comp22": "BUDGET DETAILS BY CHART OF ACCOUNT, 2022 Amount (GH¢) Accra Metropolis",
+             "bud26": "BUDGET DETAILS BY CHART OF ACCOUNT, 2026 Amount (GH¢)",
+             "narr26": "REPUBLIC OF GHANA\n  COMPOSITE BUDGET   FOR 2026-2029\n PROGRAMME BASED BUDGET ESTIMATES  FOR 2026  ACCRA"}
+    ledger = [*LEDGER, doc("narr26", "2026 NARRATIVE STATEMENT", 2026)]
+    budget = requirement(build_record(ledger, NOW, pages), "composite_budget")
+    held_2026 = period(budget, "2026")
+    assert [d["id"] for d in held_2026["documents"]] == ["narr26"] and held_2026["documents"][0]["year_source"] == "cover"
+    assert "Programme Based Budget Estimates for 2026" in held_2026["documents"][0]["note"]
+    annex = next(d for d in held_2026["related"] if d["id"] == "bud26")  # titled "2026 AMA Budget", but an annex
+    assert "not the full Composite Budget" in annex["note"]
+    assert period(budget, "2022")["state"] == "related"  # "2022 Composite Budget" is the chart-of-account annex
+    assert period(requirement(build_record(LEDGER, NOW), "rti_manual"), "2022")["state"] == "missing"
+
+
+def test_a_year_from_the_ledgers_record_says_so() -> None:
+    record = build_record([*LEDGER, doc("rev", "REVISED ANNUAL ACTION PLAN", 2025, "dept-central-administration", "Annual Action Plan")], NOW)
+    held = period(requirement(record, "aap"), "2025")["documents"][0]
+    assert (held["year"], held["year_source"]) == (2025, "ledger")
+    assert period(requirement(record, "fee_fixing"), "2026")["documents"][0]["year_source"] == "title"
+
+
 def test_the_summary_counts_what_was_due(monkeypatch: pytest.MonkeyPatch) -> None:
     summary = build_record(LEDGER, NOW)["summary"]
     assert summary["due"] == summary["held"] + summary["related"] + summary["missing"] and summary["not_due"] > 0
@@ -216,6 +238,7 @@ def test_only_the_last_twelve_months_count() -> None:
 
 def test_both_routes_answer_publicly(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(publishing_record, "published_documents", lambda: LEDGER)
+    monkeypatch.setattr(publishing_record, "first_chunks", lambda: {})
     monkeypatch.setattr(publishing_record.CACHE, "_value", None)
     monkeypatch.setattr(department_responsiveness, "public_cases", lambda: works_cases(6, 6)[0])
     monkeypatch.setattr(department_responsiveness, "every_record", lambda collection, queries: works_cases(6, 6)[1] if "assign" in collection else [])

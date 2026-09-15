@@ -7,7 +7,7 @@ import { RecordDetail } from "@/components/accountability/record-detail";
 import { ErrorPanel, LoadingPanel } from "@/components/documents/panels";
 import { PageIntro } from "@/components/portal/page-intro";
 import { usePublishingRecord } from "@/lib/api/public-queries";
-import { ASSUMPTION_NOTE, STATE_LABELS, dateLabel, periodsIn, planSpan, yearsOf, type RecordState } from "@/lib/accountability";
+import { ASSUMPTION_NOTE, LEDGER_YEAR_NOTE, STATE_LABELS, dateLabel, periodsIn, planSpan, yearFromLedger, yearsOf, type RecordState } from "@/lib/accountability";
 import { cn } from "@/lib/utils";
 
 import type { PublishingRecord, RecordPeriod, RecordRequirement } from "@/lib/api/types";
@@ -35,12 +35,13 @@ function Cell({ requirement, period, selected, onSelect, short }: {
       type="button"
       onClick={() => onSelect(requirement, period)}
       aria-pressed={selected}
-      aria-label={`${requirement.name}, ${period.label}: ${STATE_LABELS[period.state]}`}
+      aria-label={`${requirement.name}, ${period.label}: ${STATE_LABELS[period.state]}${yearFromLedger(period) ? ` (${LEDGER_YEAR_NOTE})` : ""}`}
       className={cn("inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[11.5px] text-ink-soft hover:bg-paper-subtle", selected && "bg-teal-tint ring-1 ring-teal")}
       data-testid={`record-${requirement.id}-${period.label.replace(/\W+/g, "-")}`}
     >
       <Mark state={period.state} small={Boolean(short)} />
       {short}
+      {yearFromLedger(period) ? <sup aria-hidden>†</sup> : null}
     </button>
   );
 }
@@ -113,6 +114,9 @@ function Group({ record, index, selected, onSelect }: { record: PublishingRecord
           </tbody>
         </table>
       </div>
+      {group.requirements.some((r) => r.periods.some(yearFromLedger)) ? (
+        <p className="text-[12px] text-ink-soft" data-testid={`record-group-${group.id}-footnote`}>† {LEDGER_YEAR_NOTE}</p>
+      ) : null}
       {open && period ? <RecordDetail requirement={open} period={period} checked={record.documents_centre_checked} /> : null}
     </section>
   );
