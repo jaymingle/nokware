@@ -56,6 +56,7 @@ export type Responsiveness = Schemas["Responsiveness"];
 export type DepartmentFigures = Schemas["DepartmentFigures"];
 export type ChartValue = Schemas["ChartValue"];
 export type ExportView = Schemas["ExportView"];
+export type AskHeard = Schemas["AskHeard"];
 export type ExportFormat = Schemas["AskExportRequest"]["format"];
 export type Issue = Schemas["Issue"];
 export type IssuePage = Schemas["IssuePage"];

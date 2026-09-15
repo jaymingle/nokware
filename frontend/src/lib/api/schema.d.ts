@@ -75,6 +75,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/ask/voice": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ask Voice
+         * @description A spoken question in words, to be checked before it is asked. Nothing is asked here.
+         */
+        post: operations["ask_voice_api_ask_voice_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/ledger/{document_id}/file": {
         parameters: {
             query?: never;
@@ -1317,6 +1337,18 @@ export interface components {
              */
             grouped_by: "none" | "topic" | "sub_metro" | "month";
         };
+        /**
+         * AskHeard
+         * @description A spoken question in words, shown to the person to check before anything is asked.
+         */
+        AskHeard: {
+            /** Question */
+            question: string;
+            /** Language */
+            language: string;
+            /** Understood */
+            understood: string;
+        };
         /** AskRequest */
         AskRequest: {
             /** Question */
@@ -1406,6 +1438,14 @@ export interface components {
             threshold_reached_at: string;
             /** Response Due */
             response_due: string;
+        };
+        /** Body_ask_voice_api_ask_voice_post */
+        Body_ask_voice_api_ask_voice_post: {
+            /**
+             * Audio
+             * @description The spoken question, as the browser recorded it
+             */
+            audio: string;
         };
         /** Body_file_report_api_reports_post */
         Body_file_report_api_reports_post: {
@@ -3350,6 +3390,39 @@ export interface operations {
                     "application/pdf": unknown;
                     "application/vnd.openxmlformats-officedocument.wordprocessingml.document": unknown;
                     "text/csv; charset=utf-8": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ask_voice_api_ask_voice_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_ask_voice_api_ask_voice_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AskHeard"];
                 };
             };
             /** @description Validation Error */

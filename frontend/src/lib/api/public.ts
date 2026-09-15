@@ -3,6 +3,7 @@ import { ApiError, UNREACHABLE, errorMessage } from "@/lib/api/errors";
 import { env } from "@/lib/env";
 
 import type {
+  AskHeard,
   ContactDirectory,
   Dashboard,
   ExportView,
@@ -32,6 +33,13 @@ async function publicFetch(path: string, init: RequestInit): Promise<Response> {
 
 export async function publicRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
   return (await (await publicFetch(path, init)).json()) as T;
+}
+
+/** A spoken question's words, as the API heard them; nothing is asked. Throws ApiError with the API's own words. */
+export function hearQuestion(recording: Blob): Promise<AskHeard> {
+  const body = new FormData();
+  body.append("audio", recording, recording.type.includes("mp4") ? "question.m4a" : "question.webm");
+  return publicRequest<AskHeard>("/api/ask/voice", { method: "POST", body });
 }
 
 /** One part of a reading, and how many parts the whole reading has. */
