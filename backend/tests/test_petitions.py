@@ -207,8 +207,8 @@ def stored(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
     """One petition in a dict, and every trail entry written."""
     state: dict[str, Any] = {"petition": _petition(), "trail": []}
     monkeypatch.setattr(petitions, "find", lambda code: dict(state["petition"]))
-    monkeypatch.setattr(petitions, "_update", lambda pid, changes: state.update(petition={**state["petition"], **changes}) or dict(state["petition"]))
-    monkeypatch.setattr(petitions, "_record", lambda p, action, actor, from_status, reason=None, note=None:
+    monkeypatch.setattr(petitions, "update_petition", lambda pid, changes: state.update(petition={**state["petition"], **changes}) or dict(state["petition"]))
+    monkeypatch.setattr(petitions, "record_history", lambda p, action, actor, from_status, reason=None, note=None:
                         state["trail"].append((action, actor.role, from_status, reason, note)))
     return state
 

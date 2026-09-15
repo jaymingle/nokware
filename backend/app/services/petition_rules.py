@@ -9,8 +9,13 @@ Lifecycle:
     the MCE refuses it, for one of the fixed reasons only -> refused
       the creator edits and resubmits it (at most twice) -> in_review, with a fresh 72 hours
     the MCE decides nothing in 72 hours -> open: it publishes automatically
-  open for 90 days -> closed
-  the creator may withdraw it until it closes -> withdrawn
+  it reaches its threshold of signatures -> awaiting_response; the MCE has 30 days to respond publicly
+    (it keeps taking signatures until its 90 days are up)
+  open for 90 days without reaching it -> closed
+  the creator may withdraw it until it reaches its threshold or closes -> withdrawn
+
+One signature per confirmed Ghanaian number per petition. A signer is
+anonymous unless they choose to show their name, which is then public.
 
 The MCE is usually the petition's target, so moderation can't be a veto: a
 refusal must name a reason from REFUSALS, the public list counts refusals by
@@ -45,6 +50,7 @@ class PetitionStatus(StrEnum):
     IN_REVIEW = "in_review"
     REFUSED = "refused"
     OPEN = "open"
+    AWAITING_RESPONSE = "awaiting_response"  # reached its threshold: the MCE must respond publicly
     CLOSED = "closed"
     WITHDRAWN = "withdrawn"
 
@@ -68,6 +74,7 @@ class PetitionAction(StrEnum):
     WITHDRAWN = "withdrawn"
     CLOSED = "closed"
     MADE_ANONYMOUS = "made_anonymous"
+    THRESHOLD_REACHED = "threshold_reached"
 
 
 @dataclass(frozen=True)
@@ -229,8 +236,38 @@ def check_resubmit(petition: dict[str, Any]) -> None:
 
 
 def check_withdraw(petition: dict[str, Any]) -> None:
+    if petition.get("status") == PetitionStatus.AWAITING_RESPONSE:
+        raise WrongState("It has reached its signatures and gone to the MCE, so it can't be withdrawn now.")
     if petition.get("status") not in (PetitionStatus.IN_REVIEW, PetitionStatus.REFUSED, PetitionStatus.OPEN):
         raise WrongState("This petition has already closed.")
+
+
+SIGNING = (PetitionStatus.OPEN, PetitionStatus.AWAITING_RESPONSE)
+_NAME = re.compile(r"^[^\W\d_]+(?:[ .'’-]+[^\W\d_]+)*\.?$")  # letters, with spaces, dots, apostrophes and hyphens between
+
+
+def check_signable(petition: dict[str, Any], now: datetime) -> None:
+    closes = parse_datetime(petition.get("closesAt"))
+    if petition.get("status") not in SIGNING or closes is None or closes <= now:
+        raise WrongState("This petition has closed, so it takes no more signatures.")
+
+
+def clean_signer_name(show_name: bool, name: str | None) -> str | None:
+    """A signer's name to show publicly: letters only, so the name field can't carry a number or a message."""
+    given = clean_name(show_name, name)
+    if given and not _NAME.match(given):
+        raise InvalidPetition("A name can have letters, spaces, hyphens and apostrophes only.")
+    return given
+
+
+def threshold_fields(petition: dict[str, Any], signatures: int, now: datetime) -> dict[str, Any]:
+    """The new count, and, the moment it reaches the threshold, the MCE's 30 days to respond."""
+    changes: dict[str, Any] = {"signatureCount": signatures}
+    threshold = petition.get("threshold")
+    if petition.get("status") == PetitionStatus.OPEN and threshold and signatures >= threshold:
+        changes.update(status=PetitionStatus.AWAITING_RESPONSE.value, thresholdReachedAt=now.isoformat(),
+                       responseDue=(now + RESPONSE_WINDOW).isoformat())
+    return changes
 
 
 def closing_due(petition: dict[str, Any], now: datetime) -> bool:

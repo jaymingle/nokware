@@ -65,7 +65,8 @@ RETENTION = timedelta(days=30)
 JOB_BATCH = 100
 CODE_ATTEMPTS = 5
 PUBLIC_FIELDS = ["code", "title", "topic", "recipients", "scope", "wardLocation", "subMetro", "status", "publishedAt",
-                 "publishedBy", "closesAt", "closedAt", "threshold", "signatureCount", "creatorName"]
+                 "publishedBy", "closesAt", "closedAt", "threshold", "signatureCount", "creatorName", "thresholdReachedAt",
+                 "responseDue"]
 
 
 class PetitionNotFound(Exception):
@@ -108,11 +109,12 @@ def public(code: str) -> dict[str, Any]:
     return petition
 
 
-def _update(petition_id: str, changes: dict[str, Any]) -> dict[str, Any]:
+def update_petition(petition_id: str, changes: dict[str, Any]) -> dict[str, Any]:
+    """Write changes to a petition; callers hold its lock."""
     return as_record(get_databases().update_document(DATABASE_ID, PETITIONS_COLLECTION, petition_id, changes))
 
 
-def _record(petition: dict[str, Any], action: PetitionAction, actor: Actor, from_status: str | None,
+def record_history(petition: dict[str, Any], action: PetitionAction, actor: Actor, from_status: str | None,
             reason: str | None = None, note: str | None = None) -> None:
     get_databases().create_document(DATABASE_ID, HISTORY_COLLECTION, ID.unique(), {
         "petitionId": petition["$id"], "action": action.value, "actorId": actor.id, "actorName": actor.name or None,
@@ -173,7 +175,7 @@ def submit(proof: Proof, draft: Draft, show_name: bool, name: str | None, now: d
         "creatorKey": key, "creatorPhone": proof.number, "creatorChannel": proof.channel.value,
         "creatorName": shown_name, "createdAt": now.isoformat(),
     })
-    _record(petition, PetitionAction.SUBMITTED, CREATOR, None)
+    record_history(petition, PetitionAction.SUBMITTED, CREATOR, None)
     return petition
 
 
@@ -195,8 +197,8 @@ def resubmit(code: str, proof: Proof, draft: Draft, now: datetime) -> dict[str, 
         check_resubmit(petition)
         changes = {**draft_fields(draft), **_location(draft), **review_fields(now),
                    "resubmissions": (petition.get("resubmissions") or 0) + 1, "purgeAt": None}
-        updated = _update(petition["$id"], changes)
-        _record(updated, PetitionAction.RESUBMITTED, CREATOR, petition["status"])
+        updated = update_petition(petition["$id"], changes)
+        record_history(updated, PetitionAction.RESUBMITTED, CREATOR, petition["status"])
     return updated
 
 
@@ -209,8 +211,8 @@ def withdraw(code: str, proof: Proof, now: datetime) -> dict[str, Any]:
     with record_lock(petition["$id"]):
         petition = _owned(code, proof)
         check_withdraw(petition)
-        updated = _update(petition["$id"], _finish(PetitionStatus.WITHDRAWN, now))
-        _record(updated, PetitionAction.WITHDRAWN, CREATOR, petition["status"])
+        updated = update_petition(petition["$id"], _finish(PetitionStatus.WITHDRAWN, now))
+        record_history(updated, PetitionAction.WITHDRAWN, CREATOR, petition["status"])
     return updated
 
 
@@ -220,8 +222,8 @@ def make_anonymous(code: str, proof: Proof) -> dict[str, Any]:
     if not petition.get("creatorName"):
         return petition
     with record_lock(petition["$id"]):
-        updated = _update(petition["$id"], {"creatorName": None})
-        _record(updated, PetitionAction.MADE_ANONYMOUS, CREATOR, petition["status"])
+        updated = update_petition(petition["$id"], {"creatorName": None})
+        record_history(updated, PetitionAction.MADE_ANONYMOUS, CREATOR, petition["status"])
     return updated
 
 
@@ -268,8 +270,8 @@ def decide(principal: Principal, code: str, publish: bool, reason: str | None, n
         petition = find(code)
         check_review(petition, now)
         changes, action = _decision(petition, publish, reason or "", note, duplicate_of, now)
-        updated = _update(petition["$id"], changes)
-        _record(updated, action, _mce(principal), petition["status"], changes.get("refusalReason"), changes.get("refusalNote"))
+        updated = update_petition(petition["$id"], changes)
+        record_history(updated, action, _mce(principal), petition["status"], changes.get("refusalReason"), changes.get("refusalNote"))
     return updated
 
 
@@ -283,8 +285,8 @@ def _auto_publish(candidate: dict[str, Any], now: datetime) -> bool:
         petition = find(candidate["code"])  # re-read: the MCE may have just decided
         if not review_expired(petition, now):
             return False
-        updated = _update(petition["$id"], publish_fields(petition, PublishedBy.AUTOMATIC, now, _threshold(petition)))
-        _record(updated, PetitionAction.AUTO_PUBLISHED, SYSTEM, petition["status"])
+        updated = update_petition(petition["$id"], publish_fields(petition, PublishedBy.AUTOMATIC, now, _threshold(petition)))
+        record_history(updated, PetitionAction.AUTO_PUBLISHED, SYSTEM, petition["status"])
     return True
 
 
@@ -293,8 +295,8 @@ def _close(candidate: dict[str, Any], now: datetime) -> bool:
         petition = find(candidate["code"])
         if not closing_due(petition, now):
             return False
-        updated = _update(petition["$id"], _finish(PetitionStatus.CLOSED, now))
-        _record(updated, PetitionAction.CLOSED, SYSTEM, petition["status"])
+        updated = update_petition(petition["$id"], _finish(PetitionStatus.CLOSED, now))
+        record_history(updated, PetitionAction.CLOSED, SYSTEM, petition["status"])
     return True
 
 
@@ -323,12 +325,20 @@ def purge_creator_numbers(now: datetime) -> int:
 
 
 def list_public(statuses: list[PetitionStatus], topic: str | None, limit: int, offset: int) -> tuple[list[dict[str, Any]], int]:
-    """Published petitions in the given states, newest first."""
+    """Published petitions in the given states: most supported first while they take signatures, else latest closed."""
+    closed = PetitionStatus.OPEN not in statuses and PetitionStatus.AWAITING_RESPONSE not in statuses
+    order = [Query.order_desc("closedAt")] if closed else [Query.order_desc("signatureCount"), Query.order_desc("publishedAt")]
     return _list([
         Query.equal("status", [s.value for s in statuses]), Query.is_not_null("publishedAt"),
         *([Query.equal("topic", topic)] if topic else []),
-        Query.select(PUBLIC_FIELDS), Query.order_desc("publishedAt"), Query.limit(limit), Query.offset(offset),
+        Query.select(PUBLIC_FIELDS), *order, Query.limit(limit), Query.offset(offset),
     ])
+
+
+def awaiting_response() -> list[dict[str, Any]]:
+    """Petitions that reached their threshold, the one whose 30 days run out first at the top."""
+    return every_record(PETITIONS_COLLECTION, [Query.equal("status", PetitionStatus.AWAITING_RESPONSE.value),
+                                               Query.order_asc("responseDue")])
 
 
 def _count(queries: list[str]) -> int:

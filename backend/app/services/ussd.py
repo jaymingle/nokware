@@ -1,4 +1,4 @@
-"""USSD (Arkesel): the keypad menu. Ask a question, report an issue, check a case, confirm a web code.
+"""USSD (Arkesel): the keypad menu. Ask a question, report an issue, check a case, confirm a web code, sign a petition.
 
 A screen holds 160 characters and a session lasts seconds, so:
 - the menu's place is kept in Redis under the session ID, for 3 minutes;
@@ -16,6 +16,9 @@ if the citizen then says yes, and any SMS about it says nothing but the
 reference. Reports carry no photos. The same services as the web:
 report_intake.submit() and rag.answer_question(). "Confirm a web code" proves the
 number to a Nokware page that asked for it (phone_proof): the network says who dialled.
+"Sign a petition" takes the petition's six-digit number and signs it from the
+dialling number, anonymously unless the resident chooses to show a name, after
+being told that anyone can see it, including the department it concerns.
 """
 
 import logging
@@ -27,13 +30,23 @@ from typing import Any
 
 from app.config import get_settings
 from app.contacts import EMERGENCY_TOPICS, short_line
-from app.services import channel_limits, channel_sessions, phone_proof, report_followups, report_intake, report_store
+from app.services import (
+    channel_limits,
+    channel_sessions,
+    petition_signatures,
+    petitions,
+    phone_proof,
+    report_followups,
+    report_intake,
+    report_store,
+)
 from app.services.channel_answers import for_sms
 from app.services.channel_messages import send_sms
 from app.services.channel_status import status_text
 from app.services.citizen_reports import IntakeChannel, NotificationEvent
 from app.services.ledger_documents import utc_now
 from app.services.notifications import notify_quietly
+from app.services.petition_rules import InvalidPetition, WrongState, check_signable, clean_signer_name, normalise_code
 from app.services.rag import AnswerLength, answer_question
 from app.services.report_contacts import InvalidNumber, masked, update_contact
 from app.services.report_intake import DESCRIPTION_MIN, Receipt, ReportSubmission
@@ -53,7 +66,7 @@ CONTINUE = "\n1 Continue"
 SCREEN_MAX = 160
 QUESTION_MIN = 5
 WHO_MAX = 40  # longer office names give way to a count, so the receipt keeps its last words
-MENU = "Nokware - Accra Assembly\n1 Ask a question\n2 Report an issue\n3 Check a case\n4 Medical emergency\n5 Confirm a web code"
+MENU = "Nokware - Accra Assembly\n1 Ask a question\n2 Report an issue\n3 Check a case\n4 Medical emergency\n5 Confirm a web code\n6 Sign a petition"
 MEDICAL = "Nokware can't file this: it isn't an Assembly matter. Ambulance: 193, 0501 614 877, 0505 982 870. Or call 112."
 CONFIRM = "File this report?\n1 File, and SMS me updates\n2 File, no SMS\n0 Cancel"
 _filing = ThreadPoolExecutor(max_workers=4, thread_name_prefix="ussd-filing")
@@ -141,7 +154,9 @@ def _menu(dial: Dial, state: State, later: Later) -> tuple[Reply, State | None]:
         return end(MEDICAL), None
     if choice == "5":
         return con("Enter the 6-digit code shown on the Nokware page:"), {"step": "code"}
-    return con("Choose 1 to 5.\n" + MENU), state
+    if choice == "6":
+        return con("Enter the petition's 6-digit number:"), {"step": "sign_code"}
+    return con("Choose 1 to 6.\n" + MENU), state
 
 
 def _ask(dial: Dial, state: State, later: Later) -> tuple[Reply, State | None]:
@@ -362,10 +377,62 @@ def _code(dial: Dial, state: State, later: Later) -> tuple[Reply, State | None]:
     return end(CODE_REPLIES[phone_proof.claim(dial.text, dial.msisdn, phone_proof.Channel.USSD, utc_now())]), None
 
 
+TITLE_ON_SCREEN = 70
+NAME_PROMPT = ("Your name will be shown on the petition: anyone can see it, including the department it concerns. "
+               "Type your name, or 0 to sign anonymously:")
+
+
+def _signed(dial: Dial, code: str, name: str | None) -> tuple[Reply, State | None]:
+    try:
+        signed = petition_signatures.sign(code, dial.msisdn, phone_proof.Channel.USSD, name is not None, name, utc_now())
+    except (petitions.PetitionNotFound, WrongState) as error:
+        return end(str(error) if isinstance(error, WrongState) else "No open petition has that number."), None
+    if not signed.added:
+        return end("This number has already signed this petition."), None
+    count = f"{signed.petition.get('signatureCount') or 0} of {signed.petition.get('threshold')} signatures"
+    return end(f"Signed{' with your name shown' if signed.named else ' anonymously'}. {count}. Thank you."), None
+
+
+def _sign_code(dial: Dial, state: State, later: Later) -> tuple[Reply, State | None]:
+    code = normalise_code(dial.text)
+    if code is None:
+        return con("A petition number has 6 digits. Try again:"), state
+    try:
+        petition = petitions.public(code)
+        check_signable(petition, utc_now())
+    except (petitions.PetitionNotFound, WrongState):
+        return end("No open petition has that number. Check it and dial again."), None
+    title = petition["title"] if len(petition["title"]) <= TITLE_ON_SCREEN else petition["title"][: TITLE_ON_SCREEN - 3] + "..."
+    menu = f"{title}\n1 Sign, name not shown\n2 Sign with my name shown\n0 Cancel"
+    return con(menu), {"step": "sign_choice", "code": code}
+
+
+def _sign_choice(dial: Dial, state: State, later: Later) -> tuple[Reply, State | None]:
+    choice = dial.text.strip()
+    if choice == "1":
+        return _signed(dial, state["code"], None)
+    if choice == "2":
+        return con(NAME_PROMPT), {**state, "step": "sign_name"}
+    if choice == "0":
+        return end("Cancelled. You haven't signed."), None
+    return con("Choose 1, 2 or 0."), state
+
+
+def _sign_name(dial: Dial, state: State, later: Later) -> tuple[Reply, State | None]:
+    typed = dial.text.strip()
+    if typed == "0":
+        return _signed(dial, state["code"], None)
+    try:
+        clean_signer_name(True, typed)
+    except InvalidPetition as error:
+        return con(f"{error} Type your name, or 0 to sign anonymously:"), state
+    return _signed(dial, state["code"], typed)
+
+
 STEPS: dict[str, Callable[[Dial, State, Later], tuple[Reply, State | None]]] = {
     "menu": _menu, "ask": _ask, "describe": _describe, "help": _help, "sub_metro": _sub_metro, "ward": _ward,
     "safety_sub_metro": _safety_sub_metro, "confirm": _confirm, "updates": _updates, "call": _call, "check": _check,
-    "code": _code,
+    "code": _code, "sign_code": _sign_code, "sign_choice": _sign_choice, "sign_name": _sign_name,
 }
 
 

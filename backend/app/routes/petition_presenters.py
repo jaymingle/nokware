@@ -9,10 +9,13 @@ from dataclasses import asdict
 from typing import Any
 
 from app.schemas.petitions import (
+    AwaitingResponse,
     DocumentRef,
     LedgerMatch,
     LinkedIssue,
     Moderation,
+    MySignature,
+    NamedSignature,
     OwnPetition,
     PetitionCard,
     PetitionDetail,
@@ -49,6 +52,7 @@ def _card_fields(petition: dict[str, Any]) -> dict[str, Any]:
         "published_by": petition.get("publishedBy"), "closes_at": petition.get("closesAt"), "closed_at": petition.get("closedAt"),
         "threshold": petition.get("threshold"), "signatures": petition.get("signatureCount") or 0,
         "started_by": petition.get("creatorName"),
+        "threshold_reached_at": petition.get("thresholdReachedAt"), "response_due": petition.get("responseDue"),
     }
 
 
@@ -128,3 +132,22 @@ def moderation(counts: dict[str, Any]) -> Moderation:
     return Moderation(awaiting=counts["awaiting"], published_by_mce=counts["published_by_mce"],
                       published_automatically=counts["published_automatically"], refusals=refusals,
                       refusals_total=sum(r.count for r in refusals))
+
+
+def my_signature(signature: dict[str, Any] | None) -> MySignature:
+    if not signature:
+        return MySignature(signed=False, named=False, name=None, signed_at=None)
+    return MySignature(signed=True, named=bool(signature.get("named")), name=signature.get("name"), signed_at=signature.get("createdAt"))
+
+
+def named_signature(row: dict[str, Any]) -> NamedSignature:
+    return NamedSignature(name=row["name"], signed_at=row["createdAt"])
+
+
+def awaiting(petition: dict[str, Any]) -> AwaitingResponse:
+    fields = _card_fields(petition)
+    return AwaitingResponse(
+        code=fields["code"], title=fields["title"], topic=fields["topic"], departments=fields["departments"], scope=fields["scope"],
+        area=fields["area"], sub_metro=fields["sub_metro"], signatures=fields["signatures"], threshold=petition["threshold"],
+        threshold_reached_at=petition["thresholdReachedAt"], response_due=petition["responseDue"],
+    )

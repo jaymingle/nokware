@@ -85,10 +85,12 @@ membership.
 | `GET /api/publishing-record` (the documents AMA is required to publish, against what the Ledger holds, by year; cached ten minutes) | public |
 | `GET /api/responsiveness` (each Assembly department's handling of reports and contributors' documents, last twelve months; cached a minute) | public |
 | `POST /api/phone/challenges`, `/challenges/status`, `/challenges/sms`, `/challenges/sms/confirm` (confirm a phone number; the secret in the body) | public, rate-limited per client |
-| `GET /api/petitions/options`, `GET /api/petitions` (`?group=open\|closed`, `?topic`; with the MCE's moderation record), `GET /api/petitions/{number}`, `/ledger` | public |
+| `GET /api/petitions/options`, `GET /api/petitions` (`?group=open\|awaiting\|closed`, `?topic`; with the MCE's moderation record), `GET /api/petitions/{number}`, `/ledger` | public |
 | `POST /api/petitions/check`, `POST /api/petitions/ledger` (a draft's words checked; what the Ledger holds on its subject) | public, 30 an hour per client |
 | `POST /api/petitions`, `GET /api/petitions/mine`, `POST /api/petitions/{number}/resubmit`, `/withdraw`, `/anonymous` | the creator (`X-Phone-Proof`) |
-| `GET /api/petitions/review`, `POST /api/petitions/{number}/decision` (`publish`, or `refuse` with a fixed `reason`) | MCE |
+| `POST /api/petitions/{number}/signatures` (`show_name`, `name`), `GET /api/petitions/{number}/signature`, `POST .../signature/anonymous` | the signer (`X-Phone-Proof`) |
+| `GET /api/petitions/{number}/names` (the names signers chose to show) | public |
+| `GET /api/petitions/review`, `POST /api/petitions/{number}/decision` (`publish`, or `refuse` with a fixed `reason`), `GET /api/petitions/responses` | MCE |
 | `GET /api/me` | anyone signed in |
 | `GET /api/departments`, `GET /api/categories` | anyone signed in |
 | `POST /api/documents` (multipart: `file`, `title`, `category`, `document_year`, `department`, `source_url`) | department (published), contributor (held 72h) |
@@ -555,8 +557,20 @@ and the clocks in `app/services/petitions.py`.
   flood plans and budget lines, to strengthen the case or to find the commitment
   already exists and wasn't kept. The match is by search, and the page says it
   means a document touches the subject, not that it commits to what's asked.
+- **Signing** (`app/services/petition_signatures.py`): one signature per
+  confirmed Ghanaian number per petition, on the petition's page (with a number
+  confirmed by WhatsApp, USSD or, once switched on, SMS; a tab that has
+  confirmed a number signs further petitions without another message) or by
+  USSD alone (option 6, then the petition's six-digit number). A signature
+  holds no phone number, only a keyed hash of number and petition together,
+  under a unique index: a number can't sign twice, and no one can list what a
+  number has signed. The count is recounted under the petition's lock after
+  every signature.
 - **Thresholds** (`PETITION_THRESHOLD_AREA=150`, `PETITION_THRESHOLD_METRO=500`)
-  are fixed on a petition when it opens.
+  are fixed on a petition when it opens. The signature that reaches it sends the
+  petition to the MCE, who has 30 days to respond publicly, counted down on the
+  page. It keeps taking signatures until its 90 days are up, and can no longer
+  be withdrawn.
 - **Names are the person's choice.** Anonymous by default; a name is shown
   publicly only if its owner chooses, told first that anyone can see it,
   including the department the petition concerns, and it can be taken off
@@ -571,9 +585,15 @@ and the clocks in `app/services/petitions.py`.
 `scripts/create_petitions.py` creates the collections (a dry run by default;
 run it with `--yes` before deploying this code).
 
-**Stages.** P1 (this): drafting, the confirmed phone, the MCE's review with the
-72-hour clock, the public pages. P2: signing (one per confirmed phone per
-petition) and the threshold escalating to the MCE. P3: the MCE's public
+**Known limit, stated rather than hidden:** the count is of confirmed numbers,
+not of people. Someone with several SIM cards can sign once with each. A daily
+cap per number (30 petitions) and a per-connection limit slow a flood, but
+don't stop a determined one; the page counts "signatures from confirmed
+Ghanaian numbers", and that is what it is.
+
+**Stages.** P1: drafting, the confirmed phone, the MCE's review with the 72-hour
+clock, the public pages. P2 (this): signing, one per confirmed number per
+petition, and the threshold sending it to the MCE. P3: the MCE's public
 response within 30 days, counted down, with "No response 30 days after the
 petition reached its threshold" stated plainly when it runs out; updates to the
 creator; petition figures on the accountability pages.

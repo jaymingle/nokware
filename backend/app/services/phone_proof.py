@@ -142,9 +142,14 @@ def _phone_secret() -> bytes:
         get_settings().appwrite_api_key.encode(), b"nokware-verified-phones", hashlib.sha256).digest()
 
 
+def keyed_hash(text: str) -> str:
+    """A keyed hash under the phone secret: it can be matched, but not read back."""
+    return hmac.new(_phone_secret(), text.encode(), hashlib.sha256).hexdigest()
+
+
 def phone_key(number: str) -> str:
-    """A verified number as stored: a keyed hash, never the number, so it can be matched but not read back."""
-    return hmac.new(_phone_secret(), number.encode(), hashlib.sha256).hexdigest()
+    """A verified number as stored: a keyed hash, never the number."""
+    return keyed_hash(number)
 
 
 def _challenge_key(secret: str) -> str:

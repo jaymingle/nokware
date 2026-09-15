@@ -8,7 +8,7 @@ from app.schemas.documents import Option
 from app.services.ledger_documents import Provenance
 from app.services.petition_rules import BODY_MAX, DOCUMENTS_MAX, NAME_MAX, NOTE_MAX, TITLE_MAX
 
-Status = Literal["in_review", "refused", "open", "closed", "withdrawn"]
+Status = Literal["in_review", "refused", "open", "awaiting_response", "closed", "withdrawn"]
 Scope = Literal["metro", "area"]
 
 
@@ -80,10 +80,12 @@ class PetitionCard(BaseModel):
     threshold: int | None
     signatures: int
     started_by: str | None  # a name only if the creator chose to show one
+    threshold_reached_at: str | None
+    response_due: str | None  # the MCE's 30 days to respond publicly, once it reached its threshold
 
 
 class TimelineEntry(BaseModel):
-    action: Literal["submitted", "resubmitted", "published", "auto_published", "refused", "withdrawn", "closed"]
+    action: Literal["submitted", "resubmitted", "published", "auto_published", "refused", "withdrawn", "closed", "threshold_reached"]
     at: str
     reason: str | None  # a refusal's reason, as the public list counts it
 
@@ -233,3 +235,47 @@ class SmsCodeSent(BaseModel):
 
 class SmsConfirmRequest(ChallengeRequest):
     code: str = Field(max_length=12)
+
+
+class SignRequest(BaseModel):
+    show_name: bool = False
+    name: str | None = Field(None, max_length=NAME_MAX + 20)
+
+
+class SignResult(BaseModel):
+    added: bool  # False: this number had already signed
+    named: bool
+    signatures: int
+    threshold: int | None
+    status: Status
+
+
+class MySignature(BaseModel):
+    signed: bool
+    named: bool
+    name: str | None
+    signed_at: str | None
+
+
+class NamedSignature(BaseModel):
+    name: str
+    signed_at: str
+
+
+class NamedSignatures(BaseModel):
+    names: list[NamedSignature]
+    total: int  # signers who chose to show their name
+
+
+class AwaitingResponse(BaseModel):
+    code: str
+    title: str
+    topic: str
+    departments: list[str]
+    scope: Scope
+    area: str | None
+    sub_metro: str | None
+    signatures: int
+    threshold: int
+    threshold_reached_at: str
+    response_due: str

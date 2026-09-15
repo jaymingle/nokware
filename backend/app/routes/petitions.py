@@ -3,6 +3,7 @@
     GET  /api/petitions/options            topics, areas, thresholds, refusal reasons, ways to confirm a number
     GET  /api/petitions                    published petitions (?group=open|closed, ?topic) and the MCE's moderation record
     GET  /api/petitions/review             MCE: petitions waiting for a decision, closest to publishing automatically first
+    GET  /api/petitions/responses          MCE: petitions that reached their threshold, closest to their 30 days first
     GET  /api/petitions/mine               the creator's own petitions (X-Phone-Proof)
     POST /api/petitions/check              the draft's words, checked before it is sent
     POST /api/petitions/ledger             what the Ledger holds on a draft's subject
@@ -13,6 +14,10 @@
     POST /api/petitions/{code}/withdraw    (X-Phone-Proof)
     POST /api/petitions/{code}/anonymous   take the creator's name off it (X-Phone-Proof)
     POST /api/petitions/{code}/decision    MCE: publish, or refuse for a fixed reason
+    POST /api/petitions/{code}/signatures  sign it, anonymous unless a name is shown (X-Phone-Proof)
+    GET  /api/petitions/{code}/signature   whether this number has signed (X-Phone-Proof)
+    POST /api/petitions/{code}/signature/anonymous   take the signer's name off (X-Phone-Proof)
+    GET  /api/petitions/{code}/names       the names signers chose to show, newest first
 """
 
 from dataclasses import asdict
@@ -26,11 +31,14 @@ from app.routes import petition_presenters as present
 from app.schemas.documents import Option
 from app.schemas.petitions import (
     AreaOption,
+    AwaitingResponse,
     DecisionRequest,
     DraftRequest,
     LedgerMatch,
     LedgerSearchRequest,
     MyPetitions,
+    MySignature,
+    NamedSignatures,
     OwnPetition,
     PetitionDetail,
     PetitionOptions,
@@ -38,10 +46,12 @@ from app.schemas.petitions import (
     ReviewQueue,
     ScreenRequest,
     ScreenResult,
+    SignRequest,
+    SignResult,
     SubmitRequest,
     Verification,
 )
-from app.services import petition_ledger, petition_screen, petitions, phone_proof, rate_limit
+from app.services import petition_ledger, petition_screen, petition_signatures, petitions, phone_proof, rate_limit
 from app.services.auth import Principal, Role
 from app.services.ledger_documents import utc_now
 from app.services.petition_rules import (
@@ -60,9 +70,11 @@ from app.wards import sub_metros, wards
 router = APIRouter(prefix="/api/petitions", tags=["petitions"])
 Checks = Depends(rate_limited(rate_limit.PETITION_CHECKS))
 Changes = Depends(rate_limited(rate_limit.PETITION_CHANGES))
+Signing = Depends(rate_limited(rate_limit.SIGNING))
 Mce = Annotated[Principal, Depends(require_roles(Role.MCE))]
 PAGE_MAX = 50
-GROUPS = {"open": [PetitionStatus.OPEN], "closed": [PetitionStatus.CLOSED, PetitionStatus.WITHDRAWN]}
+GROUPS = {"open": [PetitionStatus.OPEN], "awaiting": [PetitionStatus.AWAITING_RESPONSE],
+          "closed": [PetitionStatus.CLOSED, PetitionStatus.WITHDRAWN]}
 
 
 def confirmed_phone(x_phone_proof: Annotated[str | None, Header()] = None) -> phone_proof.Proof:
@@ -94,7 +106,7 @@ def options() -> PetitionOptions:
 
 @router.get("", response_model=PetitionPage)
 def published(
-    group: Literal["open", "closed"] = "open",
+    group: Literal["open", "awaiting", "closed"] = "open",
     topic: str | None = None,
     limit: Annotated[int, Query(ge=1, le=PAGE_MAX)] = 20,
     offset: Annotated[int, Query(ge=0)] = 0,
@@ -109,6 +121,11 @@ def published(
 def review(_: Mce) -> ReviewQueue:
     return ReviewQueue(petitions=[present.review_item(p) for p in petitions.review_queue()],
                        refusal_reasons=present.refusal_reasons())
+
+
+@router.get("/responses", response_model=list[AwaitingResponse])
+def responses(_: Mce) -> list[AwaitingResponse]:
+    return [present.awaiting(p) for p in petitions.awaiting_response()]
 
 
 @router.get("/mine", response_model=MyPetitions)
@@ -175,3 +192,30 @@ def decide(code: str, request: DecisionRequest, principal: Mce) -> ReviewQueue:
     petitions.decide(principal, code, request.decision == "publish", request.reason, request.note, request.duplicate_of,
                      utc_now())
     return review(principal)
+
+
+@router.post("/{code}/signatures", response_model=SignResult, dependencies=[Signing])
+def sign(code: str, request: SignRequest, proof: Phone) -> SignResult:
+    signed = petition_signatures.sign(code, proof.number, proof.channel, request.show_name, request.name, utc_now())
+    return SignResult(added=signed.added, named=signed.named, signatures=signed.petition.get("signatureCount") or 0,
+                      threshold=signed.petition.get("threshold"), status=signed.petition["status"])
+
+
+@router.get("/{code}/signature", response_model=MySignature)
+def my_signature(code: str, proof: Phone) -> MySignature:
+    return present.my_signature(petition_signatures.my_signature(code, proof.number))
+
+
+@router.post("/{code}/signature/anonymous", response_model=MySignature, dependencies=[Changes])
+def signature_anonymous(code: str, proof: Phone) -> MySignature:
+    return present.my_signature(petition_signatures.make_anonymous(code, proof.number))
+
+
+@router.get("/{code}/names", response_model=NamedSignatures)
+def names(
+    code: str,
+    limit: Annotated[int, Query(ge=1, le=petition_signatures.NAMES_PAGE_MAX)] = 50,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> NamedSignatures:
+    rows, total = petition_signatures.named(code, limit, offset)
+    return NamedSignatures(names=[present.named_signature(r) for r in rows if r.get("name")], total=total)

@@ -6,7 +6,13 @@
   withdrawn, or is refused and not sent back. A name only if they chose to
   show it.
 - petition_history: the audit trail, one row per step (submitted, published,
-  refused with its reason, published automatically, withdrawn, closed).
+  refused with its reason, published automatically, withdrawn, closed, reached
+  its threshold).
+- petition_signatures (P2): one row per signature. No phone number: a keyed
+  hash of number and petition together, unique, so a number signs once and
+  can't be matched across petitions. A name only if the signer chose to show
+  it (public). P2 also adds thresholdReachedAt and responseDue to petitions,
+  and awaiting_response and threshold_reached to the two status lists.
 
 Both are server-only: no client permissions. A dry run by default: it prints
 what it would do. --yes applies it. It only adds; nothing is deleted. Safe to
@@ -33,6 +39,7 @@ from app.services.petition_rules import (
     PublishedBy,
     Scope,
 )
+from app.services.petition_signatures import SIGNATURES_COLLECTION as SIGNATURES
 from app.services.petitions import HISTORY_COLLECTION as HISTORY, PETITIONS_COLLECTION as PETITIONS
 from app.services.phone_proof import Channel
 from create_citizen_reports import ENCRYPTED_MIN, ID, KEY, TEAM, UNIQUE, Creator, ensure, ensure_indexes, values, wait_for_attributes
@@ -74,6 +81,8 @@ def petition_state(db: Databases, c: tuple[str, str]) -> dict[str, Creator]:
         "refusalNote": lambda: db.create_string_attribute(*c, "refusalNote", NOTE_MAX + 24, False),
         "duplicateOf": lambda: db.create_string_attribute(*c, "duplicateOf", CODE_DIGITS, False),
         "createdAt": lambda: db.create_datetime_attribute(*c, "createdAt", True),
+        "thresholdReachedAt": lambda: db.create_datetime_attribute(*c, "thresholdReachedAt", False),
+        "responseDue": lambda: db.create_datetime_attribute(*c, "responseDue", False),
     }
 
 
@@ -108,6 +117,26 @@ def history_attributes() -> dict[str, Creator]:
     }
 
 
+def signature_attributes() -> dict[str, Creator]:
+    db, c = get_databases(), (DATABASE_ID, SIGNATURES)
+    return {
+        "petitionId": lambda: db.create_string_attribute(*c, "petitionId", ID, True),
+        "signerKey": lambda: db.create_string_attribute(*c, "signerKey", HASH, True),
+        "named": lambda: db.create_boolean_attribute(*c, "named", True),
+        "name": lambda: db.create_string_attribute(*c, "name", NAME_MAX + 20, False),
+        "channel": lambda: db.create_enum_attribute(*c, "channel", values(Channel), True),
+        "createdAt": lambda: db.create_datetime_attribute(*c, "createdAt", True),
+    }
+
+
+def adjust_status_lists() -> None:
+    """Statuses and trail steps P2 adds, set in place: nothing is deleted."""
+    db = get_databases()
+    db.update_enum_attribute(DATABASE_ID, PETITIONS, "status", values(PetitionStatus), True, None)
+    db.update_enum_attribute(DATABASE_ID, HISTORY, "action", values(PetitionAction), True, None)
+    print("updated   petitions.status (adds awaiting_response), petition_history.action (adds threshold_reached)")
+
+
 PETITION_INDEXES = {
     "uniq_code": (UNIQUE, ["code"]),
     "idx_status_reviewDeadline": (KEY, ["status", "reviewDeadline"]),
@@ -116,20 +145,28 @@ PETITION_INDEXES = {
     "idx_publishedBy": (KEY, ["publishedBy"]),
     "idx_creatorKey": (KEY, ["creatorKey"]),
     "idx_purgeAt": (KEY, ["purgeAt"]),
+    "idx_status_responseDue": (KEY, ["status", "responseDue"]),
+    "idx_status_signatures": (KEY, ["status", "signatureCount"]),
 }
 HISTORY_INDEXES = {"idx_petition_at": (KEY, ["petitionId", "at"]), "idx_action": (KEY, ["action"])}
+SIGNATURE_INDEXES = {
+    "uniq_signerKey": (UNIQUE, ["signerKey"]),
+    "idx_petition_named_created": (KEY, ["petitionId", "named", "createdAt"]),
+}
 
 
 def build_schema() -> None:
     db = get_databases()
     plan = ((PETITIONS, "Petitions", petition_attributes(), PETITION_INDEXES),
-            (HISTORY, "Petition history", history_attributes(), HISTORY_INDEXES))
+            (HISTORY, "Petition history", history_attributes(), HISTORY_INDEXES),
+            (SIGNATURES, "Petition signatures", signature_attributes(), SIGNATURE_INDEXES))
     for collection, name, creators, indexes in plan:
         ensure(f"collection {collection}", lambda collection=collection, name=name: db.create_collection(DATABASE_ID, collection, name))
         for key, create in creators.items():
             ensure(f"attribute {collection}.{key}", create)
         wait_for_attributes(collection, list(creators))
         ensure_indexes(collection, indexes)
+    adjust_status_lists()
 
 
 def main() -> int:
@@ -138,9 +175,11 @@ def main() -> int:
     args = parser.parse_args()
     quiet_sdk_deprecation_warnings()
     if not args.yes:
-        print(f"[dry run] would create collection {PETITIONS} ({len(petition_attributes())} attributes, "
-              f"{len(PETITION_INDEXES)} indexes) and {HISTORY} ({len(history_attributes())} attributes, "
-              f"{len(HISTORY_INDEXES)} indexes); any that exist are left as they are")
+        print(f"[dry run] would create collections {PETITIONS} ({len(petition_attributes())} attributes, "
+              f"{len(PETITION_INDEXES)} indexes), {HISTORY} ({len(history_attributes())} attributes, "
+              f"{len(HISTORY_INDEXES)} indexes) and {SIGNATURES} ({len(signature_attributes())} attributes, "
+              f"{len(SIGNATURE_INDEXES)} indexes), leaving any that exist as they are, and set the status lists "
+              "to include awaiting_response and threshold_reached")
         return 0
     build_schema()
     print("\nPetitions are ready.")
