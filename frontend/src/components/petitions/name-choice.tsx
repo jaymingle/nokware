@@ -18,8 +18,9 @@ function Choice({ checked, onChange, testId, label, hint }: { checked: boolean; 
 }
 
 /** Anonymous by default. A name is shown publicly only if its owner chooses, and they're told first who can see it. */
-export function NameChoice({ named, setNamed, name, setName, testId, anonymousHint }: {
-  named: boolean; setNamed: (value: boolean) => void; name: string; setName: (value: string) => void; testId: string; anonymousHint: string;
+export function NameChoice({ named, setNamed, name, setName, testId, anonymousHint, note = NAME_NOTE }: {
+  named: boolean; setNamed: (value: boolean) => void; name: string; setName: (value: string) => void; testId: string;
+  anonymousHint: string; note?: string;
 }) {
   return (
     <fieldset className="flex flex-col gap-3">
@@ -31,7 +32,7 @@ export function NameChoice({ named, setNamed, name, setName, testId, anonymousHi
         <Input value={name} onChange={(e) => setName(e.target.value)} maxLength={NAME_MAX} required placeholder="The name to show"
           aria-label="The name to show" autoComplete="name" className="ml-6.5 max-w-72" data-testid={`${testId}-name`} />
       ) : null}
-      <p className="rounded-lg bg-gold-tint px-3 py-2.5 text-[13px]" data-testid={`${testId}-note`}>{NAME_NOTE}</p>
+      <p className="rounded-lg bg-gold-tint px-3 py-2.5 text-[13px]" data-testid={`${testId}-note`}>{note}</p>
     </fieldset>
   );
 }

@@ -17,7 +17,14 @@ import type { PetitionGroup } from "@/lib/api/petitions";
 import type { PetitionPage } from "@/lib/api/types";
 
 const PAGE = 20;
-const GROUPS: { id: PetitionGroup; label: string }[] = [{ id: "open", label: "Open" }, { id: "closed", label: "Closed" }];
+const GROUPS: { id: PetitionGroup; label: string }[] = [
+  { id: "open", label: "Open" }, { id: "awaiting", label: "With the MCE" }, { id: "closed", label: "Closed" },
+];
+const EMPTY: Record<PetitionGroup, string> = {
+  open: "No petitions are open yet.",
+  awaiting: "No petition has reached its signatures yet.",
+  closed: "No petitions have closed yet.",
+};
 
 function Tabs({ group, onGroup }: { group: PetitionGroup; onGroup: (group: PetitionGroup) => void }) {
   return (
@@ -35,7 +42,7 @@ function Tabs({ group, onGroup }: { group: PetitionGroup; onGroup: (group: Petit
 
 function Listing({ page, group, now }: { page: PetitionPage; group: PetitionGroup; now: number }) {
   if (page.petitions.length === 0) {
-    return <p className="py-4 text-[14px] text-ink-soft" data-testid="petitions-empty">{group === "open" ? "No petitions are open yet." : "No petitions have closed yet."}</p>;
+    return <p className="py-4 text-[14px] text-ink-soft" data-testid="petitions-empty">{EMPTY[group]}</p>;
   }
   return <ul>{page.petitions.map((p) => <PetitionCard key={p.code} petition={p} now={now} />)}</ul>;
 }

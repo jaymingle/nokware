@@ -5,6 +5,8 @@ import { postJson, publicRequest } from "@/lib/api/public";
 import type {
   LedgerMatch,
   MyPetitions,
+  MySignature,
+  NamedSignatures,
   OwnPetition,
   PetitionDetail,
   PetitionDraft,
@@ -14,10 +16,11 @@ import type {
   PhoneChallenge,
   PhoneChallengeStatus,
   ScreenResult,
+  SignResult,
   SmsCodeSent,
 } from "@/lib/api/types";
 
-export type PetitionGroup = "open" | "closed";
+export type PetitionGroup = "open" | "awaiting" | "closed";
 export type PetitionFilters = { group: PetitionGroup; topic: string; limit: number; offset: number };
 
 const petitionPath = (code: string) => `/api/petitions/${encodeURIComponent(code)}`;
@@ -84,4 +87,24 @@ export function sendSmsCode(challenge: string, phone: string): Promise<SmsCodeSe
 
 export function confirmSmsCode(challenge: string, code: string): Promise<PhoneChallengeStatus> {
   return postJson<PhoneChallengeStatus>("/api/phone/challenges/sms/confirm", { challenge, code });
+}
+
+export type SignChoice = { show_name: boolean; name: string | null };
+
+export function signPetition(code: string, choice: SignChoice, proof: string): Promise<SignResult> {
+  return postJson<SignResult>(`${petitionPath(code)}/signatures`, choice, proofHeader(proof));
+}
+
+/** Whether the confirmed number has signed this petition, and under what name. */
+export function getMySignature(code: string, proof: string): Promise<MySignature> {
+  return publicRequest<MySignature>(`${petitionPath(code)}/signature`, { headers: proofHeader(proof) });
+}
+
+export function takeNameOffSignature(code: string, proof: string): Promise<MySignature> {
+  return postJson<MySignature>(`${petitionPath(code)}/signature/anonymous`, {}, proofHeader(proof));
+}
+
+/** The names signers chose to show, newest first. */
+export function getSignerNames(code: string, limit: number, offset: number): Promise<NamedSignatures> {
+  return publicRequest<NamedSignatures>(`${petitionPath(code)}/names?limit=${limit}&offset=${offset}`);
 }

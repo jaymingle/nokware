@@ -1,6 +1,7 @@
 import { apiRequest } from "@/lib/api/client";
 
 import type {
+  AwaitingResponse,
   CaseAction,
   CaseDetail,
   CaseOversight,
@@ -115,4 +116,9 @@ export function decidePetition(code: string, decision: PetitionDecision): Promis
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(decision),
   });
+}
+
+/** Petitions that reached their threshold: the MCE owes each a public response within 30 days. */
+export function getAwaitingResponses(): Promise<AwaitingResponse[]> {
+  return apiRequest<AwaitingResponse[]>("/api/petitions/responses");
 }

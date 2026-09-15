@@ -757,6 +757,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/petitions/responses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Responses */
+        get: operations["responses_api_petitions_responses_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/petitions/mine": {
         parameters: {
             query?: never;
@@ -907,6 +924,74 @@ export interface paths {
          * @description The decision, then the queue as it now stands.
          */
         post: operations["decide_api_petitions__code__decision_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/petitions/{code}/signatures": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sign */
+        post: operations["sign_api_petitions__code__signatures_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/petitions/{code}/signature": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My Signature */
+        get: operations["my_signature_api_petitions__code__signature_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/petitions/{code}/signature/anonymous": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Signature Anonymous */
+        post: operations["signature_anonymous_api_petitions__code__signature_anonymous_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/petitions/{code}/names": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Names */
+        get: operations["names_api_petitions__code__names_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1077,7 +1162,7 @@ export interface paths {
          * @description A spoken reply, fetched by Twilio as it sends the voice note. The link is random and lasts 10 minutes, and
          *     the audio is an answer from public documents, never anything about a report.
          */
-        get: operations["whatsapp_audio_api_channels_whatsapp_audio__name__get"];
+        get: operations["whatsapp_audio_api_channels_whatsapp_audio__name__head"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1087,7 +1172,7 @@ export interface paths {
          * @description A spoken reply, fetched by Twilio as it sends the voice note. The link is random and lasts 10 minutes, and
          *     the audio is an answer from public documents, never anything about a report.
          */
-        head: operations["whatsapp_audio_api_channels_whatsapp_audio__name__get"];
+        head: operations["whatsapp_audio_api_channels_whatsapp_audio__name__head"];
         patch?: never;
         trace?: never;
     };
@@ -1235,6 +1320,34 @@ export interface components {
          * @description One line of POST /api/ask/stream's newline-delimited JSON.
          */
         AskStreamEvent: components["schemas"]["StageEvent"] | components["schemas"]["SourcesEvent"] | components["schemas"]["DeltaEvent"] | components["schemas"]["DoneEvent"] | components["schemas"]["ErrorEvent"];
+        /** AwaitingResponse */
+        AwaitingResponse: {
+            /** Code */
+            code: string;
+            /** Title */
+            title: string;
+            /** Topic */
+            topic: string;
+            /** Departments */
+            departments: string[];
+            /**
+             * Scope
+             * @enum {string}
+             */
+            scope: "metro" | "area";
+            /** Area */
+            area: string | null;
+            /** Sub Metro */
+            sub_metro: string | null;
+            /** Signatures */
+            signatures: number;
+            /** Threshold */
+            threshold: number;
+            /** Threshold Reached At */
+            threshold_reached_at: string;
+            /** Response Due */
+            response_due: string;
+        };
         /** Body_file_report_api_reports_post */
         Body_file_report_api_reports_post: {
             /**
@@ -2062,6 +2175,31 @@ export interface components {
             /** Petitions */
             petitions: components["schemas"]["OwnPetition"][];
         };
+        /** MySignature */
+        MySignature: {
+            /** Signed */
+            signed: boolean;
+            /** Named */
+            named: boolean;
+            /** Name */
+            name: string | null;
+            /** Signed At */
+            signed_at: string | null;
+        };
+        /** NamedSignature */
+        NamedSignature: {
+            /** Name */
+            name: string;
+            /** Signed At */
+            signed_at: string;
+        };
+        /** NamedSignatures */
+        NamedSignatures: {
+            /** Names */
+            names: components["schemas"]["NamedSignature"][];
+            /** Total */
+            total: number;
+        };
         /** NoteRequest */
         NoteRequest: {
             /** Note */
@@ -2108,7 +2246,7 @@ export interface components {
              * Status
              * @enum {string}
              */
-            status: "in_review" | "refused" | "open" | "closed" | "withdrawn";
+            status: "in_review" | "refused" | "open" | "awaiting_response" | "closed" | "withdrawn";
             /** Published At */
             published_at: string | null;
             /** Published By */
@@ -2123,6 +2261,10 @@ export interface components {
             signatures: number;
             /** Started By */
             started_by: string | null;
+            /** Threshold Reached At */
+            threshold_reached_at: string | null;
+            /** Response Due */
+            response_due: string | null;
             /** Body */
             body: string;
             /** Topic Id */
@@ -2166,7 +2308,7 @@ export interface components {
              * Status
              * @enum {string}
              */
-            status: "in_review" | "refused" | "open" | "closed" | "withdrawn";
+            status: "in_review" | "refused" | "open" | "awaiting_response" | "closed" | "withdrawn";
             /** Published At */
             published_at: string | null;
             /** Published By */
@@ -2181,6 +2323,10 @@ export interface components {
             signatures: number;
             /** Started By */
             started_by: string | null;
+            /** Threshold Reached At */
+            threshold_reached_at: string | null;
+            /** Response Due */
+            response_due: string | null;
         };
         /** PetitionDetail */
         PetitionDetail: {
@@ -2205,7 +2351,7 @@ export interface components {
              * Status
              * @enum {string}
              */
-            status: "in_review" | "refused" | "open" | "closed" | "withdrawn";
+            status: "in_review" | "refused" | "open" | "awaiting_response" | "closed" | "withdrawn";
             /** Published At */
             published_at: string | null;
             /** Published By */
@@ -2220,6 +2366,10 @@ export interface components {
             signatures: number;
             /** Started By */
             started_by: string | null;
+            /** Threshold Reached At */
+            threshold_reached_at: string | null;
+            /** Response Due */
+            response_due: string | null;
             /** Body */
             body: string;
             /** Timeline */
@@ -2670,6 +2820,32 @@ export interface components {
             /** Shared At */
             shared_at: string;
         };
+        /** SignRequest */
+        SignRequest: {
+            /**
+             * Show Name
+             * @default false
+             */
+            show_name: boolean;
+            /** Name */
+            name?: string | null;
+        };
+        /** SignResult */
+        SignResult: {
+            /** Added */
+            added: boolean;
+            /** Named */
+            named: boolean;
+            /** Signatures */
+            signatures: number;
+            /** Threshold */
+            threshold: number | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "in_review" | "refused" | "open" | "awaiting_response" | "closed" | "withdrawn";
+        };
         /** SmsCodeRequest */
         SmsCodeRequest: {
             /** Challenge */
@@ -2793,7 +2969,7 @@ export interface components {
              * Action
              * @enum {string}
              */
-            action: "submitted" | "resubmitted" | "published" | "auto_published" | "refused" | "withdrawn" | "closed";
+            action: "submitted" | "resubmitted" | "published" | "auto_published" | "refused" | "withdrawn" | "closed" | "threshold_reached";
             /** At */
             at: string;
             /** Reason */
@@ -4043,7 +4219,7 @@ export interface operations {
     published_api_petitions_get: {
         parameters: {
             query?: {
-                group?: "open" | "closed";
+                group?: "open" | "awaiting" | "closed";
                 topic?: string | null;
                 limit?: number;
                 offset?: number;
@@ -4125,6 +4301,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReviewQueue"];
+                };
+            };
+        };
+    };
+    responses_api_petitions_responses_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AwaitingResponse"][];
                 };
             };
         };
@@ -4426,6 +4622,143 @@ export interface operations {
             };
         };
     };
+    sign_api_petitions__code__signatures_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-phone-proof"?: string | null;
+            };
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SignRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SignResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    my_signature_api_petitions__code__signature_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-phone-proof"?: string | null;
+            };
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MySignature"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    signature_anonymous_api_petitions__code__signature_anonymous_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-phone-proof"?: string | null;
+            };
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MySignature"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    names_api_petitions__code__names_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NamedSignatures"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     new_challenge_api_phone_challenges_post: {
         parameters: {
             query?: never;
@@ -4646,7 +4979,7 @@ export interface operations {
             };
         };
     };
-    whatsapp_audio_api_channels_whatsapp_audio__name__get: {
+    whatsapp_audio_api_channels_whatsapp_audio__name__head: {
         parameters: {
             query?: never;
             header?: never;
@@ -4677,7 +5010,7 @@ export interface operations {
             };
         };
     };
-    whatsapp_audio_api_channels_whatsapp_audio__name__get: {
+    whatsapp_audio_api_channels_whatsapp_audio__name__head: {
         parameters: {
             query?: never;
             header?: never;

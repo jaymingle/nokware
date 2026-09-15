@@ -4,6 +4,9 @@ import { checkKey, EMPTY_DRAFT, toRequest } from "@/hooks/use-petition-draft";
 import {
   closingLine,
   keepProof,
+  nameNote,
+  NO_RESPONSE,
+  responseLine,
   keptProof,
   placeLine,
   progressPercent,
@@ -51,6 +54,32 @@ describe("how a petition reads in public", () => {
     expect(timelineText({ action: "auto_published", at: "t", reason: null })).toContain("didn't decide within 72 hours");
     expect(decodeURIComponent(whatsappShareUrl("Desilt the drain", "https://nokware.org/petitions/482913"))).toContain(
       "Petition to the Accra Metropolitan Assembly: Desilt the drain\nhttps://nokware.org/petitions/482913");
+  });
+});
+
+describe("once a petition reaches its signatures", () => {
+  const reached = {
+    status: "awaiting_response" as const, threshold: 150, closes_at: "2026-12-14T09:00:00Z", closed_at: null,
+    threshold_reached_at: "2026-09-15T09:00:00Z", response_due: "2026-10-15T09:00:00Z",
+  };
+
+  it("counts down the MCE's 30 days, then says plainly that there was no response", () => {
+    expect(responseLine(reached, NOW)).toBe(
+      "Reached 150 signatures on 15 Sept 2026. The MCE has until 15 Oct 2026 to respond publicly on this page: 30 days left.");
+    expect(responseLine(reached, Date.parse("2026-10-15T09:00:00Z"))).toBe(`Reached 150 signatures on 15 Sept 2026. ${NO_RESPONSE}`);
+    expect(NO_RESPONSE).toBe("No response 30 days after the petition reached its threshold.");
+    expect(responseLine({ ...reached, status: "open" }, NOW)).toBeNull();
+  });
+
+  it("keeps taking signatures until its 90 days are up", () => {
+    expect(closingLine(reached, NOW)).toBe("Signing stays open until 14 Dec 2026");
+    expect(closingLine(reached, Date.parse("2026-12-15T00:00:00Z"))).toBe("Signing has closed");
+    expect(timelineText({ action: "threshold_reached", at: "t", reason: null })).toBe("Reached its signatures and went to the MCE for a response");
+  });
+
+  it("tells a signer exactly who can see a public name", () => {
+    expect(nameNote("Works Department")).toContain("including Works Department, which it concerns");
+    expect(nameNote(null)).toContain("including the department it concerns");
   });
 });
 

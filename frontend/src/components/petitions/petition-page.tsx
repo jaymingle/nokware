@@ -6,12 +6,14 @@ import { useState, type ReactNode } from "react";
 import { ErrorPanel, LoadingPanel } from "@/components/documents/panels";
 import { DocumentLine, LedgerMatches } from "@/components/petitions/ledger-matches";
 import { Progress } from "@/components/petitions/petition-card";
+import { SignPanel } from "@/components/petitions/sign-panel";
+import { Signers } from "@/components/petitions/signers";
 import { PageIntro } from "@/components/portal/page-intro";
 import { Button } from "@/components/ui/button";
 import { useMounted } from "@/hooks/use-mounted";
 import { useNow } from "@/hooks/use-now";
 import { usePetition, usePetitionLedger, usePetitionOptions } from "@/lib/api/petition-queries";
-import { closingLine, placeLine, publishedLine, spacedCode, startedBy, timelineText, whatsappShareUrl } from "@/lib/petitions";
+import { closingLine, placeLine, publishedLine, responseLine, spacedCode, startedBy, timelineText, whatsappShareUrl } from "@/lib/petitions";
 import { joinNames } from "@/lib/text";
 import { formatDate } from "@/lib/time";
 import { voicesLine } from "@/lib/voices";
@@ -34,20 +36,17 @@ function Section({ title, children, testId }: { title: string; children: ReactNo
 function Standing({ petition, now }: { petition: PetitionDetail; now: number }) {
   const options = usePetitionOptions();
   const days = options.data?.response_days ?? 30;
+  const response = responseLine(petition, now);
   return (
     <div className="flex flex-col gap-3 rounded-xl border bg-card p-5" data-testid="petition-standing">
       <Progress signatures={petition.signatures} threshold={petition.threshold} large />
+      {response ? <p className="rounded-lg bg-gold-tint px-3 py-2.5 text-[14px]" data-testid="petition-response-due">{response}</p> : null}
       <p className="text-[13.5px]" data-testid="petition-closing">{closingLine(petition, now)}</p>
       {petition.status === "open" && petition.threshold ? (
-        <>
-          <p className="text-[13.5px] text-ink-soft">
-            If it reaches {petition.threshold.toLocaleString()} signatures, it goes to the MCE, who then has {days} days to respond
-            publicly on this page.
-          </p>
-          <p className="rounded-lg bg-paper-subtle px-3 py-2.5 text-[13px]" data-testid="petition-signing-soon">
-            Signing opens here soon. Each signature is confirmed by phone: one per number.
-          </p>
-        </>
+        <p className="text-[13.5px] text-ink-soft">
+          If it reaches {petition.threshold.toLocaleString()} signatures, it goes to the MCE, who then has {days} days to respond
+          publicly on this page.
+        </p>
       ) : null}
     </div>
   );
@@ -119,6 +118,10 @@ function Timeline({ petition }: { petition: PetitionDetail }) {
   );
 }
 
+function signable(petition: PetitionDetail, now: number): boolean {
+  return (petition.status === "open" || petition.status === "awaiting_response") && !!petition.closes_at && Date.parse(petition.closes_at) > now;
+}
+
 function Petition({ petition }: { petition: PetitionDetail }) {
   const now = useNow();
   const byline = [startedBy(petition.started_by), publishedLine(petition)].filter(Boolean).join(" · ");
@@ -129,10 +132,12 @@ function Petition({ petition }: { petition: PetitionDetail }) {
       </PageIntro>
       <p className="-mt-4 text-[13px] text-ink-soft" data-testid="petition-byline">{byline}</p>
       <Standing petition={petition} now={now} />
+      {signable(petition, now) ? <SignPanel petition={petition} /> : null}
       <Share petition={petition} />
       <Section title="Why" testId="petition-body">
         <p className="text-[15px] whitespace-pre-line">{petition.body}</p>
       </Section>
+      <Signers code={petition.code} signatures={petition.signatures} />
       <Cited petition={petition} />
       <LedgerContext code={petition.code} />
       <Timeline petition={petition} />

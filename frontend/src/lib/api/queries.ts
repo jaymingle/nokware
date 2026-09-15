@@ -4,6 +4,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient, type QueryClie
 
 import {
   decidePetition,
+  getAwaitingResponses,
   getCase,
   getPetitionReview,
   openSharedLocation,
@@ -49,6 +50,7 @@ export const queryKeys = {
   categories: ["categories"] as const,
   departments: ["departments"] as const,
   petitionReview: ["petition-review"] as const,
+  awaitingResponses: ["petition-responses"] as const,
 };
 
 /** Every list or view of documents; refreshed after any change to one. */
@@ -189,4 +191,8 @@ export function useDecidePetition() {
     mutationFn: ({ code, decision }) => decidePetition(code, decision),
     onSuccess: (queue) => queryClient.setQueryData(queryKeys.petitionReview, queue),
   });
+}
+
+export function useAwaitingResponses() {
+  return useQuery({ queryKey: queryKeys.awaitingResponses, queryFn: getAwaitingResponses, refetchInterval: PETITION_REVIEW_REFRESH_MS });
 }

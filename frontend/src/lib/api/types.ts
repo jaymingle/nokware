@@ -84,3 +84,7 @@ export type PetitionDecision = Schemas["DecisionRequest"];
 export type PhoneChallenge = Schemas["ChallengeResult"];
 export type PhoneChallengeStatus = Schemas["ChallengeStatus"];
 export type SmsCodeSent = Schemas["SmsCodeSent"];
+export type SignResult = Schemas["SignResult"];
+export type MySignature = Schemas["MySignature"];
+export type NamedSignatures = Schemas["NamedSignatures"];
+export type AwaitingResponse = Schemas["AwaitingResponse"];

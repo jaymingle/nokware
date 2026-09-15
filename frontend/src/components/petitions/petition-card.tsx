@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { closingLine, placeLine, progressPercent, signaturesLine, spacedCode } from "@/lib/petitions";
+import { closingLine, placeLine, progressPercent, responseLine, signaturesLine, spacedCode } from "@/lib/petitions";
 import { cn } from "@/lib/utils";
 
 import type { PetitionCard as Card } from "@/lib/api/types";
@@ -31,7 +31,7 @@ export function PetitionCard({ petition, now }: { petition: Card; now: number })
         No. {spacedCode(petition.code)} · {petition.topic} · {placeLine(petition)}
       </p>
       <div className="max-w-sm"><Progress signatures={petition.signatures} threshold={petition.threshold} /></div>
-      <p className="text-[12.5px] text-ink-soft">{closingLine(petition, now)}</p>
+      <p className="text-[12.5px] text-ink-soft">{responseLine(petition, now) ?? closingLine(petition, now)}</p>
     </li>
   );
 }
