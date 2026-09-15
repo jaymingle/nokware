@@ -259,22 +259,31 @@ Emergency numbers (`app/contacts.py`, `channel_contacts.py`): Ghana's hotlines
 often don't connect, so a report where someone may be in danger shows every
 number we have for each service involved, in the order to try them: 112, then
 the services its topic needs (fire, NADMO, the Police), and the ambulance for
-anything where someone could be hurt. Personal safety adds the Police
-reporting lines (marked, as everywhere, as reported via X and not
-independently verified), the Helpline of Hope and Social Welfare (the
-citizen's sub-metro desk, or every desk, and the head office). The web and
-WhatsApp show the full list, and USSD every number that can be called from the
-phone in hand, over as many screens as it takes; an SMS about a report, which
+anything where someone could be hurt. Personal safety adds DOVVSU, the
+Police's Domestic Violence and Victim Support Unit (its helpline as the Police
+publish it on police.gov.gh, checked 15 September 2026), the Police reporting
+lines (marked, as everywhere, as reported via X and not independently
+verified), the Helpline of Hope and Social Welfare (the citizen's sub-metro
+desk, or every desk, and the head office). A source may carry its own checked
+date where it was checked apart from the rest. The web and WhatsApp show the
+full list, and USSD the verified numbers that can be called from the phone in
+hand; an SMS about a report, which
 can't hold it, gives two numbers per service and points to
 `/contacts/emergency`, a page of emergency numbers only (no "Who represents
 you": safety reporters are never pointed to an Assembly Member, an elected
 politician who in a small area may know the abuser). An SMS about a
 personal-safety report never carries numbers: it says only the reference. The
 numbers reach a safety reporter's phone by SMS only if they ask for them at the
-end of a USSD report, told first that anyone with the phone could see them. A road accident is a public-safety report to the Police with Police
-and ambulance numbers. A medical emergency (someone ill or hurt, no one else
-involved) isn't the Assembly's to act on: WhatsApp and USSD (menu 4) say so
-plainly, file nothing, and give the ambulance numbers.
+end of a USSD report, told first that anyone with the phone could see them.
+After a personal-safety report's numbers, every channel shows the same steps
+for right now (`app/safety_steps.py`: leave for a neighbour, family or the
+nearest police station if you can; ask there for DOVVSU; keep your phone; a
+hospital or 193 if hurt; don't confront the person when it's someone else):
+the web safety form and a private report's receipt, the first WhatsApp reply,
+and two USSD screens. A road accident is a public-safety report to the Police
+with Police and ambulance numbers. A medical emergency (someone ill or hurt, no
+one else involved) isn't the Assembly's to act on: WhatsApp and USSD (menu 4)
+say so plainly, file nothing, and give the ambulance numbers.
 
 A precise location (`report_locations.py`) is the one exception to the
 coarse-location rule, and only on the citizen's explicit opt-in. After a
@@ -362,13 +371,14 @@ two pages at most (5 a day per number). A report is described by keypad and
 read (classified) at once, allowed 4 seconds before the rules decide alone.
 Help comes first, filing second: an emergency then shows every number to call
 for it, under "In danger now? Call 112", before any other question. The
-services that come to you are listed first (the Police, Fire, NADMO, the
-ambulance, which every emergency where someone could be hurt includes), then
-the Helpline of Hope, Social Welfare and the unverified Police lines; a fire or
-a flood fits one screen, personal safety two. A personal-safety report then
-shows two screens of what to do right now (somewhere safe, the phone kept
-close, a hospital or 193 if hurt, and not confronting the person when it's
-someone else). An everyday or public-safety report is placed by sub-metro and
+services that come to you are listed first (the Police, DOVVSU, Fire, NADMO,
+the ambulance, which every emergency where someone could be hurt includes),
+then the Helpline of Hope and Social Welfare; a fire or a flood fits one
+screen, personal safety two. The Police reporting lines, reported on X and not
+independently verified, stay on the web and WhatsApp: a keypad session can
+time out, and their screen is better spent on DOVVSU's verified line. A
+personal-safety report then shows the steps for right now on two screens. An
+everyday or public-safety report is placed by sub-metro and
 electoral area from numbered lists; a personal-safety report is asked only for
 its sub-metro, which it may skip, and its Social Welfare desk's number is shown
 as soon as the sub-metro is chosen. Then it is confirmed (with or without SMS

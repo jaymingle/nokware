@@ -2738,6 +2738,8 @@ export interface components {
             description_max: number;
             /** Safety Contacts */
             safety_contacts: components["schemas"]["PublicContact"][];
+            /** Safety Steps */
+            safety_steps: string[];
         };
         /** ReportReceipt */
         ReportReceipt: {

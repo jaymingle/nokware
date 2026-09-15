@@ -8,6 +8,7 @@ import { DescriptionField } from "@/components/report/description-field";
 import { FormActions, FormSection } from "@/components/report/form-parts";
 import { Note } from "@/components/report/notes";
 import { PhotoField } from "@/components/report/photo-field";
+import { SafetySteps } from "@/components/report/safety-steps";
 import { SubMetroField } from "@/components/report/place-fields";
 import { SafetyTypeField } from "@/components/report/safety-type-field";
 import { Card, CardContent } from "@/components/ui/card";
@@ -44,6 +45,7 @@ export function SafetyForm({ options, onFiled, onBack }: ReportFormProps) {
             directoryLink={false}
             columns
           />
+          <SafetySteps steps={options.safety_steps} testId="report-safety-steps" />
           <SafetyTypeField types={options.safety_types} value={topic} onChange={setTopic} />
           {chosen ? <WhoReceives type={chosen} /> : null}
           <DescriptionField

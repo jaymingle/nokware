@@ -14,6 +14,11 @@
       "label": "mint.gov.gh",
       "url": "https://www.mint.gov.gh/agencies/ghana-police-service/"
     },
+    "police-dovvsu": {
+      "label": "police.gov.gh",
+      "url": "https://police.gov.gh/en/index.php/domestic-violence-victims-support-unit-dovvsu/",
+      "checked": "2026-09-15"
+    },
     "nas": {
       "label": "nas.gov.gh",
       "url": "https://nas.gov.gh/contact.php"
@@ -150,6 +155,20 @@
         }
       ],
       "source": "mint"
+    },
+    {
+      "id": "dovvsu",
+      "service": "police",
+      "tier": 2,
+      "name": "DOVVSU (Domestic Violence and Victim Support Unit)",
+      "detail": "The Ghana Police Service's unit for domestic violence and abuse. At any police station, ask for DOVVSU.",
+      "numbers": [
+        {
+          "number": "0551 000 900",
+          "kind": "call"
+        }
+      ],
+      "source": "police-dovvsu"
     },
     {
       "id": "police-mobile",

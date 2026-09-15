@@ -2,22 +2,24 @@
 
 The numbers live in data/contacts.json, each with where it comes from: a
 national emergency line (tier 1), an official site checked on a given date
-(tier 2), or a social-media report shown as not independently verified
-(tier 3). Where a number given to Nokware differs from the one on the cited
-page, both are shown and the cited one is marked current. A number with no
-source at all is kept in the file's "held" list and never shown.
+(tier 2; the file's date, unless the source carries its own), or a
+social-media report shown as not independently verified (tier 3). Where a
+number given to Nokware differs from the one on the cited page, both are shown
+and the cited one is marked current. A number with no source at all is kept in
+the file's "held" list and never shown.
 
 Ghana's emergency hotlines often don't connect, so a report where someone may
 be in danger shows every number we have for each service involved, in the order
 to try them, so the citizen can work down the list. 112 comes first; then each
 service the topic needs (EMERGENCY_TOPICS), and the ambulance for anything where
 someone could be hurt. A personal-safety report gets the Police (with their
-reporting lines, marked as not independently verified), the Helpline of Hope,
-Social Welfare (the citizen's sub-metro desk, or every desk if unknown, and the
-head office) and the ambulance. Unverified numbers stay marked as such: in an
+reporting lines, marked as not independently verified), DOVVSU (the Police's
+Domestic Violence and Victim Support Unit), the Helpline of Hope, Social
+Welfare (the citizen's sub-metro desk, or every desk if unknown, and the head
+office) and the ambulance. Unverified numbers stay marked as such: in an
 emergency a number worth trying beats none. Where a message can't hold the
 list (an SMS about a report), short_line() gives two numbers per service; USSD
-screens get every number that can be called (channel_contacts.call_lines).
+screens get the verified numbers that can be called (channel_contacts.call_lines).
 
 An everyday report shows any numbers for its topic (ROUTES), or the Assembly's
 switchboard. Safety reporters are never pointed to an Assembly Member: elected
@@ -43,6 +45,7 @@ AGENCY_LINES = {POLICE: "police-191", GNFS: "fire-192"}
 EMERGENCY_SERVICES: dict[str, tuple[str, ...]] = {
     "police": ("police-191", "police-18555", "police-main"),
     "police_reporting": ("police-mobile", "police-whatsapp"),  # reported via X: shown for personal safety
+    "dovvsu": ("dovvsu",),  # the Police's Domestic Violence and Victim Support Unit
     "fire": ("fire-192", "gnfs"),
     "ambulance": ("ambulance-193", "nas"),
     "disaster": ("nadmo-emergency", "nadmo-whatsapp"),
@@ -50,10 +53,11 @@ EMERGENCY_SERVICES: dict[str, tuple[str, ...]] = {
 }
 SERVICE_NAMES = {
     "emergency": "Any emergency", "police": "Police", "police_reporting": "Police reporting lines",
+    "dovvsu": "DOVVSU (domestic violence)",
     "fire": "Fire service", "ambulance": "Ambulance",
     "disaster": "NADMO (floods and disasters)", "helpline": "Helpline of Hope (abuse and children)", "welfare": "Social Welfare",
 }
-SAFETY_SERVICES = ("police", "police_reporting", "helpline", "welfare", "ambulance")
+SAFETY_SERVICES = ("police", "dovvsu", "police_reporting", "helpline", "welfare", "ambulance")
 # The services an emergency topic needs; anything where someone could be hurt includes the ambulance.
 EMERGENCY_TOPICS: dict[str, tuple[str, ...]] = {
     "fire": ("fire", "ambulance"),
@@ -78,7 +82,7 @@ WITH_112 = ("police", "fire", "disaster")  # services whose short form leads wit
 def _contact(raw: dict[str, Any], sources: dict[str, Any], checked: str) -> PublicContact:
     fields = {k: v for k, v in raw.items() if k not in ("source", "sub_metro")}
     source = raw.get("source")
-    contact = PublicContact(**fields, source=ContactSource(**sources[source], checked=checked) if source else None)
+    contact = PublicContact(**fields, source=ContactSource(**{"checked": checked, **sources[source]}) if source else None)
     if (contact.tier == 2) != (contact.source is not None):
         raise ValueError(f"contact {contact.id}: tier 2 needs a source, and only tier 2 has one")
     if not any(n.current for n in contact.numbers) or any(not n.current and not n.note for n in contact.numbers):

@@ -285,6 +285,9 @@ def test_personal_safety_gets_every_number_first_and_only_a_sub_metro_question(m
     first = chat[-1]
     assert first.startswith("*If anyone is in danger now*") and "0800 800 800" in first and "0591 476 884" in first
     assert first.index("0800 800 800") < first.index("Which sub-metro are you in?")  # the numbers come before any question
+    assert "*DOVVSU (domestic violence)*\n0551 000 900" in first
+    steps = first.index("*What to do now*\n- If you can leave now, go to a neighbour, family, or the nearest police station.")
+    assert first.index("0800 800 800") < steps < first.index("Which sub-metro are you in?") and "ask for DOVVSU" in first
     assert "electoral area" not in first and "Assembly Member" not in first
     say("2")  # Okaikoi South
     assert chat[-1].startswith("Ready to send your report to Ghana Police Service and Social Welfare. You can send photos first: only they will see them.")
@@ -323,6 +326,7 @@ def test_a_fire_gets_its_numbers_first_then_the_area_question(monkeypatch: pytes
     say("A house is on fire near the market")
     assert chat[-1].startswith("*If anyone is in danger now*") and "*Fire service*\n192" in chat[-1]
     assert chat[-1].endswith("Reply with its name, for example Kaneshie or Bubiashie.")
+    assert "What to do now" not in chat[-1]  # the steps are for a danger to a person
 
 
 def test_a_reference_gets_its_status(monkeypatch: pytest.MonkeyPatch, chat: list[str]) -> None:

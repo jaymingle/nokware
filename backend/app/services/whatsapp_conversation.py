@@ -8,7 +8,8 @@ misread is never filed. An unclear message gets "question or report?".
 
 A report is read (report_intake.read_report) as soon as it is described. An
 emergency (a danger to a person, a fire, a flood, a crime) gets every number
-to try in that first reply, before any other question. A personal-safety
+to try in that first reply, before any other question, and a danger to a
+person also what to do right now (safety_steps). A personal-safety
 report is asked only for its sub-metro, which it may skip, never its
 electoral area; an area it names is kept only as its sub-metro.
 
@@ -35,7 +36,7 @@ from app.config import get_settings
 from app.services import channel_limits, channel_sessions, report_followups, report_intake, report_store
 from app.contacts import EMERGENCY_TOPICS
 from app.services.channel_answers import for_chat
-from app.services.channel_contacts import medical_text, numbers_text
+from app.services.channel_contacts import medical_text, numbers_text, steps_text
 from app.services.channel_intent import Intent, read_message
 from app.services.channel_status import status_text
 from app.services.citizen_reports import MAX_PHOTOS, IntakeChannel
@@ -180,6 +181,7 @@ def _prompt(number: str, state: State) -> None:
     numbers = ""
     if state.get("filed") and not state.get("numbers_sent"):
         numbers, state = numbers_text(state["filed"]["topic"], state.get("sub_metro")), {**state, "numbers_sent": True}
+        numbers = "\n\n".join(part for part in (numbers, steps_text() if _private(state) else "") if part)
     channel_sessions.save("whatsapp", number, state, DRAFT_SECONDS)
     get_redis().expire(_photos_key(number), DRAFT_SECONDS)
     whatsapp_reply.reply(number, "\n\n".join(part for part in (numbers, question) if part))

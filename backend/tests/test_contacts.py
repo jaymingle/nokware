@@ -27,7 +27,7 @@ AMBULANCE = ["ambulance-193", "nas"]
 
 def test_a_safety_report_gets_every_number_to_try_and_its_sub_metros_welfare_desk() -> None:
     assert ids(contacts.for_report("abuse", "ablekuma-south")) == [
-        "emergency-112", *POLICE, "police-mobile", "police-whatsapp", "helpline-of-hope",
+        "emergency-112", *POLICE, "dovvsu", "police-mobile", "police-whatsapp", "helpline-of-hope",
         "sw-ablekuma-south", "sw-head-office", *AMBULANCE]
     unknown = ids(contacts.for_report("child_at_risk", None))  # no sub-metro given: every desk, then the head office
     assert unknown[unknown.index("helpline-of-hope") + 1:unknown.index("ambulance-193")] == [
@@ -48,7 +48,8 @@ def test_where_a_screen_cannot_hold_them_two_numbers_per_service() -> None:
     assert contacts.short_line("fire", None) == "Fire: 112, 192. Ambulance: 193, 0501 614 877."
     assert contacts.short_line("public_crime", None) == "Police: 112, 191. Ambulance: 193, 0501 614 877."
     assert contacts.short_line("abuse", "okaikoi-south") == (
-        "Police: 112, 191. Helpline: 0800 800 800, 0800 900 900. Social Welfare: 0303 935 397. Ambulance: 193, 0501 614 877.")
+        "Police: 112, 191. DOVVSU (domestic violence): 0551 000 900. Helpline: 0800 800 800, 0800 900 900. "
+        "Social Welfare: 0303 935 397. Ambulance: 193, 0501 614 877.")
     assert "Social Welfare: 0550 006 688." in contacts.short_line("abuse", None)  # the head office when unknown
     assert contacts.short_line("roads", None) == ""
 
@@ -126,3 +127,10 @@ def test_a_medical_emergency_gets_the_ambulance_and_is_told_plainly_it_isnt_the_
     text = medical_text()
     assert text.startswith("This isn't something the Assembly can act on, so Nokware won't file it.")
     assert all(number in text for number in ("112", "193", "0501 614 877", "0505 982 870"))
+
+
+def test_dovvsu_is_the_line_the_police_publish_checked_on_its_own_date() -> None:
+    dovvsu = contacts.contacts()["dovvsu"]
+    assert dovvsu.tier == 2 and [n.number for n in dovvsu.numbers] == ["0551 000 900"]
+    assert dovvsu.source and dovvsu.source.label == "police.gov.gh" and dovvsu.source.checked == "2026-09-15"
+    assert contacts.contacts()["police-main"].source.checked == contacts.directory().checked  # the file's date otherwise

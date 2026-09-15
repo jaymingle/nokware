@@ -21,7 +21,7 @@ function StepView({ step, options, go }: { step: Step; options: ReportOptions; g
   const back = () => go({ kind: "choose" });
   const filed = (receipt: ReportReceipt) => go({ kind: "filed", receipt });
   if (step.kind === "choose") return <SafetyQuestion onChoose={(safety) => go({ kind: "form", safety })} />;
-  if (step.kind === "filed") return <ReportReceiptView receipt={step.receipt} onAnother={back} />;
+  if (step.kind === "filed") return <ReportReceiptView receipt={step.receipt} safetySteps={options.safety_steps} onAnother={back} />;
   if (step.safety) return <SafetyForm options={options} onFiled={filed} onBack={back} />;
   return <CivicForm options={options} onFiled={filed} onBack={back} />;
 }

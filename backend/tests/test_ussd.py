@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 
 from app.config import get_settings
 from app.main import RedactChannelSecrets, app
+from app.safety_steps import STEPS
 from app.routes import channels
 from app.services import channel_limits, channel_sessions, redis_store, report_followups, report_intake, ussd
 from app.services.channel_contacts import numbers_sms
@@ -50,7 +51,7 @@ def keys(later: list[tuple[Any, ...]], *presses: str, session_id: str = "s1") ->
 
 def test_every_fixed_screen_fits_one_plain_screen() -> None:
     screens = [MENU, CONFIRM, ussd.MEDICAL, sub_metro_screen(), *(ward_screen(i) for i in sub_metros()),
-               *(step + ussd.CONTINUE for step in ussd.SAFETY_STEPS), f"Reference M3RD-8WQA received.\n{ussd.NUMBERS_OFFER}",
+               *(step + ussd.CONTINUE for step in ussd.help_pages("abuse", True)), f"Reference M3RD-8WQA received.\n{ussd.NUMBERS_OFFER}",
                f"The numbers were already sent to this phone today. Keep your reference M3RD-8WQA.\n{ussd.CALL_LIST}"]
     for screen in screens:
         assert len(screen) <= ussd.SCREEN_MAX and is_gsm7(screen), screen
@@ -133,8 +134,10 @@ def test_personal_safety_shows_numbers_first_asks_only_the_sub_metro_and_updates
     first = keys(session, "2", "My neighbour beats his wife every night")
     assert first.message.startswith(ussd.HELP_HEADING + "\nPolice: 191, 18555, 0302 779 300 (HQ)") and first.message.endswith("1 Next")
     shown = [first.message] + [ussd.respond(Dial("s1", PHONE, "1", False), lambda *a: None).message for _ in range(3)]
+    assert "DOVVSU (domestic violence): 0551 000 900" in shown[0]
     assert "Helpline of Hope (abuse, children): 0800 800 800" in shown[1] and "Social Welfare: 0550 006 688" in shown[1]
-    assert shown[2].startswith("If you are in danger:") and shown[3].endswith("1 Continue")  # what to do, then on
+    assert shown[2].startswith("If you can leave now, go to a neighbour") and "ask for DOVVSU" in shown[2]
+    assert shown[3].endswith("1 Continue")  # what to do, then on
     place = ussd.respond(Dial("s1", PHONE, "1", False), lambda *a: None)
     assert place.message.startswith("Which sub-metro are you in?") and place.message.endswith("0 Skip")
     assert "electoral area" not in place.message
@@ -172,7 +175,7 @@ def _through_help(topic: str) -> list[str]:
 
 def test_every_emergency_shows_every_number_to_call_on_screens_that_fit(session: list[tuple[Any, ...]]) -> None:
     expected = {"fire": ("192", "0299 340 383", "193"), "disaster": ("0302 964 884", "193"), "road_accident": ("191", "18555", "193"),
-                "public_crime": ("191", "0302 779 300"), "child_at_risk": ("0800 800 800", "0550 006 688", "0501 614 877")}
+                "public_crime": ("191", "0302 779 300"), "child_at_risk": ("0800 800 800", "0550 006 688", "0501 614 877", "0551 000 900")}
     for topic in EMERGENCY_TOPICS:
         private = TOPICS_BY_ID[topic].category == "personal_safety"
         pages = ussd.help_pages(topic, private)
@@ -180,7 +183,7 @@ def test_every_emergency_shows_every_number_to_call_on_screens_that_fit(session:
         for page in pages:
             assert len(page + ussd.CONTINUE) <= ussd.SCREEN_MAX and is_gsm7(page), (topic, page)
         assert all(number in "\n".join(pages) for number in expected.get(topic, ("112",))), topic
-        assert (ussd.SAFETY_STEPS[0] in pages) == private, topic
+        assert (STEPS[0] in "\n".join(pages)) == private and len(pages) <= 4, topic  # two of numbers, two of steps
     assert ussd.help_pages("drainage", False) == []
     assert len(ussd.safety_sub_metro_screen()) <= ussd.SCREEN_MAX
 
@@ -201,6 +204,7 @@ def test_the_numbers_go_by_sms_only_when_asked_for(session: list[tuple[Any, ...]
     assert sent.message.startswith("The numbers are on their way by SMS. Keep your reference M3RD-8WQA.") and not sent.more
     (send, to, text), = session
     assert (send, to) == (ussd.send_sms, PHONE) and "Social Welfare: 0553 260 046, head office 0550 006 688" in text
+    assert "DOVVSU: 0551 000 900" in text
     assert text.startswith("Call 112 first.") and pages(text) <= 2 and is_gsm7(text)
     for giveaway in ("abuse", "violence", "children", "danger", "Nokware"):
         assert giveaway not in text  # the sender says who it's from; nothing says why
@@ -300,3 +304,4 @@ def test_a_ussd_session_from_an_older_version_ends_cleanly(session: list[tuple[A
     channel_sessions.save("ussd", "old", {"step": "retired-step"}, 60)
     assert ussd.respond(Dial("old", PHONE, "1", False), lambda *a: None) == ussd.Reply("Your session ended. Please dial again.", False)
     assert channel_sessions.load("ussd", "old") is None
+

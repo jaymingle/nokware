@@ -27,6 +27,7 @@ class ReportOptions(BaseModel):
     description_min: int
     description_max: int
     safety_contacts: list[PublicContact]  # shown on the safety form: emergency lines, the helpline, Social Welfare
+    safety_steps: list[str]  # what to do right now, after the numbers: the same steps as WhatsApp and USSD
 
 
 class ReportReceipt(BaseModel):

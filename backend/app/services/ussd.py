@@ -18,7 +18,8 @@ updates only if the citizen then says yes, and any SMS about the report says
 nothing but the reference. Last, the citizen may ask for the numbers by SMS,
 told first that anyone with the phone could see them: nobody gets them without
 choosing, and nobody who asks is refused (a phone that already had them three
-times today is told so; each is two SMS credits). Reports carry no photos. The same services as the web:
+times today is told so; each is two SMS credits). Reports carry no photos.
+The same services as the web:
 report_intake.submit() and rag.answer_question(). "Confirm a web code" proves the
 number to a Nokware page that asked for it (phone_proof): the network says who dialled.
 "Sign a petition" takes the petition's six-digit number and signs it from the
@@ -33,9 +34,9 @@ from concurrent.futures import TimeoutError as FilingTimeout
 from dataclasses import dataclass
 from typing import Any
 
+from app import safety_steps
 from app.config import get_settings
 from app.contacts import EMERGENCY_TOPICS, short_line
-from app.services.channel_contacts import call_lines, desk_line, numbers_sms
 from app.services import (
     channel_limits,
     channel_sessions,
@@ -48,6 +49,7 @@ from app.services import (
     report_store,
 )
 from app.services.channel_answers import for_sms
+from app.services.channel_contacts import call_lines, desk_line, numbers_sms
 from app.services.channel_messages import send_sms
 from app.services.channel_status import status_text
 from app.services.citizen_reports import IntakeChannel, NotificationEvent
@@ -78,10 +80,6 @@ MEDICAL = "Nokware can't file this: it isn't an Assembly matter. Ambulance: 193,
 CONFIRM = "File this report?\n1 File, and SMS me updates\n2 File, no SMS\n0 Cancel"
 NEXT = "\n1 Next"
 HELP_HEADING = "In danger now? Call 112. If it fails, try the next number."
-SAFETY_STEPS = (
-    "If you are in danger:\n- Go somewhere safe if you can: a neighbour, family or a police station.\n- Keep your phone with you.",
-    "If you are hurt, go to a hospital or call 193.\nIf it is someone else, a child or an adult, don't confront the person yourself.",
-)
 NUMBERS_OFFER = "Send these numbers by SMS? Anyone with your phone could see them.\n1 Yes\n2 No"
 CALL_LIST = "Your call list may show you dialled Nokware: delete it if that is safer."
 _filing = ThreadPoolExecutor(max_workers=4, thread_name_prefix="ussd-filing")
@@ -209,24 +207,27 @@ def _private(state: State) -> bool:
     return state["filed"]["category"] == Category.PERSONAL_SAFETY
 
 
-def numbers_pages(topic: str) -> list[str]:
-    """Every number to call for an emergency, the services that come to you first, on as few screens as hold
-    them with their key line. Empty for everyday topics."""
-    lines = call_lines(topic, None)
-    if not lines:
-        return []
-    pages, page = [], [HELP_HEADING]
+def _pack(lines: list[str]) -> list[str]:
+    """Lines on as few screens as hold them, each screen leaving room for its key line."""
+    pages: list[str] = []
+    page: list[str] = []
     for line in lines:
-        if len("\n".join([*page, line]) + CONTINUE) > SCREEN_MAX:
+        if page and len("\n".join([*page, line]) + CONTINUE) > SCREEN_MAX:
             pages.append("\n".join(page))
             page = []
         page.append(line)
-    return [*pages, "\n".join(page)]
+    return [*pages, "\n".join(page)] if page else []
+
+
+def numbers_pages(topic: str) -> list[str]:
+    """Every number to call for an emergency, the services that come to you first. Empty for everyday topics."""
+    lines = call_lines(topic, None)
+    return _pack([HELP_HEADING, *lines]) if lines else []
 
 
 def help_pages(topic: str, private: bool) -> list[str]:
     """What comes before any question about place: the numbers, then for personal safety what to do now."""
-    return numbers_pages(topic) + (list(SAFETY_STEPS) if private else [])
+    return numbers_pages(topic) + (_pack(list(safety_steps.STEPS)) if private else [])
 
 
 def safety_sub_metro_screen() -> str:
@@ -251,8 +252,7 @@ def _describe(dial: Dial, state: State, later: Later) -> tuple[Reply, State | No
     description = dial.text.strip()
     if len(description) < DESCRIPTION_MIN:
         return con("Please describe it in a few more words, with where it is:"), state
-    filed = _read(description)
-    return _help_page({"description": description, "filed": _saved(filed)}, 0)  # help first, filing second
+    return _help_page({"description": description, "filed": _saved(_read(description))}, 0)  # help first, filing second
 
 
 def _help(dial: Dial, state: State, later: Later) -> tuple[Reply, State | None]:
@@ -491,10 +491,9 @@ def _sign_name(dial: Dial, state: State, later: Later) -> tuple[Reply, State | N
 
 
 STEPS: dict[str, Callable[[Dial, State, Later], tuple[Reply, State | None]]] = {
-    "menu": _menu, "ask": _ask, "describe": _describe, "help": _help, "sub_metro": _sub_metro, "ward": _ward,
-    "safety_sub_metro": _safety_sub_metro, "confirm": _confirm, "updates": _updates, "call": _call,
-    "numbers_sms": _numbers_sms, "check": _check,
-    "code": _code, "sign_code": _sign_code, "sign_choice": _sign_choice, "sign_name": _sign_name,
+    "menu": _menu, "ask": _ask, "describe": _describe, "help": _help, "sub_metro": _sub_metro,
+    "ward": _ward, "safety_sub_metro": _safety_sub_metro, "confirm": _confirm, "updates": _updates, "call": _call,
+    "numbers_sms": _numbers_sms, "check": _check, "code": _code, "sign_code": _sign_code, "sign_choice": _sign_choice, "sign_name": _sign_name,
 }
 
 

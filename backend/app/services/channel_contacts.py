@@ -8,18 +8,30 @@ number is kept too in a chat, marked as one that may not connect.
 For USSD screens and the SMS a safety reporter may ask for (call_lines): one
 line per service, the numbers that can be called from the phone in hand (no
 WhatsApp lines, no earlier listings), the services that come to you first.
+The Police reporting lines, reported on X and not independently verified,
+stay on the web and WhatsApp: on a keypad, whose sessions time out, their
+screen is better spent on DOVVSU's verified line.
 """
 
-from app.contacts import MEDICAL_SERVICES, SAFETY_DESK_FALLBACK, SERVICE_NAMES, contacts, emergency_groups, service_groups, welfare_desk
+from app import safety_steps
+from app.contacts import (
+    MEDICAL_SERVICES,
+    SAFETY_DESK_FALLBACK,
+    SERVICE_NAMES,
+    contacts,
+    emergency_groups,
+    service_groups,
+    welfare_desk,
+)
 from app.schemas.contacts import ContactNumber, PublicContact
 from app.wards import sub_metros
 
 HEADING = "*If anyone is in danger now*, call. If a number doesn't connect, try the next one."
 LABELS = {"police-main": "Police HQ, Accra", "gnfs": "GNFS Accra", "sw-head-office": "head office"}
-CALL_ORDER = ("police", "fire", "disaster", "ambulance", "helpline", "welfare", "police_reporting")
-CALL_LABELS = {"fire": "Fire", "disaster": "NADMO", "helpline": "Helpline of Hope (abuse, children)",
-               "police_reporting": "Police lines, not verified"}
-SMS_LABELS = {**CALL_LABELS, "helpline": "Helpline of Hope"}  # on a phone others may read, not what it is for
+CALL_ORDER = ("police", "dovvsu", "fire", "disaster", "ambulance", "helpline", "welfare")
+CALL_LABELS = {"fire": "Fire", "disaster": "NADMO", "helpline": "Helpline of Hope (abuse, children)"}
+# On a phone others may read: who each line is, not what it is for.
+SMS_LABELS = {**CALL_LABELS, "helpline": "Helpline of Hope", "dovvsu": "DOVVSU"}
 CALL_NOTES = {"police-main": "HQ"}
 SMS_HEADING = "Call 112 first. If a number fails, try the next."
 
@@ -76,7 +88,7 @@ def call_lines(topic: str, sub_metro: str | None, labels: dict[str, str] = CALL_
     0302 779 300 (HQ)". 112 isn't a line: it leads the heading. Empty for everyday topics."""
     groups = dict(emergency_groups(topic, sub_metro)[1:])
     lines = []
-    for service in sorted(groups, key=CALL_ORDER.index):
+    for service in (s for s in CALL_ORDER if s in groups):
         numbers = _welfare_calls(sub_metro) if service == "welfare" else [n for c in groups[service] for n in _calls(c)]
         lines.append(f"{labels.get(service, SERVICE_NAMES[service])}: {', '.join(numbers)}")
     return lines
@@ -91,6 +103,11 @@ def desk_line(sub_metro: str | None) -> str | None:
 def numbers_sms(topic: str, sub_metro: str | None) -> str:
     """The numbers a safety reporter asked to have by SMS: every one to call, and nothing saying what happened."""
     return "\n".join([SMS_HEADING, *call_lines(topic, sub_metro, SMS_LABELS)])
+
+
+def steps_text() -> str:
+    """What to do right now, for a chat: after a personal-safety report's numbers, before any question."""
+    return "\n".join(["*What to do now*", *(f"- {step}" for step in safety_steps.STEPS)])
 
 
 def medical_text() -> str:

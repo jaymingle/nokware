@@ -8,6 +8,7 @@ import { ContactList } from "@/components/contacts/contact-list";
 import { Tag } from "@/components/documents/tag";
 import { ReadAloud } from "@/components/read-aloud/read-aloud";
 import { PreferencesForm } from "@/components/report/preferences-form";
+import { SafetySteps } from "@/components/report/safety-steps";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { reportAudio } from "@/lib/api/public";
@@ -69,8 +70,10 @@ function Filed({ receipt }: { receipt: ReportReceipt }) {
   );
 }
 
+type ReceiptProps = { receipt: ReportReceipt; safetySteps: string[]; onAnother: () => void };
+
 /** The confirmation: the reference to keep, where the report went, and what messages to expect. */
-export function ReportReceiptView({ receipt, onAnother }: { receipt: ReportReceipt; onAnother: () => void }) {
+export function ReportReceiptView({ receipt, safetySteps, onAnother }: ReceiptProps) {
   const messages = messagesLine(receipt);
   return (
     <Card className="border-teal" data-testid="report-receipt">
@@ -89,6 +92,7 @@ export function ReportReceiptView({ receipt, onAnother }: { receipt: ReportRecei
           contacts={receipt.contacts}
           testId="report-receipt-contacts"
         />
+        {receipt.private ? <SafetySteps steps={safetySteps} testId="report-receipt-steps" /> : null}
         <div className="flex flex-wrap gap-2 border-t pt-4">
           <Button asChild>
             <Link href="/report/status" data-testid="report-go-status">Check its status</Link>

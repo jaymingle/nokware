@@ -11,7 +11,7 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, Header, UploadFile
 
-from app import contacts
+from app import contacts, safety_steps
 from app.dependencies import rate_limited
 from app.schemas.documents import Option
 from app.schemas.reports import (
@@ -61,6 +61,7 @@ def options() -> ReportOptions:
         description_min=DESCRIPTION_MIN,
         description_max=DESCRIPTION_MAX,
         safety_contacts=contacts.safety_contacts(None),
+        safety_steps=list(safety_steps.STEPS),
     )
 
 
