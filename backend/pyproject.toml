@@ -32,6 +32,7 @@ dependencies = [
     "reportlab>=4,<5",
     "python-docx>=1,<2",
     "cryptography>=45,<51",  # seals the proof of a confirmed phone (phone_proof.py)
+    "mcp>=2.2,<3",  # the report-figures server at /mcp (stats_mcp.py)
 ]
 
 [project.optional-dependencies]

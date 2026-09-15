@@ -11,6 +11,7 @@ from fastapi.responses import JSONResponse
 from psycopg_pool import PoolTimeout
 from sqlalchemy.exc import OperationalError as SearchIndexUnreachable
 
+from app import stats_mcp
 from app.config import get_settings
 from app.routes import (
     accountability,
@@ -100,7 +101,9 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     # creator's, 30 days after the petition closes); spoken
     # replies Twilio never reported on are deleted from Twilio a day after they were sent.
     purge = scheduler.start(settings.contact_purge_interval_seconds, run_contact_purge, "Contact purge")
-    yield
+    # The MCP server at /mcp answers only while its session manager runs, and its own app's lifespan never does here.
+    async with stats_mcp.SERVER.session_manager.run():
+        yield
     await scheduler.stop(task)
     await scheduler.stop(clock)
     await scheduler.stop(purge)
@@ -210,3 +213,4 @@ app.include_router(petition_routes.router)
 app.include_router(phone.router)
 app.include_router(speech.router)
 app.include_router(channels.router)
+app.add_route(stats_mcp.PATH, stats_mcp.APP)  # live report figures for AI clients: public Ask's tools and rules

@@ -203,6 +203,17 @@ it without `https://` where one SMS page is tight.
 Then `curl https://api.nokware.tstitagency.com/health` answers
 `{"status": "ok"}`.
 
+The MCP server (report figures for AI clients) is part of the API at
+`https://api.nokware.tstitagency.com/mcp`: nothing to add in Coolify. It
+accepts only the host in `PUBLIC_API_URL` (and localhost), so a wrong value
+there shows as `421 Misdirected Request` on `/mcp`. Check it answers:
+
+```bash
+curl -s -X POST https://api.nokware.tstitagency.com/mcp -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+```
+
+The reply lists `count_reports` and `personal_safety_figures`.
+
 ## 6. Coolify: the site and portal
 
 New resource → **Application** → the same repository and branch.

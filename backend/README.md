@@ -92,6 +92,7 @@ membership.
 | `GET /api/petitions/{number}/names` (the names signers chose to show) | public |
 | `GET /api/petitions/review`, `POST /api/petitions/{number}/decision` (`publish`, or `refuse` with a fixed `reason`), `GET /api/petitions/responses`, `POST /api/petitions/{number}/response` (`kind`: `will_act`, `referred` or `cannot_act`; `text`; `department`; `documents`) | MCE |
 | `POST /api/speech/answer` (`view`: an Ask answer's signed export view), `POST /api/speech/report` (`reference`, `kind`); each with `part` (from 0): that part as MP3, and `X-Speech-Parts` saying how many | public, 120 an hour per client |
+| `/mcp` (an MCP server over streamable HTTP, stateless: the `count_reports` and `personal_safety_figures` tools; see [Report figures for AI clients](#report-figures-for-ai-clients-mcp)) | public, no sign-in, 120 requests per 10 minutes per client |
 | `GET /api/me` | anyone signed in |
 | `GET /api/departments`, `GET /api/categories` | anyone signed in |
 | `POST /api/documents` (multipart: `file`, `title`, `category`, `document_year`, `department`, `source_url`) | department (published), contributor (held 72h) |
@@ -468,8 +469,9 @@ accounts to `scripts/seed_users.toml` and re-run `scripts/seed_users.py`.
 
 ## What the public sees, and the privacy model
 
-Three public surfaces read citizen reports: the dashboard, Ask's live figures
-and the issue list. They share one set of rules (`app/services/stats.py`):
+Four public surfaces read citizen reports: the dashboard, Ask's live figures,
+the MCP server and the issue list. They share one set of rules
+(`app/services/stats.py`):
 
 - **Personal safety is never counted**, not as a filter and not in any total,
   so no total less the visible topics can give its number away. Ask answers a
@@ -485,6 +487,52 @@ and the issue list. They share one set of rules (`app/services/stats.py`):
 Ask's figures come from a counting tool (`app/services/ask_figures.py`) that a
 quick planning call can invoke; each figure is cited as `[R1]` beside the
 documents' `[S1]`, and the answer says it is live report data, not a document.
+
+### Report figures for AI clients (MCP)
+
+`/mcp` (`app/stats_mcp.py`) is an MCP server that lets an outside AI client
+(Claude, ChatGPT, a newsroom's own agent) query the same live figures Ask uses.
+It has Ask's two tools and nothing else: `count_reports` (Ask's `CountReports`:
+a topic, category, status, electoral area, sub-metro, department and period,
+optionally broken down by topic, sub-metro or month) and
+`personal_safety_figures`, which gives the fixed refusal. The counting is
+`stats.py`'s, so every rule above holds: personal safety is never counted and
+is not a topic the tool accepts, and 1 to 4 reads "fewer than 5". Each result
+says what was counted, when (at most a minute ago), and that these are
+reports residents filed with Nokware, not the Assembly's own records.
+
+It is read-only, needs no sign-in, and is rate-limited per client address.
+It runs inside the API process (stateless streamable HTTP with plain JSON
+responses, so no session state and no sticky routing), accepts only the
+API's own host (`PUBLIC_API_URL`) and localhost as the `Host` header, and
+refuses browser origins: it is for MCP clients, not web pages. To connect a
+client, give it `https://<API host>/mcp`.
+
+**A deliberate decision: the MCE gets no more through MCP than the public
+does.** It would have been easy to add a signed-in path where the MCE sees the
+personal-safety counts that public Ask refuses. We decided not to, for three
+reasons:
+
+- **Differencing.** A query tool is not a fixed figure. Anyone who can ask for
+  counts freely can subtract one answer from another (a sub-metro total less
+  its other topics, this month less last month) and recover a cell that "fewer
+  than 5" hides. For personal safety, a count by electoral area and month can
+  point to one household. Leaving personal safety out entirely is the
+  protection that matters, and a signed-in path would put it back.
+- **Results leave Nokware.** An MCP result lands in an outside AI client's
+  context, transcripts and logs, run by another company under its own
+  retention rules. Nokware decides how long what it holds is kept; it has no
+  say over how long a figure lives in someone else's chat history.
+- **The MCE already has what the job needs.** The portal shows the MCE the
+  open personal-safety count metro-wide (as "fewer than 5" below five) and
+  every personal-safety case in outline: its status, recipients, age and
+  history, without the resident's words or photos. The MCE can see whether
+  safety cases are being handled without being able to query them.
+
+If the Assembly needs more, the way to give it is another fixed, suppressed
+figure in the portal (open safety cases by sub-metro, say), not a query tool.
+Sign-in would only matter on `/mcp` if it widened what comes back, so there
+is none.
 
 "Add your voice" (`app/services/issue_voices.py`) takes open civic-service
 issues only. A voice is anonymous unless the resident gives a name; names are

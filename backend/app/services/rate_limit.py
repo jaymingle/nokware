@@ -42,3 +42,4 @@ PHONE_CHALLENGES = RateLimit(limit=20, window_seconds=3600)
 PHONE_POLLS = RateLimit(limit=400, window_seconds=900)  # the page asks every few seconds while it waits
 SIGNING = RateLimit(limit=120, window_seconds=3600)  # generous: many phones share one address on a mobile network
 SPEECH = RateLimit(limit=120, window_seconds=3600)  # one request per part: a long answer is up to seven
+MCP = RateLimit(limit=120, window_seconds=600)  # every MCP message is a request; a count reads a cached list, so this only stops floods
