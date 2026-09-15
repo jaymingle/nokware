@@ -114,6 +114,19 @@ verified contributor. It comes from each record's `origin` attribute, which
 `scripts/add_document_origin.py` added and backfilled; the AMA import and the
 portal set it on every new document.
 
+**Known limitation: characters some PDFs lost.** Some of the Assembly's PDFs
+store ligatures and bullets in a font's private characters, and extraction kept
+them: "flooding" is stored as a private character followed by "ooding", "fi" as
+U+F001, bullets as U+F0B7, and some characters were lost outright (U+FFFD).
+Measured on 15 September 2026: 740 of the Ledger's 7,539 chunks, across 42
+documents. It affects accuracy, not only looks: Ask's keyword search can't
+match "flooding" in those chunks (the meaning-based search still can), and a
+quoted passage can show boxes. Passages shown beside a petition are mended for
+reading (`petition_ledger.readable`), but the chunks themselves are unchanged.
+The fix, which is held for now, is to normalise the text at ingestion and
+re-index those 42 documents; that re-embeds them with Gemini, so it costs
+credits and time.
+
 ### Exports and charts
 
 Every Ask answer can be downloaded as a PDF, a Word document or a CSV
