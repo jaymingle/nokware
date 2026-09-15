@@ -35,6 +35,7 @@ SUBMISSIONS = RateLimit(limit=5, window_seconds=600)
 LOOKUPS = RateLimit(limit=30, window_seconds=60)
 ESCALATIONS = RateLimit(limit=5, window_seconds=3600)
 VOICES = RateLimit(limit=20, window_seconds=3600)
+SPOKEN_QUESTIONS = RateLimit(limit=20, window_seconds=3600)  # each is heard by Gemini
 EXPORTS = RateLimit(limit=30, window_seconds=3600)  # each renders a PDF, a Word file or a CSV
 PETITION_CHECKS = RateLimit(limit=30, window_seconds=3600)  # each reads the draft with Gemini or searches the Ledger
 PETITION_CHANGES = RateLimit(limit=20, window_seconds=3600)

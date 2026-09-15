@@ -4,20 +4,23 @@ POST /api/ask returns the whole answer at once. POST /api/ask/stream sends the
 same answer as newline-delimited JSON events (see AskStreamEvent), so the page
 can show progress during the 6-13 seconds an answer takes. Each answer comes with
 its export view, signed; POST /api/ask/export takes one back and returns it as a
-PDF, a Word document or a CSV (ask_export.py).
+PDF, a Word document or a CSV (ask_export.py). POST /api/ask/voice turns a spoken
+question into words through the same pipeline as a WhatsApp voice note
+(voice_transcribe.listen), for the person to check before it is asked. The
+recording is held in memory only: never stored, and its words never logged.
 """
 
 import logging
 from collections.abc import Iterator
 
-from typing import Any
+from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile, status
 from fastapi.responses import StreamingResponse
 
 from app.config import get_settings
 from app.dependencies import rate_limited
-from app.schemas.ask import AskExportRequest, AskRequest, AskResponse, AskStreamEvent, ExportView
+from app.schemas.ask import MAX_QUESTION_LENGTH, AskExportRequest, AskHeard, AskRequest, AskResponse, AskStreamEvent, ExportView
 from app.services import ask_export, rate_limit, read_aloud
 from app.services.ask_export import Answered, export_view
 from app.services.export_csv import csv_bytes
@@ -25,6 +28,8 @@ from app.services.export_docx import docx
 from app.services.export_pdf import pdf
 from app.services.ledger_documents import utc_now
 from app.services.rag import answer_question, stream_answer
+from app.services.voice_audio import AudioRejected
+from app.services.voice_transcribe import TranscriptionFailed, Unusable, listen, understood
 
 router = APIRouter(prefix="/api", tags=["ask"])
 logger = logging.getLogger(__name__)
@@ -42,6 +47,13 @@ FORMATS = {
     "csv": (csv_bytes, "text/csv; charset=utf-8", "csv"),
 }
 Exports = Depends(rate_limited(rate_limit.EXPORTS))
+SpokenQuestions = Depends(rate_limited(rate_limit.SPOKEN_QUESTIONS))
+VOICE_MAX_SECONDS = 60
+VOICE_MAX_BYTES = 5 * 1024 * 1024  # a minute of speech is well under 1 MB in any format a browser records
+VOICE_TOO_LONG = "Spoken questions can be up to a minute. Try a shorter one, or type your question."
+VOICE_NOT_HEARD = "I couldn't make out that recording. Try again somewhere quieter, or type your question."
+VOICE_FAILED = "Your recording couldn't be read just now. Try again, or type your question."
+VOICE_NOT_AUDIO = "That recording couldn't be played. Try again, or type your question."
 
 
 @router.post("/ask", response_model=AskResponse)
@@ -111,3 +123,28 @@ def export(request: AskExportRequest) -> Response:
     content = ask_export.content(view, get_settings().public_site_url.rstrip("/"))
     headers = {"Content-Disposition": f'attachment; filename="{ask_export.filename(view, extension)}"', "Cache-Control": "no-store"}
     return Response(render(content), media_type=media_type, headers=headers)
+
+
+def _recording(upload: UploadFile) -> bytes:
+    data = upload.file.read(VOICE_MAX_BYTES + 1)
+    if len(data) > VOICE_MAX_BYTES:
+        raise HTTPException(status.HTTP_413_CONTENT_TOO_LARGE, VOICE_TOO_LONG)
+    if not data:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, VOICE_NOT_HEARD)
+    return data
+
+
+@router.post("/ask/voice", response_model=AskHeard, dependencies=[SpokenQuestions])
+def ask_voice(audio: Annotated[UploadFile, File(description="The spoken question, as the browser recorded it")]) -> AskHeard:
+    """A spoken question in words, to be checked before it is asked. Nothing is asked here."""
+    try:
+        heard = listen(_recording(audio), audio.content_type or "", VOICE_MAX_SECONDS)
+    except AudioRejected:
+        raise HTTPException(status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, VOICE_NOT_AUDIO) from None
+    except TranscriptionFailed:
+        logger.warning("A spoken question couldn't be transcribed")
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, VOICE_FAILED) from None
+    if isinstance(heard, Unusable):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, VOICE_TOO_LONG if heard is Unusable.TOO_LONG else VOICE_NOT_HEARD)
+    question = heard.english[:MAX_QUESTION_LENGTH]
+    return AskHeard(question=question, language=heard.language, understood=understood(question, heard.language))

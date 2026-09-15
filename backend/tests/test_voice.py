@@ -220,8 +220,8 @@ def phone(monkeypatch: pytest.MonkeyPatch, redis_server: fakeredis.FakeRedis) ->
     monkeypatch.setattr(whatsapp_reply, "reply", lambda number, text: seen["text"].append(text))
     monkeypatch.setattr(whatsapp_reply, "reply_audio", lambda number, url, about: seen["audio"].append(url) or "MMspoken")
     monkeypatch.setattr(whatsapp_voice, "twilio", lambda: seen["twilio"])
-    monkeypatch.setattr(whatsapp_voice, "seconds", lambda data: 12.0)
-    monkeypatch.setattr(whatsapp_voice, "transcribe", lambda data, content_type: seen["heard"])
+    monkeypatch.setattr(voice_transcribe, "seconds", lambda data: 12.0)
+    monkeypatch.setattr(voice_transcribe, "transcribe", lambda data, content_type: seen["heard"])
     monkeypatch.setattr(whatsapp_voice.voice_speech, "speak", lambda script: seen["spoken"].append(script) or NOTE)
     monkeypatch.setattr(whatsapp_conversation, "answer_question", lambda question, length: ANSWER)
     return seen
@@ -376,13 +376,13 @@ def test_a_voice_note_that_cannot_be_used_says_why_and_nothing_else_happens(monk
     if problem == "unclear":
         phone["heard"] = Heard("", "", "unknown", False, False)
     elif problem == "invented":  # half a second of "One." heard as a sentence (seen live from Gemini)
-        monkeypatch.setattr(whatsapp_voice, "seconds", lambda data: 0.44)
+        monkeypatch.setattr(voice_transcribe, "seconds", lambda data: 0.44)
         said = "Hello. Good morning. Please, I want to ask about the AMA."
         phone["heard"] = Heard(said, said, "English", True, False)
     elif problem == "too_long":
-        monkeypatch.setattr(whatsapp_voice, "seconds", lambda data: 181.0)
+        monkeypatch.setattr(voice_transcribe, "seconds", lambda data: 181.0)
     else:
-        monkeypatch.setattr(whatsapp_voice, "transcribe", lambda data, content_type: (_ for _ in ()).throw(voice_transcribe.TranscriptionFailed("x")))
+        monkeypatch.setattr(voice_transcribe, "transcribe", lambda data, content_type: (_ for _ in ()).throw(voice_transcribe.TranscriptionFailed("x")))
     speak_note()
     assert phone["text"] == [expected] and asked == [] and phone["twilio"].deleted == [VOICE.url]
 

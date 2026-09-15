@@ -1,9 +1,8 @@
 """Voice notes on WhatsApp: heard, handled as if typed, and a question answered aloud as well as in text.
 
 In: the note is fetched from Twilio once and deleted there at once; it is never
-stored. It may be up to 3 minutes long, 10 an hour per number. A transcript with
-more words than anyone could say in the note's length is taken as unheard: on a
-very short note, Gemini can invent a whole sentence. Gemini's English
+stored. It may be up to 3 minutes long, 10 an hour per number, and is heard by
+voice_transcribe.listen(), as a question spoken on the web is. Gemini's English
 for it is handled exactly like a typed message, through every step of the chat;
 a lone spoken choice ("one", "yes", "remove") or a spelled-out reference is read
 as its typed form, so someone who can't type can use every menu.
@@ -40,14 +39,13 @@ from app.services.rag import RagAnswer
 from app.services.redis_store import RedisUnavailable, get_redis, key
 from app.services.report_contacts import masked
 from app.services.report_rules import suggests_danger_to_a_person
-from app.services.voice_audio import AudioRejected, Encoded, seconds
-from app.services.voice_transcribe import Heard, TranscriptionFailed, transcribe
+from app.services.voice_audio import AudioRejected, Encoded
+from app.services.voice_transcribe import Heard, TranscriptionFailed, Unusable, listen
 from app.services.whatsapp import WhatsAppError, WhatsAppNotConfigured, twilio
 
 logger = logging.getLogger(__name__)
 
 VOICE_MAX_SECONDS = 180
-WORDS_PER_SECOND = 4  # brisk speech is about 3; more than this, and the words weren't all said
 HOLD_SECONDS = 10 * 60
 AUDIO_PATH = "/api/channels/whatsapp/audio"
 AUDIO_TYPES = {"ogg": "audio/ogg", "mp3": "audio/mpeg"}
@@ -82,15 +80,11 @@ def _listen(url: str, content_type: str) -> Heard | str:
     """What the voice note says, or what to tell the citizen if it can't be used."""
     try:
         data, fetched_type = _fetch(url)
-        length = seconds(data)
-        if length > VOICE_MAX_SECONDS:
-            return TOO_LONG
-        heard = transcribe(data, content_type or fetched_type)
+        heard = listen(data, content_type or fetched_type, VOICE_MAX_SECONDS)
     except (WhatsAppError, WhatsAppNotConfigured, AudioRejected, TranscriptionFailed, OSError):
         logger.exception("A WhatsApp voice note couldn't be read")
         return FAILED
-    sayable = len(heard.heard.split()) <= WORDS_PER_SECOND * length + 3
-    return heard if heard.clear and heard.english and sayable else NOT_HEARD
+    return {Unusable.TOO_LONG: TOO_LONG, Unusable.NOT_HEARD: NOT_HEARD}[heard] if isinstance(heard, Unusable) else heard
 
 
 def hear(number: str, url: str, content_type: str) -> Heard | None:
@@ -120,12 +114,6 @@ def as_typed(text: str) -> str:
     if len(words) == 1 and (words[0] in NUMBER_WORDS or words[0].isdigit() or words[0] in COMMANDS):
         return NUMBER_WORDS.get(words[0], words[0])
     return _spelled_reference(words) or text.strip()
-
-
-def understood(english: str, language: str) -> str:
-    """How a voice note's words are shown back, so the citizen can catch a mistake."""
-    translated = "" if language.strip().lower() == "english" else f" (from {language}, translated by machine)"
-    return f'I understood: "{english}"{translated}'
 
 
 def _today_allows(now: datetime) -> bool:

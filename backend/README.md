@@ -71,6 +71,7 @@ membership.
 | `POST /api/ask` (whole answer) | public |
 | `POST /api/ask/stream` (newline-delimited JSON events: stage, sources, answer text, done) | public |
 | `POST /api/ask/export` (`view`: an answer's signed export view, `format`: `pdf`, `docx` or `csv`; the file as an attachment) | public, 30 an hour per client |
+| `POST /api/ask/voice` (multipart `audio`, up to a minute; returns the words to check, asks nothing) | public, 20 an hour per client |
 | `GET /api/ledger/{id}/file` (redirects to a 10-minute PDF link; published documents only, 404 otherwise) | public |
 | `GET /api/reports/options` (wards by sub-metro, personal-safety types, limits) | public |
 | `POST /api/reports` (multipart: `description`, `ward` or `sub_metro`, `safety_topic`, `phone`, `whatsapp`, `notify`, `callback_consent`, up to 10 `photos`) | public, 5 per 10 minutes per client |
@@ -115,6 +116,19 @@ from ama.gov.gh, submitted by a department through the portal, or from a
 verified contributor. It comes from each record's `origin` attribute, which
 `scripts/add_document_origin.py` added and backfilled; the AMA import and the
 portal set it on every new document.
+
+**Speaking a question on Ask** (`POST /api/ask/voice`): a microphone beside the
+question box. The browser records up to a minute (WebM/Opus in Chrome and
+Firefox, MP4/AAC in Safari, re-encoded for Gemini) and sends it once; it goes
+through the same pipeline as a WhatsApp voice note (`voice_transcribe.listen`),
+and comes back as words, never an answer. The page shows "I understood: …"
+(marked "translated by machine" when it wasn't English) with Ask this, Edit and
+Discard: nothing is asked until the person chooses, so a mishearing is caught
+before it becomes a question. The recording is held in memory only, never
+stored, and its words are never logged. 20 an hour per client, since each is a
+Gemini call. French from a natural voice was heard word for word in testing;
+the robotic macOS French voice was misheard, and Twi is untested (see the voice
+limits below).
 
 **Read aloud** (`app/services/read_aloud.py`, `app/routes/speech.py`): a speaker
 button on Ask answers, report confirmations and report status pages, the places
@@ -444,7 +458,9 @@ with a question's answer and in the confirm before a report is filed, so a bad
 transcription is caught by the person who said it; the audit trail records that
 a description is a confirmed machine transcription. A transcript with more
 words than the note's length could hold is taken as unheard: on a half-second
-note Gemini invented a whole sentence. Only a question's answer is also spoken:
+note Gemini invented a whole sentence. So is one that repeats Gemini's own
+instructions, which it did once on a clip it couldn't make out (words per second
+only catches that on a recording under about a minute). Only a question's answer is also spoken:
 after the text answer (which carries the sources), a voice note of about 50
 seconds of its gist, in English, ending "The sources are in the message above."
 It is never spoken when Gemini or the report rules' danger words say the note
@@ -496,7 +512,10 @@ Known limitations:
 - Voice in languages other than English is untested. Twi, Ga and Ewe haven't
   been tried with real speakers. In testing, a clear French note was heard as
   Twi-sounding words and marked unclear (so the citizen was asked to try again
-  or type): the prompt's Ghanaian context pulls Gemini towards Twi. Spoken
+  or type): the prompt's Ghanaian context pulls Gemini towards Twi. Later, two
+  French questions in a natural voice (Gemini's own speech) were heard word for
+  word with a correct English translation, while macOS's robotic French voice was
+  misheard or unheard. Real French speakers haven't been tried. Spoken
   replies are English only. "I understood: …" is the safeguard, not a
   guarantee.
 - Very short voice notes are unreliable: a half-second "one" was heard as

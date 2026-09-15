@@ -49,7 +49,7 @@ from app.services.report_photos import PhotoRejected, clean_photo
 from app.services.report_rules import Classification, ClassificationMethod, InvalidReport
 from app.services.report_taxonomy import Category
 from app.services import phone_proof, whatsapp_reply, whatsapp_safety, whatsapp_voice
-from app.services.voice_transcribe import Heard
+from app.services.voice_transcribe import Heard, understood
 from app.services.whatsapp import WhatsAppError, WhatsAppNotConfigured, first_delivery, open_window, twilio
 from app.teams import short_name
 from app.wards import find_ward, sub_metros, ward_mentioned, wards
@@ -154,7 +154,7 @@ def _confirm_question(number: str, state: State) -> str:
     photos = get_redis().llen(_photos_key(number))
     with_photos = f" with {photos} photo{'s' if photos != 1 else ''}" if photos else ""
     spoken = state.get("spoken_language")
-    heard = f"{whatsapp_voice.understood(state['description'], spoken)}\n" if spoken else ""
+    heard = f"{understood(state['description'], spoken)}\n" if spoken else ""
     if _private(state):
         who = " and ".join(short_name(r) for r in state["filed"]["recipients"])
         return (f"{heard}Ready to send your report{with_photos} to {who}. You can send photos first: only they will see them.\n"
@@ -249,7 +249,7 @@ def answer(number: str, question: str, heard: Heard | None = None) -> None:
         whatsapp_reply.reply(number, "You've asked a lot of questions this hour. Please try again later.")
         return
     found = answer_question(question, AnswerLength.CHAT)
-    shown = [whatsapp_voice.understood(heard.english, heard.language)] if heard else []
+    shown = [understood(heard.english, heard.language)] if heard else []
     whatsapp_reply.reply(number, "\n\n".join([*shown, for_chat(found, _site())]))
     if heard:
         whatsapp_voice.speak_answer(number, found, heard)

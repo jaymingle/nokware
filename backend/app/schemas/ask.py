@@ -18,6 +18,14 @@ class AskRequest(BaseModel):
     question: Question
 
 
+class AskHeard(BaseModel):
+    """A spoken question in words, shown to the person to check before anything is asked."""
+
+    question: str  # what is put to Ask once they confirm it: the English, clipped to the question limit
+    language: str  # the language spoken, named in English
+    understood: str  # 'I understood: "…"', saying so when it was translated by machine
+
+
 class AskSource(BaseModel):
     """One retrieved chunk; a document's chunks share its label."""
 
