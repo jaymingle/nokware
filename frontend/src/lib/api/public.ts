@@ -5,6 +5,7 @@ import { env } from "@/lib/env";
 import type {
   ContactDirectory,
   Dashboard,
+  Issue,
   IssuePage,
   PreferencesResult,
   PublishingRecord,
@@ -96,6 +97,11 @@ export function getIssues({ subMetro, topic, limit, offset }: IssueFilters): Pro
   if (subMetro) params.set("sub_metro", subMetro);
   if (topic) params.set("topic", topic);
   return publicRequest<IssuePage>(`/api/issues?${params}`);
+}
+
+/** One open civic issue, as the issue list shows it. */
+export function getIssue(publicId: string): Promise<Issue> {
+  return publicRequest<Issue>(`/api/issues/${encodeURIComponent(publicId)}`);
 }
 
 /** Add this browser's voice to an issue: anonymous unless a name is given. */

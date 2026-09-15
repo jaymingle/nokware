@@ -82,7 +82,7 @@ function RefuseForm({ item, reasons, onDone }: { item: ReviewItem; reasons: Refu
     const form = new FormData(event.currentTarget);
     const note = String(form.get("note") ?? "").trim() || null;
     const duplicate = String(form.get("duplicate") ?? "").trim() || null;
-    void decision.run({ decision: "refuse", reason, note, duplicate_of: duplicate }, "Refused. The person who started it has been told why.");
+    void decision.run({ decision: "refuse", reason, note, duplicate_of: duplicate }, "Refused. The person who started it sees why on their petitions page.");
   };
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-4">
@@ -135,7 +135,7 @@ function Details({ item }: { item: ReviewItem }) {
       {item.documents.map((doc) => <DocumentLine key={doc.id} doc={doc} />)}
       {item.earlier_refusals.map((r, i) => (
         <p key={i} className="rounded-lg bg-brick-tint px-3 py-2 text-[13px]">
-          Refused before: {r.label}{r.note ? `. Your note: ${r.note}` : ""}. It has since been edited and sent back.
+          Refused before: {r.label}. {r.note ? `Your note: “${r.note}” ` : ""}It has since been edited and sent back.
         </p>
       ))}
     </>

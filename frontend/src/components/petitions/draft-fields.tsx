@@ -5,6 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect, NativeSelectOptGroup, NativeSelectOption } from "@/components/ui/native-select";
 import { Textarea } from "@/components/ui/textarea";
+import { useLinkedIssue } from "@/lib/api/petition-queries";
+import { voicesLine } from "@/lib/voices";
 
 import type { DraftState } from "@/hooks/use-petition-draft";
 import type { AreaOption, PetitionOptions } from "@/lib/api/types";
@@ -71,6 +73,20 @@ function Words({ draft, change, testId }: Omit<FieldsProps, "options">) {
   );
 }
 
+/** The open issue residents reported that this petition builds on, by what it is, not its ID. */
+function IssueLink({ issue, onRemove, testId }: { issue: string; onRemove: () => void; testId: string }) {
+  const linked = useLinkedIssue(issue);
+  const place = [linked.data?.ward, linked.data?.sub_metro].filter(Boolean).join(", ");
+  const text = linked.data ? `Builds on an open issue residents reported: ${linked.data.topic}${place ? ` · ${place}` : ""}. ${voicesLine(linked.data.voices)}.`
+    : linked.error ? "The issue this was linked to isn't open any more, so it can't be linked. Remove it to send the petition." : "Builds on an open issue residents reported.";
+  return (
+    <p className="flex flex-wrap items-center gap-2 rounded-lg bg-paper-subtle px-3 py-2 text-[13px]" data-testid={`${testId}-issue`}>
+      {text}
+      <Button variant="ghost" size="xs" onClick={onRemove} data-testid={`${testId}-issue-remove`}>Remove</Button>
+    </p>
+  );
+}
+
 /** The petition's fields: the ask, why, its topic and where. Shared by a new petition and a refused one being edited. */
 export function DraftFields({ draft, change, options, testId }: FieldsProps) {
   return (
@@ -84,12 +100,7 @@ export function DraftFields({ draft, change, options, testId }: FieldsProps) {
         </NativeSelect>
       </div>
       <Scope draft={draft} change={change} options={options} testId={testId} />
-      {draft.issue ? (
-        <p className="flex flex-wrap items-center gap-2 rounded-lg bg-paper-subtle px-3 py-2 text-[13px]" data-testid={`${testId}-issue`}>
-          Linked to an open issue residents reported ({draft.issue}).
-          <Button variant="ghost" size="xs" onClick={() => change({ issue: null })} data-testid={`${testId}-issue-remove`}>Remove</Button>
-        </p>
-      ) : null}
+      {draft.issue ? <IssueLink issue={draft.issue} onRemove={() => change({ issue: null })} testId={testId} /> : null}
     </div>
   );
 }

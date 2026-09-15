@@ -22,7 +22,8 @@ import type { LedgerMatch, OwnPetition, PetitionOptions, ScreenResult } from "@/
 
 const CITE_MAX = 3;
 
-type Checked = { key: string; screen: ScreenResult; matches: LedgerMatch[] };
+type Checked = { key: string; screen: ScreenResult };
+type Found = { key: string; matches: LedgerMatch[] };
 
 function Step({ number, title, children, testId }: { number: number; title: string; children: ReactNode; testId: string }) {
   return (
@@ -33,42 +34,66 @@ function Step({ number, title, children, testId }: { number: number; title: stri
   );
 }
 
-/** The draft's words checked, and what the Ledger holds on its subject, both at once. */
+/**
+ * The draft's words checked, then what the Ledger holds on its subject. Only the check decides whether the
+ * petition can be sent: the Ledger search is context, so if it fails the creator can still send it.
+ */
 function useDraftCheck(draft: DraftState) {
   const screen = useCheckDraft();
   const ledger = useDraftLedger();
   const [checked, setChecked] = useState<Checked | null>(null);
+  const [found, setFound] = useState<Found | null>(null);
   const run = async () => {
+    const key = checkKey(draft);
     const words = { title: draft.title, body: draft.body };
+    ledger.reset();
     try {
-      const [result, matches] = await Promise.all([screen.mutateAsync(words), ledger.mutateAsync({ ...words, topic: draft.topic })]);
-      setChecked({ key: checkKey(draft), screen: result, matches });
+      const result = await screen.mutateAsync(words);
+      setChecked({ key, screen: result });
+      if (!result.stop) setFound({ key, matches: await ledger.mutateAsync({ ...words, topic: draft.topic }) });
     } catch {
-      setChecked(null);
+      // screen.error or ledger.error says what failed
     }
   };
-  const current = checked && checked.key === checkKey(draft) ? checked : null;
-  return { run, current, pending: screen.isPending || ledger.isPending, error: screen.error ?? ledger.error };
+  const key = checkKey(draft);
+  return {
+    run, current: checked?.key === key ? checked : null, matches: found?.key === key ? found.matches : null,
+    checking: screen.isPending, searching: ledger.isPending, error: screen.error, ledgerError: ledger.error,
+  };
 }
 
-function CheckResult({ checked, draft, change }: { checked: Checked; draft: DraftState; change: (next: Partial<DraftState>) => void }) {
+function LedgerSuggestions({ check, draft, change }: { check: ReturnType<typeof useDraftCheck>; draft: DraftState; change: (next: Partial<DraftState>) => void }) {
   const chosen = new Set(draft.documents);
   const toggle = (id: string) => change({ documents: chosen.has(id) ? draft.documents.filter((d) => d !== id) : [...draft.documents, id] });
   return (
-    <div className="flex flex-col gap-4">
-      {checked.screen.stop ? <ErrorNote testId="petition-check-stop">{checked.screen.stop}</ErrorNote> : null}
-      {checked.screen.warning ? <p className="rounded-lg bg-gold-tint px-3 py-2.5 text-[13.5px]" data-testid="petition-check-warning">{checked.screen.warning}</p> : null}
-      {!checked.screen.stop ? (
-        <div className="flex flex-col gap-2">
-          <h3 className="text-[15px] font-medium">What The Ledger already holds on this</h3>
-          <p className="text-[13px] text-ink-soft">
-            The Assembly may already have a plan or a budget line for this: cite it to strengthen your case, or to show a
-            commitment that wasn&apos;t kept. Cite up to {CITE_MAX}.
-          </p>
-          <LedgerMatches matches={checked.matches} testId="petition-draft-ledger"
-            cite={{ chosen, toggle, full: draft.documents.length >= CITE_MAX }} />
-        </div>
+    <div className="flex flex-col gap-2" data-testid="petition-draft-ledger-section">
+      <h3 className="text-[15px] font-medium">What The Ledger already holds on this</h3>
+      <p className="text-[13px] text-ink-soft">
+        The Assembly may already have a plan or a budget line for this: cite it to strengthen your case, or to show a
+        commitment that wasn&apos;t kept. Cite up to {CITE_MAX}.
+      </p>
+      {check.searching ? <p className="text-[13.5px] text-ink-soft">Searching the Assembly&apos;s documents…</p> : null}
+      {check.ledgerError ? (
+        <p className="text-[13.5px] text-ink-soft" data-testid="petition-draft-ledger-error">
+          The Ledger couldn&apos;t be searched just now. You can still send your petition, or check again later to cite documents.
+        </p>
       ) : null}
+      {check.matches ? (
+        <LedgerMatches matches={check.matches} testId="petition-draft-ledger" cite={{ chosen, toggle, full: draft.documents.length >= CITE_MAX }} />
+      ) : null}
+    </div>
+  );
+}
+
+function CheckResult({ check, draft, change }: { check: ReturnType<typeof useDraftCheck>; draft: DraftState; change: (next: Partial<DraftState>) => void }) {
+  const screen = check.current?.screen;
+  if (!screen) return null;
+  return (
+    <div className="flex flex-col gap-4">
+      {screen.stop ? <ErrorNote testId="petition-check-stop">{screen.stop}</ErrorNote> : null}
+      {screen.warning ? <p className="rounded-lg bg-gold-tint px-3 py-2.5 text-[13.5px]" data-testid="petition-check-warning">{screen.warning}</p> : null}
+      {!screen.stop && !screen.warning ? <p className="text-[13.5px] text-teal" data-testid="petition-check-passed">Checked: nothing in it stops it being published.</p> : null}
+      {!screen.stop ? <LedgerSuggestions check={check} draft={draft} change={change} /> : null}
     </div>
   );
 }
@@ -141,11 +166,11 @@ function Form({ options, issue }: { options: PetitionOptions; issue: string | nu
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-5">
       <Step number={1} title="Your petition" testId="petition-step-words">
         <DraftFields draft={draft} change={change} options={options} testId="petition-draft" />
-        <Button variant="secondary" className="w-fit" onClick={() => void check.run()} disabled={check.pending} data-testid="petition-check">
-          {check.pending ? "Checking…" : check.current ? "Check again" : "Check my petition"}
+        <Button variant="secondary" className="w-fit" onClick={() => void check.run()} disabled={check.checking || check.searching} data-testid="petition-check">
+          {check.checking ? "Checking…" : check.current ? "Check again" : "Check my petition"}
         </Button>
         {check.error ? <ErrorNote testId="petition-check-error">{check.error.message}</ErrorNote> : null}
-        {check.current ? <CheckResult checked={check.current} draft={draft} change={change} /> : null}
+        <CheckResult check={check} draft={draft} change={change} />
       </Step>
       <Step number={2} title="Your name" testId="petition-step-name">
         <NameChoice named={named} setNamed={setNamed} name={name} setName={setName} testId="petition-name"

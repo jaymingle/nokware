@@ -17,6 +17,7 @@ import {
   type DraftWords,
   type PetitionFilters,
 } from "@/lib/api/petitions";
+import { getIssue } from "@/lib/api/public";
 
 import type { OwnPetition, PetitionDraft, PetitionSubmission } from "@/lib/api/types";
 
@@ -40,9 +41,14 @@ export function usePetition(code: string) {
   return useQuery({ queryKey: petitionKeys.detail(code), queryFn: () => getPetition(code) });
 }
 
-/** The Ledger search is slow and changes rarely: kept for the page's life. */
+/** The Ledger search is slow and changes rarely: kept for the page's life, and tried once more at most if it fails. */
 export function usePetitionLedger(code: string) {
-  return useQuery({ queryKey: petitionKeys.ledger(code), queryFn: () => getPetitionLedger(code), staleTime: Infinity });
+  return useQuery({ queryKey: petitionKeys.ledger(code), queryFn: () => getPetitionLedger(code), staleTime: Infinity, retry: 1 });
+}
+
+/** The open issue a petition links to, to say what it is; not retried, since a closed issue stays closed. */
+export function useLinkedIssue(publicId: string | null) {
+  return useQuery({ queryKey: ["issue", publicId], queryFn: () => getIssue(publicId ?? ""), enabled: publicId !== null, retry: false });
 }
 
 export function useMyPetitions(proof: string | null) {
