@@ -66,12 +66,14 @@ export function daysLeft(iso: string, now: number): number {
 }
 
 /** Once it reached its threshold: when, and the MCE's 30 days to respond, counted down, then said plainly if they pass. */
-export function responseLine(petition: Pick<PetitionCard, "status" | "threshold" | "threshold_reached_at" | "response_due">, now: number): string | null {
+export function responseLine(
+  petition: Pick<PetitionCard, "status" | "threshold" | "threshold_reached_at" | "response_due">, now: number, where = "on this page",
+): string | null {
   if (petition.status !== "awaiting_response" || !petition.threshold_reached_at || !petition.response_due) return null;
   const reached = `Reached ${petition.threshold?.toLocaleString()} signatures on ${formatDate(petition.threshold_reached_at)}.`;
   const left = daysLeft(petition.response_due, now);
   if (left === 0) return `${reached} ${NO_RESPONSE}`;
-  return `${reached} The MCE has until ${formatDate(petition.response_due)} to respond publicly on this page: ${left} ${left === 1 ? "day" : "days"} left.`;
+  return `${reached} The MCE has until ${formatDate(petition.response_due)} to respond publicly ${where}: ${left} ${left === 1 ? "day" : "days"} left.`;
 }
 
 /** Where the petition stands in time: open until when, or when and why it closed. */

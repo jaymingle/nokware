@@ -48,8 +48,14 @@ function useSigning(petition: PetitionDetail, phone: PhoneProof) {
     setConfirming(false);
     send(proof.token);
   };
-  const start = () => (phone.proof ? send(phone.proof.token) : setConfirming(true));
-  return { named, setNamed, name, setName, confirming, sign, onConfirmed, start };
+  const [missingName, setMissingName] = useState(false);
+  const start = () => {
+    setMissingName(named && !name.trim()); // asked before the number is confirmed, not after
+    if (named && !name.trim()) return;
+    if (phone.proof) send(phone.proof.token);
+    else setConfirming(true);
+  };
+  return { named, setNamed, name, setName, confirming, sign, onConfirmed, start, missingName };
 }
 
 function Unsigned({ petition, phone }: { petition: PetitionDetail; phone: PhoneProof }) {
@@ -66,6 +72,7 @@ function Unsigned({ petition, phone }: { petition: PetitionDetail; phone: PhoneP
           {s.sign.isPending ? "Signing…" : "Sign this petition"}
         </Button>
       )}
+      {s.missingName ? <ErrorNote testId="sign-missing-name">Enter the name to show, or choose to stay anonymous.</ErrorNote> : null}
       {s.sign.error ? <ErrorNote testId="sign-error">{s.sign.error.message}</ErrorNote> : null}
     </div>
   );

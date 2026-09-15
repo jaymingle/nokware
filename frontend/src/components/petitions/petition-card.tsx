@@ -31,7 +31,7 @@ export function PetitionCard({ petition, now }: { petition: Card; now: number })
         No. {spacedCode(petition.code)} · {petition.topic} · {placeLine(petition)}
       </p>
       <div className="max-w-sm"><Progress signatures={petition.signatures} threshold={petition.threshold} /></div>
-      <p className="text-[12.5px] text-ink-soft">{responseLine(petition, now) ?? closingLine(petition, now)}</p>
+      <p className="text-[12.5px] text-ink-soft">{responseLine(petition, now, "on its page") ?? closingLine(petition, now)}</p>
     </li>
   );
 }
