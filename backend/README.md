@@ -91,7 +91,7 @@ membership.
 | `POST /api/petitions/{number}/signatures` (`show_name`, `name`), `GET /api/petitions/{number}/signature`, `POST .../signature/anonymous` | the signer (`X-Phone-Proof`) |
 | `GET /api/petitions/{number}/names` (the names signers chose to show) | public |
 | `GET /api/petitions/review`, `POST /api/petitions/{number}/decision` (`publish`, or `refuse` with a fixed `reason`), `GET /api/petitions/responses`, `POST /api/petitions/{number}/response` (`kind`: `will_act`, `referred` or `cannot_act`; `text`; `department`; `documents`) | MCE |
-| `POST /api/speech/answer` (`view`: an Ask answer's signed export view), `POST /api/speech/report` (`reference`); MP3 audio | public, 30 an hour per client |
+| `POST /api/speech/answer` (`view`: an Ask answer's signed export view), `POST /api/speech/report` (`reference`, `kind`); each with `part` (from 0): that part as MP3, and `X-Speech-Parts` saying how many | public, 120 an hour per client |
 | `GET /api/me` | anyone signed in |
 | `GET /api/departments`, `GET /api/categories` | anyone signed in |
 | `POST /api/documents` (multipart: `file`, `title`, `category`, `document_year`, `department`, `source_url`) | department (published), contributor (held 72h) |
