@@ -31,11 +31,11 @@ Nothing here is secret. Secret values live in Coolify's environment settings
 3. **Redis database number.** Production shares the VPS's Redis with another
    product. Nokware's keys all start `nokware:`, but it should still have a
    database number of its own (for example `/2`). Pick one that is free.
-4. **Live SMS from the first day.** The plan below sends SMS through BMS,
-   which has no sandbox, so report notifications, petition updates and
-   verification codes are real and charged from deployment (within the daily
-   caps). Confirm that, or deploy on Arkesel's sandbox and switch later (see
-   *Constraints*).
+4. **Live SMS from the first day: decided, yes.** SMS goes through BMS with
+   verification codes on, so report notifications, petition updates and codes
+   are real and charged from deployment, within the daily caps. Real messages
+   arriving is the point; a demo where the SMS never comes is worse than one
+   that costs a few credits.
 
 ## What the repository already provides
 
@@ -284,7 +284,7 @@ number and set the same "when a message comes in" address on that sender.
 
 ## 9. Order of operations
 
-1. Settle the four *Decisions*.
+1. Settle the open *Decisions* (the fourth, live SMS, is settled).
 2. Add the DNS records; wait until both names resolve to the VPS.
 3. Add the Appwrite web platform.
 4. Generate `PHONE_KEY_SECRET` and the new `ARKESEL_USSD_TOKEN`; store both.
