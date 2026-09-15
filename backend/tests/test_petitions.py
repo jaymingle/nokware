@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 from app.routes import petition_presenters as present
-from app.services import channel_limits, channel_sessions, petition_rules, petition_screen, petitions, phone_proof, redis_store, ussd
+from app.services import channel_limits, channel_sessions, petition_ledger, petition_rules, petition_screen, petitions, phone_proof, redis_store, ussd
 from app.services import whatsapp_conversation, whatsapp_reply
 from app.services.auth import Principal, Role
 from app.services.petition_rules import (
@@ -263,3 +263,17 @@ def test_sending_a_petition_needs_a_confirmed_phone_and_is_checked_again(monkeyp
     proof = phone_proof.issue_proof(PHONE, Channel.USSD, datetime.now(timezone.utc))
     response = client.post("/api/petitions", json={**body, "body": f"{DRAFT.body} Call 0241234567."}, headers={"X-Phone-Proof": proof})
     assert response.status_code == 422 and "phone number" in response.json()["detail"]
+
+
+def test_a_ledger_search_the_index_cannot_answer_says_so_plainly(monkeypatch: pytest.MonkeyPatch) -> None:
+    import psycopg
+    from sqlalchemy.exc import OperationalError
+
+    client = TestClient(app, raise_server_exceptions=False)
+    words = {"title": DRAFT.title, "body": DRAFT.body, "topic": "drainage"}
+    for failure in (psycopg.OperationalError("auth failed"), OperationalError("connect", {}, Exception("auth failed"))):
+        def unreachable(query: str, failure: Exception = failure) -> list[Any]:
+            raise failure
+        monkeypatch.setattr(petition_ledger, "cached_search", unreachable)
+        response = client.post("/api/petitions/ledger", json=words)
+        assert response.status_code == 503 and response.json()["detail"] == "The Ledger can't be searched right now. Try again shortly."

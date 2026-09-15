@@ -3,9 +3,12 @@ import re
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
+import psycopg
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from psycopg_pool import PoolTimeout
+from sqlalchemy.exc import OperationalError as SearchIndexUnreachable
 
 from app.config import get_settings
 from app.routes import (
@@ -160,6 +163,15 @@ def petition_not_found(_: Request, __: petitions.PetitionNotFound) -> JSONRespon
 @app.exception_handler(RedisUnavailable)
 def redis_unavailable(_: Request, __: RedisUnavailable) -> JSONResponse:
     return JSONResponse({"detail": "Confirming a phone number isn't available right now. Try again shortly."}, status_code=503)
+
+
+@app.exception_handler(PoolTimeout)
+@app.exception_handler(psycopg.OperationalError)
+@app.exception_handler(SearchIndexUnreachable)  # the same failure, through the vector store's SQLAlchemy engine
+def ledger_search_unavailable(_: Request, exc: Exception) -> JSONResponse:
+    # The Ledger's search index (Postgres, through a tunnel) can't be reached: logged, and said plainly to the reader.
+    logging.getLogger("app").error("The Ledger's search index can't be reached: %s", type(exc).__name__)
+    return JSONResponse({"detail": "The Ledger can't be searched right now. Try again shortly."}, status_code=503)
 
 
 @app.exception_handler(DocumentNotFound)
