@@ -21,7 +21,7 @@ from appwrite.query import Query
 
 from app.services.appwrite_client import every_record
 from app.services.ledger_documents import parse_datetime
-from app.services.petition_rules import REFUSALS, PetitionAction, PetitionStatus, days_late
+from app.services.petition_rules import REFUSALS, PetitionAction, PetitionStatus, responded_late
 from app.services.petitions import HISTORY_COLLECTION, PETITIONS_COLLECTION
 
 REVIEW_ACTIONS = (PetitionAction.SUBMITTED, PetitionAction.PUBLISHED, PetitionAction.AUTO_PUBLISHED, PetitionAction.REFUSED)
@@ -36,7 +36,7 @@ def _in(moment: str | None, start: datetime) -> bool:
 def standing(petition: dict[str, Any], now: datetime) -> str:
     """Where a petition that reached its threshold stands with the MCE."""
     if petition.get("status") == PetitionStatus.RESPONDED:
-        return "answered_late" if days_late(petition) else "answered_in_time"
+        return "answered_late" if responded_late(petition) else "answered_in_time"
     due = parse_datetime(petition.get("responseDue"))
     return "unanswered" if due is not None and due <= now else "waiting"
 

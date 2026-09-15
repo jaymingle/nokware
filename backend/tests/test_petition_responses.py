@@ -18,6 +18,7 @@ from app.services.petition_rules import (
     WrongState,
     check_signable,
     days_late,
+    responded_late,
     response_fields,
     response_overdue,
 )
@@ -47,9 +48,12 @@ def test_a_response_is_one_of_three_with_a_statement_and_a_named_department_when
 
 
 def test_a_late_response_is_taken_and_says_how_late() -> None:
-    due = NOW - timedelta(days=3, hours=2)
+    due = NOW - timedelta(days=2, minutes=9)
     late = {**AWAITING, "responseDue": due.isoformat(), "respondedAt": NOW.isoformat()}
-    assert days_late(late) == 4 and days_late({**late, "respondedAt": due.isoformat()}) == 0
+    assert days_late(late) == 2 and responded_late(late)  # 2 days and 9 minutes is 2 days, never rounded up to 3
+    hours = {**late, "responseDue": (NOW - timedelta(hours=5)).isoformat()}
+    assert days_late(hours) == 0 and responded_late(hours)
+    assert days_late({**late, "respondedAt": due.isoformat()}) == 0 and not responded_late({**late, "respondedAt": due.isoformat()})
     assert response_fields({**AWAITING, "responseDue": due.isoformat()}, Response("cannot_act", TEXT, None, ()), NOW)["status"] == "responded"
 
 
@@ -76,7 +80,7 @@ def test_the_mces_response_is_published_and_the_trail_keeps_who_gave_it(stored: 
     assert stored["trail"] == [(PetitionAction.RESPONDED, "mce", "Hon. Test MCE", "referred", None)]
     shown = present.response(updated)
     assert shown is not None and shown.label == "Referred to a department" and shown.department == "Works Department"
-    assert "Hon. Test MCE" not in shown.model_dump_json() and shown.days_late == 0
+    assert "Hon. Test MCE" not in shown.model_dump_json() and shown.days_late == 0 and not shown.late
 
 
 def test_thirty_days_without_a_response_is_recorded_once_and_the_creator_told(stored: dict[str, Any], monkeypatch: pytest.MonkeyPatch) -> None:

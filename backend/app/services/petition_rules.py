@@ -25,7 +25,6 @@ refusal must name a reason from REFUSALS, the public list counts refusals by
 reason, and silence publishes.
 """
 
-import math
 import re
 import secrets
 from dataclasses import dataclass
@@ -343,9 +342,16 @@ def response_overdue(petition: dict[str, Any], now: datetime) -> bool:
             and not petition.get("noResponseAt"))
 
 
-def days_late(petition: dict[str, Any]) -> int:
-    """How many days after the 30-day deadline the MCE responded; 0 if in time."""
+def responded_late(petition: dict[str, Any]) -> bool:
+    """Whether the MCE responded after the 30-day deadline."""
     due, responded = parse_datetime(petition.get("responseDue")), parse_datetime(petition.get("respondedAt"))
-    if due is None or responded is None or responded <= due:
+    return due is not None and responded is not None and responded > due
+
+
+def days_late(petition: dict[str, Any]) -> int:
+    """Whole days after the 30-day deadline the MCE responded: never rounded up, so lateness is never overstated.
+    0 if in time, or late by less than a day (responded_late says which)."""
+    if not responded_late(petition):
         return 0
-    return math.ceil((responded - due).total_seconds() / 86400)
+    due, responded = parse_datetime(petition["responseDue"]), parse_datetime(petition["respondedAt"])
+    return (responded - due).days if due and responded else 0

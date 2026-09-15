@@ -104,7 +104,8 @@ class PetitionResponse(BaseModel):
     department: str | None  # the department it is referred to
     documents: list[DocumentRef]
     responded_at: str
-    days_late: int  # days after the 30-day deadline; 0 if in time
+    late: bool  # after the 30-day deadline
+    days_late: int  # whole days after it, never rounded up; 0 if in time or less than a day late
 
 
 class PetitionDetail(PetitionCard):
