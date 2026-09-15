@@ -93,23 +93,38 @@ def _petition_for(update: Update) -> dict[str, Any]:
     return {**AWAITING, "refusalReason": "not_assembly" if update == Update.REFUSED else None}
 
 
-def test_every_update_is_one_plain_sms_page_with_the_number_and_the_link(monkeypatch: pytest.MonkeyPatch) -> None:
-    settings = petition_updates.get_settings().model_copy(update={"public_site_url": "https://nokware.accra-metro.gov.gh"})
+SITE = "https://nokware.tstitagency.com"  # where Nokware will be deployed
+
+
+def test_every_update_is_one_plain_sms_page_in_full_with_the_deployed_address(monkeypatch: pytest.MonkeyPatch) -> None:
+    settings = petition_updates.get_settings().model_copy(update={"public_site_url": SITE})
     monkeypatch.setattr(petition_updates, "get_settings", lambda: settings)
     for update in Update:
-        text = petition_updates.compose(update, _petition_for(update))
+        petition = {**_petition_for(update), "threshold": 500, "signatureCount": 1234}
+        text = petition_updates.compose(update, petition)
+        full = petition_updates.plain(petition_updates.MESSAGES[update][0].format(
+            number="534 079", link=f"{SITE}/petitions/534079", mine=f"{SITE}/petitions/mine", threshold="500", signatures="1,234",
+            reason="Not the Assembly's responsibility"))
+        assert text == full, (update, text)  # the full wording, not the short fallback
         assert pages(text) == 1 and is_gsm7(text) and "534 079" in text, (update, text)
         assert ("petitions/mine" if update == Update.REFUSED else "petitions/534079") in text, (update, text)
         assert not any(word in text.lower() for word in ("ignored", "failed", "sorry", "unfortunately", "!")), text
     assert "Not the Assembly's responsibility" in petition_updates.compose(Update.REFUSED, _petition_for(Update.REFUSED))
 
 
-def test_no_response_is_said_plainly_in_full_with_a_usual_site_address(monkeypatch: pytest.MonkeyPatch) -> None:
-    settings = petition_updates.get_settings().model_copy(update={"public_site_url": "https://nokware.org"})
+def test_no_response_is_said_plainly_in_full_with_the_deployed_address(monkeypatch: pytest.MonkeyPatch) -> None:
+    settings = petition_updates.get_settings().model_copy(update={"public_site_url": SITE})
     monkeypatch.setattr(petition_updates, "get_settings", lambda: settings)
     assert petition_updates.compose(Update.NO_RESPONSE, AWAITING) == (
         "Nokware: no response from the MCE 30 days after your petition 534 079 reached its threshold. "
-        "Its page now says so: https://nokware.org/petitions/534079")
+        "Its page says so: https://nokware.tstitagency.com/petitions/534079")
+
+
+def test_a_longer_address_falls_back_to_the_short_wording_on_one_page(monkeypatch: pytest.MonkeyPatch) -> None:
+    settings = petition_updates.get_settings().model_copy(update={"public_site_url": "https://petitions.nokware.tstitagency.com"})
+    monkeypatch.setattr(petition_updates, "get_settings", lambda: settings)
+    for update in Update:
+        assert pages(petition_updates.compose(update, _petition_for(update))) == 1
 
 
 def test_an_update_goes_on_the_creators_own_channel_and_whatsapp_falls_back_to_sms(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -52,8 +52,8 @@ describe("how a petition reads in public", () => {
   it("gives a refusal's reason in the timeline, and shares the ask with the link", () => {
     expect(timelineText({ action: "refused", at: "t", reason: "Names a private individual" })).toBe("Refused by the MCE: Names a private individual");
     expect(timelineText({ action: "auto_published", at: "t", reason: null })).toContain("didn't decide within 72 hours");
-    expect(decodeURIComponent(whatsappShareUrl("Desilt the drain", "https://nokware.org/petitions/482913"))).toContain(
-      "Petition to the Accra Metropolitan Assembly: Desilt the drain\nhttps://nokware.org/petitions/482913");
+    expect(decodeURIComponent(whatsappShareUrl("Desilt the drain", "https://nokware.tstitagency.com/petitions/482913"))).toContain(
+      "Petition to the Accra Metropolitan Assembly: Desilt the drain\nhttps://nokware.tstitagency.com/petitions/482913");
   });
 });
 

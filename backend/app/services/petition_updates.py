@@ -46,22 +46,23 @@ class Update(StrEnum):
     CLOSED = "closed"
 
 
-# Each moment's message, and a shorter one for when a long site address would take it past one SMS page.
+# Each moment's message, and a shorter one in case a longer site address than PUBLIC_SITE_URL's deployed one
+# (nokware.tstitagency.com, with which every full message fits) would take it past one SMS page.
 MESSAGES: dict[Update, tuple[str, str]] = {
-    Update.REFUSED: ("Nokware: the MCE refused your petition {number}. Reason: {reason}. You can edit it and send it back: {mine}",
+    Update.REFUSED: ("Nokware: the MCE refused your petition {number}. Reason: {reason}. Edit and send it back: {mine}",
                      "Nokware: the MCE refused your petition {number}: {reason}. See {mine}"),
     Update.PUBLISHED: ("Nokware: the MCE published your petition {number}. It is open for signatures for 90 days: {link}",
                        "Nokware: your petition {number} is published: {link}"),
-    Update.AUTO_PUBLISHED: ("Nokware: your petition {number} was published automatically: the MCE didn't decide within 72 "
-                            "hours. Open for 90 days: {link}",
+    Update.AUTO_PUBLISHED: ("Nokware: your petition {number} was published automatically: the MCE didn't decide in 72 hours. "
+                            "Open 90 days: {link}",
                             "Nokware: your petition {number} was published automatically after 72 hours: {link}"),
-    Update.THRESHOLD_REACHED: ("Nokware: your petition {number} reached {threshold} signatures and has gone to the MCE, who has "
-                               "30 days to respond publicly: {link}",
+    Update.THRESHOLD_REACHED: ("Nokware: your petition {number} reached {threshold} signatures and went to the MCE, who has 30 "
+                               "days to respond: {link}",
                                "Nokware: your petition {number} reached {threshold} signatures. The MCE has 30 days to respond: {link}"),
     Update.RESPONDED: ("Nokware: the MCE has responded to your petition {number}. Read the response: {link}",
                        "Nokware: the MCE responded to petition {number}: {link}"),
     Update.NO_RESPONSE: ("Nokware: no response from the MCE 30 days after your petition {number} reached its threshold. "
-                         "Its page now says so: {link}",
+                         "Its page says so: {link}",
                          "Nokware: no response from the MCE 30 days after petition {number} reached its threshold: {link}"),
     Update.CLOSED: ("Nokware: your petition {number} closed after 90 days with {signatures} of {threshold} signatures: {link}",
                     "Nokware: petition {number} closed with {signatures} of {threshold} signatures: {link}"),

@@ -15,7 +15,7 @@ from app.services.sms import ArkeselSms, DailyBudget, SmsError, SmsLimitReached,
 from app.services.sms_text import is_gsm7, pages, plain
 from app.teams import RECIPIENT_NAMES
 
-SITE = "https://nokware.accra.gov.gh"  # longer than any address we expect to use
+SITE = "https://nokware.tstitagency.com"  # where Nokware will be deployed (PUBLIC_SITE_URL)
 TODAY = date(2026, 9, 14)
 
 
@@ -50,8 +50,10 @@ def test_names_give_way_to_a_count_only_when_they_would_not_fit(monkeypatch: pyt
     monkeypatch.setattr(notifications, "get_settings", lambda: get_settings().model_copy(update={"public_site_url": SITE}))
     works = notifications.compose(NotificationEvent.SUBMITTED, {"reference": "K7QM-4TXP", "recipients": ["dept-works"]})
     assert "is with Works Department." in works.body
-    crowded = {"reference": "K7QM-4TXP", "recipients": ["dept-social-welfare", "dept-disaster-management", "agency-gnfs"]}
-    assert "2 other offices" in notifications.compose(NotificationEvent.SUBMITTED, crowded).body
+    # With the deployed address, two or more office names no longer fit one page beside the tracking link.
+    for recipients, count in ((["dept-works", "dept-urban-roads"], 2), (["dept-social-welfare", "dept-disaster-management", "agency-gnfs"], 3)):
+        body = notifications.compose(NotificationEvent.SUBMITTED, {"reference": "K7QM-4TXP", "recipients": recipients}).body
+        assert f"is with {count} offices." in body and pages(body) == 1
 
 
 def _client(handler: Any) -> httpx.Client:
