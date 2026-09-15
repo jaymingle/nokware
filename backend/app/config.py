@@ -87,12 +87,14 @@ class Settings(BaseSettings):
     # Spoken replies to WhatsApp voice questions: Gemini's speech model (a
     # preview, hence a setting) and its voice, and the most spoken replies sent
     # in a day across everyone (each is an extra WhatsApp message).
-    gemini_tts_model: str = "gemini-2.5-flash-preview-tts"
+    gemini_tts_model: str = "gemini-3.1-flash-tts-preview"
     gemini_tts_voice: str = "Charon"
     voice_daily_limit: int = 20
     # The web's read-aloud button (Ask answers, report confirmations and status
-    # pages): the most fresh readings made in a day across everyone. The same
-    # words are spoken once and kept for six hours, so repeats don't count.
+    # pages): the most fresh parts of speech made in a day across everyone. A
+    # reading is made in parts of about 25 seconds (a long answer is up to
+    # seven); the same words are spoken once and kept for six hours, so repeats
+    # don't count.
     read_aloud_daily_limit: int = 300
     # The USSD code residents dial (e.g. *920*123#), shown on the web where USSD
     # can confirm a phone number. Empty: USSD isn't offered for that.

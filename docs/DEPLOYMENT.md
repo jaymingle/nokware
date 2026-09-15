@@ -177,8 +177,8 @@ from development:
 | `USSD_SERVICE_CODE` | empty | empty until Arkesel confirms the dial code (e.g. `*920*123#`); then petition pages offer USSD |
 | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` | secrets | unchanged |
 | `TWILIO_WHATSAPP_FROM` | `whatsapp:+14155238886` (the sandbox) | unchanged until an approved WhatsApp sender replaces it |
-| `GEMINI_TTS_MODEL`, `GEMINI_TTS_VOICE`, `VOICE_DAILY_LIMIT` | `gemini-2.5-flash-preview-tts`, `Charon`, `20` | unchanged |
-| `READ_ALOUD_DAILY_LIMIT` | `300` | unchanged: fresh read-aloud audio made in a day across everyone (repeats come from a six-hour cache) |
+| `GEMINI_TTS_MODEL`, `GEMINI_TTS_VOICE`, `VOICE_DAILY_LIMIT` | `gemini-3.1-flash-tts-preview`, `Charon`, `20` | unchanged (leave `GEMINI_TTS_MODEL` unset or set it to the 3.1 model: 2.5 stalls on read-aloud's longer text) |
+| `READ_ALOUD_DAILY_LIMIT` | `300` | unchanged: fresh read-aloud parts (about 25 seconds each) made in a day across everyone (repeats come from a six-hour cache) |
 | `PETITION_THRESHOLD_AREA`, `PETITION_THRESHOLD_METRO` | `150`, `500` | unchanged |
 | `SMS_VERIFICATION_CODES`, `SMS_CODE_DAILY_LIMIT` | `false`, `30` | unchanged (see *Constraints*) |
 | `PHONE_KEY_SECRET` | unset | **the new secret from step 3** |

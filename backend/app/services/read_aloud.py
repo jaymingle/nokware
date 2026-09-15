@@ -16,15 +16,21 @@ is a real harm. So no personal-safety report is read aloud, nor an Ask answer
 whose question or answer carries words of danger to a person, nor the fixed
 refusal of personal-safety figures.
 
-Gemini's speech (the WhatsApp voice pipeline) as MP3. The same words give the
-same audio, so it is kept in Redis for six hours and paid for once; a daily cap
-(READ_ALOUD_DAILY_LIMIT) bounds what fresh speech can cost.
+Gemini's speech (the WhatsApp voice pipeline) as MP3, in parts that end at
+sentences. Gemini's speech model is a preview: it takes almost as long to speak
+as the audio lasts, and on long text it stalls and drops the connection. So a
+reading is made a part at a time, the first short so the first words come
+within seconds, and the page fetches each next part while the one before plays.
+The same words give the same audio, so each part is kept in Redis for six hours
+and paid for once; a daily cap on fresh parts (READ_ALOUD_DAILY_LIMIT) bounds
+what speech can cost.
 """
 
 import base64
 import hashlib
 import json
 import re
+import textwrap
 from datetime import datetime
 from typing import Any
 
@@ -37,12 +43,15 @@ from app.services.voice_audio import Encoded
 from app.services.voice_speech import SpeechFailed, cut, speak, speakable
 
 READ_MAX_CHARS = 1800  # about two and a half minutes: Gemini reads about 13 characters a second
+FIRST_PART_CHARS = 200  # about 15 seconds of speech, made in about 12
+PART_CHARS = 320  # about 25 seconds, made while the part before plays
 CACHE_SECONDS = 6 * 3600
 REST_ON_SCREEN = "The rest of the answer is on the screen."
 SOURCES_ON_SCREEN = "The documents it comes from are listed with the answer."
 NOTHING_FOUND = "The page says where else to look, and how to request a document."
 KEEP_REFERENCE = "Keep your reference: it is the only way to follow your report."
 _REFERENCE = re.compile(r"\b([A-Z0-9]{4})-([A-Z0-9]{4})\b")
+_SENTENCE_END = re.compile(r"(?<=[.!?])\s+")
 
 
 class NotReadAloud(Exception):
@@ -80,6 +89,25 @@ def status_script(status: dict[str, Any], receipt: bool = False) -> str:
     if status["private"]:
         raise NotReadAloud("A report about someone's safety isn't read aloud: audio can be overheard.")
     return _spelled(" ".join([headline(status), *spoken_details(status), *([KEEP_REFERENCE] if receipt else [])]))
+
+
+def _sentences(script: str) -> list[str]:
+    """The script's sentences, any too long for a part split between words."""
+    return [piece for sentence in _SENTENCE_END.split(script.strip()) for piece in textwrap.wrap(sentence, PART_CHARS)]
+
+
+def parts(script: str) -> list[str]:
+    """The script in parts that end at sentences, each spoken on its own: the first short, so the words start soon."""
+    made: list[str] = []
+    part = ""
+    for sentence in _sentences(script):
+        limit = PART_CHARS if made else FIRST_PART_CHARS
+        if part and len(part) + 1 + len(sentence) > limit:
+            made.append(part)
+            part = sentence
+        else:
+            part = f"{part} {sentence}".lstrip()
+    return [*made, part] if part else made
 
 
 def _cache_key(script: str) -> str:

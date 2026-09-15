@@ -39,6 +39,10 @@ class SpeechFailed(RuntimeError):
     """Gemini's speech couldn't be made or encoded."""
 
 
+class NoSpeech(SpeechFailed):
+    """Gemini answered, but with no audio."""
+
+
 def _cut(text: str, limit: int) -> str:
     """At most limit characters, ending at a sentence."""
     if len(text) <= limit:
@@ -77,17 +81,27 @@ def _pcm(script: str) -> tuple[bytes, int]:
     )
     prompt = f'Read this aloud clearly, at an unhurried pace, for a listener in Accra. Say "AMA" as the letters A, M, A.\n\n{script}'
     response = get_genai_client().models.generate_content(model=settings.gemini_tts_model, contents=prompt, config=config)
-    blob = response.candidates[0].content.parts[0].inline_data if response.candidates else None
+    content = response.candidates[0].content if response.candidates else None
+    blob = content.parts[0].inline_data if content and content.parts else None
     if blob is None or not blob.data:
-        raise SpeechFailed("Gemini returned no speech.")
+        raise NoSpeech("Gemini returned no speech.")
     rate = _RATE.search(blob.mime_type or "")
     return blob.data, int(rate[1]) if rate else PCM_RATE
+
+
+def _speech(script: str) -> tuple[bytes, int]:
+    """Gemini's speech, asked once more if the reply has no audio in it: the preview model sometimes sends none,
+    and says so at once, so asking again costs a second or two."""
+    try:
+        return _pcm(script)
+    except NoSpeech:
+        return _pcm(script)
 
 
 def speak(script: str, for_web: bool = False) -> Encoded:
     """The script as a WhatsApp voice note, or as an MP3 for a web page. Raises SpeechFailed."""
     try:
-        pcm, rate = _pcm(script)
+        pcm, rate = _speech(script)
         return (for_browser if for_web else voice_note)(wav(pcm, rate))
     except (errors.APIError, httpx.HTTPError, AudioRejected, AttributeError, IndexError, OSError) as error:
         raise SpeechFailed(f"The spoken reply couldn't be made ({type(error).__name__}).") from None

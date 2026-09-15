@@ -131,6 +131,18 @@ def test_gemini_speech_is_made_a_voice_note_and_a_failure_is_reported(monkeypatc
         voice_speech.speak("Hello")
 
 
+def test_a_reply_with_no_audio_is_asked_for_once_more(monkeypatch: pytest.MonkeyPatch) -> None:
+    empty = type("Response", (), {"candidates": [type("Candidate", (), {"content": None})]})
+    replies = iter([empty, _speech_response(_pcm(1.0))])
+    client = _Genai(None)
+    client.generate_content = lambda **kwargs: client.asked.append(kwargs) or next(replies)  # type: ignore[method-assign]
+    monkeypatch.setattr(voice_speech, "get_genai_client", lambda: client)
+    assert voice_speech.speak("Hello").data.startswith(b"OggS") and len(client.asked) == 2
+    monkeypatch.setattr(voice_speech, "get_genai_client", lambda: _Genai(empty))
+    with pytest.raises(voice_speech.SpeechFailed, match="no speech"):
+        voice_speech.speak("Hello")
+
+
 # Transcription: Gemini listens, told the place names and how references are spelled.
 
 def test_a_voice_note_is_transcribed_with_the_place_names_and_a_failure_is_reported(monkeypatch: pytest.MonkeyPatch) -> None:

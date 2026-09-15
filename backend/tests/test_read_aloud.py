@@ -42,6 +42,16 @@ def test_an_answer_is_read_as_words_with_where_its_sources_are() -> None:
     assert read_aloud.answer_script("Where is the rates office?", NO_INFO_ANSWER, "no_information").startswith(NO_INFO_ANSWER)
 
 
+def test_a_reading_is_made_in_parts_that_end_at_sentences_the_first_short() -> None:
+    script = read_aloud.answer_script("Tell me everything", "The Assembly plans many things for the markets. " * 40, "answered")
+    made = read_aloud.parts(script)
+    assert len(made[0]) <= read_aloud.FIRST_PART_CHARS and all(len(part) <= read_aloud.PART_CHARS for part in made)
+    assert " ".join(made) == script and all(part.endswith(".") for part in made) and len(made) <= 7
+    assert read_aloud.parts("Hello, Accra.") == ["Hello, Accra."]
+    run_on = "word " * 200  # no full stop anywhere: split between words
+    assert all(0 < len(part) <= read_aloud.PART_CHARS for part in read_aloud.parts(run_on))
+
+
 def test_nothing_about_someones_safety_is_read_aloud() -> None:
     for question, answer in (("My husband beats me, who can help?", "Call the Police."),
                              ("How many reports?", f"{SAFETY_FIGURES_ANSWER} The rest."),
@@ -89,6 +99,7 @@ def test_only_an_answer_the_api_gave_is_read_aloud(spoken: list[str]) -> None:
     view = _view("What does a market stall cost?", ANSWER)
     response = client.post("/api/speech/answer", json={"view": view})
     assert response.status_code == 200 and response.headers["content-type"] == "audio/mpeg" and response.content == b"ID3-mp3"
+    assert response.headers["x-speech-parts"] == "1" and client.post("/api/speech/answer", json={"view": view, "part": 1}).status_code == 404
     forged = {**view, "answer": "Anything at all, read aloud for free."}
     assert client.post("/api/speech/answer", json={"view": forged}).status_code == 403
     unsafe = _view("Someone is beating my neighbour", "Call the Police on 191.")
@@ -100,7 +111,10 @@ def test_a_report_is_read_by_its_reference_never_a_private_one(spoken: list[str]
     monkeypatch.setattr(report_store, "assignments_for", lambda case_id: [])
     monkeypatch.setattr(report_followups, "public_status", lambda case, assignments, now: STATUS)
     client = TestClient(app)
-    assert client.post("/api/speech/report", json={"reference": "K7QM-4TXP", "kind": "receipt"}).status_code == 200
+    first = client.post("/api/speech/report", json={"reference": "K7QM-4TXP", "kind": "receipt"})
+    assert first.status_code == 200 and int(first.headers["x-speech-parts"]) >= 2  # the confirmation runs past one short part
+    assert client.post("/api/speech/report", json={"reference": "K7QM-4TXP", "kind": "receipt", "part": 1}).status_code == 200
+    assert spoken[0].startswith("Report K 7 Q M") and spoken[1] != spoken[0]
     monkeypatch.setattr(report_followups, "public_status", lambda case, assignments, now: {**STATUS, "private": True, "stage": "received"})
     assert client.post("/api/speech/report", json={"reference": "K7QM-4TXP"}).status_code == 409
 

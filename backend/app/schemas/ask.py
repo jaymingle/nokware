@@ -167,10 +167,15 @@ class AskStreamEvent(RootModel[AnyStreamEvent]):
     """One line of POST /api/ask/stream's newline-delimited JSON."""
 
 
+SpeechPart = Annotated[int, Field(ge=0, le=20)]  # which part of the reading, from 0
+
+
 class SpeechAnswerRequest(BaseModel):
     view: ExportView  # the answer's signed export view, from the done event
+    part: SpeechPart = 0
 
 
 class SpeechReportRequest(BaseModel):
     reference: str = Field(max_length=40)
     kind: Literal["receipt", "status"] = "status"  # the confirmation just after filing, or the status page
+    part: SpeechPart = 0

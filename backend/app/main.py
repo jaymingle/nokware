@@ -128,7 +128,7 @@ app.add_middleware(
     allow_origin_regex=settings.cors_origin_regex or None,
     allow_methods=["GET", "POST"],
     allow_headers=["Authorization", "Content-Type", "X-Receipt-Token", "X-Phone-Proof"],
-    expose_headers=["Retry-After", "Content-Disposition"],  # an export's file name
+    expose_headers=["Retry-After", "Content-Disposition", "X-Speech-Parts"],  # an export's file name; a reading's parts
 )
 
 

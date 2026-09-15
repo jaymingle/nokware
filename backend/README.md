@@ -128,8 +128,12 @@ WhatsApp's rule: no personal-safety report, and no Ask answer whose question or
 answer carries words of danger to a person (each answer says whether it is
 `speakable`, so the page shows the button only where it works). An answer is
 read up to about two and a half minutes, then "The rest of the answer is on the
-screen." The same words are spoken once and kept in Redis for six hours;
-`READ_ALOUD_DAILY_LIMIT` (300) caps fresh readings a day.
+screen." A reading is made in parts that end at sentences (`X-Speech-Parts`
+says how many; the page asks for the next while one plays), because the speech
+model takes about two thirds as long to speak as the audio lasts: the first part
+is short, so the first words come in about seven seconds. The same words are
+spoken once and kept in Redis for six hours; `READ_ALOUD_DAILY_LIMIT` (300) caps
+fresh parts a day.
 
 **Known limitation: characters some PDFs lost.** Some of the Assembly's PDFs
 store ligatures and bullets in a font's private characters, and extraction kept
@@ -431,9 +435,13 @@ Known limitations:
 - A voice note is sent to Google's Gemini API to be transcribed, as typed text
   already is to be read, classified and answered. The recording isn't kept by
   Nokware.
-- Gemini's speech model is a preview (`gemini-2.5-flash-preview-tts`) and may
+- Gemini's speech model is a preview (`gemini-3.1-flash-tts-preview`) and may
   change or be withdrawn; `GEMINI_TTS_MODEL` swaps it without a code change, and
-  if speech fails the text answer is still sent.
+  if speech fails the text answer is still sent. It replaced
+  `gemini-2.5-flash-preview-tts`, which in September 2026 took longer than the
+  audio lasted and often stalled for 30 seconds and dropped the connection on a
+  few hundred characters; 3.1 spoke the same text in about two thirds of its
+  length without a failure.
 
 Staff work cases through `app/services/case_actions.py` (under a per-case
 lock, like Ledger documents). What each caller sees is decided in one place
