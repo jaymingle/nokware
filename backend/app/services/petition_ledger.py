@@ -11,15 +11,17 @@ means a document touches the subject, not that it commits to what the petition
 asks. Published documents only.
 """
 
+import re
 import threading
 import time
+import unicodedata
 from dataclasses import dataclass
 from typing import Any
 
 from app.services import ledger_documents
 from app.services.ledger_documents import LedgerStatus, provenance
 from app.services.publishing_record import year_and_source
-from app.services.retrieval import fuse, ranked_lists
+from app.services.retrieval import RetrievedChunk, collapse_near_duplicates, fuse, ranked_lists
 from app.teams import DEPARTMENT_NAMES
 
 DOCUMENTS_MAX = 5
@@ -42,9 +44,25 @@ def query_for(title: str, body: str, topic_label: str) -> str:
     return f"{title}. {topic_label}. {body[:BODY_IN_QUERY]}"
 
 
+# Some of the Assembly's PDFs store ligatures and bullets in a font's private characters, which the extracted
+# text keeps: "\uf002ooding" for "flooding", "\uf0b7" for a bullet. Mended for reading here; the chunks
+# themselves are unchanged.
+_PRIVATE_LIGATURES = {"\uf001": "fi", "\uf002": "fl"}
+_PRIVATE_BULLET = re.compile(r"[\uf020-\uf0ff]")  # Symbol and Wingdings bullets, arrows and ticks
+_UNREADABLE = re.compile(r"[\ue000-\uf8ff\ufffd]")  # anything else private, and characters lost in extraction
+
+
+def readable(text: str) -> str:
+    """The text with ligatures spelled out, font bullets as bullets, and characters that can't be shown removed."""
+    for private, letters in _PRIVATE_LIGATURES.items():
+        text = text.replace(private, letters)
+    text = unicodedata.normalize("NFKC", _PRIVATE_BULLET.sub("•", text))  # NFKC also spells out ﬁ, ﬂ and ﬀ
+    return _UNREADABLE.sub("", text)
+
+
 def passage(text: str) -> str:
-    """The matching passage, cut at a word near PASSAGE_MAX."""
-    flat = " ".join(text.split())
+    """The matching passage, readable, cut at a word near PASSAGE_MAX."""
+    flat = " ".join(readable(text).split())
     if len(flat) <= PASSAGE_MAX:
         return flat
     return flat[:PASSAGE_MAX].rsplit(" ", 1)[0].rstrip(",;:") + "…"
@@ -67,12 +85,12 @@ def search(query: str, limit: int = DOCUMENTS_MAX) -> list[LedgerMatch]:
     vector_lists, keyword_lists = ranked_lists([query])
     fused = fuse([*vector_lists, *keyword_lists])
     documents = ledger_documents.get_documents(chunk.document_id for chunk, _ in fused)
+    published = [RetrievedChunk(chunk, score, documents[chunk.document_id]) for chunk, score in fused
+                 if documents.get(chunk.document_id, {}).get("status") == LedgerStatus.PUBLISHED]
     found: dict[str, LedgerMatch] = {}
-    for chunk, _score in fused:  # best first, so a document's first chunk is its best
-        document = documents.get(chunk.document_id)
-        if document is None or document.get("status") != LedgerStatus.PUBLISHED or chunk.document_id in found:
-            continue
-        found[chunk.document_id] = _match(document, chunk.text)
+    for hit in collapse_near_duplicates(published):  # best first; the same text in two documents shows once
+        if hit.chunk.document_id not in found:
+            found[hit.chunk.document_id] = _match(hit.document, hit.chunk.text)
         if len(found) == limit:
             break
     return list(found.values())

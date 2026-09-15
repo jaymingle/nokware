@@ -277,3 +277,16 @@ def test_a_ledger_search_the_index_cannot_answer_says_so_plainly(monkeypatch: py
         monkeypatch.setattr(petition_ledger, "cached_search", unreachable)
         response = client.post("/api/petitions/ledger", json=words)
         assert response.status_code == 503 and response.json()["detail"] == "The Ledger can't be searched right now. Try again shortly."
+
+
+def test_a_passage_from_the_ledger_reads_as_words_and_the_same_text_shows_once(monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.services.retrieval import Chunk
+
+    assert petition_ledger.readable("preventing ooding, signicant, ﬁre  one �") == \
+        "preventing flooding, significant, fire • one "
+    plan = "FLOOD MITIGATION AND PREPAREDNESS MEASURES Identification of flood hotspots in the Accra Metropolis " * 3
+    chunks = [Chunk(1, "plan", 0, plan), Chunk(2, "copy", 0, plan), Chunk(3, "budget", 4, "Desilting of drains, 2024 budget line.")]
+    monkeypatch.setattr(petition_ledger, "ranked_lists", lambda queries: ([chunks], []))
+    docs = {d: {"$id": d, "title": d.title(), "status": "published", "department": "dept-disaster-management"} for d in ("plan", "copy", "budget")}
+    monkeypatch.setattr(petition_ledger.ledger_documents, "get_documents", lambda ids: docs)
+    assert [m.id for m in petition_ledger.search("drainage")] == ["plan", "budget"]
