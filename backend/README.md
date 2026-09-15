@@ -147,7 +147,11 @@ before it is chunked and embedded (`app/services/pdf_text.py`): a ligature
 becomes its letters and a font bullet "•"; a lost character becomes a space,
 never a guessed letter. Documents stored before the fix are re-indexed through
 the normal ingestion path by `scripts/reindex_mended.py` (a dry run by default,
-which lists them with the embedding cost).
+which lists them with the embedding cost). Run on 15 September 2026: all 42
+documents in 6.5 minutes, for about $0.15 of embeddings, with no unmended chunk
+left. Chunks matching "flood" went from 234 to 252, and the AMA newsletters,
+which weren't found for "flooding" before, now are: an Ask question about the
+newsletters' reports on flooding and desilting is answered from three of them.
 
 ### Exports and charts
 
