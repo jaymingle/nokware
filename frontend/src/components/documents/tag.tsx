@@ -16,11 +16,18 @@ const TONES: Record<Tone, string> = {
 
 export type TagTone = Tone;
 
-export function Tag({ tone, children, testId }: { tone: TagTone; children: ReactNode; testId?: string }) {
+type TagProps = { tone: TagTone; children: ReactNode; testId?: string; wrap?: boolean };
+
+/** A short status label, kept on one line; `wrap` lets a sentence-long one wrap within a narrow column. */
+export function Tag({ tone, children, testId, wrap = false }: TagProps) {
   return (
     <span
       data-testid={testId}
-      className={cn("inline-flex items-center gap-[7px] rounded-lg px-2.5 py-1 text-[12.5px] whitespace-nowrap", TONES[tone])}
+      className={cn(
+        "inline-flex items-center gap-[7px] rounded-lg px-2.5 py-1 text-[12.5px]",
+        wrap ? "max-w-full whitespace-normal" : "whitespace-nowrap",
+        TONES[tone],
+      )}
     >
       {children}
     </span>

@@ -59,7 +59,7 @@ export function SourceLine({ contact }: { contact: PublicContact }) {
   if (contact.tier === 1) return <p className="text-[12px] text-ink-soft">{tierNote(contact)}</p>;
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <Tag tone="gold">{tierNote(contact)}</Tag>
+      <Tag tone="gold" wrap testId={`contact-${contact.id}-unverified`}>{tierNote(contact)}</Tag>
       {contact.press_url ? (
         <a href={contact.press_url} target="_blank" rel="noopener" className="inline-flex items-center gap-1 text-[12px] text-teal hover:underline" data-testid={`contact-${contact.id}-press`}>
           Press report <ExternalLinkIcon aria-hidden className="size-3" />
