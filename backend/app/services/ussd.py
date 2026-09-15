@@ -8,12 +8,17 @@ A screen holds 160 characters and a session lasts seconds, so:
   longer, the reference follows by SMS, even if they chose no updates: they
   would otherwise lose it.
 The report is read (classified) as soon as it is described, allowed 4 seconds
-before the rules decide alone. An emergency (a danger to a person, a fire, a
-flood, a crime) then shows two numbers per service to try, before anything
-else. A personal-safety report is asked only for its sub-metro, which it may
-skip, never its electoral area; it gets the reference on screen, updates only
-if the citizen then says yes, and any SMS about it says nothing but the
-reference. Reports carry no photos. The same services as the web:
+before the rules decide alone. An emergency (a danger to a person, a fire, an
+accident, a flood, a crime) then shows every number to call for it, over as
+many screens as they need, before anything else: help first, filing second. A
+personal-safety report then shows what to do right now, and is asked only for
+its sub-metro, which it may skip, never its electoral area; its Social Welfare
+desk is shown once the sub-metro is known. It gets the reference on screen,
+updates only if the citizen then says yes, and any SMS about the report says
+nothing but the reference. Last, the citizen may ask for the numbers by SMS,
+told first that anyone with the phone could see them: nobody gets them without
+choosing, and nobody who asks is refused (a phone that already had them three
+times today is told so; each is two SMS credits). Reports carry no photos. The same services as the web:
 report_intake.submit() and rag.answer_question(). "Confirm a web code" proves the
 number to a Nokware page that asked for it (phone_proof): the network says who dialled.
 "Sign a petition" takes the petition's six-digit number and signs it from the
@@ -30,6 +35,7 @@ from typing import Any
 
 from app.config import get_settings
 from app.contacts import EMERGENCY_TOPICS, short_line
+from app.services.channel_contacts import call_lines, desk_line, numbers_sms
 from app.services import (
     channel_limits,
     channel_sessions,
@@ -70,6 +76,14 @@ WHO_MAX = 40  # longer office names give way to a count, so the receipt keeps it
 MENU = "Nokware - Accra Assembly\n1 Ask a question\n2 Report an issue\n3 Check a case\n4 Medical emergency\n5 Confirm a web code\n6 Sign a petition"
 MEDICAL = "Nokware can't file this: it isn't an Assembly matter. Ambulance: 193, 0501 614 877, 0505 982 870. Or call 112."
 CONFIRM = "File this report?\n1 File, and SMS me updates\n2 File, no SMS\n0 Cancel"
+NEXT = "\n1 Next"
+HELP_HEADING = "In danger now? Call 112. If it fails, try the next number."
+SAFETY_STEPS = (
+    "If you are in danger:\n- Go somewhere safe if you can: a neighbour, family or a police station.\n- Keep your phone with you.",
+    "If you are hurt, go to a hospital or call 193.\nIf it is someone else, a child or an adult, don't confront the person yourself.",
+)
+NUMBERS_OFFER = "Send these numbers by SMS? Anyone with your phone could see them.\n1 Yes\n2 No"
+CALL_LIST = "Your call list may show you dialled Nokware: delete it if that is safer."
 _filing = ThreadPoolExecutor(max_workers=4, thread_name_prefix="ussd-filing")
 
 Later = Callable[..., None]  # runs work after the screen is sent (FastAPI's BackgroundTasks.add_task)
@@ -195,12 +209,24 @@ def _private(state: State) -> bool:
     return state["filed"]["category"] == Category.PERSONAL_SAFETY
 
 
-def numbers_screen(topic: str) -> str:
-    """Two numbers per service to try now, and where the rest are, then a key to go on."""
-    numbers = short_line(topic, None)
-    more = f"\nMore numbers: {_site()}/contacts/emergency"
-    body = numbers + more if len(numbers + more + CONTINUE) <= SCREEN_MAX else numbers
-    return body + CONTINUE
+def numbers_pages(topic: str) -> list[str]:
+    """Every number to call for an emergency, the services that come to you first, on as few screens as hold
+    them with their key line. Empty for everyday topics."""
+    lines = call_lines(topic, None)
+    if not lines:
+        return []
+    pages, page = [], [HELP_HEADING]
+    for line in lines:
+        if len("\n".join([*page, line]) + CONTINUE) > SCREEN_MAX:
+            pages.append("\n".join(page))
+            page = []
+        page.append(line)
+    return [*pages, "\n".join(page)]
+
+
+def help_pages(topic: str, private: bool) -> list[str]:
+    """What comes before any question about place: the numbers, then for personal safety what to do now."""
+    return numbers_pages(topic) + (list(SAFETY_STEPS) if private else [])
 
 
 def safety_sub_metro_screen() -> str:
@@ -213,19 +239,24 @@ def _after_help(state: State) -> tuple[Reply, State]:
     return con(sub_metro_screen()), {**state, "step": "sub_metro"}
 
 
+def _help_page(state: State, page: int) -> tuple[Reply, State]:
+    pages = help_pages(state["filed"]["topic"], _private(state))
+    if page >= len(pages):
+        return _after_help(state)
+    key = CONTINUE if page == len(pages) - 1 else NEXT
+    return con(pages[page] + key), {**state, "step": "help", "page": page}
+
+
 def _describe(dial: Dial, state: State, later: Later) -> tuple[Reply, State | None]:
     description = dial.text.strip()
     if len(description) < DESCRIPTION_MIN:
         return con("Please describe it in a few more words, with where it is:"), state
     filed = _read(description)
-    state = {"description": description, "filed": _saved(filed)}
-    if filed.topic in EMERGENCY_TOPICS:  # the numbers first: a danger to a person, a fire, a flood, a crime
-        return con(numbers_screen(filed.topic)), {**state, "step": "help"}
-    return _after_help(state)
+    return _help_page({"description": description, "filed": _saved(filed)}, 0)  # help first, filing second
 
 
 def _help(dial: Dial, state: State, later: Later) -> tuple[Reply, State | None]:
-    return _after_help(state)
+    return _help_page(state, state.get("page", 0) + 1)
 
 
 def _safety_sub_metro(dial: Dial, state: State, later: Later) -> tuple[Reply, State | None]:
@@ -235,7 +266,9 @@ def _safety_sub_metro(dial: Dial, state: State, later: Later) -> tuple[Reply, St
     index = _pick(choice, len(ids))
     if choice != "0" and index is None:
         return con("Choose a number from the list, or 0 to skip.\n" + safety_sub_metro_screen()), state
-    return con(CONFIRM), {**state, "step": "confirm", "sub_metro": None if choice == "0" else ids[index]}
+    sub_metro = None if choice == "0" else ids[index]
+    desk = desk_line(sub_metro)  # their own desk, now that it is known
+    return con(f"{desk}\n{CONFIRM}" if desk else CONFIRM), {**state, "step": "confirm", "sub_metro": sub_metro}
 
 
 def _sub_metro(dial: Dial, state: State, later: Later) -> tuple[Reply, State | None]:
@@ -261,11 +294,12 @@ def _receipt(receipt: Receipt, later: Later) -> tuple[Reply, State | None]:
     if receipt.messages_on:
         later(notify_quietly, case, NotificationEvent.SUBMITTED)
     if case["isSensitive"]:  # the numbers came first; the rest of them are on the contacts page
-        more = f"More numbers: {_site()}/contacts/emergency"
+        offer = {"reference": reference, "topic": case["topic"], "sub_metro": case.get("subMetro")}
         if receipt.preferences_token:  # a number was given: ask about updates, once
+            more = f"More numbers: {_site()}/contacts/emergency"
             question = f"Reference {reference} received. {more}\nSMS updates on it? They never say what it is about.\n1 Yes\n2 No"
-            return con(question), {"step": "updates", "reference": reference, "token": receipt.preferences_token}
-        return end(f"Reference {reference} received. {more}"), None
+            return con(question), {"step": "updates", "token": receipt.preferences_token, **offer}
+        return con(f"Reference {reference} received.\n{NUMBERS_OFFER}"), {"step": "numbers_sms", **offer}
     names = [short_name(r) for r in case["recipients"]]
     who = " and ".join(names) if len(" and ".join(names)) <= WHO_MAX else f"{len(names)} offices"
     emergency = f" {short_line(case['topic'], None).split('. ')[0]}." if case["topic"] in EMERGENCY_TOPICS else ""
@@ -305,7 +339,11 @@ def _file(dial: Dial, state: State, updates: bool, later: Later) -> tuple[Reply,
         return _receipt(filing.result(timeout=FILING_WAIT_SECONDS), later)
     except FilingTimeout:
         filing.add_done_callback(lambda done: _reference_later(done, dial.msisdn))
-        return end("Your report is being filed. Your reference will come by SMS."), None
+        slow = "Your report is being filed. Your reference will come by SMS."
+        if private:  # the numbers can still be asked for while it files
+            offer = {"reference": None, "topic": state["filed"]["topic"], "sub_metro": state.get("sub_metro")}
+            return con(f"{slow}\n{NUMBERS_OFFER}"), {"step": "numbers_sms", **offer}
+        return end(slow), None
     except (InvalidReport, InvalidNumber) as error:
         return end(str(error)), None
 
@@ -337,7 +375,12 @@ def _updates(dial: Dial, state: State, later: Later) -> tuple[Reply, State | Non
     who = " or ".join(short_name(r) for r in case["recipients"])
     said = "Updates are on." if wanted else "No updates will be sent."
     question = f"{said}\nMay {who} phone you on this number about it?\n1 Yes\n2 No"
-    return con(question), {"step": "call", "case_id": case["$id"], "who": who}
+    return con(question), {**_offer(state), "step": "call", "case_id": case["$id"], "who": who}
+
+
+def _offer(state: State) -> State:
+    """What the numbers SMS at the end of a personal-safety report needs to know."""
+    return {name: state.get(name) for name in ("reference", "topic", "sub_metro")}
 
 
 def _call(dial: Dial, state: State, later: Later) -> tuple[Reply, State | None]:
@@ -345,10 +388,25 @@ def _call(dial: Dial, state: State, later: Later) -> tuple[Reply, State | None]:
     choice = dial.text.strip()
     if choice not in ("1", "2"):
         return con("Choose 1 if they may phone you, or 2 if not."), state
+    said = "No one will phone you."
     if choice == "1":
         update_contact(state["case_id"], {"callbackConsent": True})
-        return end(f"Done. {state['who']} may phone you. Keep your reference."), None
-    return end("No one will phone you. Keep your reference."), None
+        said = f"Done. {state['who']} may phone you."
+    return con(f"{said}\n{NUMBERS_OFFER}"), {**_offer(state), "step": "numbers_sms"}
+
+
+def _numbers_sms(dial: Dial, state: State, later: Later) -> tuple[Reply, State | None]:
+    """The citizen's own choice, knowing who else might read their phone: the numbers by SMS, or not."""
+    choice = dial.text.strip()
+    if choice not in ("1", "2"):
+        return con("Choose 1 or 2.\n" + NUMBERS_OFFER), state
+    keep = f" Keep your reference {state['reference']}." if state.get("reference") else ""
+    if choice == "2":
+        return end(f"No SMS sent.{keep}\n{CALL_LIST}"), None
+    if not channel_limits.NUMBERS_SMS.allow(dial.msisdn, utc_now().timestamp()):
+        return end(f"The numbers were already sent to this phone today.{keep}\n{CALL_LIST}"), None
+    later(send_sms, dial.msisdn, numbers_sms(state["topic"], state.get("sub_metro")))
+    return end(f"The numbers are on their way by SMS.{keep}\n{CALL_LIST}"), None
 
 
 def _check(dial: Dial, state: State, later: Later) -> tuple[Reply, State | None]:
@@ -434,7 +492,8 @@ def _sign_name(dial: Dial, state: State, later: Later) -> tuple[Reply, State | N
 
 STEPS: dict[str, Callable[[Dial, State, Later], tuple[Reply, State | None]]] = {
     "menu": _menu, "ask": _ask, "describe": _describe, "help": _help, "sub_metro": _sub_metro, "ward": _ward,
-    "safety_sub_metro": _safety_sub_metro, "confirm": _confirm, "updates": _updates, "call": _call, "check": _check,
+    "safety_sub_metro": _safety_sub_metro, "confirm": _confirm, "updates": _updates, "call": _call,
+    "numbers_sms": _numbers_sms, "check": _check,
     "code": _code, "sign_code": _sign_code, "sign_choice": _sign_choice, "sign_name": _sign_name,
 }
 

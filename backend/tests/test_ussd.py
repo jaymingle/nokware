@@ -12,12 +12,13 @@ from app.config import get_settings
 from app.main import RedactChannelSecrets, app
 from app.routes import channels
 from app.services import channel_limits, channel_sessions, redis_store, report_followups, report_intake, ussd
+from app.services.channel_contacts import numbers_sms
 from app.services.citizen_reports import IntakeChannel, NotificationEvent
 from app.contacts import EMERGENCY_TOPICS
 from app.services.report_intake import Receipt, ReportSubmission
 from app.services.report_rules import Classification, ClassificationMethod
 from app.services.report_taxonomy import TOPICS_BY_ID
-from app.services.sms_text import is_gsm7
+from app.services.sms_text import is_gsm7, pages
 from app.services.ussd import CONFIRM, MENU, Dial, sub_metro_screen, ward_screen
 from app.wards import sub_metros
 
@@ -48,7 +49,9 @@ def keys(later: list[tuple[Any, ...]], *presses: str, session_id: str = "s1") ->
 
 
 def test_every_fixed_screen_fits_one_plain_screen() -> None:
-    screens = [MENU, CONFIRM, ussd.MEDICAL, sub_metro_screen(), *(ward_screen(i) for i in sub_metros())]
+    screens = [MENU, CONFIRM, ussd.MEDICAL, sub_metro_screen(), *(ward_screen(i) for i in sub_metros()),
+               *(step + ussd.CONTINUE for step in ussd.SAFETY_STEPS), f"Reference M3RD-8WQA received.\n{ussd.NUMBERS_OFFER}",
+               f"The numbers were already sent to this phone today. Keep your reference M3RD-8WQA.\n{ussd.CALL_LIST}"]
     for screen in screens:
         assert len(screen) <= ussd.SCREEN_MAX and is_gsm7(screen), screen
 
@@ -127,12 +130,16 @@ def test_personal_safety_shows_numbers_first_asks_only_the_sub_metro_and_updates
     monkeypatch.setattr(report_intake, "submit", submit)
     chosen: list[Any] = []
     monkeypatch.setattr(report_followups, "set_preferences", lambda ref, token, choice, now: chosen.append((ref, token, choice)) or (SAFETY, choice.notify))
-    help_screen = keys(session, "2", "My neighbour beats his wife every night")
-    assert help_screen.message.startswith("Police: 112, 191. Helpline: 0800 800 800") and help_screen.message.endswith("1 Continue")
+    first = keys(session, "2", "My neighbour beats his wife every night")
+    assert first.message.startswith(ussd.HELP_HEADING + "\nPolice: 191, 18555, 0302 779 300 (HQ)") and first.message.endswith("1 Next")
+    shown = [first.message] + [ussd.respond(Dial("s1", PHONE, "1", False), lambda *a: None).message for _ in range(3)]
+    assert "Helpline of Hope (abuse, children): 0800 800 800" in shown[1] and "Social Welfare: 0550 006 688" in shown[1]
+    assert shown[2].startswith("If you are in danger:") and shown[3].endswith("1 Continue")  # what to do, then on
     place = ussd.respond(Dial("s1", PHONE, "1", False), lambda *a: None)
     assert place.message.startswith("Which sub-metro are you in?") and place.message.endswith("0 Skip")
     assert "electoral area" not in place.message
-    ussd.respond(Dial("s1", PHONE, "2", False), lambda *a: None)  # Okaikoi South, then the confirm screen
+    confirm = ussd.respond(Dial("s1", PHONE, "2", False), lambda *a: None)  # Okaikoi South: its desk, then the confirm
+    assert confirm.message == "Your Social Welfare desk: 0303 935 397\n" + CONFIRM
     screen = ussd.respond(Dial("s1", PHONE, "1", False), lambda *args: session.append(args))
     assert (submitted[0].ward, submitted[0].sub_metro) == (None, "okaikoi-south")
     assert screen.more and screen.message.startswith("Reference M3RD-8WQA received. More numbers:")
@@ -144,23 +151,85 @@ def test_personal_safety_shows_numbers_first_asks_only_the_sub_metro_and_updates
     assert session == [(ussd.notify_quietly, SAFETY, NotificationEvent.SUBMITTED)]
     consented: list[Any] = []
     monkeypatch.setattr(ussd, "update_contact", lambda case_id, changes: consented.append((case_id, changes)))
-    done = ussd.respond(Dial("s1", PHONE, "1", False), lambda *a: None)
-    assert done.message.startswith("Done. Ghana Police Service or Social Welfare may phone you.")
+    offer = ussd.respond(Dial("s1", PHONE, "1", False), lambda *a: None)
+    assert offer.more and offer.message == "Done. Ghana Police Service or Social Welfare may phone you.\n" + ussd.NUMBERS_OFFER
     assert consented == [("c2", {"callbackConsent": True})]
 
 
 def test_a_safety_reporter_can_skip_the_sub_metro(session: list[tuple[Any, ...]], monkeypatch: pytest.MonkeyPatch) -> None:
     submitted, submit = _filed(SAFETY, messages_on=False, monkeypatch=monkeypatch)
     monkeypatch.setattr(report_intake, "submit", submit)
-    keys(session, "2", "Someone has threatened to kill me", "1", "0", "2")
+    confirm = keys(session, "2", "Someone has threatened to kill me", *_through_help("threat_to_life"), "0")
+    assert confirm.message == CONFIRM  # no desk to show
+    receipt = ussd.respond(Dial("s1", PHONE, "2", False), lambda *a: None)
     assert (submitted[0].ward, submitted[0].sub_metro) == (None, None)
+    assert receipt.more and receipt.message == "Reference M3RD-8WQA received.\n" + ussd.NUMBERS_OFFER  # no number given: still offered
 
 
-def test_every_emergency_numbers_screen_fits(session: list[tuple[Any, ...]]) -> None:
+def _through_help(topic: str) -> list[str]:
+    return ["1"] * len(ussd.help_pages(topic, TOPICS_BY_ID[topic].category == "personal_safety"))
+
+
+def test_every_emergency_shows_every_number_to_call_on_screens_that_fit(session: list[tuple[Any, ...]]) -> None:
+    expected = {"fire": ("192", "0299 340 383", "193"), "disaster": ("0302 964 884", "193"), "road_accident": ("191", "18555", "193"),
+                "public_crime": ("191", "0302 779 300"), "child_at_risk": ("0800 800 800", "0550 006 688", "0501 614 877")}
     for topic in EMERGENCY_TOPICS:
-        screen = ussd.numbers_screen(topic)
-        assert len(screen) <= ussd.SCREEN_MAX and is_gsm7(screen) and screen.endswith("1 Continue"), topic
+        private = TOPICS_BY_ID[topic].category == "personal_safety"
+        pages = ussd.help_pages(topic, private)
+        assert pages[0].startswith(ussd.HELP_HEADING), topic
+        for page in pages:
+            assert len(page + ussd.CONTINUE) <= ussd.SCREEN_MAX and is_gsm7(page), (topic, page)
+        assert all(number in "\n".join(pages) for number in expected.get(topic, ("112",))), topic
+        assert (ussd.SAFETY_STEPS[0] in pages) == private, topic
+    assert ussd.help_pages("drainage", False) == []
     assert len(ussd.safety_sub_metro_screen()) <= ussd.SCREEN_MAX
+
+
+def _offered(session: list[tuple[Any, ...]], monkeypatch: pytest.MonkeyPatch, session_id: str) -> ussd.Reply:
+    _, submit = _filed({**SAFETY, "subMetro": "ashiedu-keteke"}, messages_on=False, monkeypatch=monkeypatch)
+    monkeypatch.setattr(report_intake, "submit", submit)
+    return keys(session, "2", "My husband beats me", *_through_help("abuse"), "1", "2", session_id=session_id)
+
+
+def test_the_numbers_go_by_sms_only_when_asked_for(session: list[tuple[Any, ...]], monkeypatch: pytest.MonkeyPatch) -> None:
+    assert _offered(session, monkeypatch, "no").more
+    declined = ussd.respond(Dial("no", PHONE, "2", False), lambda *args: session.append(args))
+    assert declined == ussd.Reply(f"No SMS sent. Keep your reference M3RD-8WQA.\n{ussd.CALL_LIST}", False) and not session
+    _offered(session, monkeypatch, "yes")
+    assert ussd.respond(Dial("yes", PHONE, "9", False), lambda *a: None).message.startswith("Choose 1 or 2.")
+    sent = ussd.respond(Dial("yes", PHONE, "1", False), lambda *args: session.append(args))
+    assert sent.message.startswith("The numbers are on their way by SMS. Keep your reference M3RD-8WQA.") and not sent.more
+    (send, to, text), = session
+    assert (send, to) == (ussd.send_sms, PHONE) and "Social Welfare: 0553 260 046, head office 0550 006 688" in text
+    assert text.startswith("Call 112 first.") and pages(text) <= 2 and is_gsm7(text)
+    for giveaway in ("abuse", "violence", "children", "danger", "Nokware"):
+        assert giveaway not in text  # the sender says who it's from; nothing says why
+
+
+def test_the_numbers_sms_is_limited_per_phone(session: list[tuple[Any, ...]], monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(channel_limits, "NUMBERS_SMS", channel_limits.NumberLimit("numbers-sms", 1, 86400))
+    for session_id in ("a", "b"):
+        _offered(session, monkeypatch, session_id)
+        last = ussd.respond(Dial(session_id, PHONE, "1", False), lambda *args: session.append(args))
+    assert len(session) == 1 and last.message.startswith("The numbers were already sent to this phone today.")
+
+
+def test_every_numbers_sms_fits_two_pages() -> None:
+    for topic in EMERGENCY_TOPICS:
+        for sub_metro in (None, *sub_metros()):
+            text = numbers_sms(topic, sub_metro)
+            assert pages(text) <= 2 and is_gsm7(text), (topic, sub_metro)
+
+
+def test_a_slow_safety_filing_still_offers_the_numbers(session: list[tuple[Any, ...]], monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(ussd, "FILING_WAIT_SECONDS", 0.05)
+    monkeypatch.setattr(report_intake, "read_report", lambda description: _classified("abuse"))
+    monkeypatch.setattr(report_intake, "submit", lambda *args: time.sleep(0.3) or Receipt(SAFETY, False, False, None))
+    monkeypatch.setattr(ussd, "send_sms", lambda to, text: True)
+    slow = keys(session, "2", "My husband beats me", *_through_help("abuse"), "0", "2")
+    assert slow.message == "Your report is being filed. Your reference will come by SMS.\n" + ussd.NUMBERS_OFFER
+    done = ussd.respond(Dial("s1", PHONE, "1", False), lambda *args: session.append(args))
+    assert done.message == f"The numbers are on their way by SMS.\n{ussd.CALL_LIST}" and session[0][0] is ussd.send_sms
 
 
 def test_a_slow_model_leaves_the_rules_to_decide_and_they_still_catch_danger(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -220,8 +289,11 @@ def test_a_medical_emergency_gets_numbers_and_nothing_is_filed(session: list[tup
     assert "193" in reply.message and "112" in reply.message
 
 
-def test_more_numbers_point_to_the_emergency_page_not_the_directory() -> None:
-    assert ussd.numbers_screen("fire").split("More numbers: ")[1].startswith("http://localhost:3000/contacts/emergency")
+def test_more_numbers_point_to_the_emergency_page_not_the_directory(session: list[tuple[Any, ...]], monkeypatch: pytest.MonkeyPatch) -> None:
+    _, submit = _filed(SAFETY, messages_on=False, token="one-time", monkeypatch=monkeypatch)
+    monkeypatch.setattr(report_intake, "submit", submit)
+    receipt = keys(session, "2", "My husband beats me", *_through_help("abuse"), "0", "1")
+    assert receipt.message.split("More numbers: ")[1].startswith("http://localhost:3000/contacts/emergency")
 
 
 def test_a_ussd_session_from_an_older_version_ends_cleanly(session: list[tuple[Any, ...]]) -> None:

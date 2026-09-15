@@ -35,6 +35,7 @@ LOOKUPS = NumberLimit("lookups", limit=30, window_seconds=3600)  # status by ref
 VOICE_NOTES = NumberLimit("voice-notes", limit=10, window_seconds=3600)  # each is transcribed by Gemini
 SIGNATURES = NumberLimit("signatures", limit=30, window_seconds=86400)  # petitions one number signs in a day
 PETITIONS = NumberLimit("petitions", limit=3, window_seconds=86400)  # started by one verified number
+NUMBERS_SMS = NumberLimit("numbers-sms", limit=3, window_seconds=86400)  # emergency numbers by SMS: 2 credits each
 SMS_CODES = NumberLimit("sms-codes", limit=3, window_seconds=3600)  # each verification code is an SMS credit
 CODE_CLAIMS = NumberLimit("code-claims", limit=10, window_seconds=3600)  # each WhatsApp claim is answered
 SPOKEN_REPLIES = NumberLimit("spoken-replies", limit=10, window_seconds=86400)  # each is an extra WhatsApp message

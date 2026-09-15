@@ -15,8 +15,9 @@ someone could be hurt. A personal-safety report gets the Police (with their
 reporting lines, marked as not independently verified), the Helpline of Hope,
 Social Welfare (the citizen's sub-metro desk, or every desk if unknown, and the
 head office) and the ambulance. Unverified numbers stay marked as such: in an
-emergency a number worth trying beats none. Where a phone screen can't hold
-the list (SMS, USSD), short_line() gives two numbers per service.
+emergency a number worth trying beats none. Where a message can't hold the
+list (an SMS about a report), short_line() gives two numbers per service; USSD
+screens get every number that can be called (channel_contacts.call_lines).
 
 An everyday report shows any numbers for its topic (ROUTES), or the Assembly's
 switchboard. Safety reporters are never pointed to an Assembly Member: elected
@@ -108,6 +109,12 @@ def directory() -> ContactDirectory:
         for s in raw["services"]
     ]
     return ContactDirectory(about=raw["about"], checked=raw["checked"], services=services)
+
+
+def welfare_desk(sub_metro: str | None) -> PublicContact | None:
+    """The Social Welfare desk of a sub-metro, if it has one."""
+    desk = _desks().get(sub_metro or "")
+    return contacts()[desk] if desk else None
 
 
 def _welfare(sub_metro: str | None) -> list[str]:

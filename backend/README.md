@@ -263,12 +263,15 @@ anything where someone could be hurt. Personal safety adds the Police
 reporting lines (marked, as everywhere, as reported via X and not
 independently verified), the Helpline of Hope and Social Welfare (the
 citizen's sub-metro desk, or every desk, and the head office). The web and
-WhatsApp show the full list; an SMS or a USSD screen, which can't hold it,
-gives two numbers per service and points to `/contacts/emergency`, a page of
-emergency numbers only (no "Who represents you": safety reporters are never
-pointed to an Assembly Member, an elected politician who in a small area may
-know the abuser). A personal-safety SMS never carries numbers: it says only the
-reference. A road accident is a public-safety report to the Police with Police
+WhatsApp show the full list, and USSD every number that can be called from the
+phone in hand, over as many screens as it takes; an SMS about a report, which
+can't hold it, gives two numbers per service and points to
+`/contacts/emergency`, a page of emergency numbers only (no "Who represents
+you": safety reporters are never pointed to an Assembly Member, an elected
+politician who in a small area may know the abuser). An SMS about a
+personal-safety report never carries numbers: it says only the reference. The
+numbers reach a safety reporter's phone by SMS only if they ask for them at the
+end of a USSD report, told first that anyone with the phone could see them. A road accident is a public-safety report to the Police with Police
 and ambulance numbers. A medical emergency (someone ill or hurt, no one else
 involved) isn't the Assembly's to act on: WhatsApp and USSD (menu 4) say so
 plainly, file nothing, and give the ambulance numbers.
@@ -356,16 +359,29 @@ characters, and the menu's place is kept in Redis under the session ID for 3
 minutes. An answer takes longer than a screen can wait, so the session ends
 with "your answer is on its way by SMS" and the answer follows as one SMS of
 two pages at most (5 a day per number). A report is described by keypad and
-read (classified) at once, allowed 4 seconds before the rules decide alone. An
-emergency then shows two numbers per service to try before anything else. An
-everyday or public-safety report is placed by sub-metro and electoral area
-from numbered lists; a personal-safety report is asked only for its sub-metro,
-which it may skip. Then it is confirmed (with or without SMS updates) and
-filed while the citizen waits for up to 8 seconds; if filing takes longer the
-reference follows by SMS. Reports have no photos. A personal-safety report
-shows its reference and where more numbers are, and asks about updates once,
-which stay off unless the citizen says yes; any SMS about it says only the
-reference. `scripts/ussd_simulator.py` plays a
+read (classified) at once, allowed 4 seconds before the rules decide alone.
+Help comes first, filing second: an emergency then shows every number to call
+for it, under "In danger now? Call 112", before any other question. The
+services that come to you are listed first (the Police, Fire, NADMO, the
+ambulance, which every emergency where someone could be hurt includes), then
+the Helpline of Hope, Social Welfare and the unverified Police lines; a fire or
+a flood fits one screen, personal safety two. A personal-safety report then
+shows two screens of what to do right now (somewhere safe, the phone kept
+close, a hospital or 193 if hurt, and not confronting the person when it's
+someone else). An everyday or public-safety report is placed by sub-metro and
+electoral area from numbered lists; a personal-safety report is asked only for
+its sub-metro, which it may skip, and its Social Welfare desk's number is shown
+as soon as the sub-metro is chosen. Then it is confirmed (with or without SMS
+updates) and filed while the citizen waits for up to 8 seconds; if filing takes
+longer the reference follows by SMS. Reports have no photos. A personal-safety
+report shows its reference and where more numbers are, and asks about updates
+once, which stay off unless the citizen says yes; any SMS about the report says
+only the reference. Last it asks "Send these numbers by SMS? Anyone with your
+phone could see them." Yes sends one SMS of two pages at most (the citizen's
+desk included, nothing saying what happened; three a day per phone); no sends
+nothing. The session ends by saying the phone's call list may show the dial.
+Medical emergencies (menu 4) aren't filed; they get the ambulance numbers at
+once. `scripts/ussd_simulator.py` plays a
 phone against the API (Arkesel's request format, from its sample application),
 so the menu can be tried locally.
 
