@@ -31,6 +31,7 @@ def _styles(document: Document) -> None:
     for name, size in (("Title", 18), ("Heading 1", 14), ("Heading 2", 12)):
         style = document.styles[name]
         style.font.name, style.font.size, style.font.color.rgb, style.font.bold = HEADING_FONT, Pt(size), INK, False
+        style.paragraph_format.keep_with_next = True
 
 
 def _small(paragraph: Paragraph, text: str, bold: bool = False) -> None:

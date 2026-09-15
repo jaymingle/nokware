@@ -136,7 +136,7 @@ def _figure(number: int, figure: AskFigure) -> list[object]:
                                    ("LINEBELOW", (0, 0), (-1, -1), 0.4, HAIRLINE), ("ALIGN", (1, 0), (1, -1), "RIGHT")]))
         parts.append(table)
     parts.append(Paragraph(markup(f"Counted {when(figure.counted_at)}."), SMALL))
-    return [KeepTogether(parts), Spacer(1, 4)]
+    return [*parts, Spacer(1, 4)]
 
 
 def _link(url: str) -> str:
@@ -145,8 +145,15 @@ def _link(url: str) -> str:
     return f'<a href="{escape(url, {chr(34): "&quot;"})}" color="#1F6F5C">{markup(url)}</a>'
 
 
+def _headed(title: str, groups: list[list[object]]) -> list[object]:
+    """A heading kept on the same page as the first thing under it."""
+    if not groups:
+        return []
+    return [KeepTogether([Paragraph(title, HEADING), *groups[0]]), *(item for group in groups[1:] for item in group)]
+
+
 def _sources(content: Content) -> list[object]:
-    flow: list[object] = [Paragraph("Sources", HEADING)] if content.sources else []
+    groups: list[list[object]] = []
     for number, source, provenance in content.sources:
         facts = " · ".join(str(p) for p in (source.department_name, source.document_year) if p)
         lines = [Paragraph(f"[{number}] {markup(source.title)}", SOURCE)]
@@ -155,8 +162,8 @@ def _sources(content: Content) -> list[object]:
             lines.append(Paragraph(f"Original: {_link(source.source_url)}", SMALL))
         if source.ledger_url:
             lines.append(Paragraph(f"Nokware's copy: {_link(source.ledger_url)}", SMALL))
-        flow += [KeepTogether(lines), Spacer(1, 6)]
-    return flow
+        groups.append([*lines, Spacer(1, 6)])
+    return _headed("Sources", groups)
 
 
 def _story(content: Content) -> list[object]:
@@ -167,9 +174,7 @@ def _story(content: Content) -> list[object]:
         story.append(Paragraph(markup(content.no_information), BODY))
     story += _chart(content.chart, content.chart_note)
     if content.figures:
-        story.append(Paragraph("Live figures", HEADING))
-        for number, figure in content.figures:
-            story += _figure(number, figure)
+        story += _headed("Live figures", [[KeepTogether(_figure(n, f))] for n, f in content.figures])
         story.append(Paragraph(markup(LIVE_DATA_NOTE), SMALL))
     return story + _sources(content)
 
