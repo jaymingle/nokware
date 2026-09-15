@@ -31,7 +31,7 @@ from app.routes import (
     reports,
     representatives,
 )
-from app.services import notifications, petitions, scheduler, search_index, whatsapp_voice
+from app.services import notifications, petition_clock, petitions, scheduler, search_index, whatsapp_voice
 from app.services.appwrite_client import quiet_sdk_deprecation_warnings
 from app.services.issue_voices import InvalidVoice, IssueNotFound, purge_expired_voice_names
 from app.services.ledger_documents import utc_now
@@ -105,7 +105,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 
 def run_petition_clock() -> None:
-    petitions.run_clock(utc_now())
+    petition_clock.run_clock(utc_now())
 
 
 def run_contact_purge() -> None:

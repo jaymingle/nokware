@@ -6,9 +6,10 @@ from pydantic import BaseModel, Field
 
 from app.schemas.documents import Option
 from app.services.ledger_documents import Provenance
-from app.services.petition_rules import BODY_MAX, DOCUMENTS_MAX, NAME_MAX, NOTE_MAX, TITLE_MAX
+from app.services.petition_rules import BODY_MAX, DOCUMENTS_MAX, NAME_MAX, NOTE_MAX, RESPONSE_MAX, TITLE_MAX
 
-Status = Literal["in_review", "refused", "open", "awaiting_response", "closed", "withdrawn"]
+Status = Literal["in_review", "refused", "open", "awaiting_response", "responded", "closed", "withdrawn"]
+ResponseKind = Literal["will_act", "referred", "cannot_act"]
 Scope = Literal["metro", "area"]
 
 
@@ -82,12 +83,28 @@ class PetitionCard(BaseModel):
     started_by: str | None  # a name only if the creator chose to show one
     threshold_reached_at: str | None
     response_due: str | None  # the MCE's 30 days to respond publicly, once it reached its threshold
+    responded_at: str | None
+    response_label: str | None  # "The Assembly will act", "Referred to a department", "The Assembly can't act"
+    unanswered_at: str | None  # when the 30 days passed with no response, if they did
 
 
 class TimelineEntry(BaseModel):
-    action: Literal["submitted", "resubmitted", "published", "auto_published", "refused", "withdrawn", "closed", "threshold_reached"]
+    action: Literal["submitted", "resubmitted", "published", "auto_published", "refused", "withdrawn", "closed", "threshold_reached",
+                    "responded", "no_response"]
     at: str
     reason: str | None  # a refusal's reason, as the public list counts it
+
+
+class PetitionResponse(BaseModel):
+    """The MCE's public response, as given. Never the name of the person who gave it."""
+
+    kind: ResponseKind
+    label: str
+    text: str
+    department: str | None  # the department it is referred to
+    documents: list[DocumentRef]
+    responded_at: str
+    days_late: int  # days after the 30-day deadline; 0 if in time
 
 
 class PetitionDetail(PetitionCard):
@@ -95,6 +112,7 @@ class PetitionDetail(PetitionCard):
     timeline: list[TimelineEntry]
     issue: LinkedIssue | None
     documents: list[DocumentRef]  # what the creator cited
+    response: PetitionResponse | None
 
 
 class RefusalCount(BaseModel):
@@ -279,3 +297,10 @@ class AwaitingResponse(BaseModel):
     threshold: int
     threshold_reached_at: str
     response_due: str
+
+
+class ResponseRequest(BaseModel):
+    kind: ResponseKind
+    text: str = Field(max_length=RESPONSE_MAX + 500)
+    department: str | None = None
+    documents: list[str] = Field(default_factory=list, max_length=DOCUMENTS_MAX)

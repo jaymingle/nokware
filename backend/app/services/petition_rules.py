@@ -10,7 +10,10 @@ Lifecycle:
       the creator edits and resubmits it (at most twice) -> in_review, with a fresh 72 hours
     the MCE decides nothing in 72 hours -> open: it publishes automatically
   it reaches its threshold of signatures -> awaiting_response; the MCE has 30 days to respond publicly
-    (it keeps taking signatures until its 90 days are up)
+    (it keeps taking signatures until its 90 days are up, or the MCE responds)
+    the MCE responds: will act, referred to a department, or can't act and why -> responded
+    30 days pass with no response -> still awaiting_response, and the page says so plainly; a late response is
+    still taken, and says how late it was
   open for 90 days without reaching it -> closed
   the creator may withdraw it until it reaches its threshold or closes -> withdrawn
 
@@ -22,6 +25,7 @@ refusal must name a reason from REFUSALS, the public list counts refusals by
 reason, and silence publishes.
 """
 
+import math
 import re
 import secrets
 from dataclasses import dataclass
@@ -51,6 +55,7 @@ class PetitionStatus(StrEnum):
     REFUSED = "refused"
     OPEN = "open"
     AWAITING_RESPONSE = "awaiting_response"  # reached its threshold: the MCE must respond publicly
+    RESPONDED = "responded"
     CLOSED = "closed"
     WITHDRAWN = "withdrawn"
 
@@ -75,6 +80,9 @@ class PetitionAction(StrEnum):
     CLOSED = "closed"
     MADE_ANONYMOUS = "made_anonymous"
     THRESHOLD_REACHED = "threshold_reached"
+    RESPONDED = "responded"
+    NO_RESPONSE = "no_response"  # 30 days after the threshold, with no response
+    CREATOR_NOTIFIED = "creator_notified"  # a message to the creator: never public
 
 
 @dataclass(frozen=True)
@@ -104,6 +112,19 @@ REFUSALS: dict[str, Refusal] = {
         "Contains personal data",
         "It contains someone's personal data, such as a phone number, a home address or an ID number."),
 }
+
+
+@dataclass(frozen=True)
+class ResponseKind:
+    label: str  # as the public reads it
+
+
+RESPONSE_KINDS: dict[str, ResponseKind] = {
+    "will_act": ResponseKind("The Assembly will act"),
+    "referred": ResponseKind("Referred to a department"),
+    "cannot_act": ResponseKind("The Assembly can't act"),
+}
+RESPONSE_MIN, RESPONSE_MAX = 50, 4000
 
 
 class PetitionError(Exception):
@@ -288,3 +309,43 @@ def creator_actions(petition: dict[str, Any]) -> list[str]:
     if petition.get("creatorName"):
         actions.append("make_anonymous")
     return actions
+
+
+@dataclass(frozen=True)
+class Response:
+    kind: str
+    text: str
+    department: str | None  # the department it is referred to
+    documents: tuple[str, ...]  # Ledger documents the MCE cites
+
+
+def response_fields(petition: dict[str, Any], response: Response, now: datetime) -> dict[str, Any]:
+    """The MCE's public response, checked. Only a petition that reached its threshold is owed one; a late one is taken."""
+    if petition.get("status") != PetitionStatus.AWAITING_RESPONSE:
+        raise WrongState("Only a petition that has reached its signatures, and not been answered, is waiting for a response.")
+    if response.kind not in RESPONSE_KINDS:
+        raise InvalidPetition("Choose what the response is: the Assembly will act, it's referred to a department, or it can't act.")
+    if response.kind == "referred" and response.department not in DEPARTMENT_TEAMS:
+        raise InvalidPetition("Choose the department it is referred to.")
+    documents = tuple(dict.fromkeys(response.documents))
+    if len(documents) > DOCUMENTS_MAX:
+        raise InvalidPetition(f"Cite at most {DOCUMENTS_MAX} documents.")
+    text = _text(response.text, "response", RESPONSE_MIN, RESPONSE_MAX)
+    return {"status": PetitionStatus.RESPONDED.value, "respondedAt": now.isoformat(), "responseKind": response.kind,
+            "responseText": text, "responseDepartment": response.department if response.kind == "referred" else None,
+            "responseDocumentIds": list(documents)}
+
+
+def response_overdue(petition: dict[str, Any], now: datetime) -> bool:
+    """The 30 days have passed with no response, and that hasn't been recorded yet."""
+    due = parse_datetime(petition.get("responseDue"))
+    return (petition.get("status") == PetitionStatus.AWAITING_RESPONSE and due is not None and due <= now
+            and not petition.get("noResponseAt"))
+
+
+def days_late(petition: dict[str, Any]) -> int:
+    """How many days after the 30-day deadline the MCE responded; 0 if in time."""
+    due, responded = parse_datetime(petition.get("responseDue")), parse_datetime(petition.get("respondedAt"))
+    if due is None or responded is None or responded <= due:
+        return 0
+    return math.ceil((responded - due).total_seconds() / 86400)

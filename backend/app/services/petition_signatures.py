@@ -48,6 +48,7 @@ class Signed:
     petition: dict[str, Any]
     added: bool  # False: this number had already signed
     named: bool
+    reached: bool  # this signature reached the threshold and sent the petition to the MCE
 
 
 def signer_key(petition_id: str, number: str) -> str:
@@ -95,7 +96,8 @@ def sign(code: str, number: str, channel: Channel, show_name: bool, name: str | 
         check_signable(petition, now)
         added = _store(petition["$id"], signer_key(petition["$id"], number), shown, channel, now)
         updated = _count(petition, now) if added else petition
-    return Signed(updated, added, shown is not None)
+    reached = petition["status"] == PetitionStatus.OPEN and updated["status"] == PetitionStatus.AWAITING_RESPONSE
+    return Signed(updated, added, shown is not None, reached)
 
 
 def _mine(petition_id: str, number: str) -> dict[str, Any] | None:

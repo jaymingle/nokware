@@ -243,9 +243,11 @@ def test_both_routes_answer_publicly(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(department_responsiveness, "public_cases", lambda: works_cases(6, 6)[0])
     monkeypatch.setattr(department_responsiveness, "every_record", lambda collection, queries: works_cases(6, 6)[1] if "assign" in collection else [])
     monkeypatch.setattr(department_responsiveness.CACHE, "_value", None)
+    monkeypatch.setattr(department_responsiveness.petition_figures, "every_record", lambda collection, queries: [])
     client = TestClient(app)
     record = client.get("/api/publishing-record").json()
     assert record["documents_centre_checked"] == "2026-09-12" and [g["name"] for g in record["groups"]] == [
         "Vision and plans", "Budget and tariffs", "Financial and audit", "Oversight and RTI"]
     response = client.get("/api/responsiveness").json()
     assert response["waiting_days"] == 7 and department(response, "Works Department")["reports"]["received"] == 6
+    assert response["petitions"]["reached_threshold"] == 0 and len(response["petitions"]["refusals"]) == 6

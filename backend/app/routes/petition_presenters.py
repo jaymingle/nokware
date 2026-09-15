@@ -19,6 +19,7 @@ from app.schemas.petitions import (
     OwnPetition,
     PetitionCard,
     PetitionDetail,
+    PetitionResponse,
     Refusal,
     RefusalCount,
     RefusalReason,
@@ -28,12 +29,12 @@ from app.schemas.petitions import (
 from app.services import issue_voices, ledger_documents, petition_ledger, petitions
 from app.services.case_workflow import CaseStatus
 from app.services.petition_ledger import describe
-from app.services.petition_rules import MAX_RESUBMISSIONS, REFUSALS, PetitionAction, creator_actions
+from app.services.petition_rules import MAX_RESUBMISSIONS, REFUSALS, RESPONSE_KINDS, PetitionAction, creator_actions, days_late
 from app.services.report_taxonomy import TOPICS_BY_ID
 from app.teams import RECIPIENT_NAMES
 from app.wards import sub_metros, wards
 
-PUBLIC_ACTIONS = {a.value for a in PetitionAction} - {PetitionAction.MADE_ANONYMOUS.value}
+PUBLIC_ACTIONS = {a.value for a in PetitionAction} - {PetitionAction.MADE_ANONYMOUS.value, PetitionAction.CREATOR_NOTIFIED.value}
 ISSUE_STAGES = {CaseStatus.SUBMITTED: "received", CaseStatus.ASSIGNED: "received", CaseStatus.IN_PROGRESS: "in_progress",
                 CaseStatus.ESCALATED: "escalated"}
 
@@ -53,6 +54,8 @@ def _card_fields(petition: dict[str, Any]) -> dict[str, Any]:
         "threshold": petition.get("threshold"), "signatures": petition.get("signatureCount") or 0,
         "started_by": petition.get("creatorName"),
         "threshold_reached_at": petition.get("thresholdReachedAt"), "response_due": petition.get("responseDue"),
+        "responded_at": petition.get("respondedAt"), "unanswered_at": petition.get("noResponseAt"),
+        "response_label": RESPONSE_KINDS[petition["responseKind"]].label if petition.get("responseKind") in RESPONSE_KINDS else None,
     }
 
 
@@ -83,9 +86,21 @@ def cited(document_ids: list[str] | None) -> list[DocumentRef]:
     return [DocumentRef(**describe(found[d])) for d in document_ids or [] if d in found]
 
 
+def response(petition: dict[str, Any]) -> PetitionResponse | None:
+    kind = petition.get("responseKind")
+    if kind not in RESPONSE_KINDS or not petition.get("respondedAt"):
+        return None
+    department = petition.get("responseDepartment")
+    return PetitionResponse(kind=kind, label=RESPONSE_KINDS[kind].label, text=petition["responseText"],
+                            department=RECIPIENT_NAMES.get(department, department) if department else None,
+                            documents=cited(petition.get("responseDocumentIds")), responded_at=petition["respondedAt"],
+                            days_late=days_late(petition))
+
+
 def detail(petition: dict[str, Any]) -> PetitionDetail:
     return PetitionDetail(**_card_fields(petition), body=petition["body"], timeline=timeline(petitions.history(petition["$id"])),
-                          issue=linked_issue(petition.get("issueId")), documents=cited(petition.get("documentIds")))
+                          issue=linked_issue(petition.get("issueId")), documents=cited(petition.get("documentIds")),
+                          response=response(petition))
 
 
 def ledger_matches(petition: dict[str, Any]) -> list[LedgerMatch]:

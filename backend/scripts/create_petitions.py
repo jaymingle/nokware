@@ -13,6 +13,10 @@
   can't be matched across petitions. A name only if the signer chose to show
   it (public). P2 also adds thresholdReachedAt and responseDue to petitions,
   and awaiting_response and threshold_reached to the two status lists.
+- P3 adds the MCE's response to petitions (its kind, statement, department,
+  cited documents, when, and the MCE's name for the trail, never shown), when
+  the 30 days passed unanswered, and the responded status, with the responded,
+  no_response and creator_notified trail steps.
 
 Both are server-only: no client permissions. A dry run by default: it prints
 what it would do. --yes applies it. It only adds; nothing is deleted. Safe to
@@ -30,6 +34,8 @@ from app.services.appwrite_client import DATABASE_ID, get_databases, quiet_sdk_d
 from app.services.petition_rules import (
     BODY_MAX,
     CODE_DIGITS,
+    RESPONSE_KINDS,
+    RESPONSE_MAX,
     NAME_MAX,
     NOTE_MAX,
     REFUSALS,
@@ -86,6 +92,18 @@ def petition_state(db: Databases, c: tuple[str, str]) -> dict[str, Creator]:
     }
 
 
+def petition_response(db: Databases, c: tuple[str, str]) -> dict[str, Creator]:
+    return {
+        "responseKind": lambda: db.create_enum_attribute(*c, "responseKind", list(RESPONSE_KINDS), False),
+        "responseText": lambda: db.create_string_attribute(*c, "responseText", RESPONSE_MAX + 96, False),
+        "responseDepartment": lambda: db.create_string_attribute(*c, "responseDepartment", TEAM, False),
+        "responseDocumentIds": lambda: db.create_string_attribute(*c, "responseDocumentIds", ID, False, array=True),
+        "respondedAt": lambda: db.create_datetime_attribute(*c, "respondedAt", False),
+        "respondedByName": lambda: db.create_string_attribute(*c, "respondedByName", 256, False),
+        "noResponseAt": lambda: db.create_datetime_attribute(*c, "noResponseAt", False),
+    }
+
+
 def petition_creator(db: Databases, c: tuple[str, str]) -> dict[str, Creator]:
     return {
         "creatorKey": lambda: db.create_string_attribute(*c, "creatorKey", HASH, True),
@@ -98,7 +116,7 @@ def petition_creator(db: Databases, c: tuple[str, str]) -> dict[str, Creator]:
 
 def petition_attributes() -> dict[str, Creator]:
     db, c = get_databases(), (DATABASE_ID, PETITIONS)
-    return {**petition_text(db, c), **petition_state(db, c), **petition_creator(db, c)}
+    return {**petition_text(db, c), **petition_state(db, c), **petition_response(db, c), **petition_creator(db, c)}
 
 
 def history_attributes() -> dict[str, Creator]:
@@ -134,7 +152,7 @@ def adjust_status_lists() -> None:
     db = get_databases()
     db.update_enum_attribute(DATABASE_ID, PETITIONS, "status", values(PetitionStatus), True, None)
     db.update_enum_attribute(DATABASE_ID, HISTORY, "action", values(PetitionAction), True, None)
-    print("updated   petitions.status (adds awaiting_response), petition_history.action (adds threshold_reached)")
+    print("updated   petitions.status (up to responded), petition_history.action (up to creator_notified)")
 
 
 PETITION_INDEXES = {
@@ -147,6 +165,7 @@ PETITION_INDEXES = {
     "idx_purgeAt": (KEY, ["purgeAt"]),
     "idx_status_responseDue": (KEY, ["status", "responseDue"]),
     "idx_status_signatures": (KEY, ["status", "signatureCount"]),
+    "idx_status_respondedAt": (KEY, ["status", "respondedAt"]),
 }
 HISTORY_INDEXES = {"idx_petition_at": (KEY, ["petitionId", "at"]), "idx_action": (KEY, ["action"])}
 SIGNATURE_INDEXES = {
@@ -179,7 +198,7 @@ def main() -> int:
               f"{len(PETITION_INDEXES)} indexes), {HISTORY} ({len(history_attributes())} attributes, "
               f"{len(HISTORY_INDEXES)} indexes) and {SIGNATURES} ({len(signature_attributes())} attributes, "
               f"{len(SIGNATURE_INDEXES)} indexes), leaving any that exist as they are, and set the status lists "
-              "to include awaiting_response and threshold_reached")
+              "to include every status and trail step up to P3's responded, no_response and creator_notified")
         return 0
     build_schema()
     print("\nPetitions are ready.")

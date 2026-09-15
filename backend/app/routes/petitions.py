@@ -14,6 +14,7 @@
     POST /api/petitions/{code}/withdraw    (X-Phone-Proof)
     POST /api/petitions/{code}/anonymous   take the creator's name off it (X-Phone-Proof)
     POST /api/petitions/{code}/decision    MCE: publish, or refuse for a fixed reason
+    POST /api/petitions/{code}/response    MCE: the public response to a petition that reached its threshold
     POST /api/petitions/{code}/signatures  sign it, anonymous unless a name is shown (X-Phone-Proof)
     GET  /api/petitions/{code}/signature   whether this number has signed (X-Phone-Proof)
     POST /api/petitions/{code}/signature/anonymous   take the signer's name off (X-Phone-Proof)
@@ -23,7 +24,7 @@
 from dataclasses import asdict
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, Header, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, Query
 
 from app.config import get_settings
 from app.dependencies import rate_limited, require_roles
@@ -43,6 +44,7 @@ from app.schemas.petitions import (
     PetitionDetail,
     PetitionOptions,
     PetitionPage,
+    ResponseRequest,
     ReviewQueue,
     ScreenRequest,
     ScreenResult,
@@ -51,7 +53,17 @@ from app.schemas.petitions import (
     SubmitRequest,
     Verification,
 )
-from app.services import petition_ledger, petition_screen, petition_signatures, petitions, phone_proof, rate_limit
+from app.services import (
+    petition_ledger,
+    petition_responses,
+    petition_screen,
+    petition_signatures,
+    petition_updates,
+    petitions,
+    phone_proof,
+    rate_limit,
+)
+from app.services.petition_updates import Update
 from app.services.auth import Principal, Role
 from app.services.ledger_documents import utc_now
 from app.services.petition_rules import (
@@ -61,6 +73,7 @@ from app.services.petition_rules import (
     Draft,
     InvalidPetition,
     PetitionStatus,
+    Response,
     Scope,
     petition_topics,
 )
@@ -73,7 +86,7 @@ Changes = Depends(rate_limited(rate_limit.PETITION_CHANGES))
 Signing = Depends(rate_limited(rate_limit.SIGNING))
 Mce = Annotated[Principal, Depends(require_roles(Role.MCE))]
 PAGE_MAX = 50
-GROUPS = {"open": [PetitionStatus.OPEN], "awaiting": [PetitionStatus.AWAITING_RESPONSE],
+GROUPS = {"open": [PetitionStatus.OPEN], "awaiting": [PetitionStatus.AWAITING_RESPONSE], "responded": [PetitionStatus.RESPONDED],
           "closed": [PetitionStatus.CLOSED, PetitionStatus.WITHDRAWN]}
 
 
@@ -106,7 +119,7 @@ def options() -> PetitionOptions:
 
 @router.get("", response_model=PetitionPage)
 def published(
-    group: Literal["open", "awaiting", "closed"] = "open",
+    group: Literal["open", "awaiting", "responded", "closed"] = "open",
     topic: str | None = None,
     limit: Annotated[int, Query(ge=1, le=PAGE_MAX)] = 20,
     offset: Annotated[int, Query(ge=0)] = 0,
@@ -187,16 +200,28 @@ def anonymous(code: str, proof: Phone) -> OwnPetition:
 
 
 @router.post("/{code}/decision", response_model=ReviewQueue)
-def decide(code: str, request: DecisionRequest, principal: Mce) -> ReviewQueue:
-    """The decision, then the queue as it now stands."""
-    petitions.decide(principal, code, request.decision == "publish", request.reason, request.note, request.duplicate_of,
-                     utc_now())
+def decide(code: str, request: DecisionRequest, principal: Mce, tasks: BackgroundTasks) -> ReviewQueue:
+    """The decision, then the queue as it now stands. The creator is told after the answer is sent."""
+    publish = request.decision == "publish"
+    updated = petitions.decide(principal, code, publish, request.reason, request.note, request.duplicate_of, utc_now())
+    tasks.add_task(petition_updates.notify_quietly, updated, Update.PUBLISHED if publish else Update.REFUSED)
     return review(principal)
 
 
+@router.post("/{code}/response", response_model=list[AwaitingResponse])
+def respond(code: str, request: ResponseRequest, principal: Mce, tasks: BackgroundTasks) -> list[AwaitingResponse]:
+    """The MCE's public response; then the petitions still waiting for one."""
+    answer = Response(request.kind, request.text, request.department, tuple(request.documents))
+    updated = petition_responses.respond(principal, code, answer, utc_now())
+    tasks.add_task(petition_updates.notify_quietly, updated, Update.RESPONDED)
+    return responses(principal)
+
+
 @router.post("/{code}/signatures", response_model=SignResult, dependencies=[Signing])
-def sign(code: str, request: SignRequest, proof: Phone) -> SignResult:
+def sign(code: str, request: SignRequest, proof: Phone, tasks: BackgroundTasks) -> SignResult:
     signed = petition_signatures.sign(code, proof.number, proof.channel, request.show_name, request.name, utc_now())
+    if signed.reached:  # this signature sent it to the MCE
+        tasks.add_task(petition_updates.notify_quietly, signed.petition, Update.THRESHOLD_REACHED)
     return SignResult(added=signed.added, named=signed.named, signatures=signed.petition.get("signatureCount") or 0,
                       threshold=signed.petition.get("threshold"), status=signed.petition["status"])
 

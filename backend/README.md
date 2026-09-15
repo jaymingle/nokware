@@ -85,12 +85,12 @@ membership.
 | `GET /api/publishing-record` (the documents AMA is required to publish, against what the Ledger holds, by year; cached ten minutes) | public |
 | `GET /api/responsiveness` (each Assembly department's handling of reports and contributors' documents, last twelve months; cached a minute) | public |
 | `POST /api/phone/challenges`, `/challenges/status`, `/challenges/sms`, `/challenges/sms/confirm` (confirm a phone number; the secret in the body) | public, rate-limited per client |
-| `GET /api/petitions/options`, `GET /api/petitions` (`?group=open\|awaiting\|closed`, `?topic`; with the MCE's moderation record), `GET /api/petitions/{number}`, `/ledger` | public |
+| `GET /api/petitions/options`, `GET /api/petitions` (`?group=open\|awaiting\|responded\|closed`, `?topic`; with the MCE's moderation record), `GET /api/petitions/{number}`, `/ledger` | public |
 | `POST /api/petitions/check`, `POST /api/petitions/ledger` (a draft's words checked; what the Ledger holds on its subject) | public, 30 an hour per client |
 | `POST /api/petitions`, `GET /api/petitions/mine`, `POST /api/petitions/{number}/resubmit`, `/withdraw`, `/anonymous` | the creator (`X-Phone-Proof`) |
 | `POST /api/petitions/{number}/signatures` (`show_name`, `name`), `GET /api/petitions/{number}/signature`, `POST .../signature/anonymous` | the signer (`X-Phone-Proof`) |
 | `GET /api/petitions/{number}/names` (the names signers chose to show) | public |
-| `GET /api/petitions/review`, `POST /api/petitions/{number}/decision` (`publish`, or `refuse` with a fixed `reason`), `GET /api/petitions/responses` | MCE |
+| `GET /api/petitions/review`, `POST /api/petitions/{number}/decision` (`publish`, or `refuse` with a fixed `reason`), `GET /api/petitions/responses`, `POST /api/petitions/{number}/response` (`kind`: `will_act`, `referred` or `cannot_act`; `text`; `department`; `documents`) | MCE |
 | `GET /api/me` | anyone signed in |
 | `GET /api/departments`, `GET /api/categories` | anyone signed in |
 | `POST /api/documents` (multipart: `file`, `title`, `category`, `document_year`, `department`, `source_url`) | department (published), contributor (held 72h) |
@@ -584,6 +584,26 @@ and the clocks in `app/services/petitions.py`.
   petition to the MCE, who has 30 days to respond publicly, counted down on the
   page. It keeps taking signatures until its 90 days are up, and can no longer
   be withdrawn.
+- **The MCE's response** (`app/services/petition_responses.py`): one of three,
+  the Assembly will act, it's referred to a department (named), or the Assembly
+  can't act and why, always with a written statement and optionally up to three
+  Ledger documents. It is published on the page as given and can't be changed;
+  the trail keeps the MCE's name, the page says "the MCE". Once answered, the
+  petition takes no more signatures. If 30 days pass first, the petition clock
+  (`app/services/petition_clock.py`) records it once and the page says plainly
+  "No response 30 days after the petition reached its threshold." A late
+  response is still taken, and the page says how many days late it came.
+- **Updates to the creator** (`app/services/petition_updates.py`), at seven
+  moments: refused (with the reason), published by the MCE, published
+  automatically, reached its threshold, responded, no response after 30 days
+  (the moment the outcome becomes a fact about the Assembly rather than a
+  pending matter), and closed short of its threshold. Neutral wording, like
+  report messages: what happened, the number, the link. Each fits one SMS page
+  in plain GSM-7. On the channel the creator confirmed with: WhatsApp while its
+  24-hour window is open, otherwise SMS to the same number; USSD and SMS
+  confirmations get SMS. Each is a credit or a WhatsApp message, so a petition
+  costs at most four messages in a normal life (published, threshold, then
+  response or no response). Each leaves a private line in the trail.
 - **Names are the person's choice.** Anonymous by default; a name is shown
   publicly only if its owner chooses, told first that anyone can see it,
   including the department the petition concerns, and it can be taken off
@@ -604,9 +624,16 @@ cap per number (30 petitions) and a per-connection limit slow a flood, but
 don't stop a determined one; the page counts "signatures from confirmed
 Ghanaian numbers", and that is what it is.
 
+**On the accountability pages** (`app/services/petition_figures.py`), over the
+last twelve months: petitions sent, published by the MCE, published
+automatically, refused (by reason); and of those that reached their threshold,
+how many the MCE answered within 30 days, answered late, hadn't answered after
+30 days, or still has time for. Exact counts: they count the MCE's decisions on
+public petitions, not residents.
+
 **Stages.** P1: drafting, the confirmed phone, the MCE's review with the 72-hour
-clock, the public pages. P2 (this): signing, one per confirmed number per
-petition, and the threshold sending it to the MCE. P3: the MCE's public
+clock, the public pages. P2: signing, one per confirmed number per petition,
+and the threshold sending it to the MCE. P3 (this), as planned: the MCE's public
 response within 30 days, counted down, with "No response 30 days after the
 petition reached its threshold" stated plainly when it runs out; updates to the
 creator; petition figures on the accountability pages.

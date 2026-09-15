@@ -32,6 +32,7 @@ from app.services.case_history import COLLECTION_ID as CASE_HISTORY, CaseHistory
 from app.services.citizen_reports import ASSIGNMENTS_COLLECTION
 from app.services.document_history import COLLECTION_ID as DOCUMENT_HISTORY, HistoryAction
 from app.services.ledger_documents import LedgerStatus, parse_datetime
+from app.services import petition_figures
 from app.services.report_dashboard import MEDIAN_MIN, _Cache, period_start
 from app.services.stats import is_public, public_cases, shown
 from app.teams import DEPARTMENT_NAMES
@@ -179,7 +180,8 @@ def responsiveness(now: datetime) -> dict[str, Any]:
     def make() -> dict[str, Any]:
         case_actions = [CaseHistoryAction.ESCALATED.value, CaseHistoryAction.ESCALATION_CONFIRMED.value, CaseHistoryAction.REASSIGNED.value]
         document_actions = [a.value for a in HistoryAction]
-        return build(public_cases(), every_record(ASSIGNMENTS_COLLECTION, [Query.equal("active", True)]),
-                     _history(CASE_HISTORY, case_actions), _history(DOCUMENT_HISTORY, document_actions), now)
+        figures = build(public_cases(), every_record(ASSIGNMENTS_COLLECTION, [Query.equal("active", True)]),
+                        _history(CASE_HISTORY, case_actions), _history(DOCUMENT_HISTORY, document_actions), now)
+        return {**figures, "petitions": petition_figures.figures(period_start(now), now)}
 
     return CACHE.get(make)

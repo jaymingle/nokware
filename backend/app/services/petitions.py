@@ -41,13 +41,11 @@ from app.services.petition_rules import (
     check_withdraw,
     clean_draft,
     clean_name,
-    closing_due,
     draft_fields,
     new_code,
     normalise_code,
     publish_fields,
     refusal_fields,
-    review_expired,
     review_fields,
     threshold_for,
     was_published,
@@ -62,11 +60,10 @@ PETITIONS_COLLECTION = "petitions"
 HISTORY_COLLECTION = "petition_history"
 IN_REVIEW_PER_PHONE = 3
 RETENTION = timedelta(days=30)
-JOB_BATCH = 100
 CODE_ATTEMPTS = 5
 PUBLIC_FIELDS = ["code", "title", "topic", "recipients", "scope", "wardLocation", "subMetro", "status", "publishedAt",
                  "publishedBy", "closesAt", "closedAt", "threshold", "signatureCount", "creatorName", "thresholdReachedAt",
-                 "responseDue"]
+                 "responseDue", "respondedAt", "responseKind", "noResponseAt"]
 
 
 class PetitionNotFound(Exception):
@@ -84,18 +81,18 @@ CREATOR = Actor("creator", "", "creator")
 SYSTEM = Actor("system", "Automatic", "system")
 
 
-def _mce(principal: Principal) -> Actor:
+def mce_actor(principal: Principal) -> Actor:
     return Actor(principal.user_id, principal.name, "mce")
 
 
-def _list(queries: list[str]) -> tuple[list[dict[str, Any]], int]:
+def list_petitions(queries: list[str]) -> tuple[list[dict[str, Any]], int]:
     listing = get_databases().list_documents(DATABASE_ID, PETITIONS_COLLECTION, queries=queries)
     return [as_record(d) for d in listing.documents], int(listing.total)
 
 
 def find(code: str) -> dict[str, Any]:
     normal = normalise_code(code)
-    found, _ = _list([Query.equal("code", normal), Query.limit(1)]) if normal else ([], 0)
+    found, _ = list_petitions([Query.equal("code", normal), Query.limit(1)]) if normal else ([], 0)
     if not found:
         raise PetitionNotFound(code)
     return found[0]
@@ -135,8 +132,13 @@ def _check_links(draft: Draft) -> None:
             issue_voices.find_issue(draft.issue)
         except (issue_voices.IssueNotFound, ClosedIssue):
             raise InvalidPetition("The linked issue isn't an open issue any more. Remove it and try again.") from None
-    documents = ledger_documents.get_documents(draft.documents)
-    if any(documents.get(d, {}).get("status") != LedgerStatus.PUBLISHED for d in draft.documents):
+    check_documents(draft.documents)
+
+
+def check_documents(document_ids: tuple[str, ...]) -> None:
+    """Every cited document must be published in the Ledger."""
+    documents = ledger_documents.get_documents(document_ids)
+    if any(documents.get(d, {}).get("status") != LedgerStatus.PUBLISHED for d in document_ids):
         raise InvalidPetition("A cited document isn't in the Ledger. Remove it and try again.")
 
 
@@ -153,7 +155,7 @@ def _create(fields: dict[str, Any]) -> dict[str, Any]:
 
 
 def _in_review_by(key: str) -> int:
-    _, total = _list([Query.equal("creatorKey", key), Query.equal("status", PetitionStatus.IN_REVIEW.value), Query.limit(1)])
+    _, total = list_petitions([Query.equal("creatorKey", key), Query.equal("status", PetitionStatus.IN_REVIEW.value), Query.limit(1)])
     return total
 
 
@@ -202,7 +204,8 @@ def resubmit(code: str, proof: Proof, draft: Draft, now: datetime) -> dict[str, 
     return updated
 
 
-def _finish(status: PetitionStatus, now: datetime) -> dict[str, Any]:
+def finish_fields(status: PetitionStatus, now: datetime) -> dict[str, Any]:
+    """Closing a petition, and the date its creator's number is deleted."""
     return {"status": status.value, "closedAt": now.isoformat(), "purgeAt": (now + RETENTION).isoformat()}
 
 
@@ -211,7 +214,7 @@ def withdraw(code: str, proof: Proof, now: datetime) -> dict[str, Any]:
     with record_lock(petition["$id"]):
         petition = _owned(code, proof)
         check_withdraw(petition)
-        updated = update_petition(petition["$id"], _finish(PetitionStatus.WITHDRAWN, now))
+        updated = update_petition(petition["$id"], finish_fields(PetitionStatus.WITHDRAWN, now))
         record_history(updated, PetitionAction.WITHDRAWN, CREATOR, petition["status"])
     return updated
 
@@ -237,7 +240,8 @@ def review_queue() -> list[dict[str, Any]]:
     return every_record(PETITIONS_COLLECTION, [Query.equal("status", PetitionStatus.IN_REVIEW.value), Query.order_asc("reviewDeadline")])
 
 
-def _threshold(petition: dict[str, Any]) -> int:
+def threshold_of(petition: dict[str, Any]) -> int:
+    """The signatures a petition needs, from the settings, fixed on it when it opens."""
     settings = get_settings()
     return threshold_for(Scope(petition["scope"]), settings.petition_threshold_area, settings.petition_threshold_metro)
 
@@ -256,7 +260,7 @@ def _open_duplicate(typed: str | None, petition: dict[str, Any]) -> str:
 def _decision(petition: dict[str, Any], publish: bool, reason: str, note: str | None, duplicate_of: str | None,
               now: datetime) -> tuple[dict[str, Any], PetitionAction]:
     if publish:
-        return publish_fields(petition, PublishedBy.MCE, now, _threshold(petition)), PetitionAction.PUBLISHED
+        return publish_fields(petition, PublishedBy.MCE, now, threshold_of(petition)), PetitionAction.PUBLISHED
     duplicate = _open_duplicate(duplicate_of, petition) if reason == "duplicate" else None
     changes = {**refusal_fields(reason, note, duplicate), "purgeAt": (now + RETENTION).isoformat()}
     return changes, PetitionAction.REFUSED
@@ -271,44 +275,8 @@ def decide(principal: Principal, code: str, publish: bool, reason: str | None, n
         check_review(petition, now)
         changes, action = _decision(petition, publish, reason or "", note, duplicate_of, now)
         updated = update_petition(petition["$id"], changes)
-        record_history(updated, action, _mce(principal), petition["status"], changes.get("refusalReason"), changes.get("refusalNote"))
+        record_history(updated, action, mce_actor(principal), petition["status"], changes.get("refusalReason"), changes.get("refusalNote"))
     return updated
-
-
-def _due(queries: list[str]) -> list[dict[str, Any]]:
-    found, _ = _list([*queries, Query.limit(JOB_BATCH)])
-    return found
-
-
-def _auto_publish(candidate: dict[str, Any], now: datetime) -> bool:
-    with record_lock(candidate["$id"]):
-        petition = find(candidate["code"])  # re-read: the MCE may have just decided
-        if not review_expired(petition, now):
-            return False
-        updated = update_petition(petition["$id"], publish_fields(petition, PublishedBy.AUTOMATIC, now, _threshold(petition)))
-        record_history(updated, PetitionAction.AUTO_PUBLISHED, SYSTEM, petition["status"])
-    return True
-
-
-def _close(candidate: dict[str, Any], now: datetime) -> bool:
-    with record_lock(candidate["$id"]):
-        petition = find(candidate["code"])
-        if not closing_due(petition, now):
-            return False
-        updated = update_petition(petition["$id"], _finish(PetitionStatus.CLOSED, now))
-        record_history(updated, PetitionAction.CLOSED, SYSTEM, petition["status"])
-    return True
-
-
-def run_clock(now: datetime) -> tuple[list[str], list[str]]:
-    """Publish every petition the MCE left undecided for 72 hours, and close every one open for 90 days."""
-    review = _due([Query.equal("status", PetitionStatus.IN_REVIEW.value), Query.less_than_equal("reviewDeadline", now.isoformat())])
-    published = [p["code"] for p in review if _auto_publish(p, now)]
-    ending = _due([Query.equal("status", PetitionStatus.OPEN.value), Query.less_than_equal("closesAt", now.isoformat())])
-    closed = [p["code"] for p in ending if _close(p, now)]
-    if published or closed:
-        logger.info("Petition clock: %d published automatically, %d closed", len(published), len(closed))
-    return published, closed
 
 
 def purge_creator_numbers(now: datetime) -> int:
@@ -325,10 +293,11 @@ def purge_creator_numbers(now: datetime) -> int:
 
 
 def list_public(statuses: list[PetitionStatus], topic: str | None, limit: int, offset: int) -> tuple[list[dict[str, Any]], int]:
-    """Published petitions in the given states: most supported first while they take signatures, else latest closed."""
-    closed = PetitionStatus.OPEN not in statuses and PetitionStatus.AWAITING_RESPONSE not in statuses
-    order = [Query.order_desc("closedAt")] if closed else [Query.order_desc("signatureCount"), Query.order_desc("publishedAt")]
-    return _list([
+    """Published petitions in the given states: most supported first while they take signatures, else the latest answered or closed."""
+    signing = PetitionStatus.OPEN in statuses or PetitionStatus.AWAITING_RESPONSE in statuses
+    latest = "respondedAt" if PetitionStatus.RESPONDED in statuses else "closedAt"
+    order = [Query.order_desc("signatureCount"), Query.order_desc("publishedAt")] if signing else [Query.order_desc(latest)]
+    return list_petitions([
         Query.equal("status", [s.value for s in statuses]), Query.is_not_null("publishedAt"),
         *([Query.equal("topic", topic)] if topic else []),
         Query.select(PUBLIC_FIELDS), *order, Query.limit(limit), Query.offset(offset),
@@ -342,7 +311,7 @@ def awaiting_response() -> list[dict[str, Any]]:
 
 
 def _count(queries: list[str]) -> int:
-    _, total = _list([*queries, Query.limit(1)])
+    _, total = list_petitions([*queries, Query.limit(1)])
     return total
 
 

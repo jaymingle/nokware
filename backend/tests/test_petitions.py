@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 from app.routes import petition_presenters as present
-from app.services import channel_limits, channel_sessions, petition_ledger, petition_rules, petition_screen, petitions, phone_proof, redis_store, ussd
+from app.services import channel_limits, channel_sessions, petition_clock, petition_ledger, petition_rules, petition_screen, petitions, phone_proof, redis_store, ussd
 from app.services import whatsapp_conversation, whatsapp_reply
 from app.services.auth import Principal, Role
 from app.services.petition_rules import (
@@ -224,10 +224,13 @@ def test_the_mce_publishes_or_refuses_and_the_trail_says_who(stored: dict[str, A
 
 
 def test_undecided_after_72_hours_it_publishes_automatically(stored: dict[str, Any], monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(petitions, "_due", lambda queries: [stored["petition"]] if stored["petition"]["status"] == "in_review" else [])
-    assert petitions.run_clock(NOW + timedelta(hours=71)) == ([], [])
-    assert petitions.run_clock(NOW + timedelta(hours=72)) == (["482913"], [])
+    monkeypatch.setattr(petition_clock, "_due", lambda queries: [stored["petition"]] if stored["petition"]["status"] == "in_review" and "in_review" in str(queries) else [])
+    told: list[str] = []
+    monkeypatch.setattr(petition_clock.petition_updates, "notify_quietly", lambda petition, update: told.append(update.value))
+    assert petition_clock.run_clock(NOW + timedelta(hours=71)) == {"published": [], "closed": [], "unanswered": []}
+    assert petition_clock.run_clock(NOW + timedelta(hours=72))["published"] == ["482913"]
     assert stored["petition"]["publishedBy"] == "automatic" and stored["trail"][-1][:2] == (PetitionAction.AUTO_PUBLISHED, "system")
+    assert told == ["auto_published"]
     with pytest.raises(WrongState):
         petitions.decide(MCE, "482913", False, "not_assembly", None, None, NOW + timedelta(hours=73))
 

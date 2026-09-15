@@ -34,6 +34,7 @@ from app.services import (
     channel_limits,
     channel_sessions,
     petition_signatures,
+    petition_updates,
     petitions,
     phone_proof,
     report_followups,
@@ -382,11 +383,13 @@ NAME_PROMPT = ("Your name will be shown on the petition: anyone can see it, incl
                "Type your name, or 0 to sign anonymously:")
 
 
-def _signed(dial: Dial, code: str, name: str | None) -> tuple[Reply, State | None]:
+def _signed(dial: Dial, code: str, name: str | None, later: Later) -> tuple[Reply, State | None]:
     try:
         signed = petition_signatures.sign(code, dial.msisdn, phone_proof.Channel.USSD, name is not None, name, utc_now())
     except (petitions.PetitionNotFound, WrongState) as error:
         return end(str(error) if isinstance(error, WrongState) else "No open petition has that number."), None
+    if signed.reached:  # this signature sent it to the MCE: its creator is told, after the screen is sent
+        later(petition_updates.notify_quietly, signed.petition, petition_updates.Update.THRESHOLD_REACHED)
     if not signed.added:
         return end("This number has already signed this petition."), None
     count = f"{signed.petition.get('signatureCount') or 0} of {signed.petition.get('threshold')} signatures"
@@ -410,7 +413,7 @@ def _sign_code(dial: Dial, state: State, later: Later) -> tuple[Reply, State | N
 def _sign_choice(dial: Dial, state: State, later: Later) -> tuple[Reply, State | None]:
     choice = dial.text.strip()
     if choice == "1":
-        return _signed(dial, state["code"], None)
+        return _signed(dial, state["code"], None, later)
     if choice == "2":
         return con(NAME_PROMPT), {**state, "step": "sign_name"}
     if choice == "0":
@@ -421,12 +424,12 @@ def _sign_choice(dial: Dial, state: State, later: Later) -> tuple[Reply, State |
 def _sign_name(dial: Dial, state: State, later: Later) -> tuple[Reply, State | None]:
     typed = dial.text.strip()
     if typed == "0":
-        return _signed(dial, state["code"], None)
+        return _signed(dial, state["code"], None, later)
     try:
         clean_signer_name(True, typed)
     except InvalidPetition as error:
         return con(f"{error} Type your name, or 0 to sign anonymously:"), state
-    return _signed(dial, state["code"], typed)
+    return _signed(dial, state["code"], typed, later)
 
 
 STEPS: dict[str, Callable[[Dial, State, Later], tuple[Reply, State | None]]] = {

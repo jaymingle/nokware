@@ -103,9 +103,31 @@ class MceFigures(BaseModel):
     reports_reopened: Count
 
 
+class PetitionRefusals(BaseModel):
+    reason: str
+    label: str
+    count: int
+
+
+class PetitionFigures(BaseModel):
+    """The MCE's handling of petitions: exact counts, since they count decisions on public petitions, not residents."""
+
+    sent: int
+    published_by_mce: int
+    published_automatically: int  # the MCE let the 72 hours pass
+    refused: int
+    refusals: list[PetitionRefusals]
+    reached_threshold: int  # the four below add up to this
+    answered_in_time: int
+    answered_late: int
+    unanswered: int  # 30 days passed, no response yet
+    waiting: int  # still within the 30 days
+
+
 class Responsiveness(BaseModel):
     generated_at: str
     period_start: str
     waiting_days: int
     departments: list[DepartmentFigures]  # by name, never ranked; Assembly departments only
     mce: MceFigures
+    petitions: PetitionFigures
