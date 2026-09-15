@@ -7,11 +7,13 @@ import type {
   Dashboard,
   IssuePage,
   PreferencesResult,
+  PublishingRecord,
   ReportOptions,
   ReportPreferences,
   ReportReceipt,
   ReportStatus,
   Representation,
+  Responsiveness,
   VoiceResult,
 } from "@/lib/api/types";
 
@@ -65,6 +67,16 @@ export function setReportPreferences(reference: string, token: string, choice: R
 
 export function getDashboard(): Promise<Dashboard> {
   return publicRequest<Dashboard>("/api/dashboard");
+}
+
+/** What the Assembly is required to publish, against what the Ledger holds, by year. */
+export function getPublishingRecord(): Promise<PublishingRecord> {
+  return publicRequest<PublishingRecord>("/api/publishing-record");
+}
+
+/** Each Assembly department's handling of reports and contributors' documents over the last twelve months. */
+export function getResponsiveness(): Promise<Responsiveness> {
+  return publicRequest<Responsiveness>("/api/responsiveness");
 }
 
 export function getContacts(): Promise<ContactDirectory> {

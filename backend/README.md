@@ -72,6 +72,8 @@ membership.
 | `GET /api/issues` (open civic issues: topic, area, department, status and voice count; `?sub_metro`, `?topic`) | public |
 | `POST /api/issues/{public_id}/voices` (`device_token`, optional `name`; one voice per browser per issue) | public, 20 an hour per client |
 | `GET /api/dashboard` (twelve months of report figures, no personal safety; Ledger counts and latest documents; cached a minute) | public |
+| `GET /api/publishing-record` (the documents AMA is required to publish, against what the Ledger holds, by year; cached ten minutes) | public |
+| `GET /api/responsiveness` (each Assembly department's handling of reports and contributors' documents, last twelve months; cached a minute) | public |
 | `GET /api/me` | anyone signed in |
 | `GET /api/departments`, `GET /api/categories` | anyone signed in |
 | `POST /api/documents` (multipart: `file`, `title`, `category`, `document_year`, `department`, `source_url`) | department (published), contributor (held 72h) |
@@ -447,6 +449,50 @@ default; run it with `--yes` before deploying this code).
 - **Voices are not verified.** Without accounts, one person can add voices from
   several browsers; the count is a signal of how many residents care, not a
   signature list, and the page says so. A per-connection rate limit caps abuse.
+
+## Accountability
+
+Two public pages publish evidence about the Assembly itself, not only its
+documents.
+
+The publishing record (`app/services/publishing_record.py`,
+`/accountability/documents`) sets what the Assembly is required to publish
+against what the Ledger holds, year by year, from 2021. The list, in four groups
+(vision and plans; budget and tariffs; financial and audit; oversight and RTI),
+is in `app/data/statutory_documents.json`: each document's cadence (annual,
+quarterly, or the 4-year development-plan period), title patterns for the
+document itself and for documents only related to it, and when it counts as
+expected. Each period is held, related documents only (a monitoring and
+evaluation report is not an Annual Progress Report), not found, or not yet
+expected. A gap says exactly what was checked, "Not found in ama.gov.gh's
+Documents Centre (checked 12 September 2026) and not in The Ledger", never that
+the document doesn't exist, links to `/rti` with the request worded, and sits
+beside what the Ledger does hold that year from the same departments or
+categories. The Auditor-General's and Public Accounts Committee reports name who
+issues them, and a PAC report, on no fixed schedule, is never marked missing.
+The "expected" dates are our own conservative assumptions, not statutory
+deadlines: confirm the dates under the Local Governance Act, 2016 (Act 936)
+before the record is used for real. `scripts/publishing_record_matches.py`
+prints every match the rules make, for a person to confirm; a wrong one is
+corrected under `confirmed` in the data file (the document's ID to a
+requirement and year, or to null to set it aside). Update
+`documents_centre_checked` whenever the Documents Centre is imported again.
+Test documents are left out.
+
+Departmental responsiveness (`app/services/department_responsiveness.py`,
+`/accountability/departments`), over the last twelve months: for each Assembly
+department, reports received, resolved and still open; still waiting to be
+started after 7 days (reports don't expire, so this is the measure chosen, not a
+statutory deadline); the median days until work started and to resolve; the
+resolutions residents said weren't fixed, and whether the MCE confirmed them or
+sent them back. For contributors' documents: accepted, disputed, or left to
+publish automatically when the 72-hour review clock ran out, and the median
+review time; and for the MCE, escalated disputes ruled on against those left to
+run out. The public rules hold: personal safety is left out entirely, a count
+from 1 to 4 reads "fewer than 5", a median needs five cases, and where two counts
+add up to one that is shown (resolved and still open make up received), hiding
+one hides the other. Departments are listed by name, never ranked. The Police and
+GNFS are national agencies, not Assembly departments, and are left off.
 
 **Roadmap:** a department-written, one-line public title for an issue (for
 example "Pothole on Kaneshie market road near the footbridge"), added when the

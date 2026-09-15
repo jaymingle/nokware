@@ -25,7 +25,7 @@ function NavLink({ href, testId, children }: { href: string; testId: string; chi
   );
 }
 
-/** The public site's header: Ask, reporting, the dashboard, and the way in for staff. On a phone or tablet the links take a second row. */
+/** The public site's header: Ask, reporting, the dashboard, accountability, and the way in for staff. On a phone or tablet the links take a second row. */
 export function PublicHeader() {
   return (
     <header className="border-b bg-paper-raised">
@@ -43,6 +43,9 @@ export function PublicHeader() {
           </NavLink>
           <NavLink href="/dashboard" testId="public-dashboard-link">
             Dashboard
+          </NavLink>
+          <NavLink href="/accountability" testId="public-accountability-link">
+            Accountability
           </NavLink>
           <NavLink href="/contacts" testId="public-contacts-link">
             Contacts

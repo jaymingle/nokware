@@ -9,9 +9,11 @@ import {
   getIssues,
   fileReport,
   getDashboard,
+  getPublishingRecord,
   getReportOptions,
   getReportStatus,
   getRepresentatives,
+  getResponsiveness,
   setReportPreferences,
   type IssueFilters,
 } from "@/lib/api/public";
@@ -24,6 +26,8 @@ export const publicKeys = {
   reportOptions: ["report-options"] as const,
   reportStatus: (reference: string) => ["report-status", reference] as const,
   dashboard: ["dashboard"] as const,
+  publishingRecord: ["publishing-record"] as const,
+  responsiveness: ["responsiveness"] as const,
   contacts: ["contacts"] as const,
   representatives: ["representatives"] as const,
   issues: (filters: IssueFilters) => ["issues", filters] as const,
@@ -72,6 +76,14 @@ export function useDashboard() {
 export function useForgetStatus(): (reference: string) => void {
   const queryClient = useQueryClient();
   return (reference) => queryClient.removeQueries({ queryKey: publicKeys.reportStatus(reference) });
+}
+
+export function usePublishingRecord() {
+  return useQuery({ queryKey: publicKeys.publishingRecord, queryFn: getPublishingRecord, staleTime: 10 * 60_000 });
+}
+
+export function useResponsiveness() {
+  return useQuery({ queryKey: publicKeys.responsiveness, queryFn: getResponsiveness, staleTime: DASHBOARD_STALE_MS });
 }
 
 export function useContacts() {

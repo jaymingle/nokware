@@ -586,6 +586,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/publishing-record": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Record */
+        get: operations["record_api_publishing_record_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/responsiveness": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Responsiveness */
+        get: operations["responsiveness_api_responsiveness_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/contacts": {
         parameters: {
             query?: never;
@@ -750,7 +784,7 @@ export interface paths {
          * @description A spoken reply, fetched by Twilio as it sends the voice note. The link is random and lasts 10 minutes, and
          *     the audio is an answer from public documents, never anything about a report.
          */
-        get: operations["whatsapp_audio_api_channels_whatsapp_audio__name__get"];
+        get: operations["whatsapp_audio_api_channels_whatsapp_audio__name__head"];
         put?: never;
         post?: never;
         delete?: never;
@@ -760,7 +794,7 @@ export interface paths {
          * @description A spoken reply, fetched by Twilio as it sends the voice note. The link is random and lasts 10 minutes, and
          *     the audio is an answer from public documents, never anything about a report.
          */
-        head: operations["whatsapp_audio_api_channels_whatsapp_audio__name__get"];
+        head: operations["whatsapp_audio_api_channels_whatsapp_audio__name__head"];
         patch?: never;
         trace?: never;
     };
@@ -1209,6 +1243,50 @@ export interface components {
             /** Text */
             text: string;
         };
+        /**
+         * DepartmentDocuments
+         * @description Contributors' documents the department had 72 hours to review.
+         */
+        DepartmentDocuments: {
+            /** Accepted */
+            accepted: number | null;
+            /** Disputed */
+            disputed: number | null;
+            /** Auto Published */
+            auto_published: number | null;
+            /** Median Hours To Review */
+            median_hours_to_review: number | null;
+        };
+        /** DepartmentFigures */
+        DepartmentFigures: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            reports: components["schemas"]["DepartmentReports"];
+            documents: components["schemas"]["DepartmentDocuments"];
+        };
+        /** DepartmentReports */
+        DepartmentReports: {
+            /** Received */
+            received: number | null;
+            /** Resolved */
+            resolved: number | null;
+            /** Open */
+            open: number | null;
+            /** Waiting */
+            waiting: number | null;
+            /** Median Days To Start */
+            median_days_to_start: number | null;
+            /** Median Days To Resolve */
+            median_days_to_resolve: number | null;
+            /** Disputed */
+            disputed: number | null;
+            /** Confirmed */
+            confirmed: number | null;
+            /** Reopened */
+            reopened: number | null;
+        };
         /** DocumentDetail */
         DocumentDetail: {
             /** Id */
@@ -1502,6 +1580,17 @@ export interface components {
             /** At */
             at: string;
         };
+        /** MceFigures */
+        MceFigures: {
+            /** Documents Ruled */
+            documents_ruled: number | null;
+            /** Documents Run Out */
+            documents_run_out: number | null;
+            /** Reports Confirmed */
+            reports_confirmed: number | null;
+            /** Reports Reopened */
+            reports_reopened: number | null;
+        };
         /** MeResponse */
         MeResponse: {
             /** User Id */
@@ -1601,6 +1690,22 @@ export interface components {
             /** Press Url */
             press_url?: string | null;
         };
+        /** PublishingRecord */
+        PublishingRecord: {
+            /** Generated At */
+            generated_at: string;
+            /** Documents Centre */
+            documents_centre: string;
+            /** Documents Centre Checked */
+            documents_centre_checked: string;
+            /** First Year */
+            first_year: number;
+            /** Last Year */
+            last_year: number;
+            /** Groups */
+            groups: components["schemas"]["RequirementGroup"][];
+            summary: components["schemas"]["RecordSummary"];
+        };
         /** ReassignRequest */
         ReassignRequest: {
             /** From Recipient */
@@ -1620,6 +1725,57 @@ export interface components {
             department_name: string | null;
             /** Published At */
             published_at: string | null;
+        };
+        /** RecordDocument */
+        RecordDocument: {
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+            /** Year */
+            year: number | null;
+            /** Department Name */
+            department_name: string | null;
+        };
+        /**
+         * RecordPeriod
+         * @description One year, quarter or plan period of a required document.
+         */
+        RecordPeriod: {
+            /** Label */
+            label: string;
+            /** Year */
+            year: number;
+            /** Quarter */
+            quarter: number | null;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "held" | "related" | "missing" | "not_due";
+            /** Expected From */
+            expected_from: string | null;
+            /** Documents */
+            documents: components["schemas"]["RecordDocument"][];
+            /** Related */
+            related: components["schemas"]["RecordDocument"][];
+            /** Nearby */
+            nearby: components["schemas"]["RecordDocument"][];
+            /** Nearby Total */
+            nearby_total: number;
+        };
+        /** RecordSummary */
+        RecordSummary: {
+            /** Due */
+            due: number;
+            /** Held */
+            held: number;
+            /** Related */
+            related: number;
+            /** Missing */
+            missing: number;
+            /** Not Due */
+            not_due: number;
         };
         /** ReportOptions */
         ReportOptions: {
@@ -1715,12 +1871,57 @@ export interface components {
             /** Url */
             url: string;
         };
+        /** Requirement */
+        Requirement: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /**
+             * Cadence
+             * @enum {string}
+             */
+            cadence: "annual" | "quarterly" | "plan_period" | "as_issued";
+            /** Issued By */
+            issued_by: string | null;
+            /** Expected Note */
+            expected_note: string | null;
+            /** Nearby Scope */
+            nearby_scope: string;
+            /** Periods */
+            periods: components["schemas"]["RecordPeriod"][];
+            /** Undated */
+            undated: components["schemas"]["RecordDocument"][];
+            /** Held */
+            held: components["schemas"]["RecordDocument"][];
+        };
+        /** RequirementGroup */
+        RequirementGroup: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Requirements */
+            requirements: components["schemas"]["Requirement"][];
+        };
         /** ResolutionNote */
         ResolutionNote: {
             /** Recipient */
             recipient: string;
             /** Note */
             note: string;
+        };
+        /** Responsiveness */
+        Responsiveness: {
+            /** Generated At */
+            generated_at: string;
+            /** Period Start */
+            period_start: string;
+            /** Waiting Days */
+            waiting_days: number;
+            /** Departments */
+            departments: components["schemas"]["DepartmentFigures"][];
+            mce: components["schemas"]["MceFigures"];
         };
         /**
          * Role
@@ -2850,6 +3051,46 @@ export interface operations {
             };
         };
     };
+    record_api_publishing_record_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublishingRecord"];
+                };
+            };
+        };
+    };
+    responsiveness_api_responsiveness_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Responsiveness"];
+                };
+            };
+        };
+    };
     directory_api_contacts_get: {
         parameters: {
             query?: never;
@@ -3071,7 +3312,7 @@ export interface operations {
             };
         };
     };
-    whatsapp_audio_api_channels_whatsapp_audio__name__get: {
+    whatsapp_audio_api_channels_whatsapp_audio__name__head: {
         parameters: {
             query?: never;
             header?: never;
@@ -3102,7 +3343,7 @@ export interface operations {
             };
         };
     };
-    whatsapp_audio_api_channels_whatsapp_audio__name__get: {
+    whatsapp_audio_api_channels_whatsapp_audio__name__head: {
         parameters: {
             query?: never;
             header?: never;
