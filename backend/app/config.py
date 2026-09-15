@@ -56,8 +56,8 @@ class Settings(BaseSettings):
     deadline_job_interval_seconds: int = 120
 
     # Citizen notifications. "log" records each message without sending it.
-    # SMS_PROVIDER=arkesel sends SMS through Arkesel; the Twilio (WhatsApp)
-    # provider is wired in later.
+    # SMS_PROVIDER=arkesel sends SMS through Arkesel, SMS_PROVIDER=bms through
+    # BMS Africa; WHATSAPP_PROVIDER=twilio sends WhatsApp through Twilio.
     sms_provider: str = "log"
     whatsapp_provider: str = "log"
     # Arkesel SMS. In sandbox mode (the default) Arkesel accepts each message
@@ -69,6 +69,14 @@ class Settings(BaseSettings):
     sms_daily_limit: int = 50
     # Arkesel's webhook secret: verifies the signed delivery reports it sends.
     arkesel_webhook_secret: str = ""
+    # BMS Africa SMS (mNotify's API), needed when SMS_PROVIDER=bms. There is no
+    # sandbox: every message is live and charged. The key travels in the
+    # request address, so it is redacted from logs and never stored.
+    bms_api_key: str = ""
+    bms_sender_id: str = ""
+    # BMS has no delivery webhook: how often the API asks it what became of the
+    # SMS sent in the last two days. 0 turns it off.
+    bms_delivery_poll_seconds: int = 120
     # The secret in Arkesel's USSD callback address. Arkesel doesn't sign USSD
     # callbacks yet, so this is their only protection. Empty: USSD is off.
     arkesel_ussd_token: str = ""
@@ -107,10 +115,11 @@ class Settings(BaseSettings):
     petition_threshold_area: int = 150  # a petition about one electoral area
     petition_threshold_metro: int = 500  # a petition about the whole Assembly
     # Verification codes by SMS, as a third way to confirm a phone number beside
-    # WhatsApp and USSD. Keep this OFF until the Arkesel sender ID is registered:
-    # messages from an unregistered sender ID are held for review for about 15
-    # minutes, and a code that arrives 15 minutes late is worse than no SMS
-    # option at all.
+    # WhatsApp and USSD. Only with an approved sender ID: messages from an
+    # unregistered one are held for review for about 15 minutes, and a code that
+    # arrives 15 minutes late is worse than no SMS option at all. "Nokware" is
+    # approved on BMS, so turn this on with SMS_PROVIDER=bms; keep it off on
+    # Arkesel until its sender ID is registered.
     sms_verification_codes: bool = False
     # The most SMS pages sent in a day for verification codes: a cap of its own,
     # apart from SMS_DAILY_LIMIT, so codes never use up report notifications.

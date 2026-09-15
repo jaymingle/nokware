@@ -44,6 +44,7 @@ from app.services.ledger_documents import parse_datetime
 from app.services.redis_store import get_redis, key
 from app.services.report_contacts import InvalidNumber, masked, normalise_phone
 from app.services.sms import SmsError, code_sms
+from app.services.sms_bms import bms_codes
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +52,7 @@ CHALLENGE_SECONDS = 15 * 60
 PROOF_LIFETIME = timedelta(hours=12)
 CODE_DIGITS = 6
 SMS_ATTEMPTS = 5
+CODE_SENDERS = {"arkesel": code_sms, "bms": bms_codes}  # SMS_PROVIDER: the client with the codes' own daily cap
 _TYPED_CODE = re.compile(r"^\s*(?:nokware\s+)?code\W*([0-9]{3})[\s-]?([0-9]{3})\W*$", re.IGNORECASE)
 _TOKEN = re.compile(r"^[A-Za-z0-9_-]{20,64}$")
 
@@ -244,11 +246,12 @@ def send_sms_code(secret: str, raw_number: str, now: datetime) -> str:
 
 def _text_code(number: str, code: str) -> None:
     body = f"Your Nokware code is {code}. It lasts 15 minutes. Don't share it."
-    if get_settings().sms_provider != "arkesel":
-        logger.warning("SMS code for %s not sent (SMS_PROVIDER isn't arkesel): %s", masked(number), code)
+    sender = CODE_SENDERS.get(get_settings().sms_provider)
+    if sender is None:
+        logger.warning("SMS code for %s not sent (no SMS provider is configured): %s", masked(number), code)
         return
     try:
-        code_sms().send(number, body)
+        sender().send(number, body)
     except SmsError as error:
         raise SmsUnavailable(f"The code couldn't be sent: {error}") from None
 

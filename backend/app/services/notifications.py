@@ -16,9 +16,9 @@ two pages. A personal-safety message never does: it says only the reference.
 
 Every message is written to the notifications outbox first (never with the
 number, which is read from report_contacts at the moment of sending), then
-handed to the channel's provider: Arkesel for SMS (SMS_PROVIDER=arkesel),
-Twilio for WhatsApp (WHATSAPP_PROVIDER=twilio), or "log", which records the
-message as not sent.
+handed to the channel's provider: Arkesel or BMS Africa for SMS
+(SMS_PROVIDER=arkesel or bms), Twilio for WhatsApp (WHATSAPP_PROVIDER=twilio),
+or "log", which records the message as not sent.
 
 WhatsApp carries a free-form message only within 24 hours of the citizen's last
 message, and until WhatsApp templates are approved nothing else can go. So a
@@ -53,6 +53,7 @@ from app.services.ledger_documents import now_iso
 from app.services.report_contacts import GHANA_CODE, contact_for, masked
 from app.services.report_taxonomy import Category
 from app.services.sms import arkesel
+from app.services.sms_bms import bms
 from app.services.sms_text import bare_address, pages
 from app.services.whatsapp import first_delivery, twilio, window_open
 from app.teams import short_name
@@ -147,6 +148,8 @@ def provider_for(channel: NotificationChannel) -> Provider | None:
         return None
     if channel == NotificationChannel.SMS and configured == "arkesel":
         return arkesel()
+    if channel == NotificationChannel.SMS and configured == "bms":
+        return bms()
     if channel == NotificationChannel.WHATSAPP and configured == "twilio":
         return twilio()
     raise NotImplementedError(f"{channel.value} provider {configured!r} is not wired in yet")

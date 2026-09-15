@@ -228,8 +228,13 @@ resolution and escalation, content-neutral for personal safety; each is
 written to the outbox, then sent. Numbers are deleted by an hourly job 30 days
 after their case closes.
 
-SMS goes through Arkesel (`sms.py`) when `SMS_PROVIDER=arkesel`; `log`, the
-default, records each message as not sent. Every message fits one SMS page
+SMS goes through Arkesel (`sms.py`) when `SMS_PROVIDER=arkesel`, or through
+BMS Africa (`sms_bms.py`, mNotify's API) when `SMS_PROVIDER=bms`; `log`, the
+default, records each message as not sent. BMS is there because "Nokware" is
+an approved sender ID on it, so its messages go at once rather than being held
+for review; Arkesel stays in place, and USSD stays on Arkesel either way. BMS
+has no sandbox: every message it accepts is sent and charged, within the same
+daily page limits. Every message fits one SMS page
 (one credit): text is made plain GSM-7 (`sms_text.py`), since one curly
 apostrophe would send it as Unicode at 70 characters a page, and office names
 give way to "2 offices" when they would not fit. `ARKESEL_SANDBOX=true` (the
@@ -291,6 +296,25 @@ constant-time, and a timestamp more than 5 minutes off is refused. Each SMS asks
 the secret are both set; the report sets the outbox row's `deliveryStatus`
 (`scripts/add_delivery_reports.py` adds the fields and the index it needs).
 Arkesel's sandbox records a message as `SANDBOXED` and sends no report.
+
+BMS sends no delivery reports at all: it has no SMS webhook, signed or not. So
+`bms_deliveries.py` asks it instead: every `BMS_DELIVERY_POLL_SECONDS` (120),
+for each BMS message sent between a minute and two days ago whose delivery
+isn't settled, it reads the campaign's report and sets the outbox row's
+`deliveryStatus` as a webhook would, so staff see DELIVERED or FAILED
+whichever provider carried the message. This gives up Arkesel's HMAC
+verification, but deliberately: with no webhook, nothing comes in, so there is
+nothing to forge. The API makes outbound requests to BMS over HTTPS and trusts
+the answers as it trusts any response from BMS. It is a different shape of risk
+rather than a worse one. What it costs is time: a status arrives up to two
+minutes after BMS knows it, where a webhook is immediate.
+
+BMS takes its API key as a query parameter (`?key=`), never a header, so the
+key is in every request's address. It never reaches a log, a stored error or
+the outbox: errors name the failure and never echo the address (an unreachable
+gateway is reported by its error type alone, and BMS's own words are stripped
+of the key and of any phone number), and a filter redacts `key=` from httpx's
+request log line, the one place a library writes the address.
 
 The messaging channels share one layer, so WhatsApp and USSD file and answer
 through the same `report_intake.submit()` and `rag.answer_question()` as the web:
@@ -415,11 +439,12 @@ Known limitations:
   redacts it from its own access log (`RedactChannelSecrets` in `main.py`), but a
   proxy in front of it, or ngrok's inspector in development, still records
   it. When Arkesel signs USSD, it moves to the same verification as SMS.
-- While the sender ID is unregistered (the account sends as "Jay" meanwhile),
-  Arkesel holds each real SMS for approval: in testing, about 15 minutes
-  before delivery. Notifications and USSD answers therefore don't arrive
-  promptly until the sender ID is registered; registration (a letter of
-  authorization, approved over some days) is the fix.
+- While the sender ID is unregistered on Arkesel (the account sends as "Jay"
+  meanwhile), Arkesel holds each real SMS for approval: in testing, about 15
+  minutes before delivery. With `SMS_PROVIDER=bms` SMS goes as the approved
+  "Nokware" and isn't held; USSD answers, which only Arkesel carries, still
+  wait on the registration (a letter of authorization, approved over some
+  days).
 - WhatsApp updates outside the 24-hour window need message templates approved
   by WhatsApp, which the Twilio sandbox can't have. Until a WhatsApp sender with
   approved templates exists (a production step), those updates go by SMS to
@@ -625,10 +650,11 @@ and the clocks in `app/services/petitions.py`.
 - **A confirmed phone.** Starting a petition needs a Ghanaian mobile number,
   confirmed from the page (`app/services/phone_proof.py`): by WhatsApp (the page
   opens a chat with "Nokware code 482173" typed; Twilio says who sent it) or
-  USSD (option 5, then the code; the network says who dialled). SMS codes are
-  built but off (`SMS_VERIFICATION_CODES=false`) until the Arkesel sender ID is
-  registered, since an unregistered sender's messages are held for about 15
-  minutes, and have a daily cap of their own. The page then holds a sealed proof
+  USSD (option 5, then the code; the network says who dialled), or by an SMS
+  code (`SMS_VERIFICATION_CODES=true`) with `SMS_PROVIDER=bms`, where "Nokware"
+  is an approved sender. Codes need an approved sender: an unregistered
+  one's messages are held for about 15 minutes, so on Arkesel they stay off
+  until its sender ID is registered. They have a daily cap of their own. The page then holds a sealed proof
   (AES-GCM) for 12 hours; no number is ever in Redis. Each WhatsApp confirmation
   costs one reply message.
 - **The MCE's review, which can't be a veto.** The MCE is usually the petition's

@@ -31,6 +31,11 @@ Nothing here is secret. Secret values live in Coolify's environment settings
 3. **Redis database number.** Production shares the VPS's Redis with another
    product. Nokware's keys all start `nokware:`, but it should still have a
    database number of its own (for example `/2`). Pick one that is free.
+4. **Live SMS from the first day.** The plan below sends SMS through BMS,
+   which has no sandbox, so report notifications, petition updates and
+   verification codes are real and charged from deployment (within the daily
+   caps). Confirm that, or deploy on Arkesel's sandbox and switch later (see
+   *Constraints*).
 
 ## What the repository already provides
 
@@ -63,13 +68,16 @@ Nothing here is secret. Secret values live in Coolify's environment settings
 - **The API's port is reached only through Coolify's proxy.** The container
   trusts the proxy's `X-Forwarded-For` so that rate limits (per client address)
   see each resident rather than the proxy. Don't publish port 8000 directly.
-- **`ARKESEL_SANDBOX=true` until the go-live decision.** In the sandbox Arkesel
-  accepts every SMS without delivering it or spending credits. Switching it
-  off is a deliberate step, not part of this deployment.
-- **`SMS_VERIFICATION_CODES=false` until the sender ID is registered.** An
-  unregistered sender ID's messages are held for about 15 minutes, and a code
-  that late is worse than no SMS option. WhatsApp and USSD confirm numbers
-  meanwhile.
+- **SMS goes through BMS (`SMS_PROVIDER=bms`), and it is live.** "Nokware" is
+  an approved sender ID on BMS, so messages aren't held for review, which is
+  what lets SMS verification codes go live (`SMS_VERIFICATION_CODES=true`). BMS
+  has no sandbox: every report notification, petition update and code is
+  delivered and charged. `SMS_DAILY_LIMIT` (50 pages) and `SMS_CODE_DAILY_LIMIT`
+  (30) bound a day's spend. To deploy without live SMS instead, set
+  `SMS_PROVIDER=arkesel` with `ARKESEL_SANDBOX=true` and
+  `SMS_VERIFICATION_CODES=false`.
+- **`ARKESEL_SANDBOX=true`.** Arkesel still carries USSD; its SMS provider
+  stays configured as the fallback, in its sandbox.
 
 ## 1. DNS
 
@@ -168,10 +176,12 @@ from development:
 | `PUBLIC_API_URL` | the ngrok address | `https://api.nokware.tstitagency.com` |
 | `PUBLIC_SITE_URL` | `http://localhost:3000` | `https://nokware.tstitagency.com` |
 | `REDIS_URL` | `redis://localhost:6379/0` | `redis://:<password>@<redis-host>:6379/<Nokware's number>` |
-| `SMS_PROVIDER` | `arkesel` | unchanged |
+| `SMS_PROVIDER` | `arkesel` | **`bms`** (see *Constraints*: live and charged) |
 | `WHATSAPP_PROVIDER` | `twilio` | unchanged |
 | `ARKESEL_API_KEY`, `ARKESEL_SENDER_ID`, `ARKESEL_WEBHOOK_SECRET` | secrets | unchanged |
 | `ARKESEL_SANDBOX` | `true` | `true` (see *Constraints*) |
+| `BMS_API_KEY`, `BMS_SENDER_ID` | secret, `Nokware` | the same (the sender ID is approved on BMS) |
+| `BMS_DELIVERY_POLL_SECONDS` | `120` | `120`: BMS sends no delivery reports, so the API asks it |
 | `SMS_DAILY_LIMIT` | `50` | unchanged unless decided otherwise |
 | `ARKESEL_USSD_TOKEN` | the development token | **the new token from step 3** |
 | `USSD_SERVICE_CODE` | empty | empty until Arkesel confirms the dial code (e.g. `*920*123#`); then petition pages offer USSD |
@@ -180,7 +190,7 @@ from development:
 | `GEMINI_TTS_MODEL`, `GEMINI_TTS_VOICE`, `VOICE_DAILY_LIMIT` | `gemini-3.1-flash-tts-preview`, `Charon`, `20` | unchanged (leave `GEMINI_TTS_MODEL` unset or set it to the 3.1 model: 2.5 stalls on read-aloud's longer text) |
 | `READ_ALOUD_DAILY_LIMIT` | `300` | unchanged: fresh read-aloud parts (about 25 seconds each) made in a day across everyone (repeats come from a six-hour cache) |
 | `PETITION_THRESHOLD_AREA`, `PETITION_THRESHOLD_METRO` | `150`, `500` | unchanged |
-| `SMS_VERIFICATION_CODES`, `SMS_CODE_DAILY_LIMIT` | `false`, `30` | unchanged (see *Constraints*) |
+| `SMS_VERIFICATION_CODES`, `SMS_CODE_DAILY_LIMIT` | `false`, `30` | **`true`**, `30` (with BMS; see *Constraints*) |
 | `PHONE_KEY_SECRET` | unset | **the new secret from step 3** |
 | `JOB_TOKEN` | unset | unset (optional; see step 3) |
 | `DEADLINE_JOB_INTERVAL_SECONDS`, `CONTACT_PURGE_INTERVAL_SECONDS` | `120`, `3600` | unchanged |
@@ -197,7 +207,7 @@ it without `https://` where one SMS page is tight.
    does, `POSTGRES_URL` or the network path is wrong: Ask and the Ledger search
    answer 503 until it's fixed (reports, the portal and petitions still work).
 2. `Deadline job runs every 120s`, `Petition clock runs every 120s`,
-   `Contact purge runs every 3600s`.
+   `Contact purge runs every 3600s`, `BMS delivery check runs every 120s`.
 3. `Application startup complete.`
 
 Then `curl https://api.nokware.tstitagency.com/health` answers
@@ -265,21 +275,27 @@ number and set the same "when a message comes in" address on that sender.
   `https://api.nokware.tstitagency.com/api/channels/sms/delivery` and verifies
   them with `ARKESEL_WEBHOOK_SECRET`. If the dashboard also keeps a webhook
   address, set it to that; the secret is unchanged.
-- **Sender ID**: registration is in progress. When it clears, SMS verification
-  codes can be switched on (`SMS_VERIFICATION_CODES=true`), after a test.
+- **Sender ID**: registration is in progress. It matters for USSD answers and
+  for SMS if the API ever goes back to Arkesel; with `SMS_PROVIDER=bms`, SMS
+  already goes as the approved "Nokware" on BMS.
+- **BMS** needs nothing configured on its side: no webhook exists, and the API
+  polls for delivery. The startup log says `BMS delivery check runs every
+  120s`. `scripts/sms_balance.py` shows the credit left (it sends nothing).
 
 ## 9. Order of operations
 
-1. Settle the three *Decisions*.
+1. Settle the four *Decisions*.
 2. Add the DNS records; wait until both names resolve to the VPS.
 3. Add the Appwrite web platform.
 4. Generate `PHONE_KEY_SECRET` and the new `ARKESEL_USSD_TOKEN`; store both.
 5. Create the API in Coolify with every variable above; deploy. Check the
-   startup log (search index reachable, three jobs running) and `/health`.
+   startup log (search index reachable, four jobs running, the fourth being the BMS
+   delivery check) and `/health`.
 6. Create the site in Coolify with its build arguments; deploy. Check:
    - the home page, Ask (a question that cites documents), and a document's PDF;
-   - filing a report with a sandbox SMS number (Arkesel's sandbox: nothing is
-     delivered or charged), and its status page;
+   - filing a report, and its status page (with BMS the SMS is real and
+     charged: file with your own number, once, and check the outbox row
+     reaches `deliveryStatus` DELIVERED within a few minutes);
    - staff sign-in (a department and the MCE), and the portal queues;
    - the petitions pages, and the accountability pages.
 7. Switch Twilio's sandbox webhook (step 7) and Arkesel's USSD callback with
