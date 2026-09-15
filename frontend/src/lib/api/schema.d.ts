@@ -2502,6 +2502,8 @@ export interface components {
             documents: components["schemas"]["DocumentRef"][];
             /** Responded At */
             responded_at: string;
+            /** Late */
+            late: boolean;
             /** Days Late */
             days_late: number;
         };

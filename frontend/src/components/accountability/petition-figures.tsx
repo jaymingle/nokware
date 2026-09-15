@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { Lines } from "@/components/accountability/figure-lines";
+import { lowerFirst } from "@/lib/text";
 
 import type { PetitionFigures as Figures } from "@/lib/api/types";
 
@@ -19,7 +20,7 @@ export function PetitionFigures({ figures }: { figures: Figures }) {
         { label: "Published automatically: the MCE didn't decide within 72 hours", value: figures.published_automatically.toLocaleString(), testId: "responsiveness-petitions-automatic" },
         { label: "Refused", value: figures.refused.toLocaleString(), testId: "responsiveness-petitions-refused" },
       ]}>
-        {reasons.length ? <p className="text-[12.5px] text-ink-soft">Refused for: {reasons.map((r) => `${r.label.toLowerCase()} (${r.count})`).join(", ")}.</p> : null}
+        {reasons.length ? <p className="text-[12.5px] text-ink-soft">Refused for: {reasons.map((r) => `${lowerFirst(r.label)} (${r.count})`).join(", ")}.</p> : null}
       </Lines>
       <Lines title={`Response to the ${figures.reached_threshold.toLocaleString()} that reached their signatures`} lines={[
         { label: "Answered within 30 days", value: figures.answered_in_time.toLocaleString(), testId: "responsiveness-petitions-in-time" },

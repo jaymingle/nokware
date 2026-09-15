@@ -75,8 +75,10 @@ describe("once a petition reaches its signatures", () => {
     expect(responseLine({ ...reached, unanswered_at: "2026-10-15T09:02:00Z" }, NOW)).toContain(NO_RESPONSE);
     const answered = { ...reached, status: "responded" as const };
     expect(responseLine({ ...answered, responded_at: "2026-10-01T10:00:00Z" }, NOW)).toBe("The MCE responded on 1 Oct 2026.");
-    expect(responseLine({ ...answered, responded_at: "2026-10-18T10:00:00Z" }, NOW)).toBe(
-      "The MCE responded on 18 Oct 2026, 4 days after the 30-day deadline.");
+    expect(responseLine({ ...answered, responded_at: "2026-10-17T09:09:00Z" }, NOW)).toBe(
+      "The MCE responded on 17 Oct 2026, 2 days after the 30-day deadline."); // 2 days 9 minutes: never rounded up
+    expect(responseLine({ ...answered, responded_at: "2026-10-15T14:00:00Z" }, NOW)).toBe(
+      "The MCE responded on 15 Oct 2026, less than a day after the 30-day deadline.");
     expect(closingLine(answered, NOW)).toBe("It takes no more signatures: the MCE has responded.");
     expect(timelineText({ action: "no_response", at: "t", reason: null })).toBe(NO_RESPONSE.replace(/\.$/, ""));
   });

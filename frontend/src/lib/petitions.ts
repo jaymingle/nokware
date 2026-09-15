@@ -68,12 +68,18 @@ export function daysLeft(iso: string, now: number): number {
 
 type Standing = Pick<PetitionCard, "status" | "threshold" | "threshold_reached_at" | "response_due" | "responded_at" | "unanswered_at">;
 
-/** When, and how late, the MCE responded: "N days after the 30-day deadline" if it passed first. */
+/** How late, in whole days never rounded up: ", 2 days after the 30-day deadline", or "less than a day"; "" if in time. */
+function lateness(respondedAt: string, due: string | null): string {
+  const lateMs = due ? Date.parse(respondedAt) - Date.parse(due) : 0;
+  if (lateMs <= 0) return "";
+  const days = Math.floor(lateMs / DAY_MS);
+  return days >= 1 ? `, ${days} ${days === 1 ? "day" : "days"} after the 30-day deadline` : ", less than a day after the 30-day deadline";
+}
+
+/** When, and how late, the MCE responded. */
 export function respondedLine(petition: Pick<PetitionCard, "responded_at" | "response_due">): string | null {
   if (!petition.responded_at) return null;
-  const late = petition.response_due ? Math.ceil((Date.parse(petition.responded_at) - Date.parse(petition.response_due)) / DAY_MS) : 0;
-  const lateness = late > 0 ? `, ${late} ${late === 1 ? "day" : "days"} after the 30-day deadline` : "";
-  return `The MCE responded on ${formatDate(petition.responded_at)}${lateness}.`;
+  return `The MCE responded on ${formatDate(petition.responded_at)}${lateness(petition.responded_at, petition.response_due)}.`;
 }
 
 /** Once it reached its threshold: when, and the MCE's 30 days to respond, counted down, then said plainly if they pass. */
