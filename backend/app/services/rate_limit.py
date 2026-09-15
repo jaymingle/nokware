@@ -36,3 +36,7 @@ LOOKUPS = RateLimit(limit=30, window_seconds=60)
 ESCALATIONS = RateLimit(limit=5, window_seconds=3600)
 VOICES = RateLimit(limit=20, window_seconds=3600)
 EXPORTS = RateLimit(limit=30, window_seconds=3600)  # each renders a PDF, a Word file or a CSV
+PETITION_CHECKS = RateLimit(limit=30, window_seconds=3600)  # each reads the draft with Gemini or searches the Ledger
+PETITION_CHANGES = RateLimit(limit=20, window_seconds=3600)
+PHONE_CHALLENGES = RateLimit(limit=20, window_seconds=3600)
+PHONE_POLLS = RateLimit(limit=400, window_seconds=900)  # the page asks every few seconds while it waits

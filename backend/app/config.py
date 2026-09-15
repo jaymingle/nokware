@@ -90,8 +90,30 @@ class Settings(BaseSettings):
     gemini_tts_model: str = "gemini-2.5-flash-preview-tts"
     gemini_tts_voice: str = "Charon"
     voice_daily_limit: int = 20
+    # The USSD code residents dial (e.g. *920*123#), shown on the web where USSD
+    # can confirm a phone number. Empty: USSD isn't offered for that.
+    ussd_service_code: str = ""
     # Where citizens follow their reports; used in the links messages carry.
     public_site_url: str = "http://localhost:3000"
+
+    # Petitions. Signatures needed before a petition goes to the MCE: fixed on
+    # each petition when it opens, so changing these never moves a live goal.
+    petition_threshold_area: int = 150  # a petition about one electoral area
+    petition_threshold_metro: int = 500  # a petition about the whole Assembly
+    # Verification codes by SMS, as a third way to confirm a phone number beside
+    # WhatsApp and USSD. Keep this OFF until the Arkesel sender ID is registered:
+    # messages from an unregistered sender ID are held for review for about 15
+    # minutes, and a code that arrives 15 minutes late is worse than no SMS
+    # option at all.
+    sms_verification_codes: bool = False
+    # The most SMS pages sent in a day for verification codes: a cap of its own,
+    # apart from SMS_DAILY_LIMIT, so codes never use up report notifications.
+    sms_code_daily_limit: int = 30
+    # The secret behind the keyed hash stored for a verified phone (who started
+    # a petition; from P2, one signature per phone per petition). Empty: derived
+    # from the Appwrite API key. Set it before launch, so that rotating that key
+    # doesn't reset who has already signed.
+    phone_key_secret: str = ""
 
     # How often the API deletes citizens' numbers whose retention has ended.
     # 0 turns it off.

@@ -74,14 +74,20 @@ def list_issues(sub_metro: str | None, topic: str | None, limit: int, offset: in
     return [as_record(d) for d in listing.documents], int(listing.total)
 
 
-def find_issue(public_id: str) -> dict[str, Any]:
-    """An open civic issue by its public ID. Anything that isn't a civic-service report is simply not found."""
+def civic_issue(public_id: str) -> dict[str, Any]:
+    """A civic issue by its public ID, open or not. Anything that isn't a civic-service report is simply not found."""
     listing = get_databases().list_documents(
         DATABASE_ID, REPORTS_COLLECTION, queries=[Query.equal("publicId", public_id), Query.limit(1)]
     )
     case = as_record(listing.documents[0]) if listing.documents else None
     if case is None or case.get("category") != Category.CIVIC_SERVICE or case.get("isSensitive"):
         raise IssueNotFound(public_id)
+    return case
+
+
+def find_issue(public_id: str) -> dict[str, Any]:
+    """An open civic issue by its public ID."""
+    case = civic_issue(public_id)
     if not is_public_issue(case):
         raise WrongState("This issue has been resolved, so it no longer takes new voices.")
     return case

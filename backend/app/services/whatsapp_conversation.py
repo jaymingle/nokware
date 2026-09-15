@@ -20,6 +20,9 @@ hour. The chat reply is the receipt, so no separate "received" message is sent.
 A voice note is heard by whatsapp_voice and then handled as if its English had
 been typed. Its words are shown back ("I understood: …") with a question's
 answer and before a report is filed. Only a question's answer is also spoken.
+
+"Nokware code 482173" confirms the number to the web page that showed the code
+(phone_proof), whatever step the chat is at, and is answered once.
 """
 
 import base64
@@ -44,7 +47,7 @@ from app.services.report_intake import DESCRIPTION_MIN, Receipt, ReportSubmissio
 from app.services.report_photos import PhotoRejected, clean_photo
 from app.services.report_rules import Classification, ClassificationMethod, InvalidReport
 from app.services.report_taxonomy import Category
-from app.services import whatsapp_reply, whatsapp_safety, whatsapp_voice
+from app.services import phone_proof, whatsapp_reply, whatsapp_safety, whatsapp_voice
 from app.services.voice_transcribe import Heard
 from app.services.whatsapp import WhatsAppError, WhatsAppNotConfigured, first_delivery, open_window, twilio
 from app.teams import short_name
@@ -365,11 +368,22 @@ def _heard(inbound: Inbound) -> Inbound | None:
     return replace(inbound, text=whatsapp_voice.as_typed(heard.english), media=None, heard=heard) if heard else None
 
 
+def _confirm_code(number: str, code: str) -> None:
+    """A code from a Nokware page, sent to confirm this number: claimed, and answered once."""
+    if channel_limits.CODE_CLAIMS.allow(number, utc_now().timestamp()):
+        claimed = phone_proof.claim(code, number, phone_proof.Channel.WHATSAPP, utc_now())
+        whatsapp_reply.reply(number, phone_proof.CLAIM_REPLIES[claimed])
+
+
 def _route(inbound: Inbound) -> None:
     """A message to the step its chat is at, or read afresh."""
     problem = _media_problem(inbound.media)
     if problem:
         whatsapp_reply.reply(inbound.number, problem)
+        return
+    code = None if inbound.media else phone_proof.typed_code(inbound.text)
+    if code:
+        _confirm_code(inbound.number, code)
         return
     state = channel_sessions.load("whatsapp", inbound.number)
     step = STEPS.get(state.get("step", "")) if state else None

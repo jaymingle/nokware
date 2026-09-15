@@ -1,4 +1,4 @@
-"""USSD (Arkesel): the keypad menu. Ask a question, report an issue, check a case.
+"""USSD (Arkesel): the keypad menu. Ask a question, report an issue, check a case, confirm a web code.
 
 A screen holds 160 characters and a session lasts seconds, so:
 - the menu's place is kept in Redis under the session ID, for 3 minutes;
@@ -14,7 +14,8 @@ else. A personal-safety report is asked only for its sub-metro, which it may
 skip, never its electoral area; it gets the reference on screen, updates only
 if the citizen then says yes, and any SMS about it says nothing but the
 reference. Reports carry no photos. The same services as the web:
-report_intake.submit() and rag.answer_question().
+report_intake.submit() and rag.answer_question(). "Confirm a web code" proves the
+number to a Nokware page that asked for it (phone_proof): the network says who dialled.
 """
 
 import logging
@@ -26,7 +27,7 @@ from typing import Any
 
 from app.config import get_settings
 from app.contacts import EMERGENCY_TOPICS, short_line
-from app.services import channel_limits, channel_sessions, report_followups, report_intake, report_store
+from app.services import channel_limits, channel_sessions, phone_proof, report_followups, report_intake, report_store
 from app.services.channel_answers import for_sms
 from app.services.channel_messages import send_sms
 from app.services.channel_status import status_text
@@ -52,7 +53,7 @@ CONTINUE = "\n1 Continue"
 SCREEN_MAX = 160
 QUESTION_MIN = 5
 WHO_MAX = 40  # longer office names give way to a count, so the receipt keeps its last words
-MENU = "Nokware - Accra Assembly\n1 Ask a question\n2 Report an issue\n3 Check a case\n4 Medical emergency"
+MENU = "Nokware - Accra Assembly\n1 Ask a question\n2 Report an issue\n3 Check a case\n4 Medical emergency\n5 Confirm a web code"
 MEDICAL = "Nokware can't file this: it isn't an Assembly matter. Ambulance: 193, 0501 614 877, 0505 982 870. Or call 112."
 CONFIRM = "File this report?\n1 File, and SMS me updates\n2 File, no SMS\n0 Cancel"
 _filing = ThreadPoolExecutor(max_workers=4, thread_name_prefix="ussd-filing")
@@ -138,7 +139,9 @@ def _menu(dial: Dial, state: State, later: Later) -> tuple[Reply, State | None]:
         return con("Enter your case reference, e.g. K7QM-4TXP:"), {"step": "check"}
     if choice == "4":  # not the Assembly's to act on, but the numbers cost nothing to give
         return end(MEDICAL), None
-    return con("Choose 1 to 4.\n" + MENU), state
+    if choice == "5":
+        return con("Enter the 6-digit code shown on the Nokware page:"), {"step": "code"}
+    return con("Choose 1 to 5.\n" + MENU), state
 
 
 def _ask(dial: Dial, state: State, later: Later) -> tuple[Reply, State | None]:
@@ -346,9 +349,23 @@ def _check(dial: Dial, state: State, later: Later) -> tuple[Reply, State | None]
     return end(status_text(status, _site(), compact=True)), None
 
 
+CODE_REPLIES = {
+    phone_proof.Claim.PROVEN: "Your number is confirmed. Go back to the Nokware page to carry on.",
+    phone_proof.Claim.NOT_GHANAIAN: "Only Ghanaian mobile numbers can be confirmed.",
+    phone_proof.Claim.UNKNOWN: "That code isn't right or has expired: codes last 15 minutes. Get a new one on the page.",
+}
+
+
+def _code(dial: Dial, state: State, later: Later) -> tuple[Reply, State | None]:
+    if not channel_limits.CODE_CLAIMS.allow(dial.msisdn, utc_now().timestamp()):
+        return end("Too many codes this hour. Please try again later."), None
+    return end(CODE_REPLIES[phone_proof.claim(dial.text, dial.msisdn, phone_proof.Channel.USSD, utc_now())]), None
+
+
 STEPS: dict[str, Callable[[Dial, State, Later], tuple[Reply, State | None]]] = {
     "menu": _menu, "ask": _ask, "describe": _describe, "help": _help, "sub_metro": _sub_metro, "ward": _ward,
     "safety_sub_metro": _safety_sub_metro, "confirm": _confirm, "updates": _updates, "call": _call, "check": _check,
+    "code": _code,
 }
 
 

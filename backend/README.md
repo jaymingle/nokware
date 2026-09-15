@@ -74,6 +74,11 @@ membership.
 | `GET /api/dashboard` (twelve months of report figures, no personal safety; Ledger counts and latest documents; cached a minute) | public |
 | `GET /api/publishing-record` (the documents AMA is required to publish, against what the Ledger holds, by year; cached ten minutes) | public |
 | `GET /api/responsiveness` (each Assembly department's handling of reports and contributors' documents, last twelve months; cached a minute) | public |
+| `POST /api/phone/challenges`, `/challenges/status`, `/challenges/sms`, `/challenges/sms/confirm` (confirm a phone number; the secret in the body) | public, rate-limited per client |
+| `GET /api/petitions/options`, `GET /api/petitions` (`?group=open\|closed`, `?topic`; with the MCE's moderation record), `GET /api/petitions/{number}`, `/ledger` | public |
+| `POST /api/petitions/check`, `POST /api/petitions/ledger` (a draft's words checked; what the Ledger holds on its subject) | public, 30 an hour per client |
+| `POST /api/petitions`, `GET /api/petitions/mine`, `POST /api/petitions/{number}/resubmit`, `/withdraw`, `/anonymous` | the creator (`X-Phone-Proof`) |
+| `GET /api/petitions/review`, `POST /api/petitions/{number}/decision` (`publish`, or `refuse` with a fixed `reason`) | MCE |
 | `GET /api/me` | anyone signed in |
 | `GET /api/departments`, `GET /api/categories` | anyone signed in |
 | `POST /api/documents` (multipart: `file`, `title`, `category`, `document_year`, `department`, `source_url`) | department (published), contributor (held 72h) |
@@ -498,6 +503,75 @@ GNFS are national agencies, not Assembly departments, and are left off.
 example "Pothole on Kaneshie market road near the footbridge"), added when the
 department starts work, so residents can tell similar issues apart without the
 citizen's own words ever being published.
+
+## Petitions
+
+A resident can ask the Assembly to act, publicly, and gather support for it.
+The rules are in `app/services/petition_rules.py`; storage, the MCE's decision
+and the clocks in `app/services/petitions.py`.
+
+- **Drafting.** The ask ("what we're asking the Assembly to do"), why, a topic
+  (everyday topics and public-safety ones an Assembly department handles; never
+  personal safety, nor what only the Police or the Fire Service handle), the
+  whole Assembly or one electoral area, and optionally an open issue and up to
+  three Ledger documents to cite. Words of danger to a person stop it (it goes
+  through Report, privately) and so does personal data found by pattern (a phone
+  number, an email address, a Ghana Card number); both are checked again on the
+  server. Gemini's reading that it names a private person only warns: a model can
+  be wrong about who is a public official, so the creator decides and the MCE
+  can refuse it (`app/services/petition_screen.py`).
+- **A confirmed phone.** Starting a petition needs a Ghanaian mobile number,
+  confirmed from the page (`app/services/phone_proof.py`): by WhatsApp (the page
+  opens a chat with "Nokware code 482173" typed; Twilio says who sent it) or
+  USSD (option 5, then the code; the network says who dialled). SMS codes are
+  built but off (`SMS_VERIFICATION_CODES=false`) until the Arkesel sender ID is
+  registered, since an unregistered sender's messages are held for about 15
+  minutes, and have a daily cap of their own. The page then holds a sealed proof
+  (AES-GCM) for 12 hours; no number is ever in Redis. Each WhatsApp confirmation
+  costs one reply message.
+- **The MCE's review, which can't be a veto.** The MCE is usually the petition's
+  target. They have 72 hours to publish it or refuse it, and may refuse it only
+  for a fixed reason (names a private individual, about personal safety,
+  duplicates an open petition, not the Assembly's responsibility, hate speech or
+  incitement, personal data), with an optional note to the creator. If they
+  decide nothing in 72 hours it **publishes automatically**. The creator can
+  edit and send a refused petition back twice. The public list shows how many
+  are waiting, how many the MCE published and how many published themselves,
+  and every refusal by reason. These counts are exact, not "fewer than 5": they
+  count the MCE's decisions, not people.
+- **Open for 90 days**, at `/petitions/{number}` (a six-digit number, so it can
+  be typed on a keypad or read aloud), with what The Ledger already holds on its
+  subject beside it: someone petitioning about drainage sees the Assembly's own
+  flood plans and budget lines, to strengthen the case or to find the commitment
+  already exists and wasn't kept. The match is by search, and the page says it
+  means a document touches the subject, not that it commits to what's asked.
+- **Thresholds** (`PETITION_THRESHOLD_AREA=150`, `PETITION_THRESHOLD_METRO=500`)
+  are fixed on a petition when it opens.
+- **Names are the person's choice.** Anonymous by default; a name is shown
+  publicly only if its owner chooses, told first that anyone can see it,
+  including the department the petition concerns, and it can be taken off
+  later. In a city where retaliation is a real concern, forcing a public list
+  would suppress signing on exactly the petitions that need it most, so the
+  choice is the signer's, not the platform's. Anonymous support still counts.
+- **The creator's number** is kept only as a keyed hash (so they can find their
+  petition again by confirming their number) and, encrypted, for updates about
+  it; the number is deleted 30 days after the petition closes, is withdrawn, or
+  is refused and not sent back.
+
+`scripts/create_petitions.py` creates the collections (a dry run by default;
+run it with `--yes` before deploying this code).
+
+**Stages.** P1 (this): drafting, the confirmed phone, the MCE's review with the
+72-hour clock, the public pages. P2: signing (one per confirmed phone per
+petition) and the threshold escalating to the MCE. P3: the MCE's public
+response within 30 days, counted down, with "No response 30 days after the
+petition reached its threshold" stated plainly when it runs out; updates to the
+creator; petition figures on the accountability pages.
+
+**Roadmap:** messages to signers when the MCE responds. Only the creator gets
+updates for now: WhatsApp can't reach someone outside the 24-hour window without
+approved message templates, and an SMS to every signer could cost hundreds of
+credits. The public page carries the response.
 
 ## Contact numbers
 

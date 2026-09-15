@@ -69,8 +69,11 @@ class _MemoryCount:
 class _RedisCount:
     """The day's pages in Redis: shared by every worker and kept across restarts, for two days."""
 
+    def __init__(self, name: str = "pages") -> None:
+        self.name = name
+
     def add(self, today: date, count: int) -> int:
-        counter = key("sms", "pages", today.isoformat())
+        counter = key("sms", self.name, today.isoformat())
         try:
             pipe = get_redis().pipeline()
             pipe.incrby(counter, count)
@@ -178,6 +181,20 @@ def arkesel() -> ArkeselSms:
         sandbox=settings.arkesel_sandbox,
         budget=DailyBudget(settings.sms_daily_limit, _RedisCount() if settings.redis_url else _MemoryCount()),
         callback_url=delivery_report_url(),
+    )
+
+
+@lru_cache
+def code_sms() -> ArkeselSms:
+    """The Arkesel client for verification codes: the same account, on a daily cap of its own
+    (SMS_CODE_DAILY_LIMIT), so codes never use up the pages report notifications need, nor the reverse."""
+    settings = get_settings()
+    report_sms = arkesel()
+    return ArkeselSms(
+        api_key=report_sms.api_key,
+        sender=report_sms.sender,
+        sandbox=report_sms.sandbox,
+        budget=DailyBudget(settings.sms_code_daily_limit, _RedisCount("code-pages") if settings.redis_url else _MemoryCount()),
     )
 
 

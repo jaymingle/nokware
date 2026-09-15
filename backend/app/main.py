@@ -21,14 +21,19 @@ from app.routes import (
     ledger,
     me,
     options,
+    petitions as petition_routes,
+    phone,
     queues,
     reports,
     representatives,
 )
-from app.services import notifications, scheduler, whatsapp_voice
+from app.services import notifications, petitions, scheduler, whatsapp_voice
 from app.services.appwrite_client import quiet_sdk_deprecation_warnings
 from app.services.issue_voices import InvalidVoice, IssueNotFound, purge_expired_voice_names
 from app.services.ledger_documents import utc_now
+from app.services.petition_rules import PetitionError
+from app.services.phone_proof import ProofError
+from app.services.redis_store import RedisUnavailable
 from app.services.portal_actions import run_deadline_job
 from app.services.portal_queries import DocumentNotFound
 from app.services.report_contacts import InvalidNumber
@@ -80,18 +85,27 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     # Documents publish when their clock runs out, without cron: the deadline
     # job runs in this process every DEADLINE_JOB_INTERVAL_SECONDS.
     task = scheduler.start(settings.deadline_job_interval_seconds, run_deadline_job, "Deadline job")
-    # Citizens' numbers, and names given with voices, are deleted 30 days after their case closes; spoken
+    # Petitions the MCE leaves undecided for 72 hours publish, and open ones close after 90 days, on the same interval.
+    clock = scheduler.start(settings.deadline_job_interval_seconds, run_petition_clock, "Petition clock")
+    # Citizens' numbers, and names given with voices, are deleted 30 days after their case closes (a petition
+    # creator's, 30 days after the petition closes); spoken
     # replies Twilio never reported on are deleted from Twilio a day after they were sent.
     purge = scheduler.start(settings.contact_purge_interval_seconds, run_contact_purge, "Contact purge")
     yield
     await scheduler.stop(task)
+    await scheduler.stop(clock)
     await scheduler.stop(purge)
+
+
+def run_petition_clock() -> None:
+    petitions.run_clock(utc_now())
 
 
 def run_contact_purge() -> None:
     now = utc_now()
     purge_expired_contacts(now)
     purge_expired_voice_names(now)
+    petitions.purge_creator_numbers(now)
     whatsapp_voice.sweep(now)
 
 
@@ -104,7 +118,7 @@ app.add_middleware(
     allow_origins=settings.cors_origin_list,
     allow_origin_regex=settings.cors_origin_regex or None,
     allow_methods=["GET", "POST"],
-    allow_headers=["Authorization", "Content-Type", "X-Receipt-Token"],
+    allow_headers=["Authorization", "Content-Type", "X-Receipt-Token", "X-Phone-Proof"],
     expose_headers=["Retry-After", "Content-Disposition"],  # an export's file name
 )
 
@@ -132,6 +146,22 @@ def issue_not_found(_: Request, __: IssueNotFound) -> JSONResponse:
     return JSONResponse({"detail": "No open issue has that ID."}, status_code=404)
 
 
+@app.exception_handler(PetitionError)
+@app.exception_handler(ProofError)
+def petition_error(_: Request, exc: PetitionError | ProofError) -> JSONResponse:
+    return JSONResponse({"detail": str(exc)}, status_code=exc.status_code)
+
+
+@app.exception_handler(petitions.PetitionNotFound)
+def petition_not_found(_: Request, __: petitions.PetitionNotFound) -> JSONResponse:
+    return JSONResponse({"detail": "No petition has that number."}, status_code=404)
+
+
+@app.exception_handler(RedisUnavailable)
+def redis_unavailable(_: Request, __: RedisUnavailable) -> JSONResponse:
+    return JSONResponse({"detail": "Confirming a phone number isn't available right now. Try again shortly."}, status_code=503)
+
+
 @app.exception_handler(DocumentNotFound)
 def document_not_found(_: Request, __: DocumentNotFound) -> JSONResponse:
     return JSONResponse({"detail": "No such document."}, status_code=404)
@@ -156,4 +186,6 @@ app.include_router(accountability.router)
 app.include_router(contacts.router)
 app.include_router(representatives.router)
 app.include_router(issues.router)
+app.include_router(petition_routes.router)
+app.include_router(phone.router)
 app.include_router(channels.router)

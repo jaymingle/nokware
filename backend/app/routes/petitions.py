@@ -1,0 +1,177 @@
+"""Petitions: public pages, the creator's own petitions (by a confirmed phone), and the MCE's review.
+
+    GET  /api/petitions/options            topics, areas, thresholds, refusal reasons, ways to confirm a number
+    GET  /api/petitions                    published petitions (?group=open|closed, ?topic) and the MCE's moderation record
+    GET  /api/petitions/review             MCE: petitions waiting for a decision, closest to publishing automatically first
+    GET  /api/petitions/mine               the creator's own petitions (X-Phone-Proof)
+    POST /api/petitions/check              the draft's words, checked before it is sent
+    POST /api/petitions/ledger             what the Ledger holds on a draft's subject
+    POST /api/petitions                    submit a petition for review (X-Phone-Proof)
+    GET  /api/petitions/{code}             one published petition
+    GET  /api/petitions/{code}/ledger      what the Ledger holds on its subject
+    POST /api/petitions/{code}/resubmit    a refused petition, edited (X-Phone-Proof)
+    POST /api/petitions/{code}/withdraw    (X-Phone-Proof)
+    POST /api/petitions/{code}/anonymous   take the creator's name off it (X-Phone-Proof)
+    POST /api/petitions/{code}/decision    MCE: publish, or refuse for a fixed reason
+"""
+
+from dataclasses import asdict
+from typing import Annotated, Literal
+
+from fastapi import APIRouter, Depends, Header, Query
+
+from app.config import get_settings
+from app.dependencies import rate_limited, require_roles
+from app.routes import petition_presenters as present
+from app.schemas.documents import Option
+from app.schemas.petitions import (
+    AreaOption,
+    DecisionRequest,
+    DraftRequest,
+    LedgerMatch,
+    LedgerSearchRequest,
+    MyPetitions,
+    OwnPetition,
+    PetitionDetail,
+    PetitionOptions,
+    PetitionPage,
+    ReviewQueue,
+    ScreenRequest,
+    ScreenResult,
+    SubmitRequest,
+    Verification,
+)
+from app.services import petition_ledger, petition_screen, petitions, phone_proof, rate_limit
+from app.services.auth import Principal, Role
+from app.services.ledger_documents import utc_now
+from app.services.petition_rules import (
+    OPEN_FOR,
+    RESPONSE_WINDOW,
+    REVIEW_WINDOW,
+    Draft,
+    InvalidPetition,
+    PetitionStatus,
+    Scope,
+    petition_topics,
+)
+from app.services.report_taxonomy import TOPICS_BY_ID
+from app.wards import sub_metros, wards
+
+router = APIRouter(prefix="/api/petitions", tags=["petitions"])
+Checks = Depends(rate_limited(rate_limit.PETITION_CHECKS))
+Changes = Depends(rate_limited(rate_limit.PETITION_CHANGES))
+Mce = Annotated[Principal, Depends(require_roles(Role.MCE))]
+PAGE_MAX = 50
+GROUPS = {"open": [PetitionStatus.OPEN], "closed": [PetitionStatus.CLOSED, PetitionStatus.WITHDRAWN]}
+
+
+def confirmed_phone(x_phone_proof: Annotated[str | None, Header()] = None) -> phone_proof.Proof:
+    """The number a page confirmed, from its sealed proof (401 if missing, altered or expired)."""
+    return phone_proof.open_proof(x_phone_proof, utc_now())
+
+
+Phone = Annotated[phone_proof.Proof, Depends(confirmed_phone)]
+
+
+def _draft(request: DraftRequest) -> Draft:
+    return Draft(request.title, request.body, request.topic, Scope(request.scope), request.ward, request.issue,
+                 tuple(request.documents))
+
+
+@router.get("/options", response_model=PetitionOptions)
+def options() -> PetitionOptions:
+    settings = get_settings()
+    return PetitionOptions(
+        topics=[Option(id=t.id, name=t.label) for t in petition_topics()],
+        areas=[AreaOption(id=w.id, name=w.name, sub_metro=sub_metros()[w.sub_metro].name) for w in wards().values()],
+        threshold_area=settings.petition_threshold_area, threshold_metro=settings.petition_threshold_metro,
+        review_hours=int(REVIEW_WINDOW.total_seconds() // 3600), open_days=OPEN_FOR.days, response_days=RESPONSE_WINDOW.days,
+        refusal_reasons=present.refusal_reasons(),
+        verification=Verification(whatsapp=phone_proof.whatsapp_available(), ussd_code=phone_proof.ussd_code(),
+                                  sms=phone_proof.sms_available()),
+    )
+
+
+@router.get("", response_model=PetitionPage)
+def published(
+    group: Literal["open", "closed"] = "open",
+    topic: str | None = None,
+    limit: Annotated[int, Query(ge=1, le=PAGE_MAX)] = 20,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> PetitionPage:
+    found, total = petitions.list_public(GROUPS[group], topic, limit, offset)
+    return PetitionPage(petitions=[present.card(p) for p in found], total=total,
+                        moderation=present.moderation(petitions.moderation_counts()),
+                        topics=[Option(id=t.id, name=t.label) for t in petition_topics()])
+
+
+@router.get("/review", response_model=ReviewQueue)
+def review(_: Mce) -> ReviewQueue:
+    return ReviewQueue(petitions=[present.review_item(p) for p in petitions.review_queue()],
+                       refusal_reasons=present.refusal_reasons())
+
+
+@router.get("/mine", response_model=MyPetitions)
+def mine(proof: Phone) -> MyPetitions:
+    return MyPetitions(number=proof.hint, petitions=[present.own(p) for p in petitions.mine(proof)])
+
+
+@router.post("/check", response_model=ScreenResult, dependencies=[Checks])
+def check(request: ScreenRequest) -> ScreenResult:
+    screened = petition_screen.screen(request.title, request.body)
+    return ScreenResult(stop=screened.stop, warning=screened.warning)
+
+
+@router.post("/ledger", response_model=list[LedgerMatch], dependencies=[Checks])
+def draft_ledger(request: LedgerSearchRequest) -> list[LedgerMatch]:
+    if request.topic not in TOPICS_BY_ID:
+        raise InvalidPetition("Choose a topic from the list.")
+    query = petition_ledger.query_for(request.title, request.body, TOPICS_BY_ID[request.topic].label)
+    return [LedgerMatch(**asdict(match)) for match in petition_ledger.cached_search(query)]
+
+
+@router.post("", response_model=OwnPetition, dependencies=[Changes])
+def submit(request: SubmitRequest, proof: Phone) -> OwnPetition:
+    _stop_if_screened(request.title, request.body)
+    return present.own(petitions.submit(proof, _draft(request), request.show_name, request.name, utc_now()))
+
+
+def _stop_if_screened(title: str, body: str) -> None:
+    """The checks that stop a petition apply again when it is sent; the private-person warning is the creator's to weigh."""
+    stop = petition_screen.hard_stop(title, body)
+    if stop:
+        raise InvalidPetition(stop)
+
+
+@router.get("/{code}", response_model=PetitionDetail)
+def petition(code: str) -> PetitionDetail:
+    return present.detail(petitions.public(code))
+
+
+@router.get("/{code}/ledger", response_model=list[LedgerMatch])
+def petition_ledger_matches(code: str) -> list[LedgerMatch]:
+    return present.ledger_matches(petitions.public(code))
+
+
+@router.post("/{code}/resubmit", response_model=OwnPetition, dependencies=[Changes])
+def resubmit(code: str, request: DraftRequest, proof: Phone) -> OwnPetition:
+    _stop_if_screened(request.title, request.body)
+    return present.own(petitions.resubmit(code, proof, _draft(request), utc_now()))
+
+
+@router.post("/{code}/withdraw", response_model=OwnPetition, dependencies=[Changes])
+def withdraw(code: str, proof: Phone) -> OwnPetition:
+    return present.own(petitions.withdraw(code, proof, utc_now()))
+
+
+@router.post("/{code}/anonymous", response_model=OwnPetition, dependencies=[Changes])
+def anonymous(code: str, proof: Phone) -> OwnPetition:
+    return present.own(petitions.make_anonymous(code, proof))
+
+
+@router.post("/{code}/decision", response_model=ReviewQueue)
+def decide(code: str, request: DecisionRequest, principal: Mce) -> ReviewQueue:
+    """The decision, then the queue as it now stands."""
+    petitions.decide(principal, code, request.decision == "publish", request.reason, request.note, request.duplicate_of,
+                     utc_now())
+    return review(principal)
