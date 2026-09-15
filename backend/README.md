@@ -49,6 +49,16 @@ it. Every `DEADLINE_JOB_INTERVAL_SECONDS` the API publishes documents whose
 
 Health check: `GET http://localhost:8000/health` → `{"status": "ok"}`.
 
+At startup the API checks that `POSTGRES_URL` reaches the Ledger's search index
+(`app/services/search_index.py`): the database it names, holding
+`document_chunks` with its 768-dimension embeddings. Postgres comes through a
+tunnel on a local port, and another program can take that port; the log then
+says so plainly ("Something answers on localhost:5433, but it isn't Nokware's
+search index…") instead of Ask failing 30 seconds into a resident's first
+question with "password authentication failed". The API starts either way:
+reports, the portal and petitions don't need the index, and Ask and the Ledger
+search answer 503 until it is fixed.
+
 ## API
 
 The Ask routes and the published-file link are public. Every other route needs
