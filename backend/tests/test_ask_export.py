@@ -83,7 +83,7 @@ def test_suppression_is_a_range_never_a_value_and_the_axis_is_round() -> None:
 @pytest.mark.parametrize(("question", "figures", "note"), [
     ("What does AMA charge for a stall?", [OPEN], None),  # no chart asked for
     ("Chart the open reports", [figure("R1", "Open reports", "30")], ask_charts.ONE_COUNT),
-    ("Graph reports each month", [figure("R1", "Reports", "12", [("Sep 2026", "12")], "month")], ask_charts.ONE_COUNT),
+    ("Graph reports each month", [figure("R1", "Reports", "12", [("Sep 2026", "12")], "month")], ask_charts.ONE_MONTH),
     ("Chart the open reports by sub-metro", [figure("R1", "Open reports", "none", [("Okaikoi South", "none"), ("Kinka", "none")], "sub_metro")], ask_charts.ALL_ZERO),
 ])
 def test_no_chart_when_none_is_asked_for_or_there_is_nothing_to_chart(question: str, figures: list[dict[str, Any]], note: str | None) -> None:

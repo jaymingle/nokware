@@ -44,6 +44,7 @@ HORIZONTAL = re.compile(r"\bhorizontal\b", re.IGNORECASE)
 UPRIGHT = re.compile(r"\b(bars?|columns?|vertical)\b", re.IGNORECASE)  # a plain "bar chart" or "column chart" stands up
 LONG_LABEL = 16  # characters: longer category names read better on horizontal bars
 ONE_COUNT = "There's only one count here, so there's nothing to chart."
+ONE_MONTH = "There's only one month of reports so far, so there's nothing to chart over time."
 ALL_ZERO = "Every count here is zero, so there's nothing to chart."
 ChartDict = dict[str, Any]
 
@@ -187,7 +188,7 @@ def chart_for(question: str, figures: list[dict[str, Any]]) -> tuple[ChartDict |
         return None, None
     data = _breakdown(figures) or _separate(figures)
     if data is None or sum(len(values) for _, values in data.series) < 2:  # one count, or one month so far
-        return None, ONE_COUNT
+        return None, ONE_MONTH if data is not None and data.over_time else ONE_COUNT
     if all(high == 0 for _, values in data.series for _, _, high in values):
         return None, ALL_ZERO
     named = _named(question)
