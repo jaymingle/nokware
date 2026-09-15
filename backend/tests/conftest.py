@@ -14,12 +14,13 @@ import httpx
 import pytest
 import requests
 
-for _name in ("ARKESEL_API_KEY", "ARKESEL_SENDER_ID", "ARKESEL_WEBHOOK_SECRET", "PUBLIC_API_URL",
+for _name in ("ARKESEL_API_KEY", "ARKESEL_SENDER_ID", "ARKESEL_WEBHOOK_SECRET", "BMS_API_KEY", "PUBLIC_API_URL",
               "TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "REDIS_URL"):
     os.environ[_name] = ""
 os.environ["SMS_PROVIDER"] = "log"
 os.environ["WHATSAPP_PROVIDER"] = "log"
 os.environ["ARKESEL_SANDBOX"] = "true"
+os.environ["SMS_VERIFICATION_CODES"] = "false"  # the default; a test that needs codes switches them on itself
 
 LOCAL = {"127.0.0.1", "localhost", "::1"}
 _httpx_handle = httpx.HTTPTransport.handle_request
