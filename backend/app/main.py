@@ -9,6 +9,7 @@ from fastapi.responses import JSONResponse
 
 from app.config import get_settings
 from app.routes import (
+    accountability,
     ask,
     cases,
     channels,
@@ -151,6 +152,7 @@ app.include_router(jobs.router)
 app.include_router(reports.router)
 app.include_router(cases.router)
 app.include_router(dashboard.router)
+app.include_router(accountability.router)
 app.include_router(contacts.router)
 app.include_router(representatives.router)
 app.include_router(issues.router)

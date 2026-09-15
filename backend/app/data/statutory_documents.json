@@ -1,0 +1,88 @@
+{
+  "about": "The documents the Accra Metropolitan Assembly is required to publish, as the publishing record checks them against the Ledger. The list and its four groups are the project's. 'expected' is our conservative assumption of when each is due, not a statutory deadline: confirm the dates under the Local Governance Act, 2016 (Act 936) before this is used for real. 'match' finds the document itself by title; 'related' finds documents about the same thing that are not it. 'confirmed' records a person's decision on a match the rules can't make, or make wrongly: document ID to [requirement, year], or to null to set it aside.",
+  "documents_centre": "https://ama.gov.gh/documents-centre.php",
+  "documents_centre_checked": "2026-09-12",
+  "first_year": 2021,
+  "groups": [
+    {"id": "plans", "name": "Vision and plans"},
+    {"id": "budget", "name": "Budget and tariffs"},
+    {"id": "finance", "name": "Financial and audit"},
+    {"id": "oversight", "name": "Oversight and RTI"}
+  ],
+  "requirements": [
+    {
+      "id": "mtdp", "group": "plans", "name": "Medium Term Development Plan", "cadence": "plan_period", "plan_years": 4,
+      "plan_starts": [2018, 2022, 2026],
+      "match": "medium[- ]term development plan|\\bMTDP\\b",
+      "related": "\\bdevelopment plan\\b",
+      "expected": {"from": "start"},
+      "departments": ["dept-central-administration", "dept-physical-planning"], "categories": ["Annual Action Plan", "Planning Projects"]
+    },
+    {
+      "id": "aap", "group": "plans", "name": "Annual Action Plan", "cadence": "annual",
+      "match": "annual action plan|\\bAAP\\b",
+      "related": "quarter(ly)? report",
+      "expected": {"from": "start"},
+      "departments": ["dept-central-administration"], "categories": ["Annual Action Plan"]
+    },
+    {
+      "id": "composite_budget", "group": "budget", "name": "Annual Composite Budget", "cadence": "annual",
+      "match": "composite budget|programme[- ]base[d]? budget|budget estimates|^\\s*(19|20)\\d\\d AMA budget\\s*$",
+      "related": "budget|narrative statement|revenue estimation|expenditure by program|funding source",
+      "expected": {"from": "start"},
+      "departments": ["dept-budget-rating", "dept-finance"], "categories": ["Budget And Fee Fixing"]
+    },
+    {
+      "id": "fee_fixing", "group": "budget", "name": "Fee-Fixing Resolution", "cadence": "annual",
+      "match": "fee[- ]fixing",
+      "related": "fee schedule|schedule of fees|\\btariffs?\\b",
+      "expected": {"from": "start"},
+      "departments": ["dept-budget-rating", "dept-finance"], "categories": ["Budget And Fee Fixing"]
+    },
+    {
+      "id": "financial_statements", "group": "finance", "name": "Annual Financial Statements", "cadence": "annual",
+      "match": "financial statements?",
+      "related": "statement of accounts|financial report|\\baccounts\\b",
+      "expected": {"from": "end", "months": 6},
+      "departments": ["dept-finance", "dept-budget-rating"], "categories": ["Budget And Fee Fixing", "Annual Reports"]
+    },
+    {
+      "id": "internal_audit", "group": "finance", "name": "Internal Audit Report", "cadence": "quarterly",
+      "match": "internal audit",
+      "related": "\\baudit\\b",
+      "expected": {"from": "end", "months": 3},
+      "departments": ["dept-finance", "dept-central-administration"], "categories": ["Annual Reports"]
+    },
+    {
+      "id": "auditor_general", "group": "finance", "name": "Auditor-General's Report", "cadence": "annual",
+      "issued_by": "the Auditor-General (Ghana Audit Service)",
+      "match": "auditor[- ]general",
+      "related": "\\baudit\\b",
+      "expected": {"from": "end", "months": 12},
+      "departments": ["dept-finance", "dept-central-administration"], "categories": ["Annual Reports"]
+    },
+    {
+      "id": "pac", "group": "finance", "name": "Public Accounts Committee Report", "cadence": "as_issued",
+      "issued_by": "Parliament's Public Accounts Committee",
+      "match": "public accounts committee|\\bPAC\\b",
+      "related": null,
+      "expected": null,
+      "departments": [], "categories": []
+    },
+    {
+      "id": "annual_progress", "group": "oversight", "name": "Annual Progress Report", "cadence": "annual",
+      "match": "annual progress report|\\bAPR\\b",
+      "related": "monitoring and evaluation|\\bM&E\\b|progress report",
+      "expected": {"from": "end", "months": 6},
+      "departments": ["dept-central-administration"], "categories": ["Annual Reports"]
+    },
+    {
+      "id": "rti_manual", "group": "oversight", "name": "RTI Manual", "cadence": "annual",
+      "match": "right to information manual|\\bRTI manual\\b",
+      "related": "right to information|\\bRTI\\b",
+      "expected": {"from": "end", "months": 0},
+      "departments": ["dept-central-administration"], "categories": ["Policy Documents", "Annual Reports"]
+    }
+  ],
+  "confirmed": {}
+}
