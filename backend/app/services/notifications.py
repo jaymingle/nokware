@@ -53,7 +53,7 @@ from app.services.ledger_documents import now_iso
 from app.services.report_contacts import GHANA_CODE, contact_for, masked
 from app.services.report_taxonomy import Category
 from app.services.sms import arkesel
-from app.services.sms_text import pages
+from app.services.sms_text import bare_address, pages
 from app.services.whatsapp import first_delivery, twilio, window_open
 from app.teams import short_name
 
@@ -112,14 +112,15 @@ def compose(event: NotificationEvent, case: dict[str, Any]) -> Message:
     reference = case["reference"]
     if case.get("category") == Category.PERSONAL_SAFETY:
         return _neutral(event, reference)
-    status_page = f"{get_settings().public_site_url.rstrip('/')}/report/status"
+    # Without "https://", so the office's full name fits one page beside the link. The reference stays out of the
+    # address: the status page asks for it, so it never lands in browser history or server logs.
+    status_page = f"{bare_address(get_settings().public_site_url)}/report/status"
     if event == NotificationEvent.RESOLVED and case.get("escalatedAt"):  # after the one escalation: final
         return Message("resolved_after_escalation", f"Nokware: report {reference} was reviewed and resolved. Outcome: {status_page}")
     if event == NotificationEvent.ESCALATED:
         return Message(event.value, f"Nokware: we've received your escalation of report {reference}. The MCE's office will review it.")
     if event == NotificationEvent.SUBMITTED and case.get("topic") in EMERGENCY_TOPICS:  # worth a second page
-        site = get_settings().public_site_url.rstrip("/")
-        numbers = f"If anyone is in danger: {short_line(case['topic'], None)} More numbers: {site}/contacts/emergency"
+        numbers = f"If anyone is in danger: {short_line(case['topic'], None)} More numbers: {bare_address(get_settings().public_site_url)}/contacts/emergency"
         return Message("submitted_emergency", _one_page(lambda who: f"Nokware: report {reference} is with {who}. {numbers}", case, pages_allowed=2))
     renders: dict[NotificationEvent, Callable[[str], str]] = {
         NotificationEvent.SUBMITTED: lambda who: f"Nokware: report {reference} is with {who}. "

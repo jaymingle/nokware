@@ -13,6 +13,7 @@ from app.services.citizen_reports import NotificationChannel, NotificationEvent,
 from app.services.report_taxonomy import TOPICS, Category
 from app.services.sms import ArkeselSms, DailyBudget, SmsError, SmsLimitReached, SmsNotConfigured
 from app.services.sms_text import is_gsm7, pages, plain
+from app.teams import RECIPIENT_NAMES, short_name
 from app.teams import RECIPIENT_NAMES
 
 SITE = "https://nokware.tstitagency.com"  # where Nokware will be deployed (PUBLIC_SITE_URL)
@@ -50,10 +51,14 @@ def test_names_give_way_to_a_count_only_when_they_would_not_fit(monkeypatch: pyt
     monkeypatch.setattr(notifications, "get_settings", lambda: get_settings().model_copy(update={"public_site_url": SITE}))
     works = notifications.compose(NotificationEvent.SUBMITTED, {"reference": "K7QM-4TXP", "recipients": ["dept-works"]})
     assert "is with Works Department." in works.body
-    # With the deployed address, two or more office names no longer fit one page beside the tracking link.
-    for recipients, count in ((["dept-works", "dept-urban-roads"], 2), (["dept-social-welfare", "dept-disaster-management", "agency-gnfs"], 3)):
-        body = notifications.compose(NotificationEvent.SUBMITTED, {"reference": "K7QM-4TXP", "recipients": recipients}).body
-        assert f"is with {count} offices." in body and pages(body) == 1
+    # A report goes to one office: with the deployed address, every office's full name fits one page beside the link.
+    for team in RECIPIENT_NAMES:
+        for event in (NotificationEvent.SUBMITTED, NotificationEvent.RESOLVED):
+            body = notifications.compose(event, {"reference": "K7QM-4TXP", "recipients": [team]}).body
+            assert short_name(team) in body and pages(body) == 1 and "nokware.tstitagency.com/report/status" in body, body
+            assert "https://" not in body and "K7QM-4TXP/" not in body  # no scheme, and the reference never in the address
+    crowded = {"reference": "K7QM-4TXP", "recipients": ["dept-social-welfare", "dept-disaster-management", "agency-gnfs"]}
+    assert pages(notifications.compose(NotificationEvent.SUBMITTED, crowded).body) == 1  # the count stands in if ever needed
 
 
 def _client(handler: Any) -> httpx.Client:

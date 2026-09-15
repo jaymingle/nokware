@@ -40,3 +40,8 @@ def pages(text: str) -> int:
         length = len(text.encode("utf-16-le")) // 2  # an emoji takes two UCS-2 units
         page, part = UCS2_PAGE, UCS2_PART
     return 1 if length <= page else math.ceil(length / part)
+
+
+def bare_address(url: str) -> str:
+    """A site address for a message, without "https://": eight characters saved, and phones still make it a link."""
+    return url.split("://", 1)[-1].rstrip("/")
