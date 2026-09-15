@@ -42,7 +42,7 @@ export function AskProgress({ turn, testId }: { turn: Turn; testId: string }) {
   const lookingFor = turn.stage === "counting" ? "Searching the Ledger and counting reports" : "Searching the Ledger";
   const status = searching ? lookingFor : "Writing the answer";
   return (
-    <div className="flex flex-col gap-3 rounded-xl border bg-paper-subtle px-4 py-3.5" data-testid={testId} data-stage={turn.stage}>
+    <div className="flex flex-col gap-3" data-testid={testId} data-stage={turn.stage}>
       <p className="sr-only" aria-live="polite">
         {searching ? `${status}…` : `${foundLabel(turn)}. ${status}…`}
       </p>

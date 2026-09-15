@@ -12,7 +12,7 @@ function Breakdown({ figure }: { figure: AskFigure }) {
       {figure.rows.map((row) => (
         <div key={row.name} className="contents">
           <dt>{row.name}</dt>
-          <dd className="text-right text-ink-soft tabular-nums">{row.value}</dd>
+          <dd className="text-end text-ink-soft tabular-nums">{row.value}</dd>
         </div>
       ))}
     </dl>
@@ -30,7 +30,7 @@ export function FigureCard({ figure, anchorId, highlighted, testIdPrefix }: Figu
       data-testid={`${testIdPrefix}-figure-${figure.label}`}
       data-highlighted={highlighted || undefined}
       className={cn(
-        "flex scroll-mt-6 gap-3 rounded-xl border border-gold/40 bg-paper-warm p-4 transition-[box-shadow,border-color] duration-300 outline-none sm:p-5",
+        "flex scroll-mt-6 gap-3 rounded-lg border border-gold/40 bg-paper-warm p-3.5 transition-[box-shadow,border-color] duration-300 outline-none",
         highlighted && "border-gold ring-2 ring-gold/40",
       )}
     >
@@ -43,7 +43,7 @@ export function FigureCard({ figure, anchorId, highlighted, testIdPrefix }: Figu
           Live report data <span className="sr-only">, figure {labelNumber(figure.label)}</span>
         </p>
         <h3 className="text-[15px] leading-snug">{figure.description}</h3>
-        <p className="font-heading text-[26px] leading-none tabular-nums">{figure.value}</p>
+        <p className="font-heading text-[24px] leading-none tabular-nums">{figure.value}</p>
         {figure.rows.length ? <Breakdown figure={figure} /> : null}
         <p className="text-[12px] text-ink-soft">
           {countedAt(figure.counted_at)} from reports residents filed with Nokware, not a published document. Reports about

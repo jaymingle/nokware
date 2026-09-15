@@ -25,7 +25,7 @@ function Passages({ excerpts, testId }: { excerpts: string[]; testId: string }) 
       </summary>
       <div className="mt-2 flex flex-col gap-2">
         {excerpts.map((text, index) => (
-          <blockquote key={index} className="border-l-2 border-hairline pl-3 text-[13px] leading-relaxed text-ink-soft">
+          <blockquote key={index} className="border-s-2 border-hairline ps-3 text-[13px] leading-relaxed text-ink-soft">
             {text.replace(/\s+/g, " ").trim()}
           </blockquote>
         ))}
@@ -46,21 +46,21 @@ export function SourceCard({ doc, anchorId, highlighted, testIdPrefix }: SourceC
       data-testid={testId}
       data-highlighted={highlighted || undefined}
       className={cn(
-        "flex scroll-mt-6 gap-3 rounded-xl border bg-card p-4 transition-[box-shadow,border-color] duration-300 outline-none sm:p-5",
+        "flex scroll-mt-6 gap-3 rounded-lg border bg-card p-3.5 transition-[box-shadow,border-color] duration-300 outline-none",
         highlighted && "border-teal bg-teal-tint/40 ring-2 ring-teal/50",
       )}
     >
       <span aria-hidden className="grid h-6 min-w-6 shrink-0 place-items-center rounded-md bg-teal-tint px-1.5 text-[12px] font-medium text-teal tabular-nums">
         {doc.label.replace(/^S/, "")}
       </span>
-      <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-        <h3 className="text-[17px] leading-snug break-words">
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
+        <h3 className="text-[15.5px] leading-snug break-words">
           <span className="sr-only">Source {doc.label.replace(/^S/, "")}: </span>
           {doc.title}
         </h3>
         <p className="text-[12.5px] text-ink-soft">{details(doc)}</p>
         <ProvenanceLine provenance={doc.provenance} departmentName={doc.departmentName} sourceUrl={doc.sourceUrl} testId={`${testId}-provenance`} />
-        <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-2">
+        <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-2">
           <LedgerPdfLink documentId={doc.documentId} testId={`${testId}-pdf`} />
           <Passages excerpts={doc.excerpts} testId={`${testId}-passages`} />
         </div>

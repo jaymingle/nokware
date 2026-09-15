@@ -13,8 +13,9 @@ export const MAX_QUESTION = 1000;
 export const QUESTION_INPUT_ID = "ask-question";
 const COUNT_FROM = 900; // show the character count only near the limit
 
-function ComposerHint({ busy, docked, length }: { busy: boolean; docked: boolean; length: number }) {
-  const hint = busy ? "Answering your question…" : docked ? "Each question is answered on its own; Nokware doesn't remember earlier ones." : "";
+function ComposerHint({ busy, length }: { busy: boolean; length: number }) {
+  // A chat suggests memory; Ask has none, so the box says so.
+  const hint = busy ? "Answering your question…" : "Each question is answered on its own: Nokware doesn't remember earlier ones.";
   return (
     <div className={cn("mt-1.5 justify-between gap-3 text-[12px] text-ink-muted", length >= COUNT_FROM ? "flex" : "hidden sm:flex")}>
       <span>{hint}</span>
@@ -27,7 +28,7 @@ function ComposerHint({ busy, docked, length }: { busy: boolean; docked: boolean
   );
 }
 
-type AskComposerProps = { busy: boolean; onAsk: (question: string) => void; docked: boolean; autoFocus?: boolean };
+type AskComposerProps = { busy: boolean; onAsk: (question: string) => void; started: boolean; panel: boolean };
 
 /** The question box: Enter asks, Shift+Enter adds a line. One question at a time. */
 function useQuestion(busy: boolean, onAsk: (question: string) => void) {
@@ -64,13 +65,14 @@ function useSpokenQuestion(onAsk: (question: string) => void, setValue: (value: 
   return { voice, input, askHeard, editHeard };
 }
 
-export function AskComposer({ busy, onAsk, docked, autoFocus = false }: AskComposerProps) {
+/** The question box, fixed at the bottom of the conversation: docked to the window on the page, the panel's foot in a panel. */
+export function AskComposer({ busy, onAsk, started, panel }: AskComposerProps) {
   const { value, setValue, canAsk, submit, onKeyDown } = useQuestion(busy, onAsk);
   const { voice, input, askHeard, editHeard } = useSpokenQuestion(onAsk, setValue);
   return (
     <form
       onSubmit={submit}
-      className={cn(docked && "sticky bottom-0 z-10 border-t bg-paper pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]")}
+      className={cn("border-t bg-paper pt-3", panel ? "px-4 pb-3" : "sticky bottom-0 z-10 pb-[max(0.75rem,env(safe-area-inset-bottom))]")}
       data-testid="ask-form"
     >
       <VoiceCheck state={voice.state} busy={busy} onAsk={askHeard} onEdit={editHeard} onDismiss={voice.clear} onRetry={voice.start} />
@@ -81,13 +83,12 @@ export function AskComposer({ busy, onAsk, docked, autoFocus = false }: AskCompo
         <Textarea
           ref={input}
           id={QUESTION_INPUT_ID}
-          autoFocus={autoFocus}
           value={value}
           onChange={(event) => setValue(event.target.value)}
           onKeyDown={onKeyDown}
           maxLength={MAX_QUESTION}
           rows={1}
-          placeholder={docked ? "Ask another question…" : "Ask about a budget, a fee, a plan or a policy…"}
+          placeholder={started ? "Ask another question…" : "Ask about a budget, a fee, a plan or a policy…"}
           className={cn("max-h-40 min-h-11 resize-none py-2.5 text-base md:text-[15px]", voice.state.kind === "recording" && "hidden")}
           data-testid="ask-input"
         />
@@ -97,7 +98,7 @@ export function AskComposer({ busy, onAsk, docked, autoFocus = false }: AskCompo
           Ask
         </Button>
       </div>
-      <ComposerHint busy={busy} docked={docked} length={value.length} />
+      <ComposerHint busy={busy} length={value.length} />
     </form>
   );
 }

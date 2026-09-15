@@ -15,17 +15,18 @@ import { Button } from "@/components/ui/button";
 import { answerAudio } from "@/lib/api/public";
 import { DISAGREEMENT_LEAD } from "@/lib/ask/sources";
 import { citedDocuments, type Turn } from "@/lib/ask/turn";
+import { cn } from "@/lib/utils";
 
 import type { ExportView } from "@/lib/api/types";
 
 const HIGHLIGHT_MS = 2400;
 
 /** Jumping from a citation to its source: scroll, focus, and briefly highlight the card. */
-function useSourceJump(turnId: string) {
+function useSourceJump(anchorPrefix: string) {
   const [highlighted, setHighlighted] = useState<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => clearTimeout(timer.current), []);
-  const anchorFor = useCallback((label: string) => `${turnId}-${label}`, [turnId]);
+  const anchorFor = useCallback((label: string) => `${anchorPrefix}-${label}`, [anchorPrefix]);
   const jump = useCallback(
     (label: string) => {
       const card = document.getElementById(anchorFor(label));
@@ -42,43 +43,39 @@ function useSourceJump(turnId: string) {
   return { highlighted, anchorFor, jump };
 }
 
+type Jump = ReturnType<typeof useSourceJump>;
+
 function plural(count: number, one: string, many: string): string {
   return `${count} ${count === 1 ? one : many}`;
 }
 
 /** What the answer rests on: documents, live report figures, or both, said apart. */
-function Attribution({ documents, figures }: { documents: number; figures: number }) {
+function attribution(turn: Turn): string | null {
+  const documents = citedDocuments(turn).length;
+  const figures = turn.figures.filter((figure) => figure.cited).length;
   const parts = [
     documents ? `${plural(documents, "document", "documents")} in the Ledger` : null,
-    figures ? `${plural(figures, "live report figure", "live report figures")}` : null,
+    figures ? plural(figures, "live report figure", "live report figures") : null,
   ].filter(Boolean);
-  if (parts.length === 0) return null;
-  return (
-    <p className="flex items-center gap-2 text-[12.5px] text-ink-soft" data-testid="ask-attribution">
-      <span aria-hidden className="size-1.5 rounded-full bg-teal" />
-      Answered from {parts.join(" and ")}
-    </p>
-  );
+  return parts.length ? `Answered from ${parts.join(" and ")}` : null;
 }
 
-function AnswerFigures({ turn, anchorFor, highlighted, testId }: {
-  turn: Turn; anchorFor: (label: string) => string; highlighted: string | null; testId: string;
-}) {
-  const cited = turn.figures.filter((figure) => figure.cited);
-  if (cited.length === 0) return null;
+/** The person's question, on the right. A heading, so a screen reader can move from question to question. */
+function QuestionMessage({ turn, headingId, testId }: { turn: Turn; headingId: string; testId: string }) {
   return (
-    <section aria-label="Figures" className="flex flex-col gap-3">
-      <h3 className="text-[12.5px] font-medium tracking-wide text-ink-soft uppercase">Figures</h3>
-      {cited.map((figure) => (
-        <FigureCard key={figure.label} figure={figure} anchorId={anchorFor(figure.label)} highlighted={highlighted === figure.label} testIdPrefix={testId} />
-      ))}
-    </section>
+    <div className="flex justify-end ps-10 sm:ps-16">
+      <h2 id={headingId} className="max-w-full rounded-2xl rounded-ee-md border border-teal/20 bg-teal-tint px-4 py-2.5 font-sans text-[15.5px] leading-snug break-words text-ink"
+        data-testid={`${testId}-question`}>
+        <span className="sr-only">You asked: </span>
+        {turn.question}
+      </h2>
+    </div>
   );
 }
 
 function Disagreement() {
   return (
-    <p className="rounded-lg border-l-[3px] border-gold bg-gold-tint px-4 py-2.5 text-[13.5px]">
+    <p className="rounded-lg border-s-[3px] border-gold bg-gold-tint px-4 py-2.5 text-[13.5px]">
       The documents disagree on part of this. Each version is given with the document it comes from.
     </p>
   );
@@ -95,57 +92,92 @@ function TurnError({ message, onRetry, testId }: { message: string; onRetry: () 
   );
 }
 
-function Answer({ turn, testId }: { turn: Turn; testId: string }) {
-  const { highlighted, anchorFor, jump } = useSourceJump(turn.id);
+/** The words of the reply: progress while it works, then the answer (or why there isn't one). */
+function ReplyBody({ turn, jump, onRetry, testId }: { turn: Turn; jump: Jump; onRetry: () => void; testId: string }) {
   const titles = useMemo(
     () => Object.fromEntries([...turn.documents.map((doc) => [doc.label, doc.title]), ...turn.figures.map((f) => [f.label, f.description])]),
     [turn.documents, turn.figures],
   );
   const done = turn.stage === "done";
-  const cited = citedDocuments(turn);
+  const working = turn.stage === "searching" || turn.stage === "counting" || (turn.stage === "writing" && !turn.text);
+  if (turn.stage === "error") return <TurnError message={turn.error ?? ""} onRetry={onRetry} testId={testId} />;
+  if (done && turn.status === "no_information") return <NoInformation testIdPrefix={testId} />;
   return (
     <>
-      {done ? <Attribution documents={cited.length} figures={turn.figures.filter((f) => f.cited).length} /> : null}
+      {working ? <AskProgress turn={turn} testId={`${testId}-progress`} /> : null}
       {done && turn.text.includes(DISAGREEMENT_LEAD) ? <Disagreement /> : null}
-      {turn.text ? <AnswerText markdown={turn.text} titles={titles} onCite={jump} testIdPrefix={testId} /> : null}
-      {done && turn.chart ? <AnswerChart chart={turn.chart} testId={testId} /> : null}
-      {done && !turn.chart && turn.chartNote ? <p className="text-[13px] text-ink-soft italic" data-testid={`${testId}-chart-note`}>{turn.chartNote}</p> : null}
-      {done ? <AnswerFigures turn={turn} anchorFor={anchorFor} highlighted={highlighted} testId={testId} /> : null}
-      {done && turn.documents.length ? (
-        <AnswerSources cited={cited} uncited={turn.documents.filter((doc) => !doc.cited)} anchorFor={anchorFor} highlighted={highlighted} testIdPrefix={testId} />
-      ) : null}
+      {turn.text ? <AnswerText markdown={turn.text} titles={titles} onCite={jump.jump} testIdPrefix={testId} /> : null}
+      {turn.stage === "writing" && turn.text ? <p className="text-[12.5px] text-ink-soft" role="status">Writing…</p> : null}
     </>
   );
 }
 
-/** One question and everything that comes back for it. */
-/** What can be done with a finished answer: hear it read aloud (unless it touches on someone's safety), or download it. */
-function AnswerTools({ turn, view, testId }: { turn: Turn; view: ExportView; testId: string }) {
+/** What the answer rests on, attached to it: the chart, the live figures, then the documents. */
+function Attachments({ turn, jump, testId }: { turn: Turn; jump: Jump; testId: string }) {
+  const figures = turn.figures.filter((figure) => figure.cited);
+  const cited = citedDocuments(turn);
+  const uncited = turn.documents.filter((doc) => !doc.cited);
+  const note = !turn.chart && turn.chartNote;
+  if (!turn.chart && !note && !figures.length && !turn.documents.length) return null;
   return (
-    <div className="flex flex-wrap items-start gap-3">
-      {turn.speakable ? <ReadAloud load={(part) => answerAudio(view, part)} label="Listen to this answer" testId={`${testId}-listen`} /> : null}
+    <div className="flex flex-col gap-4 border-t bg-paper-subtle px-4 py-4 sm:px-5" data-testid={`${testId}-attachments`}>
+      {turn.chart ? <AnswerChart chart={turn.chart} testId={testId} /> : null}
+      {note ? <p className="text-[13px] text-ink-soft italic" data-testid={`${testId}-chart-note`}>{turn.chartNote}</p> : null}
+      {figures.length ? (
+        <section aria-label="Figures" className="flex flex-col gap-2.5">
+          <h3 className="font-sans text-[12px] font-medium tracking-wide text-ink-soft uppercase">Figures</h3>
+          {figures.map((figure) => (
+            <FigureCard key={figure.label} figure={figure} anchorId={jump.anchorFor(figure.label)} highlighted={jump.highlighted === figure.label} testIdPrefix={testId} />
+          ))}
+        </section>
+      ) : null}
+      {turn.documents.length ? <AnswerSources cited={cited} uncited={uncited} anchorFor={jump.anchorFor} highlighted={jump.highlighted} testIdPrefix={testId} /> : null}
+    </div>
+  );
+}
+
+/** What can be done with a finished answer: hear it read aloud (unless it touches on someone's safety), or download it. */
+function ReplyTools({ turn, view, testId }: { turn: Turn; view: ExportView; testId: string }) {
+  return (
+    <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 border-t px-4 py-3 sm:px-5">
+      {turn.speakable ? <ReadAloud load={(part) => answerAudio(view, part)} label="Listen to this answer" testId={`${testId}-listen`} /> : <span />}
       <ExportMenu view={view} testId={testId} />
     </div>
   );
 }
 
-export function AskTurn({ turn, onRetry }: { turn: Turn; onRetry: (turn: Turn) => void }) {
-  const testId = `ask-${turn.id}`;
-  const working = turn.stage === "searching" || turn.stage === "counting" || turn.stage === "writing";
-  const noInformation = turn.stage === "done" && turn.status === "no_information";
+/** Nokware's reply, on the left under its mark: the answer, with what it rests on and what can be done with it. */
+function ReplyMessage({ turn, anchorPrefix, onRetry, testId }: { turn: Turn; anchorPrefix: string; onRetry: () => void; testId: string }) {
+  const jump = useSourceJump(anchorPrefix);
+  const done = turn.stage === "done";
+  const answered = done && turn.status === "answered";
+  const said = done ? attribution(turn) : null;
   return (
-    <section id={turn.id} aria-labelledby={`${turn.id}-question`} className="flex scroll-mt-6 flex-col gap-4" data-testid={testId}>
-      <div className="flex flex-col gap-1">
-        <p className="text-[12.5px] text-ink-soft">Question</p>
-        <h2 id={`${turn.id}-question`} className="text-[22px] leading-snug break-words">
-          {turn.question}
-        </h2>
+    <div className="flex flex-col gap-2">
+      <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px]">
+        <span aria-hidden className="grid size-7 place-items-center rounded-lg bg-ink font-heading text-[15px] leading-none text-paper">N</span>
+        <span className="font-medium text-ink">Nokware</span>
+        {said ? <span className="flex items-center gap-1.5 text-ink-soft" data-testid={`${testId}-attribution`}><span aria-hidden className="size-1.5 rounded-full bg-teal" />{said}</span> : null}
+      </p>
+      <div className={cn("overflow-hidden rounded-xl rounded-ss-md border bg-card sm:ms-9", turn.stage === "error" && "border-brick/30")}>
+        <div className="flex flex-col gap-3.5 px-4 py-4 sm:px-5">
+          <ReplyBody turn={turn} jump={jump} onRetry={onRetry} testId={testId} />
+        </div>
+        {answered ? <Attachments turn={turn} jump={jump} testId={testId} /> : null}
+        {done && turn.exportView ? <ReplyTools turn={turn} view={turn.exportView} testId={testId} /> : null}
       </div>
-      {working ? <AskProgress turn={turn} testId={`${testId}-progress`} /> : null}
-      {noInformation ? <NoInformation testIdPrefix={testId} /> : null}
-      {!noInformation && turn.stage !== "error" ? <Answer turn={turn} testId={testId} /> : null}
-      {turn.stage === "done" && turn.exportView ? <AnswerTools turn={turn} view={turn.exportView} testId={testId} /> : null}
-      {turn.stage === "error" && turn.error ? <TurnError message={turn.error} onRetry={() => onRetry(turn)} testId={testId} /> : null}
+    </div>
+  );
+}
+
+/** One exchange in the conversation: the question as the person's message, the answer as Nokware's. */
+export function AskTurn({ turn, scope, onRetry }: { turn: Turn; scope: string; onRetry: (turn: Turn) => void }) {
+  const testId = `ask-${turn.id}`;
+  const domId = `${scope}-${turn.id}`;
+  return (
+    <section id={domId} aria-labelledby={`${domId}-question`} className="flex scroll-mt-4 flex-col gap-4" data-testid={testId}>
+      <QuestionMessage turn={turn} headingId={`${domId}-question`} testId={testId} />
+      <ReplyMessage turn={turn} anchorPrefix={domId} onRetry={() => onRetry(turn)} testId={testId} />
     </section>
   );
 }

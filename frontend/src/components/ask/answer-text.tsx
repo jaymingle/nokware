@@ -38,10 +38,10 @@ function useComponents({ titles, onCite, testIdPrefix }: Omit<AnswerTextProps, "
       h3: heading,
       h4: heading,
       p: ({ children }) => <p>{children}</p>,
-      ul: ({ children }) => <ul className="flex list-disc flex-col gap-1.5 pl-5 marker:text-ink-muted">{children}</ul>,
-      ol: ({ children }) => <ol className="flex list-decimal flex-col gap-1.5 pl-5 marker:text-ink-soft">{children}</ol>,
-      li: ({ children }) => <li className="pl-1 [&>ul]:mt-1.5 [&>ol]:mt-1.5">{children}</li>,
-      blockquote: ({ children }) => <blockquote className="border-l-2 border-hairline pl-3 text-ink-soft">{children}</blockquote>,
+      ul: ({ children }) => <ul className="flex list-disc flex-col gap-1.5 ps-5 marker:text-ink-muted">{children}</ul>,
+      ol: ({ children }) => <ol className="flex list-decimal flex-col gap-1.5 ps-5 marker:text-ink-soft">{children}</ol>,
+      li: ({ children }) => <li className="ps-1 [&>ul]:mt-1.5 [&>ol]:mt-1.5">{children}</li>,
+      blockquote: ({ children }) => <blockquote className="border-s-2 border-hairline ps-3 text-ink-soft">{children}</blockquote>,
       code: ({ children }) => <code className="rounded bg-paper-subtle px-1 text-[0.92em]">{children}</code>,
     };
   }, [titles, onCite, testIdPrefix]);
@@ -51,7 +51,7 @@ function useComponents({ titles, onCite, testIdPrefix }: Omit<AnswerTextProps, "
 export function AnswerText({ markdown, ...rest }: AnswerTextProps) {
   const components = useComponents(rest);
   return (
-    <div className="flex flex-col gap-3 text-[15.5px] leading-[1.65] text-ink" data-testid={`${rest.testIdPrefix}-answer`}>
+    <div className="flex flex-col gap-3 text-[15.5px] leading-[1.65] break-words text-ink" data-testid={`${rest.testIdPrefix}-answer`}>
       <Markdown allowedElements={ALLOWED} unwrapDisallowed skipHtml components={components}>
         {linkCitations(markdown)}
       </Markdown>

@@ -16,9 +16,9 @@ function Uncited({ documents, testIdPrefix }: { documents: SourceDocument[]; tes
         <ChevronRightIcon aria-hidden className="size-3.5 transition-transform group-open:rotate-90" />
         {documents.length} other {one ? "document was" : "documents were"} searched but not used in the answer
       </summary>
-      <ul className="mt-2 flex flex-col divide-y rounded-xl border bg-card">
+      <ul className="mt-2 flex flex-col divide-y rounded-lg border bg-card">
         {documents.map((doc) => (
-          <li key={doc.label} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
+          <li key={doc.label} className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2.5">
             <div className="min-w-0">
               <p className="text-[14px] break-words">{doc.title}</p>
               <p className="text-[12px] text-ink-soft">{[doc.departmentName, doc.documentYear].filter(Boolean).join(" · ")}</p>
@@ -42,8 +42,8 @@ type AnswerSourcesProps = {
 /** The documents the answer cites, then (folded away) the ones it searched but didn't use. */
 export function AnswerSources({ cited, uncited, anchorFor, highlighted, testIdPrefix }: AnswerSourcesProps) {
   return (
-    <section aria-label="Sources" className="flex flex-col gap-3">
-      {cited.length > 0 ? <h3 className="text-[12.5px] font-medium tracking-wide text-ink-soft uppercase">Sources</h3> : null}
+    <section aria-label="Sources" className="flex flex-col gap-2.5">
+      {cited.length > 0 ? <h3 className="font-sans text-[12px] font-medium tracking-wide text-ink-soft uppercase">Sources</h3> : null}
       {cited.map((doc) => (
         <SourceCard key={doc.label} doc={doc} anchorId={anchorFor(doc.label)} highlighted={highlighted === doc.label} testIdPrefix={testIdPrefix} />
       ))}

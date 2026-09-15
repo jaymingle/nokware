@@ -212,7 +212,7 @@ export function AnswerChart({ chart, testId }: { chart: AskChart; testId: string
   const [box, width] = useWidth(640);
   const hatch = `hatch-${useId().replace(/[^a-zA-Z0-9-]/g, "")}`;
   return (
-    <figure className="flex flex-col gap-3 rounded-xl border bg-card p-4" data-testid={`${testId}-chart`} data-kind={chart.kind}>
+    <figure className="flex flex-col gap-3 rounded-lg border bg-card p-3.5 sm:p-4" data-testid={`${testId}-chart`} data-kind={chart.kind}>
       <figcaption className="text-[15px] font-medium">{chart.title}</figcaption>
       {chart.note ? <p className="text-[13px] text-ink-soft italic" data-testid={`${testId}-chart-note`}>{chart.note}</p> : null}
       <Legend chart={chart} />
