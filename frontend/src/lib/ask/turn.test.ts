@@ -24,6 +24,7 @@ describe("applyEvent", () => {
     const done = applyEvent(turn, { type: "done", answer: "Yes [S1] and.", status: "answered", cited: ["S1"] });
     expect([done.stage, done.text, done.status]).toEqual(["done", "Yes [S1] and.", "answered"]);
     expect(citedDocuments(done).map((doc) => doc.label)).toEqual(["S1"]);
+    expect([done.chart, done.chartNote, done.exportView]).toEqual([null, null, null]);
   });
 
   it("keeps the question when the answer fails", () => {

@@ -55,6 +55,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/ask/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Export
+         * @description An answer Ask gave, as a PDF, a Word document or a CSV. Only a view the API signed is rendered.
+         */
+        post: operations["export_api_ask_export_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/ledger/{document_id}/file": {
         parameters: {
             query?: never;
@@ -718,6 +738,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/channels/whatsapp/audio/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Whatsapp Audio
+         * @description A spoken reply, fetched by Twilio as it sends the voice note. The link is random and lasts 10 minutes, and
+         *     the audio is an answer from public documents, never anything about a report.
+         */
+        get: operations["whatsapp_audio_api_channels_whatsapp_audio__name__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        /**
+         * Whatsapp Audio
+         * @description A spoken reply, fetched by Twilio as it sends the voice note. The link is random and lasts 10 minutes, and
+         *     the audio is an answer from public documents, never anything about a report.
+         */
+        head: operations["whatsapp_audio_api_channels_whatsapp_audio__name__get"];
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -731,6 +777,46 @@ export interface components {
         ActionRequest: {
             /** Note */
             note?: string | null;
+        };
+        /**
+         * AskChart
+         * @description A chart the question asked for, of the answer's cited live report figures (ask_charts decides; clients draw).
+         */
+        AskChart: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "bar" | "stacked_bar" | "line" | "pie" | "donut";
+            /** Horizontal */
+            horizontal: boolean;
+            /** Title */
+            title: string;
+            /** Categories */
+            categories: string[];
+            /** Series */
+            series: components["schemas"]["ChartSeries"][];
+            /** Over Time */
+            over_time: boolean;
+            /** Figures */
+            figures: string[];
+            /** Counted At */
+            counted_at: string;
+            /** Axis Max */
+            axis_max: number;
+            /** Ticks */
+            ticks: number[];
+            /** Note */
+            note: string | null;
+        };
+        /** AskExportRequest */
+        AskExportRequest: {
+            view: components["schemas"]["ExportView"];
+            /**
+             * Format
+             * @enum {string}
+             */
+            format: "pdf" | "docx" | "csv";
         };
         /**
          * AskFigure
@@ -749,6 +835,12 @@ export interface components {
             rows: components["schemas"]["FigureRow"][];
             /** Counted At */
             counted_at: string;
+            /**
+             * Grouped By
+             * @default none
+             * @enum {string}
+             */
+            grouped_by: "none" | "topic" | "sub_metro" | "month";
         };
         /** AskRequest */
         AskRequest: {
@@ -768,6 +860,10 @@ export interface components {
             sources: components["schemas"]["AskSource"][];
             /** Figures */
             figures: components["schemas"]["AskFigure"][];
+            chart?: components["schemas"]["AskChart"] | null;
+            /** Chart Note */
+            chart_note?: string | null;
+            export: components["schemas"]["ExportView"];
         };
         /**
          * AskSource
@@ -1014,6 +1110,22 @@ export interface components {
             /** Voices */
             voices: number;
         };
+        /** ChartSeries */
+        ChartSeries: {
+            /** Name */
+            name: string;
+            /** Values */
+            values: components["schemas"]["ChartValue"][];
+        };
+        /** ChartValue */
+        ChartValue: {
+            /** Shown */
+            shown: string;
+            /** Low */
+            low: number;
+            /** High */
+            high: number;
+        };
         /**
          * Contact
          * @description Shown only to a case's recipients, and only when the citizen allowed a call.
@@ -1217,6 +1329,10 @@ export interface components {
             status: "answered" | "no_information";
             /** Cited */
             cited: string[];
+            chart?: components["schemas"]["AskChart"] | null;
+            /** Chart Note */
+            chart_note?: string | null;
+            export?: components["schemas"]["ExportView"] | null;
         };
         /** ElectoralArea */
         ElectoralArea: {
@@ -1243,6 +1359,53 @@ export interface components {
         EscalationRequest: {
             /** Note */
             note: string;
+        };
+        /**
+         * ExportSource
+         * @description A cited document as an export lists it.
+         */
+        ExportSource: {
+            /** Label */
+            label: string;
+            /** Title */
+            title: string;
+            /** Department Name */
+            department_name: string | null;
+            provenance: components["schemas"]["Provenance"] | null;
+            /** Source Url */
+            source_url: string | null;
+            /** Document Year */
+            document_year: number | null;
+            /** Published At */
+            published_at: string | null;
+            /** Ledger Url */
+            ledger_url: string | null;
+        };
+        /**
+         * ExportView
+         * @description Everything an export of one answer carries, signed by the API: the export route renders only answers it gave.
+         */
+        ExportView: {
+            /** Question */
+            question: string;
+            /** Answered At */
+            answered_at: string;
+            /** Answer */
+            answer: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "answered" | "no_information";
+            /** Sources */
+            sources: components["schemas"]["ExportSource"][];
+            /** Figures */
+            figures: components["schemas"]["AskFigure"][];
+            chart: components["schemas"]["AskChart"] | null;
+            /** Chart Note */
+            chart_note: string | null;
+            /** Token */
+            token: string;
         };
         /** FigureRow */
         FigureRow: {
@@ -1812,6 +1975,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AskStreamEvent"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_api_ask_export_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AskExportRequest"];
+            };
+        };
+        responses: {
+            /** @description The file, as an attachment. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": unknown;
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": unknown;
+                    "text/csv; charset=utf-8": unknown;
                 };
             };
             /** @description Validation Error */
@@ -2869,6 +3067,68 @@ export interface operations {
                     "application/json": {
                         [key: string]: boolean;
                     };
+                };
+            };
+        };
+    };
+    whatsapp_audio_api_channels_whatsapp_audio__name__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    whatsapp_audio_api_channels_whatsapp_audio__name__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

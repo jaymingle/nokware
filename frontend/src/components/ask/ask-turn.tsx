@@ -2,9 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { AnswerChart } from "@/components/ask/answer-chart";
 import { AnswerSources } from "@/components/ask/answer-sources";
 import { AnswerText } from "@/components/ask/answer-text";
 import { AskProgress } from "@/components/ask/ask-progress";
+import { ExportMenu } from "@/components/ask/export-menu";
 import { FigureCard } from "@/components/ask/figure-card";
 import { NoInformation } from "@/components/ask/no-information";
 import { ErrorNote } from "@/components/documents/panels";
@@ -102,6 +104,8 @@ function Answer({ turn, testId }: { turn: Turn; testId: string }) {
       {done ? <Attribution documents={cited.length} figures={turn.figures.filter((f) => f.cited).length} /> : null}
       {done && turn.text.includes(DISAGREEMENT_LEAD) ? <Disagreement /> : null}
       {turn.text ? <AnswerText markdown={turn.text} titles={titles} onCite={jump} testIdPrefix={testId} /> : null}
+      {done && turn.chart ? <AnswerChart chart={turn.chart} testId={testId} /> : null}
+      {done && !turn.chart && turn.chartNote ? <p className="text-[13px] text-ink-soft italic" data-testid={`${testId}-chart-note`}>{turn.chartNote}</p> : null}
       {done ? <AnswerFigures turn={turn} anchorFor={anchorFor} highlighted={highlighted} testId={testId} /> : null}
       {done && turn.documents.length ? (
         <AnswerSources cited={cited} uncited={turn.documents.filter((doc) => !doc.cited)} anchorFor={anchorFor} highlighted={highlighted} testIdPrefix={testId} />
@@ -126,6 +130,7 @@ export function AskTurn({ turn, onRetry }: { turn: Turn; onRetry: (turn: Turn) =
       {working ? <AskProgress turn={turn} testId={`${testId}-progress`} /> : null}
       {noInformation ? <NoInformation testIdPrefix={testId} /> : null}
       {!noInformation && turn.stage !== "error" ? <Answer turn={turn} testId={testId} /> : null}
+      {turn.stage === "done" && turn.exportView ? <ExportMenu view={turn.exportView} testId={testId} /> : null}
       {turn.stage === "error" && turn.error ? <TurnError message={turn.error} onRetry={() => onRetry(turn)} testId={testId} /> : null}
     </section>
   );

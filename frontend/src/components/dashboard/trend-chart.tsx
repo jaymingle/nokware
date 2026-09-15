@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type RefObject } from "react";
-
+import { useWidth } from "@/hooks/use-width";
 import { FEWER_THAN_FIVE, SUPPRESSED_RANGE, chartScale, drawnValue, longMonth, monthLabel, shownRuns, type Count } from "@/lib/report/dashboard";
 
 import type { MonthFigures } from "@/lib/api/types";
@@ -13,19 +12,6 @@ const PAD = { l: 34, r: 8, t: 12, b: 28 };
 const INNER_H = H - PAD.t - PAD.b;
 const FONT = 11;
 const LABEL_ROOM = 30; // below this much room per month, every other month is labelled
-
-function useWidth(fallback: number): [RefObject<HTMLDivElement | null>, number] {
-  const ref = useRef<HTMLDivElement>(null);
-  const [width, setWidth] = useState(fallback);
-  useEffect(() => {
-    const element = ref.current;
-    if (!element) return;
-    const observer = new ResizeObserver(([entry]) => setWidth(Math.max(240, Math.round(entry.contentRect.width))));
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, []);
-  return [ref, width];
-}
 
 function spoken(count: Count): string {
   return count === null ? FEWER_THAN_FIVE : String(count);
