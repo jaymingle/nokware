@@ -1,0 +1,13 @@
+# Never in the image: secrets, the local environment, caches, tests and local logs.
+.env
+.env.*
+!.env.example
+.venv/
+**/__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+tests/
+scripts/logs/
+scripts/seed_users.toml

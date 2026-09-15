@@ -1,0 +1,8 @@
+# Never in the image: local secrets, installed modules (rebuilt inside), build output and editor files.
+.env
+.env.*
+!.env.example
+node_modules/
+.next/
+.openapi.json
+*.tsbuildinfo
