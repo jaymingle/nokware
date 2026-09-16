@@ -30,7 +30,8 @@ from appwrite.query import Query
 
 from app.services.appwrite_client import every_record
 from app.services.case_workflow import CaseStatus
-from app.services.citizen_reports import REPORTS_COLLECTION, TEST_PREFIX
+from app.services.citizen_reports import REPORTS_COLLECTION
+from app.services.test_fixtures import TEST_PREFIX
 from app.services.ledger_documents import parse_datetime
 from app.services.report_taxonomy import TOPICS_BY_ID, Category
 

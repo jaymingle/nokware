@@ -29,7 +29,7 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 
 from app.services import ledger_documents
-from app.services.ledger_documents import LedgerStatus, year_from_title
+from app.services.ledger_documents import year_from_title
 from app.services.llm import get_chat_model
 from app.services.vectorstore import (
     CHUNK_INDEX_COLUMN,
@@ -269,7 +269,7 @@ def retrieve(question: str) -> Retrieval:
     candidates = [
         RetrievedChunk(chunk, score, documents[chunk.document_id])
         for chunk, score in pool
-        if documents.get(chunk.document_id, {}).get("status") == LedgerStatus.PUBLISHED
+        if ledger_documents.is_public_document(documents.get(chunk.document_id))
     ]
     ranked = collapse_near_duplicates(apply_edition_preference(candidates, question_years(question)))
     return Retrieval(queries=queries, chunks=select_final(ranked, pinned_ids))

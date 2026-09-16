@@ -29,7 +29,7 @@ from appwrite.query import Query
 from app.services import ledger_documents
 from app.services.appwrite_client import every_record
 from app.services.case_workflow import CaseStatus
-from app.services.ledger_documents import LedgerStatus, parse_datetime
+from app.services.ledger_documents import parse_datetime
 from app.services.report_taxonomy import TOPICS_BY_ID
 from app.services.stats import is_public, public_cases, shown
 from app.teams import DEPARTMENT_NAMES
@@ -142,11 +142,11 @@ def aggregate(cases: list[dict[str, Any]], now: datetime) -> dict[str, Any]:
 
 def ledger_figures() -> dict[str, Any]:
     """How many documents the Ledger has published, from how many departments, and the latest few."""
-    published = Query.equal("status", LedgerStatus.PUBLISHED.value)
+    published = ledger_documents.PUBLIC_DOCUMENTS  # a test document is neither counted nor shown as recent
     latest, total = ledger_documents.list_documents(
-        [published, Query.order_desc("publishedAt"), Query.limit(RECENT_DOCUMENTS)]
+        [*published, Query.order_desc("publishedAt"), Query.limit(RECENT_DOCUMENTS)]
     )
-    every = every_record(ledger_documents.COLLECTION_ID, [published, Query.select(["department"])])
+    every = every_record(ledger_documents.COLLECTION_ID, [*published, Query.select(["department"])])
     departments = {d.get("department") for d in every}
     recent = [
         {

@@ -37,11 +37,10 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-from appwrite.query import Query
 
 from app.services import ledger_documents
 from app.services.appwrite_client import every_record
-from app.services.ledger_documents import LedgerStatus, plausible_year, year_from_title
+from app.services.ledger_documents import plausible_year, year_from_title
 from app.services.report_dashboard import _Cache
 from app.services.vectorstore import first_chunks
 from app.teams import DEPARTMENT_NAMES
@@ -234,8 +233,8 @@ def _summary(groups: list[dict[str, Any]]) -> dict[str, int]:
 
 def published_documents() -> list[dict[str, Any]]:
     """The Ledger's published documents, test documents left out."""
-    records = every_record(ledger_documents.COLLECTION_ID, [Query.equal("status", LedgerStatus.PUBLISHED.value)])
-    return [r for r in records if not (r.get("title") or "").lstrip().startswith("[TEST]")]
+    records = every_record(ledger_documents.COLLECTION_ID, list(ledger_documents.PUBLIC_DOCUMENTS))
+    return [record for record in records if ledger_documents.is_public_document(record)]  # and again, by title
 
 
 def build(documents: list[dict[str, Any]], now: datetime, first_pages: dict[str, str] | None = None) -> dict[str, Any]:

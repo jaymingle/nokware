@@ -15,6 +15,7 @@ from appwrite.models import Document
 from appwrite.query import Query
 
 from app.services.appwrite_client import DATABASE_ID, as_record, get_databases
+from app.services.test_fixtures import TEST_PREFIX, is_test
 
 COLLECTION_ID = "ledger_documents"
 INGESTION_ERROR_MAX = 1024  # size of the ingestionError attribute
@@ -28,6 +29,18 @@ class LedgerStatus(StrEnum):
     PUBLISHED = "published"
     DISPUTED = "disputed"
     WITHDRAWN = "withdrawn"
+
+
+def is_public_document(record: dict[str, Any] | None) -> bool:
+    """Published, and not a test fixture: a document an answer may cite and a count may include.
+
+    A document titled "[TEST] …" is published by the portal's own lifecycle test so ingestion is tested for real,
+    and without this an answer could cite it to a resident as the Assembly's."""
+    return bool(record) and record.get("status") == LedgerStatus.PUBLISHED and not is_test(record.get("title"))
+
+
+# The same, as a query: published documents, test fixtures left out, for counts the database does.
+PUBLIC_DOCUMENTS = [Query.equal("status", LedgerStatus.PUBLISHED.value), Query.not_starts_with("title", TEST_PREFIX)]
 
 
 class SourceType(StrEnum):

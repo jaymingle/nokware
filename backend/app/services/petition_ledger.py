@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from app.services import ledger_documents
-from app.services.ledger_documents import LedgerStatus, provenance
+from app.services.ledger_documents import provenance
 from app.services.pdf_text import mend
 from app.services.publishing_record import year_and_source
 from app.services.retrieval import RetrievedChunk, collapse_near_duplicates, fuse, ranked_lists
@@ -72,7 +72,7 @@ def search(query: str, limit: int = DOCUMENTS_MAX) -> list[LedgerMatch]:
     fused = fuse([*vector_lists, *keyword_lists])
     documents = ledger_documents.get_documents(chunk.document_id for chunk, _ in fused)
     published = [RetrievedChunk(chunk, score, documents[chunk.document_id]) for chunk, score in fused
-                 if documents.get(chunk.document_id, {}).get("status") == LedgerStatus.PUBLISHED]
+                 if ledger_documents.is_public_document(documents.get(chunk.document_id))]
     found: dict[str, LedgerMatch] = {}
     for hit in collapse_near_duplicates(published):  # best first; the same text in two documents shows once
         if hit.chunk.document_id not in found:

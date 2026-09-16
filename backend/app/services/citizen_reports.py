@@ -16,10 +16,6 @@ VOICES_COLLECTION = "case_voices"
 PHOTOS_BUCKET = "nokware-report-photos"
 
 DESCRIPTION_MAX = 8192
-# A report whose description starts with this is a test fixture, not a resident's report. It is filed, routed and
-# worked like any other, so the pipeline is tested for real, but it is counted in no public figure: a dashboard of
-# scripted reports presented as what residents reported is the same fabrication as a backdated history.
-TEST_PREFIX = "[TEST]"
 MAX_PHOTOS = 10
 VOICE_NAME_MAX = 80
 
