@@ -35,3 +35,36 @@ starting point; the Claude Design tokens override the palette in
 ```bash
 npx shadcn@latest add <component>
 ```
+
+## Accessibility
+
+The target is WCAG 2.1 AA, with WCAG 2.5.5's 44px touch target taken on as
+well: most people here reach Nokware on a phone, and the page carrying the
+emergency numbers is the one where a mis-tap costs most.
+
+What the code holds to:
+
+- **Colour is never the only signal.** Every inline link is underlined, not
+  underlined on hover, and every text token clears 4.5:1 on every surface it is
+  used on (see the palette comments in `src/app/globals.css`).
+- **Every chart has its numbers in text.** The SVG is `aria-hidden` and the same
+  figures are in a visually hidden table beside it, with a suppressed count read
+  as "fewer than 5" rather than left blank — the same rule the visible chart
+  follows.
+- **A control is at least 44px on a touch screen.** One rule in the base layer,
+  scoped to `pointer: coarse`; anything that is a control but reads as a link
+  carries `data-touch-target`. A link inside a sentence is exempt, as WCAG
+  exempts it.
+- **Focus goes where the person asked it to.** A skip link is the first thing
+  focus reaches on every page, and when one step replaces another — the report
+  form replacing the safety question — the new step takes the focus with it
+  (`src/hooks/use-step-focus.ts`).
+- **Heading levels never skip**, so the outline a screen reader lists matches
+  the page. A panel used at more than one depth takes its level as a prop
+  instead of assuming one.
+
+The audit was axe-core over every public page, in its first state and in the
+states only reaching for something reveals — the chat panel open, both report
+forms — plus the whole of filing a report with nothing but a keyboard. What is
+outstanding is in the pass's own notes: no screen-reader testing with a real
+user, and no audit of the signed-in portal pages.
