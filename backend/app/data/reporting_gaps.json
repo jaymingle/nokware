@@ -1,0 +1,16 @@
+{
+  "about": "Figures the Assembly's published documents once reported and haven't since. This is Nokware's own reading of The Ledger, not a statutory list: nothing here says the Assembly is required to publish these figures every year, only that the newest it has published are as old as they are. Each gap records what was searched, when, and the document the figures come from, so anyone can check it. A gap is shown only while its document is still published in The Ledger.",
+  "gaps": [
+    {
+      "id": "domestic-violence",
+      "subject": "Domestic violence cases in Accra",
+      "latest_year": 2018,
+      "document_id": "ama-791ec35e938207ec37e6abdac3390249",
+      "figures": "12 cases in 2016, 18 in 2017, 11 in 2018",
+      "quote": "The number of reported cases of violence to the Domestic Violence and Victim Support Unit in the metropolis increased from 12 cases in 2016 to 18 in 2017 and declined to 11 cases in 2018.",
+      "searched": ["domestic violence", "DOVVSU", "gender-based violence", "victim support", "defilement"],
+      "checked": "2026-09-16",
+      "why": "Reported cases say how much is reaching the police unit that handles this, and whether it is rising. Without a recent figure, nobody outside the Assembly can tell."
+    }
+  ]
+}

@@ -196,6 +196,18 @@ the count in `value`, and "fewer than 5" leaves `value` empty (saying so in
 in the answer's text until the documents' tables can be read accurately. A cell
 that would start a formula is prefixed with an apostrophe.
 
+**What table extraction would unlock, concretely.** The 2023 Monitoring and
+Evaluation Report records the city's child-abuse cases. pypdf flattens the row
+to "Recorded cases of child abuse Count of recorded cases of child abuse in the
+district Child trafficking Output 1,497 100 1,497", where three numbers sit
+against two indicators and no column headers survive. Ask will not cite that
+(the chart rule refuses it by the same test), so "How many cases of child abuse
+were recorded in Accra?" answers that the documents searched don't report it —
+while the figure is in the Ledger, in a table nothing can read. Extraction would
+turn that row back into indicator, year and value; then the figure is citable,
+chartable and exportable, and the same holds for every budget line and fee
+schedule now locked in the same shape.
+
 Nothing is stored: each answer comes with its export view, signed with a key
 derived from the server's secret, and the export route renders only a view whose
 signature holds, so the server can't be used to print Nokware-branded documents
@@ -676,6 +688,20 @@ default; run it with `--yes` before deploying this code).
 
 Two public pages publish evidence about the Assembly itself, not only its
 documents.
+
+**Figures that stop** (`app/services/reporting_gaps.py`, at the top of
+`/accountability/documents`) asks a question the record can't: the document
+exists, it carries a figure the public needs, and nothing published since gives
+that figure again. Accra's most recent published domestic violence figures are
+from 2018 — 12 cases reported to DOVVSU in 2016, 18 in 2017, 11 in 2018, in the
+2020 Voluntary Local Review — and the Ledger holds nothing newer. Each finding
+in `app/data/reporting_gaps.json` carries the passage it comes from, the words
+the Ledger was searched for and the date it was searched, so a reader can check
+it instead of trusting it; the years since are counted from today. These are
+Nokware's own readings, not a statutory list: a gap says what the newest
+published figure is, never that a duty was broken. A finding is shown only while
+its document is still published, so the quotation always has a document behind
+it.
 
 The publishing record (`app/services/publishing_record.py`,
 `/accountability/documents`) sets what the Assembly is required to publish

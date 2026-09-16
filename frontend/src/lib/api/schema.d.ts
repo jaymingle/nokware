@@ -2661,6 +2661,10 @@ export interface components {
             /** Groups */
             groups: components["schemas"]["RequirementGroup"][];
             summary: components["schemas"]["RecordSummary"];
+            /** Gaps */
+            gaps: components["schemas"]["ReportingGap"][];
+            /** Gaps About */
+            gaps_about: string;
         };
         /** ReassignRequest */
         ReassignRequest: {
@@ -2847,6 +2851,34 @@ export interface components {
             voices?: number | null;
             /** Location Views */
             location_views?: components["schemas"]["LocationViewNote"][];
+        };
+        /**
+         * ReportingGap
+         * @description A figure the Assembly's documents once reported and haven't since: Nokware's reading, with its evidence.
+         */
+        ReportingGap: {
+            /** Id */
+            id: string;
+            /** Subject */
+            subject: string;
+            /** Latest Year */
+            latest_year: number;
+            /** Years Since */
+            years_since: number;
+            /** Figures */
+            figures: string;
+            /** Quote */
+            quote: string;
+            /** Document Id */
+            document_id: string;
+            /** Document Title */
+            document_title: string;
+            /** Searched */
+            searched: string[];
+            /** Checked */
+            checked: string;
+            /** Why */
+            why: string;
         };
         /** Representation */
         Representation: {

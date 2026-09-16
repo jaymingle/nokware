@@ -49,6 +49,7 @@ export type ElectoralArea = Schemas["ElectoralArea"];
 export type AskFigure = Schemas["AskFigure"];
 export type AskChart = Schemas["AskChart"];
 export type PublishingRecord = Schemas["PublishingRecord"];
+export type ReportingGap = Schemas["ReportingGap"];
 export type RecordRequirement = Schemas["Requirement"];
 export type RecordPeriod = Schemas["RecordPeriod"];
 export type RecordDocument = Schemas["RecordDocument"];

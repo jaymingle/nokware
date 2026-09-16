@@ -58,6 +58,22 @@ class RecordSummary(BaseModel):
     not_due: int
 
 
+class ReportingGap(BaseModel):
+    """A figure the Assembly's documents once reported and haven't since: Nokware's reading, with its evidence."""
+
+    id: str
+    subject: str
+    latest_year: int
+    years_since: int
+    figures: str  # the figures as the document gives them
+    quote: str  # the passage they come from
+    document_id: str  # its PDF is at /api/ledger/{id}/file
+    document_title: str
+    searched: list[str]  # the words the Ledger was searched for
+    checked: str  # the date it was searched
+    why: str
+
+
 class PublishingRecord(BaseModel):
     generated_at: str
     documents_centre: str
@@ -66,6 +82,8 @@ class PublishingRecord(BaseModel):
     last_year: int
     groups: list[RequirementGroup]
     summary: RecordSummary
+    gaps: list[ReportingGap]  # figures the documents once reported and haven't since
+    gaps_about: str
 
 
 class DepartmentReports(BaseModel):

@@ -8,7 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.services import department_responsiveness, publishing_record
+from app.services import department_responsiveness, publishing_record, reporting_gaps
 from app.services.department_responsiveness import build as build_responsiveness, complement
 from app.services.publishing_record import build as build_record, document_year, quarter_of
 
@@ -244,10 +244,14 @@ def test_both_routes_answer_publicly(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(department_responsiveness, "every_record", lambda collection, queries: works_cases(6, 6)[1] if "assign" in collection else [])
     monkeypatch.setattr(department_responsiveness.CACHE, "_value", None)
     monkeypatch.setattr(department_responsiveness.petition_figures, "every_record", lambda collection, queries: [])
+    monkeypatch.setattr(reporting_gaps, "find_document", lambda document_id: {"title": "2020 Voluntary Local Review", "status": "published"})
     client = TestClient(app)
     record = client.get("/api/publishing-record").json()
     assert record["documents_centre_checked"] == "2026-09-12" and [g["name"] for g in record["groups"]] == [
         "Vision and plans", "Budget and tariffs", "Financial and audit", "Oversight and RTI"]
+    gap = record["gaps"][0]  # the record carries what the documents stopped reporting, with its evidence
+    assert gap["subject"] == "Domestic violence cases in Accra" and gap["latest_year"] == 2018 and gap["quote"]
+    assert gap["document_title"] == "2020 Voluntary Local Review" and record["gaps_about"].startswith("Figures the Assembly")
     response = client.get("/api/responsiveness").json()
     assert response["waiting_days"] == 7 and department(response, "Works Department")["reports"]["received"] == 6
     assert response["petitions"]["reached_threshold"] == 0 and len(response["petitions"]["refusals"]) == 6
