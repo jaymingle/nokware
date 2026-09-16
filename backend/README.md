@@ -742,6 +742,25 @@ add up to one that is shown (resolved and still open make up received), hiding
 one hides the other. Departments are listed by name, never ranked. The Police and
 GNFS are national agencies, not Assembly departments, and are left off.
 
+**Roadmap: what departments actually did, in aggregate.** Ask can say how many
+reports were resolved, not what was done about them, because resolution notes
+are internal — a resident asking "what has the Assembly done about drains in
+Kaneshie?" gets a count and nothing else. The answer is in those notes, but they
+were written for the one citizen who filed the report and carry names, shops and
+house numbers. The shape decided (2026-09-16) is a fixed vocabulary, not
+summarising: each note is classified into set actions — desilted, cleared,
+repaired, replaced, inspected, referred to another agency, no action possible —
+and Ask answers only from the counts ("7 drainage reports resolved in Kaneshie:
+5 desilted, 1 referred to Hydrological Services, 1 beyond the sub-metro"). No
+sentence of a note ever reaches the public, so there is nothing to redact and
+nothing to get wrong, and the usual rules hold: personal safety excluded, 1 to 4
+reads "fewer than 5". Two conditions before it ships: the case form must tell
+staff that what they write may be counted into public totals by action type
+(changing the deal afterwards is not acceptable), and there is no per-note
+opt-out, which would turn the record into selective disclosure. The cost is
+nuance — "cleared the drain but it will silt again by December" becomes
+"cleared" — and the citizen who filed still gets the note in full.
+
 **Roadmap:** a department-written, one-line public title for an issue (for
 example "Pothole on Kaneshie market road near the footbridge"), added when the
 department starts work, so residents can tell similar issues apart without the
