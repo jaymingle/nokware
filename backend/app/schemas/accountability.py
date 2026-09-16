@@ -62,7 +62,8 @@ class ReportingGap(BaseModel):
     """A figure the Assembly's documents once reported and haven't since: Nokware's reading, with its evidence."""
 
     id: str
-    subject: str
+    subject: str  # a short label, never slotted into a sentence
+    headline: str  # the finding's own sentence, written with the figures' age filled in
     latest_year: int
     years_since: int
     figures: str  # the figures as the document gives them

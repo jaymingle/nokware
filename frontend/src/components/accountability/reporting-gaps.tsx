@@ -7,8 +7,9 @@ function Gap({ gap }: { gap: ReportingGap }) {
   return (
     <article className="flex flex-col gap-2.5 rounded-xl border border-gold/40 bg-paper-warm p-4 sm:p-5" data-testid={testId}>
       <div>
+        {/* The finding's own sentence, as written: nothing here is composed out of a label. */}
         <h3 className="text-[18px] leading-snug" data-testid={`${testId}-headline`}>
-          Accra&apos;s most recent published {gap.subject.toLowerCase()} figures are {gap.years_since} years old
+          {gap.headline}
         </h3>
         <p className="mt-1 text-[13.5px] text-ink-soft">
           The newest figures The Ledger holds are for {gap.latest_year}: {gap.figures}. Nothing published since gives
@@ -32,8 +33,10 @@ function Gap({ gap }: { gap: ReportingGap }) {
 
 /** Figures the Assembly's documents once reported and haven't since: the gap the record itself can't show. */
 export function ReportingGaps({ gaps, about }: { gaps?: ReportingGap[]; about?: string }) {
-  // Optional on purpose: an API that predates these findings must not blank the record.
-  if (!gaps?.length || !about) return null;
+  // Optional on purpose: an API that predates these findings, or one of them, must not blank the record or
+  // show a finding without its sentence.
+  const written = gaps?.filter((gap) => gap.headline) ?? [];
+  if (!written.length || !about) return null;
   return (
     <section aria-labelledby="reporting-gaps" className="flex flex-col gap-3" data-testid="reporting-gaps">
       <div>
@@ -42,7 +45,7 @@ export function ReportingGaps({ gaps, about }: { gaps?: ReportingGap[]; about?: 
         </h2>
         <p className="mt-1 max-w-[70ch] text-[14px] text-ink-soft">{about}</p>
       </div>
-      {gaps.map((gap) => (
+      {written.map((gap) => (
         <Gap key={gap.id} gap={gap} />
       ))}
     </section>

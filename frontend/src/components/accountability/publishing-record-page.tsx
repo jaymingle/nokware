@@ -73,7 +73,10 @@ function Row({ requirement, years, selected, onSelect }: { requirement: RecordRe
       </th>
       {requirement.cadence === "as_issued" ? (
         <td colSpan={years.length} className="border-l px-3 py-2.5 text-[13px] text-ink-soft" data-testid={`record-${requirement.id}-as-issued`}>
-          Issued on no fixed schedule, so no year is marked missing. {requirement.held.length ? `The Ledger holds ${requirement.held.length}.` : "The Ledger holds none."}
+          Issued on no fixed schedule, so no year is marked missing.{" "}
+          {requirement.held.length
+            ? `The Ledger holds ${requirement.held.length} of ${requirement.held.length === 1 ? "it" : "them"}.`
+            : "None is in The Ledger, and none was found in ama.gov.gh's Documents Centre."}
         </td>
       ) : requirement.cadence === "plan_period" ? (
         <PlanCells requirement={requirement} years={years} isSelected={isSelected} onSelect={onSelect} />

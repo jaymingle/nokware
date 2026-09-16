@@ -2861,6 +2861,8 @@ export interface components {
             id: string;
             /** Subject */
             subject: string;
+            /** Headline */
+            headline: string;
             /** Latest Year */
             latest_year: number;
             /** Years Since */

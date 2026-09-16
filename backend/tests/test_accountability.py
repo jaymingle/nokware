@@ -250,7 +250,7 @@ def test_both_routes_answer_publicly(monkeypatch: pytest.MonkeyPatch) -> None:
     assert record["documents_centre_checked"] == "2026-09-12" and [g["name"] for g in record["groups"]] == [
         "Vision and plans", "Budget and tariffs", "Financial and audit", "Oversight and RTI"]
     gap = record["gaps"][0]  # the record carries what the documents stopped reporting, with its evidence
-    assert gap["subject"] == "Domestic violence cases in Accra" and gap["latest_year"] == 2018 and gap["quote"]
+    assert gap["subject"] == "Domestic violence" and gap["latest_year"] == 2018 and gap["quote"] and gap["headline"]
     assert gap["document_title"] == "2020 Voluntary Local Review" and record["gaps_about"].startswith("Figures the Assembly")
     response = client.get("/api/responsiveness").json()
     assert response["waiting_days"] == 7 and department(response, "Works Department")["reports"]["received"] == 6
