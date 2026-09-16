@@ -23,8 +23,9 @@ function PortalNav() {
             href={item.href}
             data-testid={item.testId}
             aria-current={active ? "page" : undefined}
+            data-touch-target
             className={cn(
-              "rounded-lg border px-[13px] py-2 text-[13.5px] transition-colors",
+              "inline-flex items-center rounded-lg border px-[13px] py-2 text-[13.5px] transition-colors",
               active ? "border-teal bg-teal-tint font-medium text-teal" : "border-transparent text-ink-soft hover:text-ink",
             )}
           >

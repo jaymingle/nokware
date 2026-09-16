@@ -72,12 +72,18 @@ export function PdfField({ file, onChange, testId }: PdfFieldProps) {
 
   return (
     <div className="flex flex-col gap-2">
+      {/*
+        The control a person uses is the "Choose file" button, which opens this.
+        Out of the tab order and out of the accessibility tree together: left in
+        the tree it announced as an unnamed file field nobody could operate.
+      */}
       <input
         ref={input}
         type="file"
         accept="application/pdf,.pdf"
         className="sr-only"
         tabIndex={-1}
+        aria-hidden
         onChange={(event) => take(event.target.files?.[0])}
         data-testid={`${testId}-input`}
       />

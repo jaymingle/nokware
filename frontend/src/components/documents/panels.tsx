@@ -32,7 +32,7 @@ export function EmptyPanel({ title, children }: { title: string; children?: Reac
   return (
     <Card>
       <CardContent className="flex flex-col gap-1.5 py-4">
-        <h3 className="text-[19px]">{title}</h3>
+        <h2 className="text-[19px]">{title}</h2>
         {children ? <p className="max-w-[62ch] text-sm text-ink-soft">{children}</p> : null}
       </CardContent>
     </Card>
