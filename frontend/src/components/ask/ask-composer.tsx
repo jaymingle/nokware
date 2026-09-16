@@ -15,7 +15,10 @@ const COUNT_FROM = 900; // show the character count only near the limit
 
 function ComposerHint({ busy, panel, length }: { busy: boolean; panel: boolean; length: number }) {
   // A chat suggests memory; Ask has none, so the box says so. In the panel there is room for the short form only.
-  const memory = panel ? "Each question is answered on its own." : "Each question is answered on its own: Nokware doesn't remember earlier ones.";
+  // Nobody discovers a language they aren't told about, and this is where a question is typed.
+  const memory = panel
+    ? "Ask in English, French or Twi. Each question is answered on its own."
+    : "Ask in English, French or Twi, and the answer comes back in the language you asked. Each question is answered on its own: Nokware doesn't remember earlier ones.";
   const hint = busy ? "Answering your question…" : memory;
   return (
     <div className={cn("mt-1.5 justify-between gap-3 text-[12px] text-ink-muted", length >= COUNT_FROM ? "flex" : "hidden sm:flex")}>

@@ -24,8 +24,9 @@ export function AskWelcome({ compact, onAsk, disabled }: { compact: boolean; onA
         <p className="text-[12.5px] text-ink-soft">Ask Nokware</p>
         <h1 className={cn("leading-tight", compact ? "text-[24px]" : "text-[32px] sm:text-[40px]")}>Answers that carry their source</h1>
         <p className={cn("max-w-[62ch] text-ink-soft", compact ? "text-[14px]" : "text-base")}>
-          Ask about a budget, a fee, a plan or a policy, by typing or speaking. Every answer names the documents it came
-          from, who published them and when. Where the record is silent, Nokware says so.
+          Ask about a budget, a fee, a plan or a policy — by typing or speaking, in English, French or Twi. Every answer
+          names the documents it came from, who published them and when, and comes back in the language you asked in.
+          Where the record is silent, Nokware says so.
         </p>
       </div>
       <SuggestedQuestions onAsk={onAsk} disabled={disabled} compact={compact} />

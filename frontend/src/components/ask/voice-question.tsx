@@ -37,9 +37,12 @@ export function VoiceControl({ state, onStart, onStop, onCancel }: ControlProps)
   if (state.kind === "recording") return <Recording seconds={state.seconds} onStop={onStop} onCancel={onCancel} />;
   const listening = state.kind === "listening";
   return (
-    <Button type="button" variant="secondary" className="h-11 w-11 shrink-0 px-0" onClick={onStart} disabled={listening}
-      aria-label={listening ? "Listening to your question…" : "Ask by speaking"} data-testid="ask-voice-start">
+    // Named, not just drawn: an unlabelled microphone is a feature nobody finds. The word
+    // is hidden on a phone, where the composer row has no space for it, and read out there.
+    <Button type="button" variant="secondary" className="h-11 shrink-0 gap-1.5 px-3 max-sm:w-11 max-sm:px-0" onClick={onStart} disabled={listening}
+      aria-label={listening ? "Listening to your question" : "Speak your question"} data-testid="ask-voice-start">
       {listening ? <LoaderCircleIcon className="motion-safe:animate-spin" /> : <MicIcon />}
+      <span className="max-sm:sr-only">{listening ? "Listening" : "Speak"}</span>
     </Button>
   );
 }
