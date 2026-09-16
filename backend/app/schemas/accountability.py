@@ -75,6 +75,26 @@ class ReportingGap(BaseModel):
     why: str
 
 
+class CheckedSource(BaseModel):
+    name: str
+    url: str
+    holds: str  # what it does hold, so the reader can see the search was real
+
+
+class UnpublishedData(BaseModel):
+    """Something the public record would need that nobody publishes at all — no document to look for, no figure to age."""
+
+    id: str
+    subject: str  # a short label, never slotted into a sentence
+    headline: str  # the finding's own sentence, written out
+    matters: str
+    checked: list[CheckedSource]
+    checked_on: str
+    instead: str  # the nearest thing that does exist
+    rti_document: str  # what to ask the Assembly for
+    rti_period: str
+
+
 class PublishingRecord(BaseModel):
     generated_at: str
     documents_centre: str
@@ -85,6 +105,8 @@ class PublishingRecord(BaseModel):
     summary: RecordSummary
     gaps: list[ReportingGap]  # figures the documents once reported and haven't since
     gaps_about: str
+    unpublished: list[UnpublishedData]  # things nobody publishes at all
+    unpublished_about: str
 
 
 class DepartmentReports(BaseModel):

@@ -1,7 +1,8 @@
 """Accountability: what the Assembly publishes, and how its departments respond. Public, no sign-in.
 
     GET /api/publishing-record   the documents it is required to publish, against what the Ledger holds, by year,
-                                 with the figures its documents once reported and haven't since
+                                 with the figures its documents once reported and haven't since, and the things
+                                 nobody publishes at all
     GET /api/responsiveness      each department's handling of reports and contributors' documents, last 12 months
 """
 
@@ -10,7 +11,7 @@ from fastapi import APIRouter
 from dataclasses import asdict
 
 from app.schemas.accountability import PublishingRecord, Responsiveness
-from app.services import department_responsiveness, publishing_record, reporting_gaps
+from app.services import department_responsiveness, publishing_record, reporting_gaps, unpublished_data
 from app.services.ledger_documents import utc_now
 
 router = APIRouter(prefix="/api", tags=["accountability"])
@@ -21,7 +22,13 @@ def record() -> PublishingRecord:
     now = utc_now()
     found = publishing_record.publishing_record(now)
     gaps = [asdict(gap) for gap in reporting_gaps.gaps(now)]
-    return PublishingRecord.model_validate({**found, "gaps": gaps, "gaps_about": reporting_gaps.about()})
+    return PublishingRecord.model_validate({
+        **found,
+        "gaps": gaps,
+        "gaps_about": reporting_gaps.about(),
+        "unpublished": [asdict(finding) for finding in unpublished_data.findings()],
+        "unpublished_about": unpublished_data.about(),
+    })
 
 
 @router.get("/responsiveness", response_model=Responsiveness)

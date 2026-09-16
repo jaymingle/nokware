@@ -252,6 +252,10 @@ def test_both_routes_answer_publicly(monkeypatch: pytest.MonkeyPatch) -> None:
     gap = record["gaps"][0]  # the record carries what the documents stopped reporting, with its evidence
     assert gap["subject"] == "Domestic violence" and gap["latest_year"] == 2018 and gap["quote"] and gap["headline"]
     assert gap["document_title"] == "2020 Voluntary Local Review" and record["gaps_about"].startswith("Figures the Assembly")
+    # And what nobody publishes at all, which is why Accra's electoral areas are drawn as tiles, not shapes.
+    missing = {finding["id"]: finding for finding in record["unpublished"]}
+    assert "20 electoral areas" in missing["electoral-area-boundaries"]["headline"]
+    assert len(missing["electoral-area-boundaries"]["checked"]) >= 3 and record["unpublished_about"]
     response = client.get("/api/responsiveness").json()
     assert response["waiting_days"] == 7 and department(response, "Works Department")["reports"]["received"] == 6
     assert response["petitions"]["reached_threshold"] == 0 and len(response["petitions"]["refusals"]) == 6

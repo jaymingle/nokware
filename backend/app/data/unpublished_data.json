@@ -1,0 +1,24 @@
+{
+ "about": "Things the public record would need to answer an ordinary question, that nobody publishes at all. The publishing record asks whether a document the Assembly should publish exists; 'Figures that stop' asks whether a figure a document once gave is still being given. This asks a third question: the thing was never published by anyone, so there is no document to look for and no figure to go stale. Each finding names every source checked and what it holds instead, with the date, so a reader can repeat the search rather than take it on trust. These are Nokware's own findings: a finding says what could not be found, never that the Assembly broke a duty.",
+ "findings": [
+  {
+   "id": "electoral-area-boundaries",
+   "subject": "Electoral-area boundaries",
+   "headline": "Nobody publishes the boundaries of Accra's 20 electoral areas",
+   "matters": "An electoral area is the unit a resident elects an assembly member for, and the unit a report to Nokware is located by. Without its boundary nobody outside the Assembly can draw the city's areas, check which one an address falls in, or show where reports come from on a map. Nokware lists the 20 areas by name and counts reports in each; what it cannot do is draw them.",
+   "checked": [
+    {"name": "Electoral Commission of Ghana", "url": "https://ec.gov.gh/electoral-system/", "holds": "Electoral areas are described in text and PDFs. No boundary files of any kind."},
+    {"name": "Ghana Statistical Service", "url": "https://statsbank.statsghana.gov.gh/censusatlas/", "holds": "District outlines only (261 and 271 districts, October 2023). The 2021 census mapped enumeration areas, but that geography is not released."},
+    {"name": "HDX / OCHA common operational datasets", "url": "https://data.humdata.org/dataset/cod-ab-gha", "holds": "Two levels for Ghana: 16 regions and 260 districts. There is no third level. Accra Metropolitan is one district."},
+    {"name": "GADM", "url": "https://gadm.org/download_country.html", "holds": "Ghana stops at level 2, the district. Level 3 does not exist."},
+    {"name": "geoBoundaries", "url": "https://www.geoboundaries.org/", "holds": "Ghana ADM1 and ADM2 only; ADM3 returns nothing."},
+    {"name": "GRID3", "url": "https://data.grid3.org/", "holds": "Settlement extents and population rasters for Ghana. The ward-boundary products are Nigeria's."},
+    {"name": "OpenStreetMap", "url": "https://www.openstreetmap.org/relation/20406318", "holds": "No electoral or political boundary exists anywhere in Ghana. Three AMA sub-metro outlines exist, traced from satellite imagery by a contributor in April 2026 — the nearest thing to an answer, and not an Assembly boundary."}
+   ],
+   "checked_on": "2026-09-16",
+   "instead": "The finest official boundary anyone publishes for Accra is the metropolis as a single district. Below that the public record is empty.",
+   "rti_document": "map or schedule of electoral area boundaries",
+   "rti_period": "the current demarcation"
+  }
+ ]
+}

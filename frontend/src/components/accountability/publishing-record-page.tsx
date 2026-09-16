@@ -5,6 +5,7 @@ import { useState } from "react";
 
 import { RecordDetail } from "@/components/accountability/record-detail";
 import { ReportingGaps } from "@/components/accountability/reporting-gaps";
+import { UnpublishedRecord } from "@/components/accountability/unpublished-data";
 import { ErrorPanel, LoadingPanel } from "@/components/documents/panels";
 import { PageIntro } from "@/components/portal/page-intro";
 import { usePublishingRecord } from "@/lib/api/public-queries";
@@ -173,6 +174,7 @@ export function PublishingRecordPage() {
         <>
           <Summary record={record.data} />
           <ReportingGaps gaps={record.data.gaps} about={record.data.gaps_about} />
+          <UnpublishedRecord findings={record.data.unpublished} about={record.data.unpublished_about} />
           <HowToRead record={record.data} />
           {record.data.groups.map((group, index) => <Group key={group.id} record={record.data} index={index} selected={selected} onSelect={onSelect} />)}
         </>
