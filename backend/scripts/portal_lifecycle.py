@@ -24,6 +24,7 @@ from app.services import ledger_documents
 from app.services.appwrite_client import get_teams, get_users
 from app.services.ledger_documents import utc_now
 from app.services.rag import answer_question
+from app.teams import DEPARTMENT_TEAMS
 
 RUN = uuid.uuid4().hex[:6].upper()
 CATEGORY = "Annual Reports"
@@ -183,11 +184,13 @@ def escalate_and_overrule() -> None:
         actions == ["submitted", "disputed", "escalated", "overruled"],
         actions,
     )
+    # Published and ingested, but a test document: no answer may cite it as the Assembly's, and its figure must not
+    # reach a resident from anywhere. Ingestion itself is proved by the search check above.
     answer = answer_question(f"What is the fictional test footbridge budget for test reference NKW-TEST-{RUN}-S3?")
-    cited = [s for s in answer["sources"] if s["cited"] and s["document_id"] == document_id]
+    cited = [s for s in answer["sources"] if s["document_id"] == document_id]
     check(
-        "answerable in Ask, citing the overruled document",
-        bool(cited) and "424,242" in answer["answer"],
+        "never cited by Ask, though published: it is a test document",
+        not cited and "424,242" not in answer["answer"],
         answer["answer"],
     )
 
@@ -280,8 +283,9 @@ def refusals() -> None:
     check("options need sign-in (401)", client.get("/api/departments").status_code == 401)
     departments = client.get("/api/departments", headers=CONTRIBUTOR).json()
     check(
-        "12 departments on offer, including Press",
-        len(departments) == 12 and {"id": "dept-press", "name": "Press"} in departments,
+        f"every department on offer ({len(DEPARTMENT_TEAMS)}), including Press",
+        len(departments) == len(DEPARTMENT_TEAMS) and {"id": "dept-press", "name": "Press"} in departments,
+        len(departments),
     )
 
 
