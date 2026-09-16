@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { ArrowRightIcon, KeyRoundIcon, MegaphoneIcon, MessageCircleQuestionIcon } from "lucide-react";
 
+import { cn } from "@/lib/utils";
+
 import type { LucideIcon } from "lucide-react";
 
 type Entry = {
@@ -39,22 +41,25 @@ const ENTRIES: Entry[] = [
   },
 ];
 
-function EntryCard({ entry }: { entry: Entry }) {
+function EntryCard({ entry, lead = false }: { entry: Entry; lead?: boolean }) {
   const Icon = entry.icon;
   return (
     <Link
       href={entry.href}
-      className="group flex h-full flex-col items-start gap-4 rounded-xl border bg-card p-6 transition-colors hover:border-teal"
+      className={cn(
+        "group flex h-full flex-col items-start gap-4 rounded-xl border bg-card p-6 transition-colors hover:border-teal",
+        lead && "border-teal/40 bg-teal-tint/40 sm:p-8",
+      )}
       data-testid={entry.testId}
     >
-      <span aria-hidden className="grid size-10 place-items-center rounded-lg bg-teal-tint text-teal">
-        <Icon className="size-5" />
+      <span aria-hidden className={cn("grid place-items-center rounded-lg bg-teal-tint text-teal", lead ? "size-12" : "size-10")}>
+        <Icon className={lead ? "size-6" : "size-5"} />
       </span>
       <div className="flex flex-1 flex-col gap-2">
-        <h2 className="text-[22px] leading-snug">{entry.title}</h2>
-        <p className="text-[14.5px] text-ink-soft">{entry.body}</p>
+        <h2 className={cn("leading-snug", lead ? "text-[28px] sm:text-[32px]" : "text-[22px]")}>{entry.title}</h2>
+        <p className={cn("text-ink-soft", lead ? "max-w-[46ch] text-[16px]" : "text-[14.5px]")}>{entry.body}</p>
       </div>
-      <span className="inline-flex items-center gap-1.5 text-[14px] font-medium text-teal">
+      <span className={cn("inline-flex items-center gap-1.5 font-medium text-teal", lead ? "text-[15.5px]" : "text-[14px]")}>
         {entry.action}
         <ArrowRightIcon aria-hidden className="size-4 transition-transform group-hover:translate-x-0.5" />
       </span>
@@ -62,12 +67,21 @@ function EntryCard({ entry }: { entry: Entry }) {
   );
 }
 
-/** The three ways in: Ask, report an issue, and the portal for staff. */
+/**
+ * The ways in, weighted by who they are for. Ask is what almost everyone comes
+ * for; the portal is for about twenty members of staff, and it had the same
+ * size and prominence as Ask, which told a first-time reader the wrong thing
+ * about what this is.
+ */
 export function EntryPoints() {
+  const [ask, ...rest] = ENTRIES;
   return (
     <ul className="grid gap-4 md:grid-cols-3">
-      {ENTRIES.map((entry) => (
-        <li key={entry.testId}>
+      <li className="md:col-span-2">
+        <EntryCard entry={ask} lead />
+      </li>
+      {rest.map((entry) => (
+        <li key={entry.testId} className="md:col-span-1 md:last:col-span-3">
           <EntryCard entry={entry} />
         </li>
       ))}
