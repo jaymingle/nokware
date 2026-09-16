@@ -14,8 +14,9 @@ function NavLink({ href, testId, children }: { href: string; testId: string; chi
     <Link
       href={href}
       aria-current={active ? "page" : undefined}
+      data-touch-target
       className={cn(
-        "rounded-lg px-3 py-2 text-[13.5px] whitespace-nowrap transition-colors",
+        "inline-flex items-center rounded-lg px-3 py-2 text-[13.5px] whitespace-nowrap transition-colors",
         active ? "font-medium text-ink" : "text-ink-soft hover:text-ink",
       )}
       data-testid={testId}
@@ -30,7 +31,7 @@ export function PublicHeader() {
   return (
     <header className="border-b bg-paper-raised">
       <div className="mx-auto flex w-full max-w-[1360px] flex-wrap items-center justify-between gap-x-3 gap-y-2 px-5 py-3.5 sm:px-7 md:flex-nowrap">
-        <Link href="/" aria-label="Nokware home" className="min-w-0" data-testid="public-home">
+        <Link href="/" aria-label="Nokware home" data-touch-target className="inline-flex min-w-0 items-center" data-testid="public-home">
           <Brand />
         </Link>
         <nav aria-label="Main" className="-mx-3 flex w-[calc(100%+1.5rem)] items-center overflow-x-auto md:mx-0 md:w-auto md:shrink-0">

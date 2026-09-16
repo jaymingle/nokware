@@ -15,6 +15,7 @@ function NumberLink({ number, testId, marked = false }: { number: ContactNumber;
       href={numberHref(number)}
       target={whatsapp ? "_blank" : undefined}
       rel={whatsapp ? "noopener" : undefined}
+      data-touch-target
       className={cn(
         "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[14px] tabular-nums hover:border-teal",
         number.current ? "bg-card font-medium" : "bg-transparent text-ink-soft",
@@ -61,7 +62,7 @@ export function SourceLine({ contact }: { contact: PublicContact }) {
     <div className="flex flex-wrap items-center gap-2">
       <Tag tone="gold" wrap testId={`contact-${contact.id}-unverified`}>{tierNote(contact)}</Tag>
       {contact.press_url ? (
-        <a href={contact.press_url} target="_blank" rel="noopener" className="inline-flex items-center gap-1 text-[12px] text-teal hover:underline" data-testid={`contact-${contact.id}-press`}>
+        <a href={contact.press_url} target="_blank" rel="noopener" data-touch-target className="inline-flex items-center gap-1 text-[12px] text-teal underline underline-offset-2" data-testid={`contact-${contact.id}-press`}>
           Press report <ExternalLinkIcon aria-hidden className="size-3" />
         </a>
       ) : null}
@@ -84,7 +85,7 @@ export function ContactItem({ contact }: { contact: PublicContact }) {
           <NumberLink key={number.number} number={number} testId={`contact-${contact.id}-number-${i}`} marked={earlier.length > 0} />
         ))}
         {contact.email ? (
-          <a href={`mailto:${contact.email}`} className="inline-flex items-center gap-1.5 rounded-lg border bg-card px-2.5 py-1.5 text-[14px] hover:border-teal" data-testid={`contact-${contact.id}-email`}>
+          <a href={`mailto:${contact.email}`} data-touch-target className="inline-flex items-center gap-1.5 rounded-lg border bg-card px-2.5 py-1.5 text-[14px] hover:border-teal" data-testid={`contact-${contact.id}-email`}>
             <MailIcon aria-hidden className="size-3.5 text-teal" />
             {contact.email}
           </a>

@@ -25,7 +25,7 @@ export function ContactList({ title, lead, contacts, testId, directoryLink = tru
         ))}
       </ul>
       {directoryLink ? (
-        <Link href="/contacts" className="self-start pt-1 text-[13px] text-teal underline-offset-2 hover:underline" data-testid={`${testId}-directory`}>
+        <Link href="/contacts" data-touch-target className="inline-flex items-center self-start pt-1 text-[13px] text-teal underline underline-offset-2" data-testid={`${testId}-directory`}>
           All numbers, by service
         </Link>
       ) : null}

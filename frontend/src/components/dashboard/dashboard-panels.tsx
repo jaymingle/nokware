@@ -87,7 +87,8 @@ export function RecentDocuments({ documents }: { documents: RecentDocument[] }) 
               {[doc.department_name, doc.published_at ? `published ${formatDate(doc.published_at)}` : null].filter(Boolean).join(" · ")}
             </div>
           </div>
-          <a href={ledgerFileUrl(doc.id)} target="_blank" rel="noopener" className="text-[13px] whitespace-nowrap text-teal underline-offset-2 hover:underline"
+          <a href={ledgerFileUrl(doc.id)} target="_blank" rel="noopener" data-touch-target
+            className="inline-flex items-center text-[13px] whitespace-nowrap text-teal underline underline-offset-2"
             data-testid={`dashboard-document-${doc.id}`}>
             Read
           </a>

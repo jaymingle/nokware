@@ -164,4 +164,34 @@
   h6 {
     @apply font-heading font-medium;
   }
+
+  /*
+   * Touch targets. On a finger every control is at least 44px on its short
+   * side; on a mouse the design's own heights stand, because the pointer is
+   * precise. The emergency numbers on /contacts are why it matters most: a
+   * mis-tap there costs more than a mis-tap anywhere else.
+   *
+   * A link inside a sentence is exempt, as WCAG exempts it — what makes those
+   * findable is that they are underlined, not that they are large. Anything
+   * else that is a control but reads as a link carries data-touch-target.
+   */
+  @media (pointer: coarse) {
+    button,
+    select,
+    textarea,
+    summary,
+    [role="button"],
+    [data-slot="button"],
+    [data-touch-target],
+    input:not([type="checkbox"]):not([type="radio"]),
+    label:has(> input[type="checkbox"]),
+    label:has(> input[type="radio"]) {
+      min-height: 44px;
+      min-width: 44px;
+    }
+    label:has(> input[type="checkbox"]),
+    label:has(> input[type="radio"]) {
+      align-items: center;
+    }
+  }
 }
