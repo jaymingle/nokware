@@ -60,4 +60,15 @@ describe("linkCitations", () => {
   it("turns each label into a citation link, including adjacent ones", () => {
     expect(linkCitations("Fees rose [S1][S3].")).toBe("Fees rose [S1](#cite-S1)[S3](#cite-S3).");
   });
+
+  it("links every kind of source, budget figures included", () => {
+    // B was left out when budget figures arrived, so every budget answer showed "[B1]" as bare text.
+    expect(linkCitations("Approved: GH¢ 20,232,848 [B1], counted 12 [R2], stated in [S1].")).toBe(
+      "Approved: GH¢ 20,232,848 [B1](#cite-B1), counted 12 [R2](#cite-R2), stated in [S1](#cite-S1).",
+    );
+  });
+
+  it("leaves anything that isn't a label alone", () => {
+    expect(linkCitations("Section [A1] of the bye-law, item [12].")).toBe("Section [A1] of the bye-law, item [12].");
+  });
 });
