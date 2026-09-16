@@ -34,7 +34,9 @@ from langchain_core.runnables import Runnable
 from app.services.ask_charts import DOCUMENT_CHART_REFUSAL, ChartDict, asks_for_chart, chart_for
 from app.services.ask_figures import (
     NO_FIGURES,
+    NO_SAFETY_DOCUMENTS,
     SAFETY_FIGURES_ANSWER,
+    SAFETY_IN_DOCUMENTS,
     Figure,
     FigurePlan,
     figure_context,
@@ -87,9 +89,9 @@ _SYSTEM_PROMPT = (
     "- Keep document figures and live report data apart; one never confirms or corrects the other.\n"
     "- If the live figures can't settle the question (for example every count it needs is \"fewer than 5\"), say "
     "so plainly and cite them. Don't give the no-information reply when live figures were provided.\n\n"
-    "If the resident asks for a chart or graph, just answer with the figures. Never say you can't make charts or "
-    "explain how to draw one: Nokware draws any chart of live report data itself, beside your answer, and says "
-    "itself why document figures aren't charted."
+    "If the resident asks for a chart or graph, just answer with the figures, and never mention charts or graphs at "
+    "all. Never say you can't draw one, or explain how to draw one: Nokware draws the chart itself, beside your "
+    "answer, from the figures you give, and says itself when it can't."
 )
 
 _PROMPT = ChatPromptTemplate.from_messages(
@@ -266,12 +268,16 @@ def _prompt_input(prepared: Prepared, length: AnswerLength = AnswerLength.WEB) -
 
 
 def _with_safety_notice(answer: str, prepared: Prepared) -> str:
-    """Personal-safety figures are refused in fixed words, whatever else the answer says."""
+    """Nokware's own safety figures are refused in fixed words; what AMA has published still answers.
+
+    The refusal covers Nokware's report counts, which could identify a person. AMA's documents are public and
+    downloadable by anyone, so refusing to cite one Nokware holds would be refusing to do the job.
+    """
     if not prepared.figures.safety_asked or SAFETY_FIGURES_ANSWER in answer:
         return answer
     if answer_status(answer) == "no_information":
-        return SAFETY_FIGURES_ANSWER
-    return f"{SAFETY_FIGURES_ANSWER}\n\n{answer}"
+        return f"{SAFETY_FIGURES_ANSWER} {NO_SAFETY_DOCUMENTS}"
+    return f"{SAFETY_FIGURES_ANSWER}\n\n{SAFETY_IN_DOCUMENTS}\n\n{answer}"
 
 
 def _with_chart_refusal(answer: str, question: str, figures: list[FigureSource]) -> str:

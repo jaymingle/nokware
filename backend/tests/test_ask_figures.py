@@ -7,7 +7,7 @@ import pytest
 
 from app.services import ask_figures, rag, stats
 from app.services.ask_figures import CountReports, FigurePlan, count_figure, plan, wants_figures
-from app.services.retrieval import Retrieval
+from app.services.retrieval import Chunk, Retrieval, RetrievedChunk
 
 NOW = datetime(2026, 9, 14, 12, 0, tzinfo=timezone.utc)
 AT = NOW.isoformat()
@@ -76,9 +76,14 @@ class Recorder:
         return self.answer
 
 
-def answer_with(monkeypatch: pytest.MonkeyPatch, figures: FigurePlan, model_answer: str) -> tuple[dict[str, Any], Recorder]:
+def chunk(text: str, title: str = "Social Welfare Annual Report 2025") -> RetrievedChunk:
+    return RetrievedChunk(chunk=Chunk(1, "d1", 0, text), score=1.0, document={"title": title, "department": "dept-social-welfare"})
+
+
+def answer_with(monkeypatch: pytest.MonkeyPatch, figures: FigurePlan, model_answer: str,
+                chunks: list[RetrievedChunk] | None = None) -> tuple[dict[str, Any], Recorder]:
     model = Recorder(model_answer)
-    monkeypatch.setattr(rag, "retrieve", lambda question: Retrieval(queries=[question], chunks=[]))
+    monkeypatch.setattr(rag, "retrieve", lambda question: Retrieval(queries=[question], chunks=chunks or []))
     monkeypatch.setattr(rag, "plan_figures", lambda question, now: figures)
     monkeypatch.setattr(rag, "_answer_chain", lambda: model)
     return dict(rag.answer_question("How many cases are still open?")), model
@@ -93,8 +98,19 @@ def test_live_figures_answer_even_when_no_document_does(monkeypatch: pytest.Monk
 
 
 def test_personal_safety_figures_are_refused_in_fixed_words(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Nokware's own counts are refused; where no document covers it either, the answer says so rather than
+    leaving the reader thinking figures are being withheld."""
     result, model = answer_with(monkeypatch, FigurePlan([], True), "unused")
-    assert result["answer"] == ask_figures.SAFETY_FIGURES_ANSWER and not model.inputs
+    assert result["answer"] == f"{ask_figures.SAFETY_FIGURES_ANSWER} {ask_figures.NO_SAFETY_DOCUMENTS}" and not model.inputs
     figure = count_figure(CountReports(), "R1", [case() for _ in range(5)], NOW, AT)
     result, _ = answer_with(monkeypatch, FigurePlan([figure], True), "There are 5 reports in all [R1].")
     assert result["answer"].startswith(ask_figures.SAFETY_FIGURES_ANSWER) and result["answer"].endswith("[R1].")
+
+
+def test_a_safety_question_still_gets_what_the_documents_say(monkeypatch: pytest.MonkeyPatch) -> None:
+    """AMA's documents are public and downloadable by anyone: the refusal covers Nokware's counts, not the Ledger."""
+    answer = "The Social Welfare Department handled 40 domestic violence cases in 2025 [S1]."
+    result, _ = answer_with(monkeypatch, FigurePlan([], True), answer, chunks=[chunk("Domestic violence cases handled: 40.")])
+    assert result["answer"].startswith(ask_figures.SAFETY_FIGURES_ANSWER)
+    assert ask_figures.SAFETY_IN_DOCUMENTS in result["answer"] and result["answer"].endswith(answer)
+    assert result["status"] == "answered" and result["sources"][0]["cited"]

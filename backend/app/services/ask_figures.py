@@ -31,6 +31,10 @@ from app.wards import find_ward, sub_metros
 logger = logging.getLogger(__name__)
 
 SAFETY_FIGURES_ANSWER = "Nokware doesn't publish figures on reports about someone's safety."
+# The refusal covers Nokware's own counts, not AMA's published documents: those are public, and anyone can download
+# them from the Ledger. Saying so plainly matters either way, so nobody is left thinking figures are being withheld.
+SAFETY_IN_DOCUMENTS = "Here's what AMA's published documents say:"
+NO_SAFETY_DOCUMENTS = "The AMA documents Nokware searched don't report these figures either."
 FIGURE_LABEL_PREFIX = "R"
 MAX_FIGURES = 4
 # Only a question that might want figures pays for the planning call.
