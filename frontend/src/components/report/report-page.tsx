@@ -9,6 +9,7 @@ import { QuickExit } from "@/components/report/quick-exit";
 import { ReportReceiptView } from "@/components/report/report-receipt";
 import { SafetyForm } from "@/components/report/safety-form";
 import { SafetyQuestion } from "@/components/report/safety-question";
+import { useStepFocus } from "@/hooks/use-step-focus";
 import { useReportOptions } from "@/lib/api/public-queries";
 
 import type { ReportOptions, ReportReceipt } from "@/lib/api/types";
@@ -34,6 +35,7 @@ function isPrivate(step: Step): boolean {
 export function ReportPage() {
   const options = useReportOptions();
   const [step, setStep] = useState<Step>({ kind: "choose" });
+  const here = useStepFocus<HTMLDivElement>(step.kind === "form" ? `form-${step.safety}` : step.kind);
   const go = (next: Step) => {
     setStep(next);
     window.scrollTo({ top: 0 });
@@ -47,7 +49,9 @@ export function ReportPage() {
       </PageIntro>
       {options.isPending ? <LoadingPanel label="Loading the form…" /> : null}
       {options.error ? <ErrorPanel message={options.error.message} onRetry={() => options.refetch()} /> : null}
-      {options.data ? <StepView step={step} options={options.data} go={go} /> : null}
+      <div ref={here} tabIndex={-1} className="flex flex-col outline-none" data-testid="report-step">
+        {options.data ? <StepView step={step} options={options.data} go={go} /> : null}
+      </div>
     </div>
   );
 }
