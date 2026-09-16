@@ -25,11 +25,12 @@ function Contact() {
  * How to request what the Assembly hasn't published, with the contact cited
  * to the manual it comes from, like any other source.
  */
-export function RtiPanel({ testId }: { testId: string }) {
+export function RtiPanel({ testId, heading: Heading = "h3" }: { testId: string; heading?: "h2" | "h3" }) {
   return (
     <div className="flex flex-col gap-3" data-testid={testId}>
       <div className="flex flex-col gap-1">
-        <h4 className="text-[16px]">Request it from the Assembly</h4>
+        {/* The panel's own level: the whole page on /rti, a section of an answer inside Ask. */}
+        <Heading className="text-[16px]">Request it from the Assembly</Heading>
         <p className="text-[14px] text-ink-soft">
           If the Assembly holds this information but hasn&apos;t published it, you have the right to request it under the
           Right to Information Act, 2019 (Act 989). The manual below includes the standard request form (Appendix A).

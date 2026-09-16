@@ -15,7 +15,7 @@ export function Panel({ title, lead, children, className, testId }: {
 }) {
   return (
     <section className={cn("min-w-0 rounded-xl border bg-card p-5 sm:p-[22px]", className)} data-testid={testId}>
-      <h3 className="text-[19px]">{title}</h3>
+      <h2 className="text-[19px]">{title}</h2>
       {lead ? <p className="mt-1.5 text-[12.5px] text-ink-soft">{lead}</p> : null}
       <div className="mt-4">{children}</div>
     </section>
@@ -100,7 +100,7 @@ export function RecentDocuments({ documents }: { documents: RecentDocument[] }) 
 export function AskPrompt() {
   return (
     <section className="rounded-xl border bg-teal-tint p-5 sm:p-[22px]">
-      <h3 className="text-[21px]">A question about any of these?</h3>
+      <h2 className="text-[21px]">A question about any of these?</h2>
       <p className="mt-2 mb-4 text-[13.5px] text-ink-soft">Ask Nokware and the answer comes back with the document and the date attached.</p>
       <Button asChild>
         <Link href="/ask" data-testid="dashboard-ask">Ask a question</Link>

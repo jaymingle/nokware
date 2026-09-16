@@ -45,7 +45,7 @@ export function RtiPage({ document, period, elsewhere }: { document?: string; pe
         Assembly&apos;s Information Unit.
       </PageIntro>
       {name && when ? <Wording text={requestWording(name, when, Boolean(elsewhere))} /> : null}
-      <RtiPanel testId="rti-page-panel" />
+      <RtiPanel testId="rti-page-panel" heading="h2" />
     </div>
   );
 }

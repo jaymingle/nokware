@@ -7,7 +7,7 @@ export function FormSection({ title, hint, children }: { title: string; hint: st
   return (
     <section className="flex flex-col gap-3 border-t pt-5">
       <div className="flex flex-col gap-1">
-        <h3 className="text-[17px]">{title}</h3>
+        <h2 className="text-[17px]">{title}</h2>
         <p className="text-[12.5px] text-ink-soft">{hint}</p>
       </div>
       {children}

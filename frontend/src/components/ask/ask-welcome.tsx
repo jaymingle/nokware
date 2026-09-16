@@ -10,7 +10,7 @@ function RtiFootnote({ testId }: { testId: string }) {
         <span className="text-teal underline underline-offset-2">You can request it under the RTI Act.</span>
       </summary>
       <div className="mt-4">
-        <RtiPanel testId={testId} />
+        <RtiPanel testId={testId} heading="h2" />
       </div>
     </details>
   );

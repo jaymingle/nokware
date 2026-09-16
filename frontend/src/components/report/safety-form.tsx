@@ -44,6 +44,7 @@ export function SafetyForm({ options, onFiled, onBack }: ReportFormProps) {
             testId="report-safety-contacts"
             directoryLink={false}
             columns
+            heading="h2"
           />
           <SafetySteps steps={options.safety_steps} testId="report-safety-steps" />
           <SafetyTypeField types={options.safety_types} value={topic} onChange={setTopic} />

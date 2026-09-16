@@ -66,7 +66,7 @@ function Figures({ figures }: { figures: Dashboard }) {
         </Panel>
       </div>
       <div className="flex flex-wrap items-start gap-5">
-        <Panel title="By sub-metro" lead="A median is shown once five of a sub-metro's reports are resolved." className="flex-[1_1_460px] px-0 sm:px-0 [&>h3]:px-5 [&>p]:px-5">
+        <Panel title="By sub-metro" lead="A median is shown once five of a sub-metro's reports are resolved." className="flex-[1_1_460px] px-0 sm:px-0 [&>h2]:px-5 [&>p]:px-5">
           <SubMetroTable rows={figures.sub_metros} />
         </Panel>
         <div className="flex min-w-0 flex-[1_1_320px] flex-col gap-4">

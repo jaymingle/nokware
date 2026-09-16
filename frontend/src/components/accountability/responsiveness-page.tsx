@@ -49,7 +49,7 @@ function documentLines(department: DepartmentFigures): Line[] {
 function DepartmentCard({ department, waitingDays }: { department: DepartmentFigures; waitingDays: number }) {
   return (
     <article className="flex flex-col gap-4 rounded-xl border bg-card p-4 sm:p-5" data-testid={`responsiveness-${department.id}`}>
-      <h3 className="text-[18px]">{department.name}</h3>
+      <h2 className="text-[18px]">{department.name}</h2>
       <Lines title="Residents' reports" lines={reportLines(department, waitingDays)} />
       <Lines title="Contributors' documents" lines={documentLines(department)} />
     </article>
@@ -60,7 +60,7 @@ function Mce({ figures }: { figures: Responsiveness }) {
   const m = figures.mce;
   return (
     <article className="flex flex-col gap-4 rounded-xl border bg-card p-4 sm:p-5" data-testid="responsiveness-mce">
-      <h3 className="text-[18px]">The MCE</h3>
+      <h2 className="text-[18px]">The MCE</h2>
       <Lines title="Rulings" lines={[
         { label: "Resolutions residents disputed, confirmed", value: <CountValue value={m.reports_confirmed} />, testId: "responsiveness-mce-confirmed" },
         { label: "…sent back to be finished", value: <CountValue value={m.reports_reopened} />, testId: "responsiveness-mce-reopened" },

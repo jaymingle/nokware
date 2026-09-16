@@ -13,7 +13,7 @@ export function PetitionFigures({ figures }: { figures: Figures }) {
   const reasons = figures.refusals.filter((r) => r.count > 0);
   return (
     <article className="flex flex-col gap-4 rounded-xl border bg-card p-4 sm:p-5" data-testid="responsiveness-petitions">
-      <h3 className="text-[18px]">The MCE and residents&apos; petitions</h3>
+      <h2 className="text-[18px]">The MCE and residents&apos; petitions</h2>
       <Lines title="Review" lines={[
         { label: "Petitions sent for review", value: figures.sent.toLocaleString(), testId: "responsiveness-petitions-sent" },
         { label: "Published by the MCE", value: figures.published_by_mce.toLocaleString(), testId: "responsiveness-petitions-published" },
