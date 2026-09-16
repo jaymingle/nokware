@@ -1,7 +1,7 @@
 "use client";
 
 import { CircleCheckIcon, CircleDashedIcon, CircleXIcon, MinusIcon, type LucideIcon } from "lucide-react";
-import { useState } from "react";
+import { Fragment, useState } from "react";
 
 import { RecordDetail } from "@/components/accountability/record-detail";
 import { ReportingGaps } from "@/components/accountability/reporting-gaps";
@@ -97,6 +97,31 @@ function Row({ requirement, years, selected, onSelect }: { requirement: RecordRe
   );
 }
 
+/**
+ * How a group stands, beside its name. Four tables of identical marks look
+ * alike at a glance, so a group that is almost entirely "not found" read the
+ * same as one that is almost entirely held — and that contrast is the argument
+ * the page exists to make.
+ */
+function GroupTally({ group }: { group: PublishingRecord["groups"][number] }) {
+  const periods = group.requirements.flatMap((requirement) => requirement.periods);
+  const counted = (["held", "related", "missing"] as RecordState[])
+    .map((state) => ({ state, count: periods.filter((period) => period.state === state).length }))
+    .filter(({ count }) => count > 0);
+  if (!counted.length) return null;
+  return (
+    <ul className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12.5px] text-ink-soft" data-testid={`record-group-${group.id}-tally`}>
+      {counted.map(({ state, count }) => (
+        <li key={state} className="flex items-center gap-1.5">
+          <Mark state={state} small />
+          <span className="tabular-nums">{count}</span>
+          {STATE_LABELS[state].toLowerCase()}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function Group({ record, index, selected, onSelect }: { record: PublishingRecord; index: number; selected: Selected; onSelect: Select }) {
   const group = record.groups[index];
   const years = yearsOf(record);
@@ -104,7 +129,10 @@ function Group({ record, index, selected, onSelect }: { record: PublishingRecord
   const period = open?.periods.find((p) => p.label === selected?.period);
   return (
     <section aria-labelledby={`group-${group.id}`} className="flex flex-col gap-3" data-testid={`record-group-${group.id}`}>
-      <h2 id={`group-${group.id}`} className="text-[21px]">{group.name}</h2>
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <h2 id={`group-${group.id}`} className="text-[21px]">{group.name}</h2>
+        <GroupTally group={group} />
+      </div>
       <div className="overflow-x-auto rounded-xl border bg-card">
         <table className="w-full min-w-[720px] border-collapse">
           <caption className="sr-only">{group.name}: each document by year, and whether The Ledger holds it</caption>
@@ -146,14 +174,38 @@ function HowToRead({ record }: { record: PublishingRecord }) {
   );
 }
 
+/**
+ * The finding of the whole page, at the size of a finding.
+ *
+ * It read as a sentence of body text, which is the wrong weight for the one
+ * number a reader should leave with. Each count keeps its mark and its words,
+ * so nothing here is carried by colour alone.
+ */
 function Summary({ record }: { record: PublishingRecord }) {
   const { due, held, related, missing } = record.summary;
+  const counts: { value: number; state: RecordState; label: string; testId: string }[] = [
+    { value: held, state: "held", label: "in The Ledger", testId: "record-summary-held" },
+    { value: related, state: "related", label: "related documents only", testId: "record-summary-related" },
+    { value: missing, state: "missing", label: "not found", testId: "record-summary-missing" },
+  ];
   return (
-    <p className="text-[15px]" data-testid="record-summary">
-      Of the <strong className="font-medium tabular-nums">{due}</strong> documents we would expect by now since {record.first_year} (each quarter counted on its own), The Ledger holds{" "}
-      <strong className="font-medium tabular-nums">{held}</strong>. For <strong className="font-medium tabular-nums">{related}</strong> it holds related documents only, and{" "}
-      <strong className="font-medium tabular-nums">{missing}</strong> were not found.
-    </p>
+    <section aria-labelledby="record-summary-lead" className="rounded-xl border bg-card p-5 sm:p-[22px]" data-testid="record-summary">
+      <p id="record-summary-lead" className="max-w-[62ch] text-[14px] text-ink-soft">
+        Of the <strong className="font-medium text-ink tabular-nums">{due}</strong> documents we would expect by now
+        since {record.first_year}, each quarter counted on its own:
+      </p>
+      <ul className="mt-4 grid gap-4 sm:grid-cols-3">
+        {counts.map((count) => (
+          <li key={count.state} className="flex flex-col gap-1" data-testid={count.testId}>
+            <span className="font-heading text-[40px] leading-none tabular-nums sm:text-[46px]">{count.value}</span>
+            <span className="flex items-center gap-1.5 text-[13.5px] text-ink-soft">
+              <Mark state={count.state} small />
+              {count.label}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
@@ -175,8 +227,13 @@ export function PublishingRecordPage() {
           <Summary record={record.data} />
           <ReportingGaps gaps={record.data.gaps} about={record.data.gaps_about} />
           <UnpublishedRecord findings={record.data.unpublished} about={record.data.unpublished_about} />
-          <HowToRead record={record.data} />
-          {record.data.groups.map((group, index) => <Group key={group.id} record={record.data} index={index} selected={selected} onSelect={onSelect} />)}
+          {/* The legend follows the first table: before one, it explains marks the reader hasn't met. */}
+          {record.data.groups.map((group, index) => (
+            <Fragment key={group.id}>
+              <Group record={record.data} index={index} selected={selected} onSelect={onSelect} />
+              {index === 0 ? <HowToRead record={record.data} /> : null}
+            </Fragment>
+          ))}
         </>
       ) : null}
     </div>

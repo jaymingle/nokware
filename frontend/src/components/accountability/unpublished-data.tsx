@@ -11,14 +11,17 @@ function rtiHref(finding: UnpublishedData): string {
 
 function Finding({ finding }: { finding: UnpublishedData }) {
   const testId = `unpublished-${finding.id}`;
+  // Not the warm gold of "Figures that stop": that is a figure that has aged,
+  // this is an absence, and the record already marks an absence in brick. Side
+  // by side, the two read as one undifferentiated block of warm boxes.
   return (
-    <article className="flex flex-col gap-2.5 rounded-xl border border-gold/40 bg-paper-warm p-4 sm:p-5" data-testid={testId}>
+    <article className="flex flex-col gap-2.5 rounded-xl border border-s-[3px] border-brick/25 border-s-brick bg-card p-4 sm:p-5" data-testid={testId}>
       <div>
         {/* The finding's own sentence, as written: nothing here is composed out of a label. */}
         <h3 className="text-[18px] leading-snug" data-testid={`${testId}-headline`}>{finding.headline}</h3>
         <p className="mt-1 text-[13.5px] text-ink-soft">{finding.matters}</p>
       </div>
-      <div className="flex flex-col gap-1.5 rounded-lg bg-paper-raised px-3.5 py-3">
+      <div className="flex flex-col gap-1.5 rounded-lg bg-paper-subtle px-3.5 py-3">
         <h4 className="text-[12px] font-medium tracking-wide text-ink-soft uppercase">Where we looked</h4>
         <dl className="flex flex-col gap-1.5 text-[13px]">
           {finding.checked.map((source) => (
