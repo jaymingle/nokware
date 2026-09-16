@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 
 import { PortalHeader } from "@/components/portal/portal-header";
 import { StatusScreen } from "@/components/portal/status-screen";
+import { SkipLink } from "@/components/skip-link";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth/auth-context";
 
@@ -51,9 +52,10 @@ export function PortalShell({ children }: { children: ReactNode }) {
   if (status === "no-role") return <NoAccess message={error ?? ""} onSignOut={() => void signOut()} />;
   if (status === "unavailable") return <Unavailable message={error ?? ""} onRetry={retry} />;
   return (
-    <div className="flex flex-1 flex-col">
+    <div className="relative flex flex-1 flex-col">
+      <SkipLink />
       <PortalHeader />
-      <main className="mx-auto w-full max-w-[1360px] flex-1 px-7 pt-9 pb-16">{children}</main>
+      <main id="main" className="mx-auto w-full max-w-[1360px] flex-1 px-7 pt-9 pb-16">{children}</main>
     </div>
   );
 }
