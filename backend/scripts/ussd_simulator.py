@@ -5,8 +5,8 @@ from backend/.env. Messages the API sends (answers by SMS, report updates) go
 through its own SMS settings: with ARKESEL_SANDBOX=true nothing is delivered or
 charged.
 
-    backend/.venv/bin/python backend/scripts/ussd_simulator.py --msisdn 233XXXXXXXXX
-    backend/.venv/bin/python backend/scripts/ussd_simulator.py --msisdn 233XXXXXXXXX --keys 3 K7QM-4TXP
+    backend/.venv/bin/python backend/scripts/ussd_simulator.py --msisdn 233XXXXXXXXX --url http://localhost:8011
+    backend/.venv/bin/python backend/scripts/ussd_simulator.py --msisdn 233XXXXXXXXX --url http://localhost:8011 --keys 3 K7QM-4TXP
 """
 
 import argparse
@@ -41,7 +41,9 @@ def press(client: httpx.Client, url: str, session: dict[str, object], text: str,
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--msisdn", required=True, help="the dialling number, e.g. 233XXXXXXXXX")
-    parser.add_argument("--url", default="http://localhost:8000", help="the API (default http://localhost:8000)")
+    parser.add_argument("--url", required=True,
+                        help="the API to call. No default: the one on :8000 usually runs live providers, and a "
+                             "simulated resident's messages would reach real phones")
     parser.add_argument("--keys", nargs="*", help="keypresses to send in turn, instead of typing them")
     args = parser.parse_args()
     token = dotenv_values(ENV).get("ARKESEL_USSD_TOKEN")

@@ -86,7 +86,9 @@ def _forms(args: argparse.Namespace, to: str, voice_url: str | None) -> list[tup
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--from", dest="sender", required=True, help="the citizen's number, e.g. +233XXXXXXXXX")
-    parser.add_argument("--url", default="http://localhost:8000", help="the API (default http://localhost:8000)")
+    parser.add_argument("--url", required=True,
+                        help="the API to call. No default: the one on :8000 usually runs live providers, and a "
+                             "simulated resident's messages would reach real phones")
     parser.add_argument("--pin", help="a shared location as LAT,LON, sent after the messages")
     parser.add_argument("--place", help="the pin's address, as WhatsApp sends it with a named place")
     parser.add_argument("--voice", type=Path, help=f"an audio file to send as a voice note ({', '.join(AUDIO_TYPES)})")
