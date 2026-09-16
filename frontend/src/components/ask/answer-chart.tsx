@@ -14,7 +14,12 @@ import type { AskChart } from "@/lib/api/types";
 // as a hatched range from 1 to 4 or a dashed span. Drawn at the width it is
 // shown, like the dashboard's chart, with the numbers in a table for screen readers.
 
-const FONT = 11;
+const FONT = 11; // the smallest, on a phone
+// A chart drawn 1,100px wide was still labelling itself at 11px, which reads as
+// a thumbnail of a chart rather than the chart. The type grows with the drawing.
+function fontFor(width: number): number {
+  return width >= 620 ? 13 : width >= 440 ? 12 : FONT;
+}
 const PAD = { l: 34, r: 12, t: 16, b: 34 };
 const MAX_BAR = 56; // pixels: a bar never grows into a slab
 const CHAR = 0.56; // of the font size: enough to size a label column from the text
@@ -58,6 +63,7 @@ function Piece({ piece, x, y, w, h, hatch }: { piece: BarPiece; x: number; y: nu
 }
 
 function UprightBars({ chart, width, hatch }: Draw) {
+  const font = fontFor(width);
   const height = 240;
   const y = scale(chart, height - PAD.b, PAD.t);
   const band = (width - PAD.l - PAD.r) / chart.categories.length;
@@ -67,7 +73,7 @@ function UprightBars({ chart, width, hatch }: Draw) {
       {chart.ticks.map((tick) => (
         <g key={tick}>
           <line x1={PAD.l} x2={width - PAD.r} y1={y(tick)} y2={y(tick)} className="stroke-hairline" strokeWidth={0.5} />
-          <text x={PAD.l - 8} y={y(tick) + 4} textAnchor="end" fontSize={FONT} className="fill-ink-soft tabular-nums">{tickLabel(tick)}</text>
+          <text x={PAD.l - 8} y={y(tick) + 4} textAnchor="end" fontSize={font} className="fill-ink-soft tabular-nums">{tickLabel(tick)}</text>
         </g>
       ))}
       {barPieces(chart, band, MAX_BAR).map((piece) => {
@@ -77,36 +83,37 @@ function UprightBars({ chart, width, hatch }: Draw) {
           <g key={`${piece.category}-${piece.series}`}>
             <Piece piece={piece} x={x} y={y(piece.to)} w={w} h={y(piece.from) - y(piece.to)} hatch={hatch} />
             {chart.kind === "stacked_bar" ? null : (
-              <text x={x + w / 2} y={y(piece.to) - 4} textAnchor="middle" fontSize={FONT - 1} className="fill-ink-soft tabular-nums">{short(piece.value)}</text>
+              <text x={x + w / 2} y={y(piece.to) - 4} textAnchor="middle" fontSize={font - 1} className="fill-ink-soft tabular-nums">{short(piece.value)}</text>
             )}
           </g>
         );
       })}
       {chart.categories.map((name, i) => (
-        <text key={name} x={PAD.l + band * (i + 0.5)} y={height - 14} textAnchor="middle" fontSize={FONT} className="fill-ink-soft">{name}</text>
+        <text key={name} x={PAD.l + band * (i + 0.5)} y={height - 14} textAnchor="middle" fontSize={font} className="fill-ink-soft">{name}</text>
       ))}
     </svg>
   );
 }
 
 function FlatBars({ chart, width, hatch }: Draw) {
-  const row = chart.kind === "stacked_bar" || chart.series.length === 1 ? 30 : 16 * chart.series.length + 12;
-  const label = Math.min(width * 0.42, 8 + FONT * CHAR * Math.max(...chart.categories.map((c) => c.length)));
+  const font = fontFor(width);
+  const row = chart.kind === "stacked_bar" || chart.series.length === 1 ? Math.max(30, font * 2.4) : (font + 5) * chart.series.length + 12;
+  const label = Math.min(width * 0.42, 8 + font * CHAR * Math.max(...chart.categories.map((c) => c.length)));
   const height = PAD.t + row * chart.categories.length + 22;
   // Room at the right for the longest value, so a figure never runs off the edge.
   const values = barPieces(chart, row, MAX_BAR / 2).map((piece) => short(piece.value).length);
-  const x = scale(chart, label + 8, width - PAD.r - (8 + (FONT - 1) * CHAR * Math.max(...values, 2)));
+  const x = scale(chart, label + 8, width - PAD.r - (8 + (font - 1) * CHAR * Math.max(...values, 2)));
   return (
     <svg viewBox={`0 0 ${width} ${height}`} className="block h-auto w-full font-sans" aria-hidden>
       <Hatches chart={chart} id={hatch} />
       {chart.ticks.map((tick) => (
         <g key={tick}>
           <line x1={x(tick)} x2={x(tick)} y1={PAD.t} y2={height - 22} className="stroke-hairline" strokeWidth={0.5} />
-          <text x={x(tick)} y={height - 6} textAnchor="middle" fontSize={FONT} className="fill-ink-soft tabular-nums">{tickLabel(tick)}</text>
+          <text x={x(tick)} y={height - 6} textAnchor="middle" fontSize={font} className="fill-ink-soft tabular-nums">{tickLabel(tick)}</text>
         </g>
       ))}
       {chart.categories.map((name, i) => (
-        <text key={name} x={label} y={PAD.t + row * (i + 0.5) + 4} textAnchor="end" fontSize={FONT} className="fill-ink">{fit(name, label - 6)}</text>
+        <text key={name} x={label} y={PAD.t + row * (i + 0.5) + 4} textAnchor="end" fontSize={font} className="fill-ink">{fit(name, label - 6, font)}</text>
       ))}
       {barPieces(chart, row, MAX_BAR / 2).map((piece) => {
         const y = PAD.t + row * (piece.category + piece.offset);
@@ -115,7 +122,7 @@ function FlatBars({ chart, width, hatch }: Draw) {
           <g key={`${piece.category}-${piece.series}`}>
             <Piece piece={piece} x={x(piece.from)} y={y} w={x(piece.to) - x(piece.from)} h={h} hatch={hatch} />
             {chart.kind === "stacked_bar" ? null : (
-              <text x={x(piece.to) + 4} y={y + h / 2 + 4} fontSize={FONT - 1} className="fill-ink-soft tabular-nums">{short(piece.value)}</text>
+              <text x={x(piece.to) + 4} y={y + h / 2 + 4} fontSize={font - 1} className="fill-ink-soft tabular-nums">{short(piece.value)}</text>
             )}
           </g>
         );
@@ -125,6 +132,7 @@ function FlatBars({ chart, width, hatch }: Draw) {
 }
 
 function Line({ chart, width }: Draw) {
+  const font = fontFor(width);
   const height = 240;
   const y = scale(chart, height - PAD.b, PAD.t);
   const step = (width - PAD.l - PAD.r) / chart.categories.length;
@@ -135,7 +143,7 @@ function Line({ chart, width }: Draw) {
       {chart.ticks.map((tick) => (
         <g key={tick}>
           <line x1={PAD.l} x2={width - PAD.r} y1={y(tick)} y2={y(tick)} className="stroke-hairline" strokeWidth={0.5} />
-          <text x={PAD.l - 8} y={y(tick) + 4} textAnchor="end" fontSize={FONT} className="fill-ink-soft tabular-nums">{tickLabel(tick)}</text>
+          <text x={PAD.l - 8} y={y(tick) + 4} textAnchor="end" fontSize={font} className="fill-ink-soft tabular-nums">{tickLabel(tick)}</text>
         </g>
       ))}
       {chart.series.map((series, s) => (
@@ -151,7 +159,7 @@ function Line({ chart, width }: Draw) {
         </g>
       ))}
       {chart.categories.map((name, i) => (i % every === 0 || i === chart.categories.length - 1 ? (
-        <text key={name} x={x(i)} y={height - 14} textAnchor="middle" fontSize={FONT} className="fill-ink-soft">{name}</text>
+        <text key={name} x={x(i)} y={height - 14} textAnchor="middle" fontSize={font} className="fill-ink-soft">{name}</text>
       ) : null))}
     </svg>
   );

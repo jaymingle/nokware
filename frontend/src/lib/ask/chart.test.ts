@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { arcPath, barPieces, exactRuns, hasRange, short, slices } from "@/lib/ask/chart";
+import { arcPath, barPieces, exactRuns, hasRange, short, slices, tickLabel } from "@/lib/ask/chart";
 
 import type { AskChart, ChartValue } from "@/lib/api/types";
 
@@ -37,5 +37,17 @@ describe("Ask charts", () => {
     expect(parts[1].end).toBeCloseTo(2 * Math.PI);
     expect(arcPath(100, 100, 98, 0, parts[0].start, parts[0].end)).toMatch(/^M .* A 98 98 0 1 1 .* L 100 100 Z$/);
     expect(arcPath(100, 100, 98, 27, 0, Math.PI / 2)).toContain("A 27 27 0 0 0");
+  });
+});
+
+describe("tickLabel", () => {
+  it("writes small marks in full", () => {
+    expect([0, 5, 250, 1000, 9999].map(tickLabel)).toEqual(["0", "5", "250", "1,000", "9,999"]);
+  });
+
+  it("shortens the ruler on a budget axis, where every mark would otherwise read 25,000,000", () => {
+    expect([0, 5_000_000, 20_000_000, 25_000_000].map(tickLabel)).toEqual(["0", "5m", "20m", "25m"]);
+    expect([10_000, 250_000].map(tickLabel)).toEqual(["10k", "250k"]);
+    expect(tickLabel(1_500_000)).toBe("1.5m");
   });
 });

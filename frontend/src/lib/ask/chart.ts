@@ -24,8 +24,22 @@ export function hasRange(chart: AskChart): boolean {
 }
 
 /** A value-axis tick as a person writes it: 200, 7,875, or 12.50 where the figures carry pesewas. */
+/**
+ * An axis mark. Written in full up to a thousand; above that shortened, because
+ * a budget axis of tens of millions writes "25,000,000" at every tick and the
+ * marks run into each other. The figures themselves are never shortened: only
+ * the ruler is, and the amounts stand in full on the bars, in the figures card
+ * and in every export.
+ */
 export function tickLabel(tick: number): string {
+  const size = Math.abs(tick);
+  if (size >= 1_000_000) return `${trim(tick / 1_000_000)}m`;
+  if (size >= 10_000) return `${trim(tick / 1_000)}k`;
   return tick.toLocaleString("en-GB", { minimumFractionDigits: Number.isInteger(tick) ? 0 : 2, maximumFractionDigits: 2 });
+}
+
+function trim(value: number): string {
+  return value.toLocaleString("en-GB", { maximumFractionDigits: 1 });
 }
 
 /** A count as a chart labels it: "12", or "<5". */
