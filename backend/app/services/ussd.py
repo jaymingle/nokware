@@ -61,12 +61,11 @@ from app.services.ledger_documents import utc_now
 from app.services.notifications import notify_quietly
 from app.services.petition_rules import InvalidPetition, WrongState, check_signable, clean_signer_name, normalise_code
 from app.services.rag import AnswerLength, answer_question
-from app.services.report_contacts import InvalidNumber, masked, update_contact
+from app.services.report_contacts import ContactChoice, InvalidNumber, masked, normalise_phone, save_contact, update_contact
 from app.services.report_intake import DESCRIPTION_MIN, Receipt, ReportSubmission
 from app.services.report_rules import Classification, ClassificationMethod, InvalidReport, classify, normalise_reference
 from app.services.report_taxonomy import Category
 from app.services.sms_text import plain
-from app.services.workflow import NotAllowed
 from app.teams import short_name
 from app.wards import sub_metros, wards
 
@@ -82,6 +81,11 @@ WHO_MAX = 40  # longer office names give way to a count, so the receipt keeps it
 MENU = "Nokware - Accra Assembly\n1 Ask a question\n2 Report an issue\n3 Check a case\n4 Medical emergency\n5 Confirm a web code\n6 Sign a petition"
 MEDICAL = "Nokware can't file this: it isn't an Assembly matter. Ambulance: 193, 0501 614 877, 0505 982 870. Or call 112."
 CONFIRM = "File this report?\n1 File, and SMS me updates\n2 File, no SMS\n0 Cancel"
+# Personal safety asks about messages once, after filing, with the reason beside the question. Offering "SMS me
+# updates" here as well asked twice — and never turned updates on, since a report read as personal safety waits
+# for the citizen's say — so the first offer was misleading as well as repeated.
+SEND = "Send this report?\n1 Send\n0 Cancel"
+UPDATES_ASK = "SMS updates on it? They never say what it is about.\n1 Yes\n2 No"
 NEXT = "\n1 Next"
 HELP_HEADING = "In danger now? Call 112. If it fails, try the next number."
 MEDICAL_REPORT = ("This sounds like a medical emergency, which Nokware can't send help for. Ambulance: 193, 0501 614 877, "
@@ -293,7 +297,7 @@ def _safety_sub_metro(dial: Dial, state: State, later: Later) -> tuple[Reply, St
         return con("Choose a number from the list, or 0 to skip.\n" + safety_sub_metro_screen()), state
     sub_metro = None if choice == "0" else ids[index]
     desk = desk_line(sub_metro)  # their own desk, now that it is known
-    return con(f"{desk}\n{CONFIRM}" if desk else CONFIRM), {**state, "step": "confirm", "sub_metro": sub_metro}
+    return con(f"{desk}\n{SEND}" if desk else SEND), {**state, "step": "confirm", "sub_metro": sub_metro}
 
 
 def _sub_metro(dial: Dial, state: State, later: Later) -> tuple[Reply, State | None]:
@@ -319,12 +323,11 @@ def _receipt(receipt: Receipt, later: Later) -> tuple[Reply, State | None]:
     if receipt.messages_on:
         later(notify_quietly, case, NotificationEvent.SUBMITTED)
     if case["isSensitive"]:  # the numbers came first; the rest of them are on the contacts page
-        offer = {"reference": reference, "topic": case["topic"], "sub_metro": case.get("subMetro")}
-        if receipt.preferences_token:  # a number was given: ask about updates, once
-            more = f"More numbers: {_site()}/contacts/emergency"
-            question = f"Reference {reference} received. {more}\nSMS updates on it? They never say what it is about.\n1 Yes\n2 No"
-            return con(question), {"step": "updates", "token": receipt.preferences_token, **offer}
-        return con(f"Reference {reference} received.\n{NUMBERS_OFFER}"), {"step": "numbers_sms", **offer}
+        who = " or ".join(short_name(r) for r in case["recipients"])
+        offer = {"reference": reference, "topic": case["topic"], "sub_metro": case.get("subMetro"),
+                 "case_id": case["$id"], "who": who}
+        more = f"More numbers: {_site()}/contacts/emergency"
+        return con(f"Reference {reference} received. {more}\n{UPDATES_ASK}"), {"step": "updates", **offer}
     names = [short_name(r) for r in case["recipients"]]
     who = " and ".join(names) if len(" and ".join(names)) <= WHO_MAX else f"{len(names)} offices"
     emergency = f" {short_line(case['topic'], None).split('. ')[0]}." if case["topic"] in EMERGENCY_TOPICS else ""
@@ -377,6 +380,8 @@ def _confirm(dial: Dial, state: State, later: Later) -> tuple[Reply, State | Non
     choice = dial.text.strip()
     if choice == "0":
         return end("Cancelled. Nothing was filed."), None
+    if _private(state):  # sent without the number: it is attached only if they say yes to something
+        return _file(dial, state, False, later) if choice == "1" else (con("Choose 1 or 0.\n" + SEND), state)
     if choice not in ("1", "2"):
         return con("Choose 1, 2 or 0.\n" + CONFIRM), state
     # Someone in danger is never turned away by the hourly report limit.
@@ -386,21 +391,18 @@ def _confirm(dial: Dial, state: State, later: Later) -> tuple[Reply, State | Non
 
 
 def _updates(dial: Dial, state: State, later: Later) -> tuple[Reply, State | None]:
+    """Messages about a personal-safety report, asked once. The number is kept only if they say yes: this is a
+    live session on their own phone, so a session that drops before they answer leaves nothing behind."""
     choice = dial.text.strip()
     if choice not in ("1", "2"):
         return con("Choose 1 for updates or 2 for none."), state
     wanted = choice == "1"
-    preferences = report_followups.Preferences(notify=wanted, callback_consent=False)
-    try:
-        case, messages_on = report_followups.set_preferences(state["reference"], state["token"], preferences, utc_now())
-    except NotAllowed:  # the one-time choice was already made, or its hour is up
-        return end("That choice can't be changed now. Keep your reference."), None
-    if messages_on:
-        later(notify_quietly, case, NotificationEvent.SUBMITTED)
-    who = " or ".join(short_name(r) for r in case["recipients"])
+    if wanted:
+        save_contact(state["case_id"], ContactChoice(normalise_phone(dial.msisdn), None, notify=True, callback_consent=False))
+        later(notify_quietly, report_followups.find(state["reference"]), NotificationEvent.SUBMITTED)
     said = "Updates are on." if wanted else "No updates will be sent."
-    question = f"{said}\nMay {who} phone you on this number about it?\n1 Yes\n2 No"
-    return con(question), {**_offer(state), "step": "call", "case_id": case["$id"], "who": who}
+    question = f"{said}\nMay {state['who']} phone you on this number about it?\n1 Yes\n2 No"
+    return con(question), {**state, "step": "call", "updates": wanted}
 
 
 def _offer(state: State) -> State:
@@ -414,8 +416,11 @@ def _call(dial: Dial, state: State, later: Later) -> tuple[Reply, State | None]:
     if choice not in ("1", "2"):
         return con("Choose 1 if they may phone you, or 2 if not."), state
     said = "No one will phone you."
-    if choice == "1":
+    if choice == "1" and state.get("updates"):
         update_contact(state["case_id"], {"callbackConsent": True})
+        said = f"Done. {state['who']} may phone you."
+    elif choice == "1":  # a call only: the number is kept for that and nothing else
+        save_contact(state["case_id"], ContactChoice(normalise_phone(dial.msisdn), None, notify=False, callback_consent=True))
         said = f"Done. {state['who']} may phone you."
     return con(f"{said}\n{NUMBERS_OFFER}"), {**_offer(state), "step": "numbers_sms"}
 

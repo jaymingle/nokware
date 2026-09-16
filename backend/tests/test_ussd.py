@@ -20,7 +20,8 @@ from app.services.report_intake import Receipt, ReportSubmission
 from app.services.report_rules import Classification, ClassificationMethod
 from app.services.report_taxonomy import TOPICS_BY_ID
 from app.services.sms_text import is_gsm7, pages
-from app.services.ussd import CONFIRM, MENU, Dial, sub_metro_screen, ward_screen
+from app.services.report_contacts import ContactChoice, normalise_phone
+from app.services.ussd import CONFIRM, MENU, SEND, UPDATES_ASK, Dial, sub_metro_screen, ward_screen
 from app.wards import sub_metros
 
 PHONE = "+233507387216"
@@ -51,7 +52,7 @@ def keys(later: list[tuple[Any, ...]], *presses: str, session_id: str = "s1") ->
 
 
 def test_every_fixed_screen_fits_one_plain_screen() -> None:
-    screens = [MENU, CONFIRM, ussd.MEDICAL, sub_metro_screen(), *(ward_screen(i) for i in sub_metros()),
+    screens = [MENU, CONFIRM, SEND, f"Reference M3RD-8WQA received. More numbers: https://nokware.tstitagency.com/contacts/emergency\n{UPDATES_ASK}", ussd.MEDICAL, sub_metro_screen(), *(ward_screen(i) for i in sub_metros()),
                ussd.MEDICAL_REPORT, *(step + ussd.CONTINUE for step in ussd.help_pages("abuse", True)), f"Reference M3RD-8WQA received.\n{ussd.NUMBERS_OFFER}",
                f"The numbers were already sent to this phone today. Keep your reference M3RD-8WQA.\n{ussd.CALL_LIST}"]
     for screen in screens:
@@ -125,13 +126,22 @@ def test_cancel_files_nothing(session: list[tuple[Any, ...]], monkeypatch: pytes
     assert keys(session, "2", "The drain at Kaneshie market is choked", "2", "1", "0").message == "Cancelled. Nothing was filed."
 
 
+def _contacts(monkeypatch: pytest.MonkeyPatch) -> tuple[list[Any], list[Any]]:
+    """What would be kept of the citizen's number: every save and every change, recorded instead of stored."""
+    saved: list[Any] = []
+    changed: list[Any] = []
+    monkeypatch.setattr(ussd, "save_contact", lambda case_id, choice: saved.append((case_id, choice)))
+    monkeypatch.setattr(ussd, "update_contact", lambda case_id, changes: changed.append((case_id, changes)))
+    monkeypatch.setattr(report_followups, "find", lambda reference: SAFETY)
+    return saved, changed
+
+
 def test_personal_safety_shows_numbers_first_asks_only_the_sub_metro_and_updates_only_on_yes(
     session: list[tuple[Any, ...]], monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    submitted, submit = _filed(SAFETY, messages_on=False, token="one-time", monkeypatch=monkeypatch)
+    submitted, submit = _filed(SAFETY, messages_on=False, monkeypatch=monkeypatch)
     monkeypatch.setattr(report_intake, "submit", submit)
-    chosen: list[Any] = []
-    monkeypatch.setattr(report_followups, "set_preferences", lambda ref, token, choice, now: chosen.append((ref, token, choice)) or (SAFETY, choice.notify))
+    saved, changed = _contacts(monkeypatch)
     first = keys(session, "2", "My neighbour beats his wife every night")
     assert first.message.startswith(ussd.HELP_HEADING + "\nPolice: 191, 18555, 0302 779 300 (HQ)") and first.message.endswith("1 Next")
     shown = [first.message] + [ussd.respond(Dial("s1", PHONE, "1", False), lambda *a: None).message for _ in range(3)]
@@ -143,31 +153,60 @@ def test_personal_safety_shows_numbers_first_asks_only_the_sub_metro_and_updates
     assert place.message.startswith("Which sub-metro are you in?") and place.message.endswith("0 Skip")
     assert "electoral area" not in place.message
     confirm = ussd.respond(Dial("s1", PHONE, "2", False), lambda *a: None)  # Okaikoi South: its desk, then the confirm
-    assert confirm.message == "Your Social Welfare desk: 0303 935 397\n" + CONFIRM
+    assert confirm.message == "Your Social Welfare desk: 0303 935 397\n" + SEND
+    assert "SMS" not in confirm.message  # messages are asked about once, after filing, with the reason beside them
     screen = ussd.respond(Dial("s1", PHONE, "1", False), lambda *args: session.append(args))
-    assert (submitted[0].ward, submitted[0].sub_metro) == (None, "okaikoi-south")
-    assert screen.more and screen.message.startswith("Reference M3RD-8WQA received. More numbers:")
+    assert (submitted[0].ward, submitted[0].sub_metro, submitted[0].phone) == (None, "okaikoi-south", None)  # sent without the number
+    assert screen.more and screen.message.startswith("Reference M3RD-8WQA received. More numbers:") and screen.message.endswith(UPDATES_ASK)
     for giveaway in ("Police", "Social Welfare", "abuse", "safety"):
         assert giveaway not in screen.message
+    assert saved == []  # nothing kept before they say yes
     call = ussd.respond(Dial("s1", PHONE, "1", False), lambda *args: session.append(args))
     assert call.more and call.message == "Updates are on.\nMay Ghana Police Service or Social Welfare phone you on this number about it?\n1 Yes\n2 No"
-    assert chosen[0][:2] == ("M3RD-8WQA", "one-time") and not chosen[0][2].callback_consent  # updates alone
+    assert saved == [("c2", ContactChoice(normalise_phone(PHONE), None, notify=True, callback_consent=False))]  # updates alone
     assert session == [(ussd.notify_quietly, SAFETY, NotificationEvent.SUBMITTED)]
-    consented: list[Any] = []
-    monkeypatch.setattr(ussd, "update_contact", lambda case_id, changes: consented.append((case_id, changes)))
     offer = ussd.respond(Dial("s1", PHONE, "1", False), lambda *a: None)
     assert offer.more and offer.message == "Done. Ghana Police Service or Social Welfare may phone you.\n" + ussd.NUMBERS_OFFER
-    assert consented == [("c2", {"callbackConsent": True})]
+    assert changed == [("c2", {"callbackConsent": True})]
+
+
+def test_saying_no_to_updates_and_calls_keeps_no_number(session: list[tuple[Any, ...]], monkeypatch: pytest.MonkeyPatch) -> None:
+    """The first screen used to offer "File, no SMS", which kept no number. One ask after filing must keep that
+    promise: a number is stored only because they said yes to something."""
+    _, submit = _filed(SAFETY, messages_on=False, monkeypatch=monkeypatch)
+    monkeypatch.setattr(report_intake, "submit", submit)
+    saved, changed = _contacts(monkeypatch)
+    offer = keys(session, "2", "My husband beats me", *_through_help("abuse"), "0", "1", "2", "2")
+    assert offer.message == "No one will phone you.\n" + ussd.NUMBERS_OFFER
+    assert saved == [] and changed == [] and session == []
+
+
+def test_a_call_only_keeps_the_number_for_calls_and_nothing_else(session: list[tuple[Any, ...]], monkeypatch: pytest.MonkeyPatch) -> None:
+    _, submit = _filed(SAFETY, messages_on=False, monkeypatch=monkeypatch)
+    monkeypatch.setattr(report_intake, "submit", submit)
+    saved, changed = _contacts(monkeypatch)
+    keys(session, "2", "My husband beats me", *_through_help("abuse"), "0", "1", "2", "1")
+    assert saved == [("c2", ContactChoice(normalise_phone(PHONE), None, notify=False, callback_consent=True))]
+    assert changed == [] and session == []  # no messages sent
+
+
+def test_a_session_that_drops_before_the_question_keeps_no_number(session: list[tuple[Any, ...]], monkeypatch: pytest.MonkeyPatch) -> None:
+    """USSD sessions drop, and a phone can be taken mid-session: nothing is kept until an answer is given."""
+    submitted, submit = _filed(SAFETY, messages_on=False, monkeypatch=monkeypatch)
+    monkeypatch.setattr(report_intake, "submit", submit)
+    saved, changed = _contacts(monkeypatch)
+    receipt = keys(session, "2", "My husband beats me", *_through_help("abuse"), "0", "1")
+    assert receipt.message.endswith(UPDATES_ASK) and submitted[0].phone is None and saved == [] and changed == []
 
 
 def test_a_safety_reporter_can_skip_the_sub_metro(session: list[tuple[Any, ...]], monkeypatch: pytest.MonkeyPatch) -> None:
     submitted, submit = _filed(SAFETY, messages_on=False, monkeypatch=monkeypatch)
     monkeypatch.setattr(report_intake, "submit", submit)
     confirm = keys(session, "2", "Someone has threatened to kill me", *_through_help("threat_to_life"), "0")
-    assert confirm.message == CONFIRM  # no desk to show
-    receipt = ussd.respond(Dial("s1", PHONE, "2", False), lambda *a: None)
+    assert confirm.message == SEND  # no desk to show
+    receipt = ussd.respond(Dial("s1", PHONE, "1", False), lambda *a: None)
     assert (submitted[0].ward, submitted[0].sub_metro) == (None, None)
-    assert receipt.more and receipt.message == "Reference M3RD-8WQA received.\n" + ussd.NUMBERS_OFFER  # no number given: still offered
+    assert receipt.more and receipt.message.startswith("Reference M3RD-8WQA received.") and receipt.message.endswith(UPDATES_ASK)
 
 
 def _through_help(topic: str) -> list[str]:
@@ -192,7 +231,8 @@ def test_every_emergency_shows_every_number_to_call_on_screens_that_fit(session:
 def _offered(session: list[tuple[Any, ...]], monkeypatch: pytest.MonkeyPatch, session_id: str) -> ussd.Reply:
     _, submit = _filed({**SAFETY, "subMetro": "ashiedu-keteke"}, messages_on=False, monkeypatch=monkeypatch)
     monkeypatch.setattr(report_intake, "submit", submit)
-    return keys(session, "2", "My husband beats me", *_through_help("abuse"), "1", "2", session_id=session_id)
+    # Ashiedu Keteke, send, no updates, no calls: then the numbers are offered.
+    return keys(session, "2", "My husband beats me", *_through_help("abuse"), "1", "1", "2", "2", session_id=session_id)
 
 
 def test_the_numbers_go_by_sms_only_when_asked_for(session: list[tuple[Any, ...]], monkeypatch: pytest.MonkeyPatch) -> None:
@@ -231,7 +271,7 @@ def test_a_slow_safety_filing_still_offers_the_numbers(session: list[tuple[Any, 
     monkeypatch.setattr(report_intake, "read_report", lambda description: _classified("abuse"))
     monkeypatch.setattr(report_intake, "submit", lambda *args: time.sleep(0.3) or Receipt(SAFETY, False, False, None))
     monkeypatch.setattr(ussd, "send_sms", lambda to, text: True)
-    slow = keys(session, "2", "My husband beats me", *_through_help("abuse"), "0", "2")
+    slow = keys(session, "2", "My husband beats me", *_through_help("abuse"), "0", "1")
     assert slow.message == "Your report is being filed. Your reference will come by SMS.\n" + ussd.NUMBERS_OFFER
     done = ussd.respond(Dial("s1", PHONE, "1", False), lambda *args: session.append(args))
     assert done.message == f"The numbers are on their way by SMS.\n{ussd.CALL_LIST}" and session[0][0] is ussd.send_sms
@@ -324,7 +364,7 @@ def test_a_citizen_can_file_what_the_model_took_for_medical(session: list[tuple[
     monkeypatch.setattr(report_intake, "submit", submit)
     first = keys(session, "2", "My husband hit me and I am bleeding", "1")
     assert first.message.startswith(ussd.HELP_HEADING)  # the emergency numbers, as for any danger to a person
-    keys(session, "2", "My husband hit me and I am bleeding", "1", *_through_help("abuse"), "0", "2", session_id="s2")
+    keys(session, "2", "My husband hit me and I am bleeding", "1", *_through_help("abuse"), "0", "1", session_id="s2")
     assert submitted and submitted[0].sub_metro is None
 
 
