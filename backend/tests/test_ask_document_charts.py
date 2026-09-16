@@ -105,3 +105,47 @@ def test_a_reading_that_fails_is_no_chart_not_a_failed_answer(monkeypatch: pytes
 
     monkeypatch.setattr(documents, "get_quick_model", Broken)
     assert documents.figures_to_chart("chart the fees", "Stores A cost 800.00 [S1].", [FEES]) is None
+
+
+# A report writes the figure before the thing it is for, and wraps mid-sentence. From AMA's 2023 Assembly
+# minutes, which is where the refusal that prompted this was seen.
+PROSE = """
+the Assembly. In relation to the revenue performance for 2023 (up to the end of
+August), the Assembly had mobilised 48.3 percent of its IGF budget, 19.0 percent
+of its revenue from the Central Government and 10.03 percent from Donor  Funds.
+Therefore, the Assembly had mobilised 31.9 percent of its total  budgeted revenue
+for 2023 (up to the end of August).
+"""
+
+
+def test_a_report_that_writes_the_figure_before_its_label_is_charted() -> None:
+    """"48.3 percent of its IGF budget" is as much a label and a figure as "Stores - A 800.00"."""
+    plotted = verified(extracted([("IGF budget", "48.3"), ("Central Government", "19.0"), ("Donor Funds", "10.03")]), [PROSE])
+    assert plotted is not None
+    assert [value for _, _, value in plotted.pairs] == [48.3, 19.0, 10.03]
+
+
+def test_a_label_tied_to_the_next_items_figure_is_refused() -> None:
+    """Prose that reads correctly backwards also reads forwards, shifted by one, and every pair would tie.
+    What tells them apart is the comma between one item and the next."""
+    assert verified(extracted([("IGF budget", "19.0"), ("Central Government", "10.03")]), [PROSE]) is None
+
+
+def test_a_figure_that_spans_a_line_break_is_still_its_sentence_s() -> None:
+    """The passage wraps "of its total  budgeted revenue" onto the next line; a sentence is prose's row."""
+    plotted = verified(extracted([("IGF budget", "48.3"), ("total budgeted revenue", "31.9")]), [PROSE])
+    assert plotted is not None and [value for _, _, value in plotted.pairs] == [48.3, 31.9]
+
+
+def test_one_direction_has_to_tie_the_whole_chart() -> None:
+    """Otherwise "Stores - A 800 Stores - B 900" proves Stores - B costs 800, reading each pair whichever way suits."""
+    table = "Stores - A 800.00 Stores - B 900.00"
+    assert verified(extracted([("Stores - A", "800.00"), ("Stores - B", "800.00")]), [table]) is None
+    assert verified(extracted([("Stores - A", "800.00"), ("Stores - B", "900.00")]), [table]) is not None
+
+
+def test_a_value_copied_with_its_currency_is_still_a_number() -> None:
+    """The model copies the figure as the passage writes it, and the passage writes the unit with it."""
+    passage = "Stores - A: GH¢ 800.00\nStores - B: GH¢ 200.00"
+    plotted = verified(extracted([("Stores - A", "GH¢ 800.00"), ("Stores - B", "GH¢ 200.00")]), [passage])
+    assert plotted is not None and [value for _, _, value in plotted.pairs] == [800.0, 200.0]
