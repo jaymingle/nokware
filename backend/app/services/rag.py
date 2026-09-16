@@ -103,7 +103,8 @@ _SYSTEM_PROMPT = (
     "When you use a live report figure:\n"
     "- Say in words that the figure comes from Nokware's live report data as of the time given, not from "
     "a document, and cite its label.\n"
-    '- Give each figure exactly as written, including "fewer than 5" and "none".\n'
+    '- Give each figure exactly as written, including "fewer than 5". A figure of "none" is zero: say it so the '
+    'sentence reads naturally ("no reports about solid waste", "none were filed"), never as any other number.\n'
     "- Never work out a new figure from others: no adding, subtracting or comparing counts to get a number.\n"
     "- Keep document figures and live report data apart; one never confirms or corrects the other.\n"
     "- If the live figures can't settle the question (for example every count it needs is \"fewer than 5\"), say "
