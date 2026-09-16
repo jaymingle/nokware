@@ -244,6 +244,7 @@ def test_both_routes_answer_publicly(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(department_responsiveness, "every_record", lambda collection, queries: works_cases(6, 6)[1] if "assign" in collection else [])
     monkeypatch.setattr(department_responsiveness.CACHE, "_value", None)
     monkeypatch.setattr(department_responsiveness.petition_figures, "every_record", lambda collection, queries: [])
+    monkeypatch.setattr(department_responsiveness.petition_figures, "test_petition_ids", lambda: set())
     monkeypatch.setattr(reporting_gaps, "find_document", lambda document_id: {"title": "2020 Voluntary Local Review", "status": "published"})
     client = TestClient(app)
     record = client.get("/api/publishing-record").json()

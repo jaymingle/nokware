@@ -53,6 +53,7 @@ from app.services.petition_rules import (
 from app.services.phone_proof import Proof, phone_key
 from app.services.workflow import WrongState as ClosedIssue
 from app.wards import wards
+from app.services.test_fixtures import TEST_PREFIX
 
 logger = logging.getLogger(__name__)
 
@@ -292,13 +293,23 @@ def purge_creator_numbers(now: datetime) -> int:
     return len(rows)
 
 
+# A petition titled "[TEST] …" is a fixture: filed, moderated and signed for real, and never listed or counted in
+# public. Its title shows on a card, but its signatures, the MCE's decision on it and its place in every count don't.
+NOT_TEST = Query.not_starts_with("title", TEST_PREFIX)
+
+
+def test_petition_ids() -> set[str]:
+    """The fixtures, so a history row, which names only its petition, can be left out of a public count too."""
+    return {row["$id"] for row in every_record(PETITIONS_COLLECTION, [Query.starts_with("title", TEST_PREFIX), Query.select(["$id"])])}
+
+
 def list_public(statuses: list[PetitionStatus], topic: str | None, limit: int, offset: int) -> tuple[list[dict[str, Any]], int]:
     """Published petitions in the given states: most supported first while they take signatures, else the latest answered or closed."""
     signing = PetitionStatus.OPEN in statuses or PetitionStatus.AWAITING_RESPONSE in statuses
     latest = "respondedAt" if PetitionStatus.RESPONDED in statuses else "closedAt"
     order = [Query.order_desc("signatureCount"), Query.order_desc("publishedAt")] if signing else [Query.order_desc(latest)]
     return list_petitions([
-        Query.equal("status", [s.value for s in statuses]), Query.is_not_null("publishedAt"),
+        Query.equal("status", [s.value for s in statuses]), Query.is_not_null("publishedAt"), NOT_TEST,
         *([Query.equal("topic", topic)] if topic else []),
         Query.select(PUBLIC_FIELDS), *order, Query.limit(limit), Query.offset(offset),
     ])
@@ -311,13 +322,16 @@ def awaiting_response() -> list[dict[str, Any]]:
 
 
 def _count(queries: list[str]) -> int:
-    _, total = list_petitions([*queries, Query.limit(1)])
+    _, total = list_petitions([*queries, NOT_TEST, Query.limit(1)])
     return total
 
 
 def moderation_counts() -> dict[str, Any]:
     """How the MCE has handled petitions: waiting, published by them or automatically, and every refusal by reason."""
-    refusals = every_record(HISTORY_COLLECTION, [Query.equal("action", PetitionAction.REFUSED.value), Query.select(["reason"])])
+    tests = test_petition_ids()
+    refusals = [row for row in every_record(HISTORY_COLLECTION, [Query.equal("action", PetitionAction.REFUSED.value),
+                                                                  Query.select(["reason", "petitionId"])])
+                if row.get("petitionId") not in tests]
     return {
         "awaiting": _count([Query.equal("status", PetitionStatus.IN_REVIEW.value)]),
         "published_by_mce": _count([Query.equal("publishedBy", PublishedBy.MCE.value)]),

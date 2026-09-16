@@ -22,7 +22,7 @@ from appwrite.query import Query
 from app.services.appwrite_client import every_record
 from app.services.ledger_documents import parse_datetime
 from app.services.petition_rules import REFUSALS, PetitionAction, PetitionStatus, responded_late
-from app.services.petitions import HISTORY_COLLECTION, PETITIONS_COLLECTION
+from app.services.petitions import HISTORY_COLLECTION, NOT_TEST, PETITIONS_COLLECTION, test_petition_ids
 
 REVIEW_ACTIONS = (PetitionAction.SUBMITTED, PetitionAction.PUBLISHED, PetitionAction.AUTO_PUBLISHED, PetitionAction.REFUSED)
 RESPONSE_FIELDS = ["status", "thresholdReachedAt", "responseDue", "respondedAt", "noResponseAt"]
@@ -55,7 +55,11 @@ def build(history: list[dict[str, Any]], reached: list[dict[str, Any]], start: d
 
 
 def figures(start: datetime, now: datetime) -> dict[str, Any]:
-    history = every_record(HISTORY_COLLECTION, [Query.equal("action", [a.value for a in REVIEW_ACTIONS]),
-                                                Query.select(["action", "reason", "at"])])
-    reached = every_record(PETITIONS_COLLECTION, [Query.is_not_null("thresholdReachedAt"), Query.select(RESPONSE_FIELDS)])
+    """The MCE's handling of residents' petitions, test petitions left out: a count of the MCE deciding fixtures would
+    be a record of decisions that were never about a resident's petition."""
+    tests = test_petition_ids()
+    history = [row for row in every_record(HISTORY_COLLECTION, [Query.equal("action", [a.value for a in REVIEW_ACTIONS]),
+                                                                 Query.select(["action", "reason", "at", "petitionId"])])
+               if row.get("petitionId") not in tests]
+    reached = every_record(PETITIONS_COLLECTION, [Query.is_not_null("thresholdReachedAt"), NOT_TEST, Query.select(RESPONSE_FIELDS)])
     return build(history, reached, start, now)
