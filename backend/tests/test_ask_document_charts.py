@@ -131,10 +131,41 @@ def test_a_label_tied_to_the_next_items_figure_is_refused() -> None:
     assert verified(extracted([("IGF budget", "19.0"), ("Central Government", "10.03")]), [PROSE]) is None
 
 
-def test_a_figure_that_spans_a_line_break_is_still_its_sentence_s() -> None:
-    """The passage wraps "of its total  budgeted revenue" onto the next line; a sentence is prose's row."""
-    plotted = verified(extracted([("IGF budget", "48.3"), ("total budgeted revenue", "31.9")]), [PROSE])
-    assert plotted is not None and [value for _, _, value in plotted.pairs] == [48.3, 31.9]
+def test_a_figure_on_the_line_above_its_label_is_still_its_sentence_s() -> None:
+    """"19.0 percent" ends one line and "the Central Government" begins the next: a sentence is prose's row."""
+    plotted = verified(extracted([("IGF budget", "48.3"), ("Central Government", "19.0")]), [PROSE])
+    assert plotted is not None and [value for _, _, value in plotted.pairs] == [48.3, 19.0]
+
+
+def test_a_total_is_not_drawn_beside_its_own_parts() -> None:
+    """A total is by definition the largest bar, so among its parts it reads as one of them and the biggest."""
+    plotted = verified(extracted([("IGF budget", "48.3"), ("Central Government", "19.0"), ("Donor Funds", "10.03"),
+                                  ("total budgeted revenue", "31.9")]), [PROSE])
+    assert plotted is not None
+    assert [label for label, _, _ in plotted.pairs] == ["IGF budget", "Central Government", "Donor Funds"]
+    assert plotted.left_out == ("total budgeted revenue (31.9)",)  # still proved, and named in the chart's note
+
+
+def test_a_total_with_one_part_left_is_no_chart() -> None:
+    assert verified(extracted([("IGF budget", "48.3"), ("total budgeted revenue", "31.9")]), [PROSE]) is None
+
+
+def test_totals_compared_with_each_other_are_charted() -> None:
+    """Two totals side by side are peers; only a total among its own parts misleads."""
+    passage = "Total revenue 2022: 36,500,000.00\nTotal revenue 2026: 124,760,805.00"
+    plotted = verified(extracted([("Total revenue 2022", "36,500,000.00"), ("Total revenue 2026", "124,760,805.00")]), [passage])
+    assert plotted is not None and plotted.left_out == ()
+
+
+def test_the_chart_says_which_total_it_left_out() -> None:
+    from app.services.ask_charts import document_chart
+    from app.services.ask_document_charts import Plotted
+
+    chart = document_chart("Show it as a chart", Plotted("Revenue mobilised", [("IGF", "48.3", 48.3), ("Donor Funds", "10.03", 10.03)],
+                                                         left_out=("total budgeted revenue (31.9)",)))
+    assert chart["categories"] == ["IGF", "Donor Funds"]
+    assert chart["note"].startswith("total budgeted revenue (31.9) is left out of the chart")
+    assert "in the answer above" in chart["note"]
 
 
 def test_one_direction_has_to_tie_the_whole_chart() -> None:

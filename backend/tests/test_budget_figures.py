@@ -169,3 +169,31 @@ def test_too_many_bars_are_cut_to_the_largest_and_the_chart_says_so() -> None:
     assert chart and len(chart["categories"]) == MAX_CATEGORIES
     assert "20 largest of 30" in chart["note"] and "all in the answer" in chart["note"]
     assert "Department 30" in chart["categories"] and "Department 1" not in chart["categories"]
+
+
+def budget(label: str, description: str, value: str) -> dict[str, Any]:
+    return {"label": label, "cited": True, "source": "documents", "description": description, "value": value,
+            "rows": [], "grouped_by": "none", "counted_at": None}
+
+
+def test_a_total_figure_is_not_charted_beside_the_figures_it_is_the_total_of() -> None:
+    """"Approved budget · 2026" is narrowed by "· Public Works": the first is the total, and drawn among its parts
+    it would read as the biggest of them."""
+    from app.services.ask_charts import chart_for
+
+    figures = [budget("B1", "Approved budget · 2026", "GH¢ 124,760,805"),
+               budget("B2", "Approved budget · 2026 · Public Works", "GH¢ 20,232,848"),
+               budget("B3", "Approved budget · 2026 · Education", "GH¢ 7,786,630")]
+    chart, _ = chart_for("Show the 2026 budget as a chart", figures)
+    assert chart and chart["figures"] == ["B2", "B3"]
+    assert chart["note"].startswith("Approved budget · 2026 (GH¢ 124,760,805) is left out of the chart")
+
+
+def test_the_same_thing_in_two_years_is_charted_as_peers() -> None:
+    """Neither narrows the other, so neither is a total: a comparison across years is exactly what should chart."""
+    from app.services.ask_charts import chart_for
+
+    figures = [budget("B1", "Approved budget · 2022 · Public Works", "GH¢ 2,595,053"),
+               budget("B2", "Approved budget · 2026 · Public Works", "GH¢ 20,232,848")]
+    chart, _ = chart_for("Compare them as a chart", figures)
+    assert chart and chart["figures"] == ["B1", "B2"] and "left out" not in (chart["note"] or "")

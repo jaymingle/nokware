@@ -24,7 +24,7 @@ from dataclasses import dataclass, replace
 from datetime import datetime
 from typing import Any
 
-from app.services.ask_document_charts import PARTIAL_NOTE, Plotted
+from app.services.ask_document_charts import PARTIAL_NOTE, Plotted, total_left_out
 from app.services.phrases import phrase
 from app.services.stats import FEWER_THAN_SMALL, SMALL
 
@@ -129,6 +129,18 @@ def _breakdown(figures: list[dict[str, Any]]) -> _Data | None:
     return _Data(title, categories, series, over_time, len(same) == 1, [f["label"] for f in same], same[0].get("counted_at"))
 
 
+def _without_totals(figures: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """The figures that are parts, and those that are the total of another figure in the answer.
+
+    Told apart by what each describes rather than by guessing at words: "Approved budget · 2026" is the total of
+    "Approved budget · 2026 · Public Works", because the second narrows the first. Two figures neither of which
+    narrows the other — the same department in 2022 and 2026 — are peers, and both are drawn."""
+    descriptions = [str(f["description"]) for f in figures]
+    def narrowed(description: str) -> bool:
+        return any(other.startswith(f"{description} · ") for other in descriptions)
+    return [f for f in figures if not narrowed(str(f["description"]))], [f for f in figures if narrowed(str(f["description"]))]
+
+
 def _separate(figures: list[dict[str, Any]]) -> _Data | None:
     """Two or more single counts, compared: each is a category of one series."""
     counted = [(f, _value(f["value"])) for f in figures]
@@ -216,7 +228,11 @@ def chart_for(question: str, figures: list[dict[str, Any]]) -> tuple[ChartDict |
     can't be drawn from these figures."""
     if not asks_for_chart(question) or not figures:
         return None, None
-    data = _breakdown(figures) or _separate(figures)
+    data = _breakdown(figures)
+    totals: list[dict[str, Any]] = []
+    if data is None:
+        parts, totals = _without_totals(figures)
+        data = _separate(parts)
     if data is None or sum(len(values) for _, values in data.series) < 2:  # one count, or one month so far
         return None, ONE_MONTH if data is not None and data.over_time else ONE_COUNT
     if all(high == 0 for _, values in data.series for _, _, high in values):
@@ -224,7 +240,8 @@ def chart_for(question: str, figures: list[dict[str, Any]]) -> tuple[ChartDict |
     data, cap = _largest(data)
     named = _named(question)
     kind, note = _honest(named, data) if named else (_default(data), None)
-    note = " ".join(part for part in (note, cap) if part) or None
+    left_out = total_left_out([f"{f['description']} ({f['value']})" for f in totals]) if totals else None
+    note = " ".join(part for part in (note, cap, left_out) if part) or None
     long_labels = max(len(c) for c in data.categories) > LONG_LABEL
     lying = bool(HORIZONTAL.search(question)) or (long_labels and not UPRIGHT.search(question))
     horizontal = kind in ("bar", "stacked_bar") and lying
@@ -250,7 +267,8 @@ def document_chart(question: str, plotted: Plotted) -> ChartDict:
     values = [(shown, value, value) for _, shown, value in plotted.pairs]
     data = _Data(plotted.title, categories, [("Figures", values)], False, False, [], None, source="documents")
     named = _named(question)
-    note = _DOCUMENT_NOTES.get(named or "")
-    note = f"{note} {PARTIAL_NOTE}" if note and plotted.partial else (PARTIAL_NOTE if plotted.partial else note)
+    notes = [_DOCUMENT_NOTES.get(named or ""), PARTIAL_NOTE if plotted.partial else None,
+             total_left_out(list(plotted.left_out)) if plotted.left_out else None]
+    note = " ".join(part for part in notes if part) or None
     horizontal = bool(HORIZONTAL.search(question)) or (max(len(c) for c in categories) > LONG_LABEL and not UPRIGHT_ASKED.search(question))
     return _as_dict("bar", horizontal, data, note)

@@ -96,6 +96,8 @@ _PROMPT = (
     "overspend and \"44.7 percent OF its budget\" is a proportion: drawn side by side the overspend would read as "
     "the smaller figure. Where an answer mixes the two, chart neither;\n"
     "- the numbers look like the axis ticks of a chart printed in the document;\n"
+    "Leave out a total that the answer gives beside its own parts (\"31.9 percent of its total budgeted revenue\" "
+    "beside the sources it is made of): a total drawn among its parts reads as one of them. Take the parts.\n"
     "- fewer than two labels have a figure of their own.\n"
     "Copy each label and figure exactly as the passage writes them. Never calculate, convert, round or infer a "
     "figure, and never use one the passages do not state.\n"
@@ -106,6 +108,21 @@ _PROMPT = (
 
 PARTIAL_NOTE = (f"Only the first {MAX_PAIRS} figures the answer gives are drawn; the rest are in the answer above.")
 
+# A label that names a whole rather than one of its parts.
+_TOTAL = re.compile(r"\b(total|overall|grand total|in totality|altogether|aggregate)\b", re.IGNORECASE)
+
+
+def total_left_out(named: list[str]) -> str:
+    """Why a total isn't drawn beside the parts it is the total of.
+
+    A total is by definition the largest bar, so beside its own parts it reads as
+    one of them and the biggest — the same kind of false comparison as an
+    overspend drawn beside a proportion. It is still in the answer."""
+    listed = " and ".join(named)
+    many = len(named) > 1
+    return (f"{listed} {'are' if many else 'is'} left out of the chart: a total drawn beside its own parts reads as "
+            f"one of them, and the largest. {'They are' if many else 'It is'} in the answer above.")
+
 
 @dataclass(frozen=True)
 class Plotted:
@@ -114,6 +131,7 @@ class Plotted:
     title: str
     pairs: list[tuple[str, str, float]]  # (label, figure as shown, its value)
     partial: bool = False  # the answer listed more figures than a chart can hold
+    left_out: tuple[str, ...] = ()  # totals proved against the passage but not drawn beside their parts
 
 
 def _collapsed(text: str) -> list[str]:
@@ -283,6 +301,15 @@ def verified(extracted: _Extracted, passages: list[str]) -> Plotted | None:
                for backwards in (False, True)):
         logger.info("No document chart: %d pairs, and no one direction ties them all to a cited passage", len(pairs))
         return None
+    # Every pair is proved, the total included; the total just isn't drawn beside its own parts.
+    totals = [pair for pair in pairs if _TOTAL.search(pair[0])]
+    parts = [pair for pair in pairs if not _TOTAL.search(pair[0])]
+    if totals and parts:
+        if len(parts) < MIN_PAIRS:
+            logger.info("No document chart: leaving out the total leaves %d part", len(parts))
+            return None
+        left_out = tuple(f"{label} ({shown})" for label, shown, _ in totals)
+        return Plotted(extracted.title.strip() or "Figures from the documents", parts, len(extracted.pairs) > MAX_PAIRS, left_out)
     return Plotted(extracted.title.strip() or "Figures from the documents", pairs, len(extracted.pairs) > MAX_PAIRS)
 
 
