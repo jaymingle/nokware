@@ -20,13 +20,14 @@ from app.config import get_settings
 from app.services.llm import get_genai_client
 from app.services.rag import NO_INFO_ANSWER, RagAnswer
 from app.services.voice_audio import AudioRejected, Encoded, for_browser, voice_note, wav
+from app.services.citations import KINDS
 
 SPOKEN_MAX_CHARS = 620  # with the closing sentence, about 50 seconds: Gemini reads about 13 characters a second
 TIMEOUT_MS = 45_000
 PCM_RATE = 24_000  # Gemini's speech, unless its MIME type says otherwise
 SOURCES_ABOVE = "The sources are in the message above."
 NOTHING_FOUND = "The message above says where else to look, and how to request a document."
-_TAG = re.compile(r"\s*\[[SR]\d+\]")
+_TAG = re.compile(rf"\s*\[[{KINDS}]\d+\]")
 _LINK = re.compile(r"\(?https?://[^\s)]*[^\s).,;:!?]\)?")  # a link ends before the sentence's own punctuation
 _MARKUP = re.compile(r"\*\*|__|^#+\s*|`", re.MULTILINE)
 _BULLET = re.compile(r"^\s*(?:[*•-]|\d+\.)\s+(.+?)\s*$", re.MULTILINE)

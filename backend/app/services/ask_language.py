@@ -38,12 +38,13 @@ from pydantic import BaseModel, Field
 
 from app.services.llm import get_quick_model
 from app.services.phrases import Language, phrase
+from app.services.citations import KINDS
 
 logger = logging.getLogger(__name__)
 
 # A figure as an answer writes it: 12, 1,234.56, 30.5. Years count too: a mistranslated year is a wrong fact.
 _NUMBER = re.compile(r"\d[\d,. ]*\d|\d")
-_LABEL = re.compile(r"\[([SR]\d+)\]")
+_LABEL = re.compile(rf"\[([{KINDS}]\d+)\]")
 _ENGLISH_HINT = re.compile(r"\b(the|what|how|when|where|which|who|is|are|does|do|did|can|much|many)\b", re.IGNORECASE)
 _LATIN = re.compile(r"^[\x00-\x7f’'“”—–…£€$¢]*$")
 NAMED = {"english": Language.ENGLISH, "french": Language.FRENCH, "twi": Language.TWI, "akan": Language.TWI}

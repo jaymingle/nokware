@@ -2,10 +2,11 @@
 
 A `section` column says what each row is: notice, question, answer, note,
 source, figure. A figure is a row for its total and a row for each line of its
-breakdown (`category`), with the count in `value` as a number. "Fewer than 5"
+breakdown (`category`), with the count or amount in `value` as a number. "Fewer than 5"
 leaves `value` empty and says so in `shown_as`, so a spreadsheet can't add it up
-as if it were a number. Numbers quoted from documents stay in the answer's text:
-they aren't rows until the documents' tables can be read accurately.
+as if it were a number. A budget figure's amounts are rows too: they are read from
+the Assembly's budgets and each block of them proved against its stated total
+(budget_extract.py). Numbers quoted from other documents stay in the answer's text.
 
 Written as UTF-8 with a byte-order mark, so Excel shows GH¢ and ₵. A cell that
 would start a formula (=, +, -, @) is prefixed with an apostrophe: the question is
@@ -14,9 +15,10 @@ the resident's own words.
 
 import csv
 import io
+import re
 
 from app.schemas.ask import AskFigure
-from app.services.ask_export import HEADER_NOTICE, LIVE_DATA_NOTE, Content, figure_footnote
+from app.services.ask_export import HEADER_NOTICE, Content, figure_footnote, figures_notes
 
 COLUMNS = ["section", "number", "item", "category", "value", "shown_as", "detail", "department", "year", "source_url",
            "nokware_copy", "counted_at"]
@@ -27,16 +29,28 @@ def _safe(value: object) -> object:
     return f"'{value}" if isinstance(value, str) and value.startswith(_FORMULA) else value
 
 
-def count_value(shown: str) -> int | str:
-    digits = shown.replace(",", "")
-    return int(digits) if digits.isdigit() else 0 if shown == "none" else ""
+_AMOUNT = re.compile(r"^(?:GH¢|GHS|₵)?\s*(\d[\d,]*(?:\.\d+)?)$")
+
+
+def figure_value(shown: str) -> int | float | str:
+    """A figure as a number a spreadsheet can use: a count, or an amount with its currency left in "shown as".
+
+    "Fewer than 5" is never a number — the cell stays empty, so a column can't be totalled to reveal it. A budget
+    amount, "GH¢ 20,270,110", was an empty cell too, because only bare digits were read."""
+    if shown == "none":
+        return 0
+    found = _AMOUNT.match(shown.strip())
+    if not found:
+        return ""
+    number = found[1].replace(",", "")
+    return float(number) if "." in number else int(number)
 
 
 def _figure_rows(number: int, figure: AskFigure) -> list[dict[str, object]]:
     base = {"section": "figure", "number": f"F{number}", "item": figure.description,
             "counted_at": figure.counted_at, "detail": figure_footnote(figure)}
-    rows = [{**base, "category": "Total", "value": count_value(figure.value), "shown_as": figure.value}]
-    return rows + [{**base, "category": row.name, "value": count_value(row.value), "shown_as": row.value} for row in figure.rows]
+    rows = [{**base, "category": "Total", "value": figure_value(figure.value), "shown_as": figure.value}]
+    return rows + [{**base, "category": row.name, "value": figure_value(row.value), "shown_as": row.value} for row in figure.rows]
 
 
 def answer_text(content: Content) -> str:
@@ -57,8 +71,7 @@ def csv_bytes(content: Content) -> bytes:
              for n, s, provenance in content.sources]
     for number, figure in content.figures:
         rows += _figure_rows(number, figure)
-    if content.figures:
-        rows.append({"section": "note", "item": LIVE_DATA_NOTE})
+    rows += [{"section": "note", "item": note} for note in figures_notes(content.figures)]
     out = io.StringIO()
     writer = csv.DictWriter(out, fieldnames=COLUMNS, extrasaction="ignore", lineterminator="\r\n")
     writer.writeheader()

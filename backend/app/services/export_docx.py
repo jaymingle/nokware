@@ -18,7 +18,7 @@ from docx.text.paragraph import Paragraph
 
 from app.schemas.ask import AskChart, AskFigure
 from app.services import export_chart
-from app.services.ask_export import FOOTER_NOTICE, HEADER_NOTICE, LIVE_DATA_NOTE, Content, chart_footnote, figure_footnote, when
+from app.services.ask_export import FOOTER_NOTICE, HEADER_NOTICE, Content, chart_footnote, figure_footnote, figures_heading, figures_notes, when
 
 INK, INK_SOFT, TEAL = RGBColor(0x17, 0x24, 0x2B), RGBColor(0x4A, 0x5A, 0x5F), RGBColor(0x1F, 0x6F, 0x5C)
 BODY_FONT, HEADING_FONT = "Public Sans", "Fraunces"
@@ -153,10 +153,11 @@ def docx(content: Content) -> bytes:
         document.add_paragraph(content.no_information)
     _chart(document, content.chart, content.chart_note)
     if content.figures:
-        document.add_heading("Live figures", level=1)
+        document.add_heading(figures_heading(content.figures), level=1)
         for number, figure in content.figures:
             _figure(document, number, figure)
-        _small(document.add_paragraph(), LIVE_DATA_NOTE)
+        for note in figures_notes(content.figures):
+            _small(document.add_paragraph(), note)
     _sources(document, content)
     out = io.BytesIO()
     document.save(out)

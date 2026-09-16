@@ -21,7 +21,7 @@
       "text": "Les tableaux des documents de l'AMA ne sont pas encore lus d'une manière permettant de les mettre en graphique avec exactitude ; je préfère vous donner les chiffres en texte plutôt qu'un graphique qui pourrait être faux."
     },
     "ask.spreadsheet_refusal": {
-      "text": "Je ne peux pas encore vous donner les chiffres des documents sous forme de tableur : leurs tableaux sortent des PDF en chiffres épars, et une feuille de calcul inviterait à des additions que ces chiffres ne permettent pas. Les chiffres sont dans la réponse, et les documents eux-mêmes sont liés ci-dessous. Les comptages des signalements des habitants, eux, se téléchargent en tableur."
+      "text": "Je ne peux pas vous donner ces chiffres sous forme de tableur : ils sont cités de documents dont les tableaux sortent des PDF en chiffres épars, et une feuille de calcul inviterait à des additions que ces chiffres ne permettent pas. Les chiffres sont dans la réponse, et les documents eux-mêmes sont liés ci-dessous. Les comptages des signalements des habitants, et les chiffres budgétaires que Nokware lit dans les budgets de l'AMA, se téléchargent en tableur."
     },
     "ask.one_count": {
       "text": "Il n'y a qu'un seul comptage ici : il n'y a rien à mettre en graphique."

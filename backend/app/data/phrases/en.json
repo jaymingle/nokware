@@ -30,7 +30,7 @@
     },
     "ask.spreadsheet_refusal": {
       "critical": false,
-      "text": "I can't give you the documents' figures as a spreadsheet yet: their tables come out of the PDFs as loose numbers, so a sheet would invite sums the figures can't support. The figures are in the answer, and the documents themselves are linked below. Counts of residents' reports do download as a spreadsheet."
+      "text": "I can't give you these figures as a spreadsheet: they're quoted from documents whose tables come out of the PDFs as loose numbers, so a sheet would invite sums the figures can't support. The figures are in the answer, and the documents themselves are linked below. Counts of residents' reports, and budget figures Nokware reads from AMA's budgets, do download as a spreadsheet."
     },
     "ask.one_count": {
       "critical": false,

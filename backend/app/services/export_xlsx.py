@@ -11,14 +11,13 @@ Two rules keep a spreadsheet from saying more than Nokware knows:
 - "Fewer than 5" is never a number. Its count cell stays empty and the text goes
   in "Shown as", so nobody can total a column and reveal a suppressed count. The
   same for a figure that is a range.
-- Only live report figures become cells. Numbers quoted from documents stay in
-  the answer's text, because what an answer sets out is a few passages, not a
-  whole table: a sheet invites sums across rows the Ledger can't yet support.
-  That is why the export is offered only for an answer with live figures, and
-  why a question asking for budget figures as a spreadsheet is told so plainly
-  (ask_charts.SPREADSHEET_REFUSAL). A chart of document figures can be drawn
-  where every bar is proved (ask_document_charts.py); a sheet of them waits for
-  the table extraction.
+- Live report figures and budget figures become cells. A budget figure is read
+  from the Assembly's budget documents and each block of it proved against its
+  stated total (budget_extract.py), so its rows can be worked with like counts.
+  Numbers quoted from other documents stay in the answer's text: what an answer
+  sets out from those is a few passages, not a whole table, and a sheet invites
+  sums across rows the Ledger can't support. A chart of those can be drawn where
+  every bar is proved (ask_document_charts.py), and is, in the PDF and Word.
 
 A cell that would start a formula (=, +, -, @) is prefixed with an apostrophe:
 the question is the resident's own words.
@@ -34,8 +33,8 @@ from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.worksheet import Worksheet
 
 from app.schemas.ask import AskChart, AskFigure
-from app.services.ask_export import HEADER_NOTICE, LIVE_DATA_NOTE, Content, chart_footnote, figure_footnote
-from app.services.export_csv import answer_text, count_value
+from app.services.ask_export import HEADER_NOTICE, Content, chart_footnote, figure_footnote, figures_heading, figures_notes
+from app.services.export_csv import answer_text, figure_value
 
 INK = "FF17242B"
 TEAL = "FF1F6F5C"
@@ -95,13 +94,14 @@ def _figure_block(sheet: Worksheet, row: int, number: int, figure: AskFigure) ->
     row = _write(sheet, row, [f"F{number}", figure.description], HEADING)
     row = _write(sheet, row, ["Source", figure_footnote(figure)], SMALL)
     header = row
-    for column, title in enumerate(["Category", "Count", "Shown as"], start=1):
+    measure = "Amount (GH¢)" if figure.source == "documents" else "Count"
+    for column, title in enumerate(["Category", measure, "Shown as"], start=1):
         cell = sheet.cell(row=header, column=column, value=title)
         cell.font, cell.fill = WHITE_HEADING, FILL
-    row = _write(sheet, header + 1, ["Total", count_value(figure.value), figure.value])
+    row = _write(sheet, header + 1, ["Total", figure_value(figure.value), figure.value])
     first = row
     for line in figure.rows:
-        row = _write(sheet, row, [line.name, count_value(line.value), line.value])
+        row = _write(sheet, row, [line.name, figure_value(line.value), line.value])
     return row + 1, (first, row - 1) if figure.rows else None
 
 
@@ -109,8 +109,9 @@ def _figures_sheet(sheet: Worksheet, content: Content) -> dict[str, tuple[int, i
     """The working sheet. Returns each figure's breakdown rows, by label, for the chart to point at."""
     sheet.freeze_panes = "A2"
     _widths(sheet, [44, 12, 18])
-    row = _write(sheet, 1, ["Live report figures: counts of the reports residents filed with Nokware"], HEADING)
-    row = _write(sheet, row, [LIVE_DATA_NOTE], SMALL)
+    row = _write(sheet, 1, [figures_heading(content.figures)], HEADING)
+    for note in figures_notes(content.figures):
+        row = _write(sheet, row, [note], SMALL)
     row += 1
     ranges: dict[str, tuple[int, int]] = {}
     for number, figure in content.figures:
@@ -135,7 +136,9 @@ def _chart(chart: AskChart) -> BarChart | LineChart | PieChart:
 
 def _chart_sheet(sheet: Worksheet, figures: Worksheet, chart: AskChart, charted: list[tuple[int, int]]) -> None:
     """The chart Nokware drew, over the cells on the Figures sheet: a real chart, not a picture of one."""
-    first, last = charted[0][0], min(charted[0][1], charted[0][0] + MAX_ROWS_CHARTED - 1)
+    # The bars the page drew and no more, so the workbook's chart matches the note beside it ("the 20 largest of 42").
+    drawn_rows = min(len(chart.categories), MAX_ROWS_CHARTED)
+    first, last = charted[0][0], min(charted[0][1], charted[0][0] + drawn_rows - 1)
     drawn = _chart(chart)
     drawn.title = chart.title
     drawn.legend = None

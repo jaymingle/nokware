@@ -12,6 +12,7 @@ import re
 
 from app.services.rag import NO_INFO_ANSWER, RagAnswer, Source
 from app.services.sms_text import pages, plain
+from app.services.citations import FIGURE_KINDS, KINDS
 
 CHAT_TITLE_MAX = 90
 SMS_PAGES = 2
@@ -20,9 +21,12 @@ LIVE_DATA_NOTE = (
     "Counts called live report data come from reports residents filed with Nokware, not from a published "
     'document, and a count from 1 to 4 reads "fewer than 5".'
 )
+# A budget figure is the opposite of a live count: it IS from a published document. Telling a WhatsApp reader a
+# budget amount came "from reports residents filed with Nokware, not from a published document" had it backwards.
+BUDGET_DATA_NOTE = "Budget figures are approved amounts from AMA's published budgets, not money released or spent."
 _DOCUMENT_TAG = re.compile(r"\[(S\d+)\]")
-_ANY_TAG = re.compile(r"\s*\[[SR]\d+\]")
-_FIGURE_TAG = re.compile(r"\s*\[R\d+\]")
+_ANY_TAG = re.compile(rf"\s*\[[{KINDS}]\d+\]")
+_FIGURE_TAG = re.compile(rf"\s*\[[{FIGURE_KINDS}]\d+\]")
 _BOLD = re.compile(r"\*\*(.+?)\*\*")
 _HEADING = re.compile(r"^#+\s*", re.MULTILINE)
 _BULLET = re.compile(r"^(\s*)[*-] ", re.MULTILINE)  # markdown bullets, which WhatsApp would show as stars
@@ -67,8 +71,8 @@ def for_chat(answer: RagAnswer, site: str) -> str:
     if numbers:
         listed = [f"[{number}] {_describe(documents[label], CHAT_TITLE_MAX)}" for label, number in numbers.items() if label in documents]
         parts.append("Sources:\n" + "\n".join(listed))
-    if any(figure["cited"] for figure in answer["figures"]):
-        parts.append(LIVE_DATA_NOTE)
+    cited = {figure.get("source", "reports") for figure in answer["figures"] if figure["cited"]}
+    parts += [note for kind, note in (("reports", LIVE_DATA_NOTE), ("documents", BUDGET_DATA_NOTE)) if kind in cited]
     return "\n\n".join(parts)
 
 

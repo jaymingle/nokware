@@ -13,13 +13,18 @@ cannot survive a single fabricated citation.
 import re
 
 LABEL_PREFIX = "S"
+# Every kind of citation, in one place: S a document, R a live report count, B a budget figure. Each module that
+# finds, strips or renumbers citations builds its pattern from this. B was added to two of them and missed in five,
+# so budget answers showed "[B1]" raw on the page, in WhatsApp and SMS, in every export, and read it aloud.
+KINDS = "SRB"
+FIGURE_KINDS = KINDS.replace(LABEL_PREFIX, "")  # the citations that are figures, not documents: R and B
 
 # One citation group: [S1], [S1, S3], [S1; S2], [S1 and S2], (S2), [s 4], [Sources S1, S2], [R1], [S2][R1] ...
 _CITATION_GROUP = re.compile(
-    r"[\[(]\s*(?:sources?\s*)?([SRB]\s*\d+(?:\s*(?:,|;|&|and)\s*[SRB]\s*\d+)*)\s*[\])]",
+    rf"[\[(]\s*(?:sources?\s*)?([{KINDS}]\s*\d+(?:\s*(?:,|;|&|and)\s*[{KINDS}]\s*\d+)*)\s*[\])]",
     re.IGNORECASE,
 )
-_LABEL = re.compile(r"([SRB])\s*(\d+)", re.IGNORECASE)
+_LABEL = re.compile(rf"([{KINDS}])\s*(\d+)", re.IGNORECASE)
 # Raw document ids never appear in the prompt; strip any that show up anyway.
 _DOCUMENT_ID = re.compile(r"\bama-[0-9a-f]{6,}\b", re.IGNORECASE)
 _SPACE_BEFORE_PUNCTUATION = re.compile(r"[ \t]+([.,;:!?])")

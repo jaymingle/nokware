@@ -28,12 +28,13 @@ from app.services import export_chart
 from app.services.ask_export import (
     FOOTER_NOTICE,
     HEADER_NOTICE,
-    LIVE_DATA_NOTE,
     SUPPRESSED_KEY,
     Block,
     Content,
     chart_footnote,
     figure_footnote,
+    figures_heading,
+    figures_notes,
     when,
 )
 
@@ -180,8 +181,8 @@ def _story(content: Content) -> list[object]:
         story.append(Paragraph(markup(content.no_information), BODY))
     story += _chart(content.chart, content.chart_note)
     if content.figures:
-        story += _headed("Live figures", [[KeepTogether(_figure(n, f))] for n, f in content.figures])
-        story.append(Paragraph(markup(LIVE_DATA_NOTE), SMALL))
+        story += _headed(figures_heading(content.figures), [[KeepTogether(_figure(n, f))] for n, f in content.figures])
+        story += [Paragraph(markup(note), SMALL) for note in figures_notes(content.figures)]
     return story + _sources(content)
 
 
