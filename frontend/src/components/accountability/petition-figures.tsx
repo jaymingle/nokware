@@ -30,7 +30,7 @@ export function PetitionFigures({ figures }: { figures: Figures }) {
       ]} />
       <p className="text-[12.5px] text-ink-soft">
         Exact counts, unlike the report figures: they count the MCE&apos;s decisions on public petitions, not residents.{" "}
-        <Link href="/petitions" className="text-teal underline-offset-2 hover:underline" data-testid="responsiveness-petitions-link">See the petitions</Link>
+        <Link href="/petitions" className="text-teal underline underline-offset-2" data-testid="responsiveness-petitions-link">See the petitions</Link>
       </p>
     </article>
   );

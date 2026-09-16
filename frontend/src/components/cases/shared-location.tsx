@@ -20,7 +20,7 @@ function Place({ location, testId }: { location: SharedLocationView; testId: str
     <div className="flex flex-col gap-1" data-testid={`${testId}-place`}>
       {location.address ? <p className="text-[14px] break-words text-ink">{location.address}</p> : null}
       {map ? (
-        <a href={map} target="_blank" rel="noreferrer" className="w-fit text-teal underline-offset-2 hover:underline" data-testid={`${testId}-map`}>
+        <a href={map} target="_blank" rel="noreferrer" className="w-fit text-teal underline underline-offset-2" data-testid={`${testId}-map`}>
           Open the pin in maps ({location.latitude}, {location.longitude})
         </a>
       ) : null}

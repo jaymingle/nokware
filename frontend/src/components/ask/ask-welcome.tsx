@@ -7,7 +7,7 @@ function RtiFootnote({ testId }: { testId: string }) {
     <details className="group rounded-xl border bg-card px-4 py-3.5">
       <summary className="cursor-pointer list-none text-[13.5px] text-ink-soft [&::-webkit-details-marker]:hidden" data-testid="ask-rti-toggle">
         Looking for something the Assembly hasn&apos;t published?{" "}
-        <span className="text-teal underline-offset-2 group-hover:underline">You can request it under the RTI Act.</span>
+        <span className="text-teal underline underline-offset-2">You can request it under the RTI Act.</span>
       </summary>
       <div className="mt-4">
         <RtiPanel testId={testId} />

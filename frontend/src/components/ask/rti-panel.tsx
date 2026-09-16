@@ -11,7 +11,7 @@ function Contact() {
       <dd>{RTI_CONTACT.officer}</dd>
       <dt className="text-ink-soft">Phone</dt>
       <dd>
-        <a href={RTI_CONTACT.phoneHref} className="text-teal underline-offset-2 hover:underline" data-testid="rti-phone">
+        <a href={RTI_CONTACT.phoneHref} className="text-teal underline underline-offset-2" data-testid="rti-phone">
           {RTI_CONTACT.phone}
         </a>
       </dd>

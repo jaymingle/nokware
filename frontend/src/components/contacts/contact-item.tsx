@@ -49,7 +49,7 @@ export function SourceLine({ contact }: { contact: PublicContact }) {
     return (
       <p className="text-[12px] text-ink-soft">
         Source:{" "}
-        <a href={contact.source.url} target="_blank" rel="noopener" className="text-teal underline-offset-2 hover:underline" data-testid={`contact-${contact.id}-source`}>
+        <a href={contact.source.url} target="_blank" rel="noopener" className="text-teal underline underline-offset-2" data-testid={`contact-${contact.id}-source`}>
           {contact.source.label}
         </a>
         , checked {formatDate(contact.source.checked)}

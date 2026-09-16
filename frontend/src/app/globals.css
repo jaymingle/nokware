@@ -96,10 +96,12 @@
   --ink: #17242B; /* primary text, dark surfaces */
   --ink-soft: #4A5A5F; /* secondary text */
   /*
-   * Tertiary text — large or decorative text only. ~2.9:1 on white, so it
-   * fails WCAG AA (4.5:1) at body size; use ink-soft for small/body text.
+   * Tertiary text. 4.9:1 on paper and 5.4:1 on white, and at least 4.5:1 on
+   * every tint above, so it passes WCAG AA at body size wherever it is used —
+   * it was #8D9A9E, which read at 2.6:1 and failed at the 12px it was mostly
+   * set in.
    */
-  --ink-muted: #8D9A9E;
+  --ink-muted: #5F6D70;
   --hairline: #D6DAD4; /* borders, dividers */
   --teal: #1F6F5C; /* primary accent */
   --teal-tint: #E7F0EC;

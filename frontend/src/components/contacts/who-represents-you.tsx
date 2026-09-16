@@ -47,7 +47,7 @@ function Representative({ match, data }: { match: AreaMatch; data: Representatio
       {area.note ? <p className="text-[12.5px] text-ink-soft">{area.note}</p> : null}
       <p className="text-[12px] text-ink-soft">
         Sub-metro, chairperson and office:{" "}
-        <a href={data.source.url} target="_blank" rel="noopener" className="text-teal underline-offset-2 hover:underline" data-testid="representative-source">
+        <a href={data.source.url} target="_blank" rel="noopener" className="text-teal underline underline-offset-2" data-testid="representative-source">
           {data.source.label}
         </a>
       </p>

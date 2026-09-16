@@ -136,7 +136,7 @@ function HowToRead({ record }: { record: PublishingRecord }) {
       </ul>
       <p>
         <strong className="font-medium">Not found</strong> means not found in{" "}
-        <a href={record.documents_centre} target="_blank" rel="noopener noreferrer" className="text-teal underline-offset-2 hover:underline">ama.gov.gh&apos;s Documents Centre</a>{" "}
+        <a href={record.documents_centre} target="_blank" rel="noopener noreferrer" className="text-teal underline underline-offset-2">ama.gov.gh&apos;s Documents Centre</a>{" "}
         (checked {dateLabel(record.documents_centre_checked)}) and not in The Ledger. It doesn&apos;t mean the document doesn&apos;t exist: it may simply not have been published online. <strong className="font-medium">Related documents only</strong> means The Ledger holds documents about the same thing, but not the document itself.
       </p>
       <p className="text-ink-soft">{ASSUMPTION_NOTE}</p>

@@ -22,7 +22,7 @@ export function DocumentSummary({ doc, byline }: { doc: DocumentOut; byline: str
           href={doc.source_url}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex w-fit items-center gap-1 text-[12.5px] text-teal hover:underline"
+          className="inline-flex w-fit items-center gap-1 text-[12.5px] text-teal underline underline-offset-2"
           data-testid={`source-link-${doc.id}`}
         >
           Source: {sourceHost(doc.source_url)}

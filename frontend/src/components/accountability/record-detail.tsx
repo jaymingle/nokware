@@ -12,7 +12,7 @@ function Documents({ documents, testId }: { documents: RecordDocument[]; testId:
     <ul className="flex flex-col gap-1.5" data-testid={testId}>
       {documents.map((doc) => (
         <li key={doc.id} className="flex flex-wrap items-baseline gap-x-2 text-[14px]">
-          <a href={ledgerFileUrl(doc.id)} target="_blank" rel="noopener" className="inline-flex items-center gap-1 text-teal underline-offset-2 hover:underline">
+          <a href={ledgerFileUrl(doc.id)} target="_blank" rel="noopener" className="inline-flex items-center gap-1 text-teal underline underline-offset-2">
             <FileTextIcon aria-hidden className="size-3.5 shrink-0" />
             {doc.title}
           </a>

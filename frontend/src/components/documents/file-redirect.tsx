@@ -26,7 +26,7 @@ export function FileRedirect({ id }: { id: string }) {
   if (status === "signed-out" || status === "no-role") {
     return (
       <StatusScreen title="Sign in to view this PDF">
-        <Link href="/login" className="text-sm text-teal hover:underline" data-testid="file-sign-in">
+        <Link href="/login" className="text-sm text-teal underline underline-offset-2" data-testid="file-sign-in">
           Go to sign in
         </Link>
       </StatusScreen>

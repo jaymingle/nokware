@@ -15,7 +15,7 @@ export function DocumentLine({ doc }: { doc: PetitionDocument }) {
   return (
     <div className="flex min-w-0 flex-col gap-0.5">
       <a href={ledgerFileUrl(doc.id)} target="_blank" rel="noopener noreferrer"
-        className="inline-flex items-start gap-1.5 text-[14px] font-medium text-teal underline-offset-2 hover:underline" data-testid={`ledger-doc-${doc.id}`}>
+        className="inline-flex items-start gap-1.5 text-[14px] font-medium text-teal underline underline-offset-2" data-testid={`ledger-doc-${doc.id}`}>
         <FileTextIcon aria-hidden className="mt-0.5 size-3.5 shrink-0" />
         {doc.title}
       </a>

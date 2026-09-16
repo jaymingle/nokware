@@ -69,7 +69,7 @@ export function FigureCard({ figure, anchorId, highlighted, testIdPrefix }: Figu
           <p className="text-[12px] text-ink-soft">
             {countedAt(figure.counted_at ?? "")} from reports residents filed with Nokware, not a published document. Reports about
             someone&apos;s safety are never counted, and counts from 1 to 4 read &ldquo;fewer than 5&rdquo;.{" "}
-            <Link href="/dashboard" className="text-teal underline-offset-2 hover:underline" data-testid={`${testIdPrefix}-figure-${figure.label}-dashboard`}>
+            <Link href="/dashboard" className="text-teal underline underline-offset-2" data-testid={`${testIdPrefix}-figure-${figure.label}-dashboard`}>
               See the dashboard
             </Link>
           </p>

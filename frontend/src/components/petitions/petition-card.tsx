@@ -23,7 +23,7 @@ export function Progress({ signatures, threshold, large = false }: { signatures:
 export function PetitionCard({ petition, now }: { petition: Card; now: number }) {
   return (
     <li className="flex flex-col gap-2 border-b py-4 last:border-0" data-testid={`petition-${petition.code}`}>
-      <Link href={`/petitions/${petition.code}`} className="text-[16px] font-medium underline-offset-2 hover:underline"
+      <Link href={`/petitions/${petition.code}`} className="text-[16px] font-medium underline underline-offset-2"
         data-testid={`petition-${petition.code}-link`}>
         {petition.title}
       </Link>

@@ -28,7 +28,7 @@ function ResponseCard({ petition, now }: { petition: AwaitingResponse; now: numb
         <p className="text-[12.5px] text-ink-soft">
           No. {spacedCode(petition.code)} · {petition.topic} · {placeLine(petition)} · concerns {joinNames(petition.departments)}
         </p>
-        <Link href={`/petitions/${petition.code}`} className="text-[18px] leading-snug underline-offset-2 hover:underline" data-testid={`petition-response-${petition.code}-link`}>
+        <Link href={`/petitions/${petition.code}`} className="text-[18px] leading-snug underline underline-offset-2" data-testid={`petition-response-${petition.code}-link`}>
           {petition.title}
         </Link>
         <p className="text-[13px] text-ink-soft">{signaturesLine(petition.signatures, petition.threshold)} · reached on {formatDate(petition.threshold_reached_at)}</p>

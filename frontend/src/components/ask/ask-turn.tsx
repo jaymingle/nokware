@@ -99,7 +99,7 @@ function TranslationNote({ showing, onToggle, testId }: { showing: "asked" | "en
     <p className="flex flex-wrap items-center gap-x-2 gap-y-1 border-t pt-2.5 text-[12.5px] text-ink-soft" data-testid={`${testId}-translation`}>
       <LanguagesIcon aria-hidden className="size-3.5" />
       Translated by machine from the English answer, which the sources are in.
-      <button type="button" onClick={onToggle} className="cursor-pointer text-teal underline-offset-2 hover:underline"
+      <button type="button" onClick={onToggle} className="cursor-pointer text-teal underline underline-offset-2"
         data-testid={`${testId}-show-english`}>
         {showing === "asked" ? "Show the English" : "Show the translation"}
       </button>

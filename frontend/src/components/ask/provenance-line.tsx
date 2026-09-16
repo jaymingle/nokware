@@ -18,7 +18,7 @@ export function ProvenanceLine({ testId, ...doc }: ProvenanceLineProps) {
             href={view.link.href}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-0.5 text-teal underline-offset-2 hover:underline"
+            className="inline-flex items-center gap-0.5 text-teal underline underline-offset-2"
             data-testid={`${testId}-link`}
           >
             {view.link.text}

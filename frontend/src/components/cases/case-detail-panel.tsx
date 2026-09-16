@@ -55,7 +55,7 @@ function Callback({ detail }: { detail: CaseDetail }) {
     <div className="flex flex-col gap-1 rounded-lg bg-teal-tint px-3.5 py-3 text-[13px]" data-testid={`case-contact-${detail.case_id}`}>
       <p className="font-medium text-teal">The citizen allowed a call about this case</p>
       {numbers.map((number) => (
-        <a key={number} href={`tel:${number}`} className="inline-flex items-center gap-1.5 text-teal underline-offset-2 hover:underline">
+        <a key={number} href={`tel:${number}`} className="inline-flex items-center gap-1.5 text-teal underline underline-offset-2">
           <PhoneIcon aria-hidden className="size-3.5" />
           {number}
         </a>
