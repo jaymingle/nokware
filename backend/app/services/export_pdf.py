@@ -25,14 +25,12 @@ from reportlab.platypus import Image, KeepTogether, ListFlowable, ListItem, Para
 
 from app.schemas.ask import AskChart, AskFigure
 from app.services import export_chart
-from app.services.ask_export import FOOTER_NOTICE, HEADER_NOTICE, LIVE_DATA_NOTE, Block, Content, when
+from app.services.ask_export import FOOTER_NOTICE, HEADER_NOTICE, LIVE_DATA_NOTE, SUPPRESSED_KEY, Block, Content, chart_footnote, when
 
 FONTS = Path(__file__).resolve().parents[1] / "fonts"
 INK, INK_SOFT, TEAL, HAIRLINE = colors.HexColor("#17242B"), colors.HexColor("#4A5A5F"), colors.HexColor("#1F6F5C"), colors.HexColor("#D6DAD4")
 MARGIN = 20 * mm
 TEXT_WIDTH = A4[0] - 2 * MARGIN
-SUPPRESSED_KEY = ('Hatched or dashed: "fewer than 5", somewhere from 1 to 4. Nokware never shows these counts exactly, '
-                  "so they are drawn as a range, not a value.")
 
 
 @lru_cache
@@ -117,9 +115,7 @@ def _chart(chart: AskChart | None, note: str | None) -> list[object]:
     if chart.note:
         parts.append(Paragraph(markup(chart.note), _style("chart-note", fontName="PublicSans-Italic", textColor=INK_SOFT, spaceAfter=4)))
     parts.append(picture)
-    suppressed = any(v.low != v.high for s in chart.series for v in s.values)
-    footnote = f"Live report data, counted {when(chart.counted_at)}." + (f" {SUPPRESSED_KEY}" if suppressed else "")
-    parts.append(Paragraph(markup(footnote), SMALL))
+    parts.append(Paragraph(markup(chart_footnote(chart)), SMALL))
     return [KeepTogether(parts)]
 
 

@@ -23,6 +23,11 @@ export function hasRange(chart: AskChart): boolean {
   return chart.series.some((series) => series.values.some(isRange));
 }
 
+/** A value-axis tick as a person writes it: 200, 7,875, or 12.50 where the figures carry pesewas. */
+export function tickLabel(tick: number): string {
+  return tick.toLocaleString("en-GB", { minimumFractionDigits: Number.isInteger(tick) ? 0 : 2, maximumFractionDigits: 2 });
+}
+
 /** A count as a chart labels it: "12", or "<5". */
 export function short(value: ChartValue): string {
   return isRange(value) ? "<5" : value.shown;

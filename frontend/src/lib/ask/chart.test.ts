@@ -7,7 +7,7 @@ import type { AskChart, ChartValue } from "@/lib/api/types";
 const exact = (n: number): ChartValue => ({ shown: String(n), low: n, high: n });
 const small: ChartValue = { shown: "fewer than 5", low: 1, high: 4 };
 const chart = (kind: AskChart["kind"], series: ChartValue[][]): AskChart => ({
-  kind, horizontal: false, title: "Reports", categories: ["Okaikoi South", "Ablekuma South"], over_time: false,
+  kind, horizontal: false, title: "Reports", categories: ["Okaikoi South", "Ablekuma South"], over_time: false, source: "reports",
   series: series.map((values, i) => ({ name: `S${i}`, values })), figures: ["R1"], counted_at: "2026-09-14T22:40:00+00:00",
   axis_max: 20, ticks: [0, 5, 10, 15, 20], note: null,
 });

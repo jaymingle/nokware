@@ -1275,7 +1275,7 @@ export interface components {
         };
         /**
          * AskChart
-         * @description A chart the question asked for, of the answer's cited live report figures (ask_charts decides; clients draw).
+         * @description A chart the question asked for, of the answer's cited figures (ask_charts decides; clients draw).
          */
         AskChart: {
             /**
@@ -1293,10 +1293,16 @@ export interface components {
             series: components["schemas"]["ChartSeries"][];
             /** Over Time */
             over_time: boolean;
+            /**
+             * Source
+             * @default reports
+             * @enum {string}
+             */
+            source: "reports" | "documents";
             /** Figures */
             figures: string[];
             /** Counted At */
-            counted_at: string;
+            counted_at: string | null;
             /** Axis Max */
             axis_max: number;
             /** Ticks */

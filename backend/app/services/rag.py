@@ -31,7 +31,8 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import Runnable
 
-from app.services.ask_charts import DOCUMENT_CHART_REFUSAL, ChartDict, asks_for_chart, chart_for
+from app.services.ask_charts import DOCUMENT_CHART_REFUSAL, ChartDict, asks_for_chart, chart_for, document_chart
+from app.services.ask_document_charts import figures_to_chart
 from app.services.ask_figures import (
     NO_FIGURES,
     NO_SAFETY_DOCUMENTS,
@@ -280,10 +281,17 @@ def _with_safety_notice(answer: str, prepared: Prepared) -> str:
     return f"{SAFETY_FIGURES_ANSWER}\n\n{SAFETY_IN_DOCUMENTS}\n\n{answer}"
 
 
-def _with_chart_refusal(answer: str, question: str, figures: list[FigureSource]) -> str:
-    """A chart asked of document data is refused in fixed words: its tables can't be charted accurately yet."""
-    wanted = asks_for_chart(question) and not any(figure["cited"] for figure in figures)
+def _with_chart_refusal(answer: str, question: str, chart: ChartDict | None, note: str | None) -> str:
+    """A chart that can't be drawn is refused in fixed words, not left unexplained."""
+    wanted = asks_for_chart(question) and chart is None and note is None
     return f"{DOCUMENT_CHART_REFUSAL}\n\n{answer}" if wanted and answer_status(answer) == "answered" else answer
+
+
+def _from_documents(prepared: Prepared, answer: str, sources: list[Source]) -> ChartDict | None:
+    """A chart of the figures in the cited passages, drawn only where each one is proved against them."""
+    passages = [source["chunk_text"] for source in sources if source["cited"]]
+    plotted = figures_to_chart(prepared.question, answer, passages) if passages else None
+    return document_chart(prepared.question, plotted) if plotted else None
 
 
 def finish(prepared: Prepared, raw_answer: str) -> RagAnswer:
@@ -291,12 +299,15 @@ def finish(prepared: Prepared, raw_answer: str) -> RagAnswer:
     valid = set(prepared.labels.values()) | {f.label for f in prepared.figures.figures}
     answer, cited = sanitize_citations(raw_answer if prepared.has_sources else NO_INFO_ANSWER, valid)
     figures = _to_figures(prepared, cited)
+    sources = _to_sources(prepared.chunks, prepared.labels, cited)
     chart, chart_note = chart_for(prepared.question, [dict(f) for f in figures if f["cited"]])
-    answer = _with_safety_notice(_with_chart_refusal(answer, prepared.question, figures), prepared)  # safety first
+    if chart is None and chart_note is None and asks_for_chart(prepared.question):
+        chart = _from_documents(prepared, answer, sources)
+    answer = _with_safety_notice(_with_chart_refusal(answer, prepared.question, chart, chart_note), prepared)  # safety first
     return RagAnswer(
         answer=answer,
         status=answer_status(answer),
-        sources=_to_sources(prepared.chunks, prepared.labels, cited),
+        sources=sources,
         figures=figures,
         search_queries=prepared.queries,
         chart=chart,

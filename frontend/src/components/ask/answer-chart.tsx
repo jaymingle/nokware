@@ -3,7 +3,7 @@
 import { useId } from "react";
 
 import { useWidth } from "@/hooks/use-width";
-import { RANGE_KEY, arcPath, barPieces, colour, exactRuns, hasRange, isRange, short, slices, type BarPiece } from "@/lib/ask/chart";
+import { RANGE_KEY, arcPath, barPieces, colour, exactRuns, hasRange, isRange, short, slices, tickLabel, type BarPiece } from "@/lib/ask/chart";
 import { countedAt } from "@/lib/ask/figures";
 
 import type { AskChart } from "@/lib/api/types";
@@ -17,6 +17,13 @@ import type { AskChart } from "@/lib/api/types";
 const FONT = 11;
 const PAD = { l: 34, r: 12, t: 16, b: 34 };
 const MAX_BAR = 56; // pixels: a bar never grows into a slab
+const CHAR = 0.56; // of the font size: enough to size a label column from the text
+
+/** As much of a name as fits the space, ending in an ellipsis; the full name is in the table for screen readers. */
+function fit(name: string, space: number, size: number = FONT): string {
+  const room = Math.floor(space / (size * CHAR));
+  return name.length <= room ? name : `${name.slice(0, Math.max(1, room - 1))}…`;
+}
 
 type Draw = { chart: AskChart; width: number; hatch: string };
 
@@ -60,7 +67,7 @@ function UprightBars({ chart, width, hatch }: Draw) {
       {chart.ticks.map((tick) => (
         <g key={tick}>
           <line x1={PAD.l} x2={width - PAD.r} y1={y(tick)} y2={y(tick)} className="stroke-hairline" strokeWidth={0.5} />
-          <text x={PAD.l - 8} y={y(tick) + 4} textAnchor="end" fontSize={FONT} className="fill-ink-soft tabular-nums">{tick}</text>
+          <text x={PAD.l - 8} y={y(tick) + 4} textAnchor="end" fontSize={FONT} className="fill-ink-soft tabular-nums">{tickLabel(tick)}</text>
         </g>
       ))}
       {barPieces(chart, band, MAX_BAR).map((piece) => {
@@ -84,20 +91,22 @@ function UprightBars({ chart, width, hatch }: Draw) {
 
 function FlatBars({ chart, width, hatch }: Draw) {
   const row = chart.kind === "stacked_bar" || chart.series.length === 1 ? 30 : 16 * chart.series.length + 12;
-  const label = Math.min(width * 0.42, 8 + FONT * 0.56 * Math.max(...chart.categories.map((c) => c.length)));
+  const label = Math.min(width * 0.42, 8 + FONT * CHAR * Math.max(...chart.categories.map((c) => c.length)));
   const height = PAD.t + row * chart.categories.length + 22;
-  const x = scale(chart, label + 8, width - PAD.r - 26);
+  // Room at the right for the longest value, so a figure never runs off the edge.
+  const values = barPieces(chart, row, MAX_BAR / 2).map((piece) => short(piece.value).length);
+  const x = scale(chart, label + 8, width - PAD.r - (8 + (FONT - 1) * CHAR * Math.max(...values, 2)));
   return (
     <svg viewBox={`0 0 ${width} ${height}`} className="block h-auto w-full font-sans" aria-hidden>
       <Hatches chart={chart} id={hatch} />
       {chart.ticks.map((tick) => (
         <g key={tick}>
           <line x1={x(tick)} x2={x(tick)} y1={PAD.t} y2={height - 22} className="stroke-hairline" strokeWidth={0.5} />
-          <text x={x(tick)} y={height - 6} textAnchor="middle" fontSize={FONT} className="fill-ink-soft tabular-nums">{tick}</text>
+          <text x={x(tick)} y={height - 6} textAnchor="middle" fontSize={FONT} className="fill-ink-soft tabular-nums">{tickLabel(tick)}</text>
         </g>
       ))}
       {chart.categories.map((name, i) => (
-        <text key={name} x={label} y={PAD.t + row * (i + 0.5) + 4} textAnchor="end" fontSize={FONT} className="fill-ink">{name}</text>
+        <text key={name} x={label} y={PAD.t + row * (i + 0.5) + 4} textAnchor="end" fontSize={FONT} className="fill-ink">{fit(name, label - 6)}</text>
       ))}
       {barPieces(chart, row, MAX_BAR / 2).map((piece) => {
         const y = PAD.t + row * (piece.category + piece.offset);
@@ -126,7 +135,7 @@ function Line({ chart, width }: Draw) {
       {chart.ticks.map((tick) => (
         <g key={tick}>
           <line x1={PAD.l} x2={width - PAD.r} y1={y(tick)} y2={y(tick)} className="stroke-hairline" strokeWidth={0.5} />
-          <text x={PAD.l - 8} y={y(tick) + 4} textAnchor="end" fontSize={FONT} className="fill-ink-soft tabular-nums">{tick}</text>
+          <text x={PAD.l - 8} y={y(tick) + 4} textAnchor="end" fontSize={FONT} className="fill-ink-soft tabular-nums">{tickLabel(tick)}</text>
         </g>
       ))}
       {chart.series.map((series, s) => (
@@ -220,7 +229,9 @@ export function AnswerChart({ chart, testId }: { chart: AskChart; testId: string
         <Drawing chart={chart} width={width} hatch={hatch} />
       </div>
       <p className="text-[12px] text-ink-soft">
-        Live report data. {countedAt(chart.counted_at)}.{hasRange(chart) ? ` ${RANGE_KEY}` : ""}
+        {chart.source === "documents"
+          ? "Drawn from the figures in the cited documents. Every figure here is written that way in a passage below; Nokware charts none it cannot find there."
+          : `Live report data. ${countedAt(chart.counted_at ?? "")}.${hasRange(chart) ? ` ${RANGE_KEY}` : ""}`}
       </p>
       <ChartTable chart={chart} />
     </figure>

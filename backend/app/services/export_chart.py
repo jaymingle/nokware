@@ -39,6 +39,11 @@ def short(value: ChartValue) -> str:
     return "<5" if value.low != value.high else value.shown
 
 
+def tick_label(tick: float) -> str:
+    """A tick as a person writes it: 200, not 200.0; 12.50 where the figures carry pesewas."""
+    return f"{tick:,.0f}" if float(tick).is_integer() else f"{tick:,.2f}"
+
+
 def _text_width(text: str, size: int = LABEL) -> float:
     return font(size).getlength(text)
 
@@ -163,10 +168,10 @@ def _value_grid(draw: ImageDraw.ImageDraw, chart: AskChart, axis: _Axis, vertica
         at = axis.at(tick)
         if vertical:
             draw.line([(PAD_L, at), (WIDTH - PAD_R, at)], fill=HAIRLINE, width=1)
-            draw.text((PAD_L - 14, at), f"{tick:,}", font=font(TICK), fill=INK_SOFT, anchor="rm")
+            draw.text((PAD_L - 14, at), tick_label(tick), font=font(TICK), fill=INK_SOFT, anchor="rm")
         else:
             draw.line([(at, across[0]), (at, across[1])], fill=HAIRLINE, width=1)
-            draw.text((at, across[1] + 12), f"{tick:,}", font=font(TICK), fill=INK_SOFT, anchor="ma")
+            draw.text((at, across[1] + 12), tick_label(tick), font=font(TICK), fill=INK_SOFT, anchor="ma")
 
 
 def _line(image: Image.Image, chart: AskChart, top: float) -> None:

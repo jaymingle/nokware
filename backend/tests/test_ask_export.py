@@ -16,6 +16,7 @@ from app.main import app
 from app.routes import ask as ask_route
 from app.services import ask_charts, rag, rate_limit, stats
 from app.services.ask_charts import DOCUMENT_CHART_REFUSAL, chart_for
+from app.services.ask_document_charts import Plotted
 from app.services.ask_export import FOOTER_NOTICE, HEADER_NOTICE, Answered, content, export_view, filename, provenance_line, verified
 from app.services.ask_figures import CountReports, FigurePlan, count_figure
 from app.services.export_csv import csv_bytes
@@ -90,12 +91,14 @@ def test_no_chart_when_none_is_asked_for_or_there_is_nothing_to_chart(question: 
     assert chart_for(question, figures) == (None, note)
 
 
-def _answer(monkeypatch: pytest.MonkeyPatch, question: str, figures: FigurePlan, text: str) -> dict[str, Any]:
+def _answer(monkeypatch: pytest.MonkeyPatch, question: str, figures: FigurePlan, text: str,
+            plotted: Plotted | None = None, passage: str = "Budget text") -> dict[str, Any]:
     class Model:
         def invoke(self, prompt_input: dict[str, str]) -> str:
             return text
 
-    chunk = RetrievedChunk(chunk=Chunk(1, "d1", 0, "Budget text"), score=1.0, document={"title": "2026 Budget", "department": "dept-finance"})
+    chunk = RetrievedChunk(chunk=Chunk(1, "d1", 0, passage), score=1.0, document={"title": "2026 Budget", "department": "dept-finance"})
+    monkeypatch.setattr(rag, "figures_to_chart", lambda q, a, passages: plotted)  # the reading is tested on its own
     monkeypatch.setattr(rag, "retrieve", lambda q: Retrieval(queries=[q], chunks=[chunk]))
     monkeypatch.setattr(rag, "plan_figures", lambda q, now: figures)
     monkeypatch.setattr(rag, "_answer_chain", lambda: Model())
@@ -107,6 +110,16 @@ def test_a_chart_of_document_data_is_refused_in_plain_words_and_the_figures_stay
     assert result["answer"] == f"{DOCUMENT_CHART_REFUSAL}\n\nWorks gets GH¢2m [S1]." and result["chart"] is None
     result = _answer(monkeypatch, "Give me a bar graph of the 2026 budget", rag.NO_FIGURES, "I don't have information on that in the Ledger.")
     assert result["status"] == "no_information" and DOCUMENT_CHART_REFUSAL not in result["answer"]
+
+
+def test_document_figures_are_charted_when_each_one_is_proved_against_a_cited_passage(monkeypatch: pytest.MonkeyPatch) -> None:
+    plotted = Plotted("Market stall fees, 2026 (GHS)", [("Stores - A", "800.00", 800.0), ("Stores - B", "200.00", 200.0)])
+    result = _answer(monkeypatch, "Show the stall fees as a bar chart", rag.NO_FIGURES, "Stores A cost 800.00 [S1].", plotted)
+    chart = result["chart"]
+    assert chart["source"] == "documents" and chart["kind"] == "bar" and chart["counted_at"] is None and chart["figures"] == []
+    assert chart["categories"] == ["Stores - A", "Stores - B"] and [v["shown"] for v in chart["series"][0]["values"]] == ["800.00", "200.00"]
+    assert chart["axis_max"] == 800 and chart["ticks"] == [0, 200, 400, 600, 800]
+    assert DOCUMENT_CHART_REFUSAL not in result["answer"]
 
 
 def test_a_chart_of_live_figures_comes_with_the_answer(monkeypatch: pytest.MonkeyPatch) -> None:

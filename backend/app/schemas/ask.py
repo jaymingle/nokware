@@ -61,9 +61,9 @@ class AskFigure(BaseModel):
 
 
 class ChartValue(BaseModel):
-    shown: str  # as the public may see it: "12", "fewer than 5", "none"
-    low: int
-    high: int  # low == high for an exact count; "fewer than 5" is 1 to 4, drawn as a range, never a value
+    shown: str  # as the public may see it: "12", "fewer than 5", "none", "7,875.00"
+    low: float
+    high: float  # low == high for an exact figure; "fewer than 5" is 1 to 4, drawn as a range, never a value
 
 
 class ChartSeries(BaseModel):
@@ -72,7 +72,7 @@ class ChartSeries(BaseModel):
 
 
 class AskChart(BaseModel):
-    """A chart the question asked for, of the answer's cited live report figures (ask_charts decides; clients draw)."""
+    """A chart the question asked for, of the answer's cited figures (ask_charts decides; clients draw)."""
 
     kind: Literal["bar", "stacked_bar", "line", "pie", "donut"]  # bar: side by side when there are several series
     horizontal: bool  # bars lie flat (long category names)
@@ -80,10 +80,11 @@ class AskChart(BaseModel):
     categories: list[str]  # oldest first when over_time
     series: list[ChartSeries]
     over_time: bool
-    figures: list[str]  # the R labels charted
-    counted_at: str
-    axis_max: int  # 0 for a pie or donut
-    ticks: list[int]
+    source: Literal["reports", "documents"] = "reports"  # live counts, or figures proved against cited passages
+    figures: list[str]  # the R labels charted; empty for a chart of document figures
+    counted_at: str | None  # when the counts were taken; None for figures read from documents
+    axis_max: float  # 0 for a pie or donut
+    ticks: list[float]
     note: str | None  # why this isn't the kind asked for, in one line
 
 

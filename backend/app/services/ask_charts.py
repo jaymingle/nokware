@@ -1,11 +1,12 @@
-"""Charts in Ask: asked for in the question, drawn only from live report figures, never with a false value.
+"""Charts in Ask: asked for in the question, drawn from the answer's figures, never with a false value.
 
 "Give me a pie chart of reports by topic" or "show this as a graph" asks for one.
-Only Ask's live report figures are charted: they are exact counts. A document's
-numbers aren't safe to plot yet: pypdf flattens a table's columns, a chart inside
-a PDF comes through as its axis ticks, and an answer rests on a few passages, not
-a whole table. So a chart of document data gets DOCUMENT_CHART_REFUSAL, a plain
-sentence saying why, and the figures stay in the text.
+Ask's live report figures are exact counts and chart directly. A document's
+figures chart only when each one can be tied to its label in a cited passage
+(ask_document_charts.py checks that in code): pypdf flattens a table's columns,
+so a value can lose its row, and a chart inside a PDF comes through as its axis
+ticks. Where that check doesn't pass, the answer gets DOCUMENT_CHART_REFUSAL, a
+plain sentence saying why, and the figures stay in the text.
 
 The kind is the one the question names, unless that kind can't show the data
 honestly: then the nearest honest kind, with one line saying why. Unnamed, it is
@@ -17,11 +18,13 @@ segment above it) are never drawn with one in the set. This module decides; the
 web (answer-chart.tsx) and the exports (export_chart.py) only draw.
 """
 
+import math
 import re
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
+from app.services.ask_document_charts import PARTIAL_NOTE, Plotted
 from app.services.stats import FEWER_THAN_SMALL, SMALL
 
 DOCUMENT_CHART_REFUSAL = (
@@ -42,6 +45,8 @@ NAMED = (
 )
 HORIZONTAL = re.compile(r"\bhorizontal\b", re.IGNORECASE)
 UPRIGHT = re.compile(r"\b(bars?|columns?|vertical)\b", re.IGNORECASE)  # a plain "bar chart" or "column chart" stands up
+# A document's labels are names, not places: only an explicit ask stands a long-labelled chart upright.
+UPRIGHT_ASKED = re.compile(r"\b(columns?|vertical|upright)\b", re.IGNORECASE)
 LONG_LABEL = 16  # characters: longer category names read better on horizontal bars
 ONE_COUNT = "There's only one count here, so there's nothing to chart."
 ONE_MONTH = "There's only one month of reports so far, so there's nothing to chart over time."
@@ -53,11 +58,12 @@ ChartDict = dict[str, Any]
 class _Data:
     title: str
     categories: list[str]
-    series: list[tuple[str, list[tuple[str, int, int]]]]  # (name, [(shown, low, high)]): low == high when exact
+    series: list[tuple[str, list[tuple[str, float, float]]]]  # (name, [(shown, low, high)]): low == high when exact
     over_time: bool
     parts_of_a_whole: bool  # one breakdown of one count: its rows add up to it
     figures: list[str]
-    counted_at: str
+    counted_at: str | None  # when the counts were taken; None for figures read from documents
+    source: str = "reports"  # "reports": live counts; "documents": figures proved against cited passages
 
     @property
     def suppressed(self) -> bool:
@@ -72,7 +78,7 @@ def _named(question: str) -> str | None:
     return next((kind for kind, pattern in NAMED if pattern.search(question)), None)
 
 
-def _value(shown: str) -> tuple[str, int, int] | None:
+def _value(shown: str) -> tuple[str, float, float] | None:
     """A count as shown, with the range it stands for: "fewer than 5" is 1 to 4, "none" is 0."""
     if shown == FEWER_THAN_SMALL:
         return shown, 1, SMALL - 1
@@ -152,15 +158,15 @@ def _honest(kind: str, data: _Data) -> tuple[str, str | None]:
     return kind, None
 
 
-def _scale(kind: str, data: _Data) -> tuple[int, list[int]]:
+def _scale(kind: str, data: _Data) -> tuple[float, list[float]]:
     """A round top for the value axis (above the tallest stack, for a stacked bar), and its ticks."""
     columns = [[values[i][2] for _, values in data.series] for i in range(len(data.categories))]
     top = max((sum(c) if kind == "stacked_bar" else max(c) for c in columns), default=0)
     step = 1
-    while -(-top // step) > 5:
+    while math.ceil(top / step) > 5:
         step = _next_step(step)
-    axis_max = max(step, -(-top // step) * step)
-    return axis_max, list(range(0, axis_max + 1, step))
+    axis_max = max(step, math.ceil(top / step) * step)
+    return axis_max, [step * n for n in range(int(axis_max / step) + 1)]
 
 
 def _next_step(step: int) -> int:
@@ -176,7 +182,7 @@ def _as_dict(kind: str, horizontal: bool, data: _Data, note: str | None) -> Char
         "kind": kind, "horizontal": horizontal, "title": data.title, "categories": data.categories,
         "series": [{"name": name, "values": [{"shown": s, "low": lo, "high": hi} for s, lo, hi in values]}
                    for name, values in data.series],
-        "over_time": data.over_time, "figures": data.figures, "counted_at": data.counted_at,
+        "over_time": data.over_time, "figures": data.figures, "counted_at": data.counted_at, "source": data.source,
         "axis_max": axis_max, "ticks": ticks, "note": note,
     }
 
@@ -197,3 +203,26 @@ def chart_for(question: str, figures: list[dict[str, Any]]) -> tuple[ChartDict |
     lying = bool(HORIZONTAL.search(question)) or (long_labels and not UPRIGHT.search(question))
     horizontal = kind in ("bar", "stacked_bar") and lying
     return _as_dict(kind, horizontal, data, note), None
+
+
+# A document's figures are separate amounts, one per label: a bar chart, however the question asked for them.
+_DOCUMENT_NOTES = {
+    "pie": "A pie needs parts of one whole, and these are separate figures from the documents, so here's a bar chart.",
+    "donut": "A ring needs parts of one whole, and these are separate figures from the documents, so here's a bar chart.",
+    "stacked_bar": "There's one set of figures here, so there's nothing to stack.",
+    "line": "A line would suggest a trend between things that aren't in any order, so here's a bar chart.",
+    "unsupported": "I can draw bar, line, stacked bar, pie and donut charts; the type you asked for doesn't fit "
+                   "figures like these, so here's a bar chart.",
+}
+
+
+def document_chart(question: str, plotted: Plotted) -> ChartDict:
+    """A bar chart of figures read from the documents. Every pair is already proved against a cited passage."""
+    categories = [label for label, _, _ in plotted.pairs]
+    values = [(shown, value, value) for _, shown, value in plotted.pairs]
+    data = _Data(plotted.title, categories, [("Figures", values)], False, False, [], None, source="documents")
+    named = _named(question)
+    note = _DOCUMENT_NOTES.get(named or "")
+    note = f"{note} {PARTIAL_NOTE}" if note and plotted.partial else (PARTIAL_NOTE if plotted.partial else note)
+    horizontal = bool(HORIZONTAL.search(question)) or (max(len(c) for c in categories) > LONG_LABEL and not UPRIGHT_ASKED.search(question))
+    return _as_dict("bar", horizontal, data, note)

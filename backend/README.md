@@ -215,12 +215,36 @@ set (a slice needs a size), nor a stacked bar (an unknown segment shifts every
 one above it); a pie of separate, possibly overlapping counts becomes bars; and
 a line across unordered categories becomes bars. The web draws the chart
 (`answer-chart.tsx`); the exports draw the same decisions with Pillow
-(`export_chart.py`). A chart of document data is refused in fixed words, "The
-tables in AMA's documents aren't yet read in a form that can be charted
-accurately, so I'd rather give you the figures in text than a chart that might be
-wrong.": pypdf flattens a table's columns, a chart inside a PDF comes through as
-its axis ticks, and an answer rests on a few passages, not a whole table. Charts
-of document data wait for the table extraction.
+(`export_chart.py`).
+
+A document's figures chart too, but only where each bar can be proved
+(`ask_document_charts.py`). An answer that lists a fee against each stall type is
+already label-and-value, and refusing to chart it would be refusing to do the
+job; but pypdf flattens a table's columns, so a value can lose its row, and a
+chart inside a PDF comes through as its axis ticks. So gemini-2.5-flash offers
+label-value pairs from the answer and the passages it cites, and then the pairs
+are checked **in code** — the model's word alone draws nothing:
+
+- the label must be written in a cited passage, and the figure must be the only
+  amount after it on that line, so a value keeps the row it was written on;
+- a number inside a name ("Chop Bars 1-6"), a year in brackets and a percentage
+  are not amounts; a second amount on the row (another column of a flattened
+  table) drops the chart;
+- where the answer qualifies a label with its section ("Ashiedu Keteke Central
+  Market Stores - A"), the row must tie the figure and that section must be the
+  nearest heading (a line carrying no amount) above it: a row under another
+  market's heading proves nothing about this one;
+- a repeated label drops the chart, since two bars reading "Stores - A" with
+  different fees would mislead; only the figures the answer itself gives are
+  charted, at most twelve, and past that the chart says so.
+
+If any pair fails, there is no chart and the answer keeps DOCUMENT_CHART_REFUSAL,
+as before. In testing on the market-fee question it drew about three times in
+four and refused the rest (an answer that mixed markets, a value written "120.00
+per bay"); it has not drawn a wrong bar. Each rejection is logged with the pair
+that failed, so the refusals can be read. This is not the table extraction, which
+stays on the roadmap: it charts only what an answer already set out as labels and
+single values.
 
 ## Citizen reports
 
@@ -564,7 +588,14 @@ the MCP server and the issue list. They share one set of rules
 - **Personal safety is never counted**, not as a filter and not in any total,
   so no total less the visible topics can give its number away. Ask answers a
   request for such figures with "Nokware doesn't publish figures on reports
-  about someone's safety."
+  about someone's safety." The refusal covers Nokware's own counts, not AMA's
+  documents: those are public and anyone can download them, so refusing to cite
+  one Nokware holds would be refusing to do the job. So the refusal comes first,
+  then "Here's what AMA's published documents say:" and the cited answer — for
+  example the 2020 Voluntary Local Review's DOVVSU figures, 12 reported cases in
+  2016, 18 in 2017 and 11 in 2018. Where no document answers, it says so in the
+  same breath ("The AMA documents Nokware searched don't report these figures
+  either"), so nobody is left thinking figures are being withheld.
 - **A count from 1 to 4 reads "fewer than 5"**, on the dashboard and in Ask
   alike. Zero is shown.
 - **Only aggregates, never content.** Ask's tool returns numbers only; the

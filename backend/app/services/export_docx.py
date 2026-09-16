@@ -18,8 +18,7 @@ from docx.text.paragraph import Paragraph
 
 from app.schemas.ask import AskChart, AskFigure
 from app.services import export_chart
-from app.services.ask_export import FOOTER_NOTICE, HEADER_NOTICE, LIVE_DATA_NOTE, Content, when
-from app.services.export_pdf import SUPPRESSED_KEY
+from app.services.ask_export import FOOTER_NOTICE, HEADER_NOTICE, LIVE_DATA_NOTE, Content, chart_footnote, when
 
 INK, INK_SOFT, TEAL = RGBColor(0x17, 0x24, 0x2B), RGBColor(0x4A, 0x5A, 0x5F), RGBColor(0x1F, 0x6F, 0x5C)
 BODY_FONT, HEADING_FONT = "Public Sans", "Fraunces"
@@ -105,8 +104,7 @@ def _chart(document: Document, chart: AskChart | None, note: str | None) -> None
     if chart.note:
         document.add_paragraph().add_run(chart.note).italic = True
     document.add_picture(io.BytesIO(export_chart.png(chart)), width=Cm(17))
-    suppressed = any(v.low != v.high for s in chart.series for v in s.values)
-    _small(document.add_paragraph(), f"Live report data, counted {when(chart.counted_at)}." + (f" {SUPPRESSED_KEY}" if suppressed else ""))
+    _small(document.add_paragraph(), chart_footnote(chart))
 
 
 def _figure(document: Document, number: int, figure: AskFigure) -> None:
