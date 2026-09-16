@@ -70,7 +70,7 @@ membership.
 |---|---|
 | `POST /api/ask` (whole answer) | public |
 | `POST /api/ask/stream` (newline-delimited JSON events: stage, sources, answer text, done) | public |
-| `POST /api/ask/export` (`view`: an answer's signed export view, `format`: `pdf`, `docx` or `csv`; the file as an attachment) | public, 30 an hour per client |
+| `POST /api/ask/export` (`view`: an answer's signed export view, `format`: `pdf`, `docx`, `csv` or `xlsx`; the file as an attachment) | public, 30 an hour per client |
 | `POST /api/ask/voice` (multipart `audio`, up to a minute; returns the words to check, asks nothing) | public, 20 an hour per client |
 | `GET /api/ledger/{id}/file` (redirects to a 10-minute PDF link; published documents only, 404 otherwise) | public |
 | `GET /api/reports/options` (wards by sub-metro, personal-safety types, limits) | public |
@@ -195,6 +195,20 @@ the count in `value`, and "fewer than 5" leaves `value` empty (saying so in
 `shown_as`) so a spreadsheet can't add it up. Numbers quoted from documents stay
 in the answer's text until the documents' tables can be read accurately. A cell
 that would start a formula is prefixed with an apostrophe.
+
+The Excel workbook (`export_xlsx.py`, openpyxl) is the working copy: an
+**Answer** sheet (notice, question, answer, cited documents), a **Figures**
+sheet with each live figure's total and breakdown, the count in its own column
+as a number, and a **Chart** sheet holding a real Excel chart over those cells —
+of the kind Nokware drew, tied to the data rather than a picture of it, so
+changing a cell moves the bar. "Fewer than 5" leaves its count cell empty, as in
+the CSV, so no column total can reveal a suppressed count. It is offered only
+for an answer that cites live figures: a question asking for document figures as
+a spreadsheet gets `ask_charts.SPREADSHEET_REFUSAL` in the same fixed-words way
+as the chart refusal, and the button says why it is off. The narrowed chart rule
+doesn't change that — a chart of proved pairs is a picture of what the answer
+already said, while a sheet invites sums across rows the extraction can't yet
+support.
 
 **What table extraction would unlock, concretely.** The 2023 Monitoring and
 Evaluation Report records the city's child-abuse cases. pypdf flattens the row

@@ -29,6 +29,7 @@ dependencies = [
     "twilio>=9,<10",
     "google-genai>=2,<3",
     "av>=16,<17",
+    "openpyxl>=3.1,<4",
     "reportlab>=4,<5",
     "python-docx>=1,<2",
     "cryptography>=45,<51",  # seals the proof of a confirmed phone (phone_proof.py)

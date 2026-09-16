@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { EXPORT_OFFLINE, ExportError, downloadAnswer, filenameFrom } from "@/lib/ask/export";
+import { EXPORT_FORMATS, EXPORT_OFFLINE, ExportError, downloadAnswer, filenameFrom, spreadsheetReady } from "@/lib/ask/export";
 
 import type { ExportView } from "@/lib/api/types";
 
@@ -32,5 +32,17 @@ describe("downloading an answer", () => {
     const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe("https://api.nokware.test/api/ask/export");
     expect(JSON.parse(String(init.body))).toEqual({ view, format: "docx" });
+  });
+});
+
+describe("Excel", () => {
+  it("is offered only for an answer that counts residents' reports", () => {
+    const view = (figures: unknown[]) => ({ figures } as unknown as ExportView);
+    expect(spreadsheetReady(view([{ label: "R1" }]))).toBe(true);
+    expect(spreadsheetReady(view([]))).toBe(false);
+  });
+
+  it("is one of the formats offered", () => {
+    expect(EXPORT_FORMATS.map((format) => format.format)).toContain("xlsx");
   });
 });

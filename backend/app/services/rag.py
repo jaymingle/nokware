@@ -31,7 +31,15 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import Runnable
 
-from app.services.ask_charts import DOCUMENT_CHART_REFUSAL, ChartDict, asks_for_chart, chart_for, document_chart
+from app.services.ask_charts import (
+    DOCUMENT_CHART_REFUSAL,
+    SPREADSHEET_REFUSAL,
+    ChartDict,
+    asks_for_chart,
+    asks_for_spreadsheet,
+    chart_for,
+    document_chart,
+)
 from app.services.ask_document_charts import figures_to_chart
 from app.services.ask_figures import (
     NO_FIGURES,
@@ -287,6 +295,12 @@ def _with_chart_refusal(answer: str, question: str, chart: ChartDict | None, not
     return f"{DOCUMENT_CHART_REFUSAL}\n\n{answer}" if wanted and answer_status(answer) == "answered" else answer
 
 
+def _with_spreadsheet_refusal(answer: str, question: str, figures: list[FigureSource]) -> str:
+    """A spreadsheet of document figures is refused in fixed words: a sheet invites sums the tables can't support."""
+    wanted = asks_for_spreadsheet(question) and not any(figure["cited"] for figure in figures)
+    return f"{SPREADSHEET_REFUSAL}\n\n{answer}" if wanted and answer_status(answer) == "answered" else answer
+
+
 def _from_documents(prepared: Prepared, answer: str, sources: list[Source]) -> ChartDict | None:
     """A chart of the figures in the cited passages, drawn only where each one is proved against them."""
     passages = [source["chunk_text"] for source in sources if source["cited"]]
@@ -303,7 +317,8 @@ def finish(prepared: Prepared, raw_answer: str) -> RagAnswer:
     chart, chart_note = chart_for(prepared.question, [dict(f) for f in figures if f["cited"]])
     if chart is None and chart_note is None and asks_for_chart(prepared.question):
         chart = _from_documents(prepared, answer, sources)
-    answer = _with_safety_notice(_with_chart_refusal(answer, prepared.question, chart, chart_note), prepared)  # safety first
+    answer = _with_chart_refusal(answer, prepared.question, chart, chart_note)
+    answer = _with_safety_notice(_with_spreadsheet_refusal(answer, prepared.question, figures), prepared)  # safety first
     return RagAnswer(
         answer=answer,
         status=answer_status(answer),

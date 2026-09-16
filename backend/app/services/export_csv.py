@@ -27,18 +27,18 @@ def _safe(value: object) -> object:
     return f"'{value}" if isinstance(value, str) and value.startswith(_FORMULA) else value
 
 
-def _count(shown: str) -> int | str:
+def count_value(shown: str) -> int | str:
     digits = shown.replace(",", "")
     return int(digits) if digits.isdigit() else 0 if shown == "none" else ""
 
 
 def _figure_rows(number: int, figure: AskFigure) -> list[dict[str, object]]:
     base = {"section": "figure", "number": f"F{number}", "item": figure.description, "counted_at": figure.counted_at}
-    rows = [{**base, "category": "Total", "value": _count(figure.value), "shown_as": figure.value}]
-    return rows + [{**base, "category": row.name, "value": _count(row.value), "shown_as": row.value} for row in figure.rows]
+    rows = [{**base, "category": "Total", "value": count_value(figure.value), "shown_as": figure.value}]
+    return rows + [{**base, "category": row.name, "value": count_value(row.value), "shown_as": row.value} for row in figure.rows]
 
 
-def _answer_text(content: Content) -> str:
+def answer_text(content: Content) -> str:
     marks = {"bullet": "• ", "numbered": "- ", "heading": "", "paragraph": ""}
     return "\n".join(marks[block.kind] + "".join(text for text, _ in block.runs) for block in content.blocks)
 
@@ -47,7 +47,7 @@ def csv_bytes(content: Content) -> bytes:
     rows: list[dict[str, object]] = [
         {"section": "notice", "item": HEADER_NOTICE},
         {"section": "question", "item": content.question, "detail": f"Answered {content.answered}"},
-        {"section": "answer", "item": _answer_text(content)},
+        {"section": "answer", "item": answer_text(content)},
     ]
     rows += [{"section": "note", "item": note} for note in (content.no_information, content.chart_note,
                                                             content.chart.note if content.chart else None) if note]

@@ -4,7 +4,7 @@ POST /api/ask returns the whole answer at once. POST /api/ask/stream sends the
 same answer as newline-delimited JSON events (see AskStreamEvent), so the page
 can show progress during the 6-13 seconds an answer takes. Each answer comes with
 its export view, signed; POST /api/ask/export takes one back and returns it as a
-PDF, a Word document or a CSV (ask_export.py). POST /api/ask/voice turns a spoken
+PDF, a Word document, a CSV or an Excel workbook (ask_export.py). POST /api/ask/voice turns a spoken
 question into words through the same pipeline as a WhatsApp voice note
 (voice_transcribe.listen), for the person to check before it is asked. The
 recording is held in memory only: never stored, and its words never logged.
@@ -26,6 +26,7 @@ from app.services.ask_export import Answered, export_view
 from app.services.export_csv import csv_bytes
 from app.services.export_docx import docx
 from app.services.export_pdf import pdf
+from app.services.export_xlsx import xlsx
 from app.services.ledger_documents import utc_now
 from app.services.rag import answer_question, stream_answer
 from app.services.voice_audio import AudioRejected
@@ -45,6 +46,7 @@ FORMATS = {
     "pdf": (pdf, "application/pdf", "pdf"),
     "docx": (docx, "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "docx"),
     "csv": (csv_bytes, "text/csv; charset=utf-8", "csv"),
+    "xlsx": (xlsx, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "xlsx"),
 }
 Exports = Depends(rate_limited(rate_limit.EXPORTS))
 SpokenQuestions = Depends(rate_limited(rate_limit.SPOKEN_QUESTIONS))

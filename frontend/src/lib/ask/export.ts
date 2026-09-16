@@ -6,7 +6,18 @@ export const EXPORT_FORMATS: { format: ExportFormat; label: string }[] = [
   { format: "pdf", label: "PDF" },
   { format: "docx", label: "Word" },
   { format: "csv", label: "CSV" },
+  { format: "xlsx", label: "Excel" },
 ];
+
+/**
+ * Excel is offered only for an answer that counts residents' reports. A document's figures stay in the answer's
+ * text: their tables come out of the PDFs as loose numbers, so a sheet would invite sums they can't support.
+ */
+export const NO_SPREADSHEET = "A spreadsheet needs figures Nokware counted itself. This answer's figures come from documents, whose tables can't yet be read into rows.";
+
+export function spreadsheetReady(view: ExportView): boolean {
+  return view.figures.length > 0;
+}
 
 const MESSAGES: Record<number, string> = {
   403: "This answer can't be downloaded. Ask the question again to get one that can.",

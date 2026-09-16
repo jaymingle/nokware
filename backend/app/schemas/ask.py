@@ -128,7 +128,7 @@ class AskResponse(BaseModel):
 
 class AskExportRequest(BaseModel):
     view: ExportView
-    format: Literal["pdf", "docx", "csv"]
+    format: Literal["pdf", "docx", "csv", "xlsx"]
 
 
 class StageEvent(BaseModel):

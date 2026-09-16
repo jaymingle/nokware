@@ -1317,7 +1317,7 @@ export interface components {
              * Format
              * @enum {string}
              */
-            format: "pdf" | "docx" | "csv";
+            format: "pdf" | "docx" | "csv" | "xlsx";
         };
         /**
          * AskFigure
@@ -3428,6 +3428,7 @@ export interface operations {
                     "application/pdf": unknown;
                     "application/vnd.openxmlformats-officedocument.wordprocessingml.document": unknown;
                     "text/csv; charset=utf-8": unknown;
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": unknown;
                 };
             };
             /** @description Validation Error */
