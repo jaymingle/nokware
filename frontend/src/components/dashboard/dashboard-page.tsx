@@ -1,5 +1,6 @@
 "use client";
 
+import { AreasMap } from "@/components/dashboard/areas-map";
 import { AskPrompt, Panel, RecentDocuments, SubMetroTable, TopicShares } from "@/components/dashboard/dashboard-panels";
 import { TrendChart } from "@/components/dashboard/trend-chart";
 import { ErrorPanel, LoadingPanel } from "@/components/documents/panels";
@@ -65,8 +66,15 @@ function Figures({ figures }: { figures: Dashboard }) {
           <TopicShares topics={figures.topics} total={figures.received} />
         </Panel>
       </div>
+      <Panel
+        title="Where reports come from"
+        lead="The last twelve months, by sub-metro and by electoral area. Personal-safety reports are not counted here, and a count from 1 to 4 reads “fewer than 5”."
+        testId="dashboard-areas"
+      >
+        <AreasMap subMetros={figures.sub_metros} areas={figures.electoral_areas} />
+      </Panel>
       <div className="flex flex-wrap items-start gap-5">
-        <Panel title="By sub-metro" lead="A median is shown once five of a sub-metro's reports are resolved." className="flex-[1_1_460px] px-0 sm:px-0 [&>h2]:px-5 [&>p]:px-5">
+        <Panel title="By sub-metro" lead="A median is shown once five of a sub-metro's reports are resolved." className="flex-[1_1_460px] px-0 sm:px-0 [&>h2]:px-5 [&>p]:px-5" testId="dashboard-sub-metro-panel">
           <SubMetroTable rows={figures.sub_metros} />
         </Panel>
         <div className="flex min-w-0 flex-[1_1_320px] flex-col gap-4">

@@ -1742,6 +1742,15 @@ export interface components {
             /** High */
             high: number;
         };
+        /** CheckedSource */
+        CheckedSource: {
+            /** Name */
+            name: string;
+            /** Url */
+            url: string;
+            /** Holds */
+            holds: string;
+        };
         /**
          * Contact
          * @description Shown only to a case's recipients, and only when the citizen allowed a call.
@@ -1805,6 +1814,8 @@ export interface components {
             topics: components["schemas"]["TopicFigures"][];
             /** Sub Metros */
             sub_metros: components["schemas"]["SubMetroFigures"][];
+            /** Electoral Areas */
+            electoral_areas: components["schemas"]["ElectoralAreaFigures"][];
             /** Documents Published */
             documents_published: number;
             /** Departments Publishing */
@@ -2070,6 +2081,22 @@ export interface components {
             alternates: string[];
             /** Note */
             note?: string | null;
+        };
+        /**
+         * ElectoralAreaFigures
+         * @description One of AMA's electoral areas. No median: see report_dashboard's note on why not at this size.
+         */
+        ElectoralAreaFigures: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Sub Metro */
+            sub_metro: string;
+            /** Reports */
+            reports: number | null;
+            /** Resolved */
+            resolved: number | null;
         };
         /** ErrorEvent */
         ErrorEvent: {
@@ -2708,6 +2735,10 @@ export interface components {
             gaps: components["schemas"]["ReportingGap"][];
             /** Gaps About */
             gaps_about: string;
+            /** Unpublished */
+            unpublished: components["schemas"]["UnpublishedData"][];
+            /** Unpublished About */
+            unpublished_about: string;
         };
         /** ReassignRequest */
         ReassignRequest: {
@@ -3211,6 +3242,8 @@ export interface components {
         };
         /** SubMetroFigures */
         SubMetroFigures: {
+            /** Id */
+            id: string;
             /** Name */
             name: string;
             /** Reports */
@@ -3289,6 +3322,30 @@ export interface components {
             label: string;
             /** Count */
             count: number | null;
+        };
+        /**
+         * UnpublishedData
+         * @description Something the public record would need that nobody publishes at all — no document to look for, no figure to age.
+         */
+        UnpublishedData: {
+            /** Id */
+            id: string;
+            /** Subject */
+            subject: string;
+            /** Headline */
+            headline: string;
+            /** Matters */
+            matters: string;
+            /** Checked */
+            checked: components["schemas"]["CheckedSource"][];
+            /** Checked On */
+            checked_on: string;
+            /** Instead */
+            instead: string;
+            /** Rti Document */
+            rti_document: string;
+            /** Rti Period */
+            rti_period: string;
         };
         /**
          * UssdRequest
