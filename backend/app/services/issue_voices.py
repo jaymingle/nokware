@@ -24,7 +24,7 @@ from appwrite.query import Query
 
 from app.services import report_store
 from app.services.appwrite_client import DATABASE_ID, as_record, every_record, get_databases
-from app.services.citizen_reports import REPORTS_COLLECTION, VOICE_NAME_MAX, VOICES_COLLECTION
+from app.services.citizen_reports import REPORTS_COLLECTION, TEST_PREFIX, VOICE_NAME_MAX, VOICES_COLLECTION
 from app.services.locks import record_lock
 from app.services.report_taxonomy import Category
 from app.services.stats import OPEN
@@ -62,6 +62,7 @@ def list_issues(sub_metro: str | None, topic: str | None, limit: int, offset: in
         Query.equal("isSensitive", False),
         Query.equal("status", [s.value for s in OPEN]),
         Query.is_not_null("publicId"),
+        Query.not_starts_with("description", TEST_PREFIX),  # a test fixture is not an issue residents raised
         *([Query.equal("subMetro", sub_metro)] if sub_metro else []),
         *([Query.equal("topic", topic)] if topic else []),
         Query.select(ISSUE_FIELDS),

@@ -30,7 +30,7 @@ from appwrite.query import Query
 
 from app.services.appwrite_client import every_record
 from app.services.case_workflow import CaseStatus
-from app.services.citizen_reports import REPORTS_COLLECTION
+from app.services.citizen_reports import REPORTS_COLLECTION, TEST_PREFIX
 from app.services.ledger_documents import parse_datetime
 from app.services.report_taxonomy import TOPICS_BY_ID, Category
 
@@ -160,9 +160,15 @@ def topic_label(topic: str) -> str:
 
 
 def _fetch_public_cases() -> list[dict[str, Any]]:
+    """Every report the public figures may count. Test fixtures are filtered out by the database, so their
+    descriptions never enter this path at all."""
     return every_record(
         REPORTS_COLLECTION,
-        [Query.not_equal("category", Category.PERSONAL_SAFETY.value), Query.select(CASE_FIELDS)],
+        [
+            Query.not_equal("category", Category.PERSONAL_SAFETY.value),
+            Query.not_starts_with("description", TEST_PREFIX),
+            Query.select(CASE_FIELDS),
+        ],
     )
 
 
