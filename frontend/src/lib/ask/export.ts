@@ -10,10 +10,11 @@ export const EXPORT_FORMATS: { format: ExportFormat; label: string }[] = [
 ];
 
 /**
- * Excel is offered only for an answer that counts residents' reports. A document's figures stay in the answer's
- * text: their tables come out of the PDFs as loose numbers, so a sheet would invite sums they can't support.
+ * Excel is offered for an answer with figures a sheet can hold: counts of residents' reports, or budget figures read
+ * from the Assembly's budgets and proved against their totals. Numbers quoted from other documents stay in the
+ * answer's text: those come out of the PDFs as loose numbers, and a sheet would invite sums they can't support.
  */
-export const NO_SPREADSHEET = "A spreadsheet needs figures Nokware counted itself. This answer's figures come from documents, whose tables can't yet be read into rows.";
+export const NO_SPREADSHEET = "A spreadsheet needs report counts or budget figures. This answer's figures are quoted from documents, which aren't read into rows.";
 
 export function spreadsheetReady(view: ExportView): boolean {
   return view.figures.length > 0;

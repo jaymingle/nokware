@@ -11,7 +11,7 @@ import type { ExportFormat, ExportView } from "@/lib/api/types";
 
 /**
  * Download the answer as a PDF, a Word document, a CSV or an Excel workbook. Each says it's Nokware's, not an
- * official AMA document. Excel is offered only where the answer counts residents' reports (see NO_SPREADSHEET).
+ * official AMA document. Excel is offered only where the answer has report counts or budget figures (see NO_SPREADSHEET).
  */
 export function ExportMenu({ view, testId }: { view: ExportView; testId: string }) {
   const [busy, setBusy] = useState<ExportFormat | null>(null);
@@ -46,7 +46,7 @@ export function ExportMenu({ view, testId }: { view: ExportView; testId: string 
       </div>
       <p className="text-[11.5px] text-ink-soft">
         Marked as Nokware&apos;s, not an official AMA document. Downloads are in English, the language of the sources.
-        {spreadsheetReady(view) ? "" : " Excel needs figures Nokware counted itself."}
+        {spreadsheetReady(view) ? "" : " Excel needs report counts or budget figures."}
       </p>
       {error ? <ErrorNote testId={`${testId}-export-error`}>{error}</ErrorNote> : null}
     </div>

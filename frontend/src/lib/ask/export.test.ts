@@ -36,10 +36,11 @@ describe("downloading an answer", () => {
 });
 
 describe("Excel", () => {
-  it("is offered only for an answer that counts residents' reports", () => {
+  it("is offered for report counts and budget figures, not for numbers quoted from documents", () => {
     const view = (figures: unknown[]) => ({ figures } as unknown as ExportView);
-    expect(spreadsheetReady(view([{ label: "R1" }]))).toBe(true);
-    expect(spreadsheetReady(view([]))).toBe(false);
+    expect(spreadsheetReady(view([{ label: "R1", source: "reports" }]))).toBe(true);
+    expect(spreadsheetReady(view([{ label: "B1", source: "documents" }]))).toBe(true);
+    expect(spreadsheetReady(view([]))).toBe(false);  // only [S#] citations: nothing a sheet can hold
   });
 
   it("is one of the formats offered", () => {
