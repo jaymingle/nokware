@@ -60,10 +60,11 @@ VOICE_NOT_AUDIO = "That recording couldn't be played. Try again, or type your qu
 
 @router.post("/ask", response_model=AskResponse)
 def ask(request: AskRequest) -> AskResponse:
-    result = answer_question(request.question)
-    answered = Answered(request.question, result["answer"], result["status"], list(result["sources"]), list(result["figures"]),
-                        result["chart"], result["chart_note"])
-    speakable = read_aloud.may_speak_answer(request.question, result["answer"])
+    result = answer_question(request.question, languages=True)
+    # The export and the reading are of the English: it is the answer that was checked, and the sources are in it.
+    answered = Answered(request.question, result["answer_english"], result["status"], list(result["sources"]),
+                        list(result["figures"]), result["chart"], result["chart_note"])
+    speakable = not result["translated"] and read_aloud.may_speak_answer(request.question, result["answer_english"])
     return AskResponse.model_validate({**result, "export": export_view(answered, utc_now()), "speakable": speakable})
 
 
@@ -85,8 +86,9 @@ def _signed(question: str, event: dict[str, Any], seen: dict[str, Any]) -> dict[
         return event
     cited = set(event["cited"])
     marked = {name: [{**item, "cited": item["label"] in cited} for item in seen.get(name, [])] for name in ("sources", "figures")}
-    answered = Answered(question, event["answer"], event["status"], marked["sources"], marked["figures"], event["chart"], event["chart_note"])
-    speakable = read_aloud.may_speak_answer(question, event["answer"])
+    in_english = event.get("answer_english") or event["answer"]
+    answered = Answered(question, in_english, event["status"], marked["sources"], marked["figures"], event["chart"], event["chart_note"])
+    speakable = not event.get("translated") and read_aloud.may_speak_answer(question, in_english)
     return {**event, "export": export_view(answered, utc_now()), "speakable": speakable}
 
 
@@ -94,7 +96,7 @@ def ndjson_events(question: str) -> Iterator[str]:
     """The stream's lines. A failure mid-answer ends it with an error event, not a broken stream."""
     seen: dict[str, Any] = {}
     try:
-        for event in stream_answer(question):
+        for event in stream_answer(question, languages=True):
             yield _line(_signed(question, event, seen))
     except Exception as error:
         logger.exception("Ask failed")

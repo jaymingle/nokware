@@ -23,6 +23,7 @@ from pydantic import BaseModel, Field
 
 from app.services import stats
 from app.services.llm import get_quick_model
+from app.services.phrases import phrase
 from app.services.report_taxonomy import TOPICS, Category
 from app.services.stats import Period, ReportFilter, StatusGroup
 from app.teams import RECIPIENT_NAMES
@@ -30,11 +31,11 @@ from app.wards import find_ward, sub_metros
 
 logger = logging.getLogger(__name__)
 
-SAFETY_FIGURES_ANSWER = "Nokware doesn't publish figures on reports about someone's safety."
+SAFETY_FIGURES_ANSWER = phrase("ask.safety_figures")
 # The refusal covers Nokware's own counts, not AMA's published documents: those are public, and anyone can download
 # them from the Ledger. Saying so plainly matters either way, so nobody is left thinking figures are being withheld.
-SAFETY_IN_DOCUMENTS = "Here's what AMA's published documents say:"
-NO_SAFETY_DOCUMENTS = "The AMA documents Nokware searched don't report these figures either."
+SAFETY_IN_DOCUMENTS = phrase("ask.safety_in_documents")
+NO_SAFETY_DOCUMENTS = phrase("ask.no_safety_documents")
 FIGURE_LABEL_PREFIX = "R"
 MAX_FIGURES = 4
 # Only a question that might want figures pays for the planning call.

@@ -21,10 +21,21 @@ describe("applyEvent", () => {
     ]);
     expect([turn.stage, turn.text, turn.documents.length]).toEqual(["writing", "Yes [S1] and [S7].", 2]);
 
-    const done = applyEvent(turn, { type: "done", answer: "Yes [S1] and.", status: "answered", cited: ["S1"], speakable: true });
+    const done = applyEvent(turn, { type: "done", answer: "Yes [S1] and.", answer_english: "Yes [S1] and.",
+      language: "en", translated: false, status: "answered", cited: ["S1"], speakable: true });
     expect([done.stage, done.text, done.status]).toEqual(["done", "Yes [S1] and.", "answered"]);
+    expect([done.english, done.translated]).toEqual(["Yes [S1] and.", false]);
     expect(citedDocuments(done).map((doc) => doc.label)).toEqual(["S1"]);
     expect([done.chart, done.chartNote, done.exportView, done.speakable]).toEqual([null, null, null, true]);
+  });
+
+  it("keeps the English beside an answer a machine translated", () => {
+    const turn = play([
+      { type: "sources", sources: [source("S1")], figures: [] },
+      { type: "done", answer: "Oui [S1].", answer_english: "Yes [S1].", language: "fr", translated: true,
+        status: "answered", cited: ["S1"], speakable: false },
+    ]);
+    expect([turn.text, turn.english, turn.translated, turn.speakable]).toEqual(["Oui [S1].", "Yes [S1].", true, false]);
   });
 
   it("keeps the question when the answer fails", () => {

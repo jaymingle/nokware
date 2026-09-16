@@ -45,7 +45,7 @@ export function ExportMenu({ view, testId }: { view: ExportView; testId: string 
         })}
       </div>
       <p className="text-[11.5px] text-ink-soft">
-        Marked as Nokware&apos;s, not an official AMA document.
+        Marked as Nokware&apos;s, not an official AMA document. Downloads are in English, the language of the sources.
         {spreadsheetReady(view) ? "" : " Excel needs figures Nokware counted itself."}
       </p>
       {error ? <ErrorNote testId={`${testId}-export-error`}>{error}</ErrorNote> : null}

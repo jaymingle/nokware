@@ -52,9 +52,11 @@ from app.services.ask_figures import (
     wants_figures,
 )
 from app.services.ask_figures import plan as plan_figures
+from app.services.ask_language import Asked, failed_note, read_question, translate_answer
 from app.services.citations import make_label, sanitize_citations
 from app.services.ledger_documents import Provenance, provenance, utc_now
 from app.services.llm import get_chat_model
+from app.services.phrases import Language, phrase
 from app.services.retrieval import RetrievedChunk, retrieve
 from app.teams import DEPARTMENT_NAMES
 
@@ -63,10 +65,10 @@ ANSWER_TEMPERATURE = 0.2
 # loss in completeness, while thinking=0 started citing other years' editions for
 # single-document questions.
 ANSWER_THINKING_BUDGET = 1024
-NO_INFO_ANSWER = "I don't have information on that in the Ledger."
+NO_INFO_ANSWER = phrase("ask.no_information")
 UNKNOWN_YEAR = "unknown"
 # Fixed wording so readers, and the UI, can reliably spot conflicting sources.
-DISAGREEMENT_LEAD = "The sources disagree"
+DISAGREEMENT_LEAD = phrase("ask.disagreement_lead")
 
 _SYSTEM_PROMPT = (
     "You are the Nokware Ledger assistant. Answer the resident's question using ONLY "
@@ -159,7 +161,10 @@ class FigureSource(TypedDict):
 
 
 class RagAnswer(TypedDict):
-    answer: str
+    answer: str  # what the resident reads: their own language where it could be translated safely
+    answer_english: str  # the answer as it was written and checked; the sources are in English
+    language: str  # the language the answer is written in: "en", "fr" or "tw"
+    translated: bool  # whether a machine translated it from the English
     status: AnswerStatus
     sources: list[Source]
     figures: list[FigureSource]
@@ -276,29 +281,33 @@ def _prompt_input(prepared: Prepared, length: AnswerLength = AnswerLength.WEB) -
     }
 
 
-def _with_safety_notice(answer: str, prepared: Prepared) -> str:
-    """Nokware's own safety figures are refused in fixed words; what AMA has published still answers.
+BODY = "\x00body"  # where the answer itself goes among the fixed sentences around it
 
-    The refusal covers Nokware's report counts, which could identify a person. AMA's documents are public and
-    downloadable by anyone, so refusing to cite one Nokware holds would be refusing to do the job.
+
+def _notices(body: str, prepared: Prepared, question: str, chart: ChartDict | None, note: str | None,
+             figures: list[FigureSource]) -> list[list[str]]:
+    """The answer as paragraphs of catalogue keys around BODY, so each language writes its own fixed sentences.
+
+    Nokware's safety figures are refused whatever else is said: the refusal covers its own report counts, which
+    could identify a person, never AMA's documents, which are public and downloadable by anyone.
     """
-    if not prepared.figures.safety_asked or SAFETY_FIGURES_ANSWER in answer:
-        return answer
-    if answer_status(answer) == "no_information":
-        return f"{SAFETY_FIGURES_ANSWER} {NO_SAFETY_DOCUMENTS}"
-    return f"{SAFETY_FIGURES_ANSWER}\n\n{SAFETY_IN_DOCUMENTS}\n\n{answer}"
+    answered = answer_status(body) == "answered"
+    if prepared.figures.safety_asked and SAFETY_FIGURES_ANSWER not in body:
+        if not answered:  # no document answers it either, and saying so beats leaving figures looking withheld
+            return [["ask.safety_figures", "ask.no_safety_documents"]]
+        return [["ask.safety_figures"], ["ask.safety_in_documents"], [BODY]]
+    paragraphs = []
+    if answered and asks_for_chart(question) and chart is None and note is None:
+        paragraphs.append(["ask.document_chart_refusal"])
+    if answered and asks_for_spreadsheet(question) and not any(figure["cited"] for figure in figures):
+        paragraphs.append(["ask.spreadsheet_refusal"])
+    return [*paragraphs, [BODY]]
 
 
-def _with_chart_refusal(answer: str, question: str, chart: ChartDict | None, note: str | None) -> str:
-    """A chart that can't be drawn is refused in fixed words, not left unexplained."""
-    wanted = asks_for_chart(question) and chart is None and note is None
-    return f"{DOCUMENT_CHART_REFUSAL}\n\n{answer}" if wanted and answer_status(answer) == "answered" else answer
-
-
-def _with_spreadsheet_refusal(answer: str, question: str, figures: list[FigureSource]) -> str:
-    """A spreadsheet of document figures is refused in fixed words: a sheet invites sums the tables can't support."""
-    wanted = asks_for_spreadsheet(question) and not any(figure["cited"] for figure in figures)
-    return f"{SPREADSHEET_REFUSAL}\n\n{answer}" if wanted and answer_status(answer) == "answered" else answer
+def _written(paragraphs: list[list[str]], body: str, language: Language) -> str:
+    """The answer in one language: the body as written, every fixed sentence from the catalogue."""
+    return "\n\n".join(" ".join(body if part == BODY else phrase(part, language) for part in paragraph)
+                        for paragraph in paragraphs)
 
 
 def _from_documents(prepared: Prepared, answer: str, sources: list[Source]) -> ChartDict | None:
@@ -308,20 +317,25 @@ def _from_documents(prepared: Prepared, answer: str, sources: list[Source]) -> C
     return document_chart(prepared.question, plotted) if plotted else None
 
 
-def finish(prepared: Prepared, raw_answer: str) -> RagAnswer:
-    """The checked answer: only real citations kept, sources and figures marked cited or not, and any chart."""
+def finish(prepared: Prepared, raw_answer: str, asked: Asked | None = None) -> RagAnswer:
+    """The checked answer: only real citations kept, sources and figures marked cited or not, any chart, and —
+    where the question wasn't in English — the answer in the language it was asked in, if every figure survives."""
     valid = set(prepared.labels.values()) | {f.label for f in prepared.figures.figures}
-    answer, cited = sanitize_citations(raw_answer if prepared.has_sources else NO_INFO_ANSWER, valid)
+    body, cited = sanitize_citations(raw_answer if prepared.has_sources else NO_INFO_ANSWER, valid)
     figures = _to_figures(prepared, cited)
     sources = _to_sources(prepared.chunks, prepared.labels, cited)
     chart, chart_note = chart_for(prepared.question, [dict(f) for f in figures if f["cited"]])
     if chart is None and chart_note is None and asks_for_chart(prepared.question):
-        chart = _from_documents(prepared, answer, sources)
-    answer = _with_chart_refusal(answer, prepared.question, chart, chart_note)
-    answer = _with_safety_notice(_with_spreadsheet_refusal(answer, prepared.question, figures), prepared)  # safety first
+        chart = _from_documents(prepared, body, sources)
+    paragraphs = _notices(body, prepared, prepared.question, chart, chart_note, figures)
+    in_english = _written(paragraphs, body, Language.ENGLISH)
+    answer, language, translated = _in_the_language_asked(paragraphs, body, in_english, asked)
     return RagAnswer(
         answer=answer,
-        status=answer_status(answer),
+        answer_english=in_english,
+        language=language.value,
+        translated=translated,
+        status=answer_status(in_english),
         sources=sources,
         figures=figures,
         search_queries=prepared.queries,
@@ -330,23 +344,44 @@ def finish(prepared: Prepared, raw_answer: str) -> RagAnswer:
     )
 
 
-def answer_question(question: str, length: AnswerLength = AnswerLength.WEB) -> RagAnswer:
-    """Answer from the Ledger, at the length the channel allows. Every [S#] left maps to a returned source."""
-    prepared = prepare(question)
+def _in_the_language_asked(paragraphs: list[list[str]], body: str, in_english: str,
+                           asked: Asked | None) -> tuple[str, Language, bool]:
+    """The answer to show: the language asked for where every figure and citation survived, the English otherwise."""
+    if asked is None or not asked.translated:
+        return in_english, Language.ENGLISH, False
+    if answer_status(body) == "no_information":  # the body is a fixed sentence: the catalogue has it already
+        return _written(paragraphs, phrase("ask.no_information", asked.language), asked.language), asked.language, True
+    translated = translate_answer(body, asked)
+    if translated is None:
+        return f"{failed_note(asked.language)}\n\n{in_english}", asked.language, False
+    return _written(paragraphs, translated, asked.language), asked.language, True
+
+
+def answer_question(question: str, length: AnswerLength = AnswerLength.WEB, languages: bool = False) -> RagAnswer:
+    """Answer from the Ledger, at the length the channel allows. Every [S#] left maps to a returned source.
+
+    With languages on (the web), a question in French or Twi is answered in that language: it is read into English
+    first, so every rule in the pipeline still applies, and the answer is translated back only if its figures and
+    citations survive. The channels answer in English, as they always have.
+    """
+    asked = read_question(question) if languages else None
+    prepared = prepare(asked.english if asked else question)
     if not prepared.has_sources:
-        return finish(prepared, NO_INFO_ANSWER)
-    return finish(prepared, _answer_chain().invoke(_prompt_input(prepared, length)))
+        return finish(prepared, NO_INFO_ANSWER, asked)
+    return finish(prepared, _answer_chain().invoke(_prompt_input(prepared, length)), asked)
 
 
-def stream_answer(question: str) -> Iterator[dict[str, Any]]:
+def stream_answer(question: str, languages: bool = False) -> Iterator[dict[str, Any]]:
     """The answer as events: stage, sources, deltas of raw text, then the checked answer.
 
     Deltas are the model's raw text, shown while it writes; the final "done"
     event carries the sanitized answer that replaces them, so a citation the
     checker removes never survives.
     """
-    yield {"type": "stage", "stage": "counting" if wants_figures(question) else "searching"}
-    prepared = prepare(question)
+    asked = read_question(question) if languages else None
+    english_question = asked.english if asked else question
+    yield {"type": "stage", "stage": "counting" if wants_figures(english_question) else "searching"}
+    prepared = prepare(english_question)
     sources = _to_sources(prepared.chunks, prepared.labels, set())
     yield {"type": "sources", "sources": sources, "figures": _to_figures(prepared, set())}
     parts: list[str] = []
@@ -354,9 +389,15 @@ def stream_answer(question: str) -> Iterator[dict[str, Any]]:
         yield {"type": "stage", "stage": "writing"}
         for piece in _answer_chain().stream(_prompt_input(prepared)):
             parts.append(piece)
-            yield {"type": "delta", "text": piece}
-    result = finish(prepared, "".join(parts))
+            # An answer to be translated isn't shown as it is written: the reader would watch English appear and
+            # then be replaced. They see it being translated instead.
+            if not (asked and asked.translated):
+                yield {"type": "delta", "text": piece}
+    if asked and asked.translated and prepared.has_sources:
+        yield {"type": "stage", "stage": "translating"}
+    result = finish(prepared, "".join(parts), asked)
     cited = sorted({source["label"] for source in result["sources"] if source["cited"]})
     cited += sorted(figure["label"] for figure in result["figures"] if figure["cited"])
-    yield {"type": "done", "answer": result["answer"], "status": result["status"], "cited": cited,
-           "chart": result["chart"], "chart_note": result["chart_note"]}
+    yield {"type": "done", "answer": result["answer"], "answer_english": result["answer_english"],
+           "language": result["language"], "translated": result["translated"], "status": result["status"],
+           "cited": cited, "chart": result["chart"], "chart_note": result["chart_note"]}

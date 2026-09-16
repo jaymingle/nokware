@@ -1365,6 +1365,21 @@ export interface components {
             /** Answer */
             answer: string;
             /**
+             * Answer English
+             * @default
+             */
+            answer_english: string;
+            /**
+             * Language
+             * @default en
+             */
+            language: string;
+            /**
+             * Translated
+             * @default false
+             */
+            translated: boolean;
+            /**
              * Status
              * @enum {string}
              */
@@ -1980,6 +1995,21 @@ export interface components {
             type: "done";
             /** Answer */
             answer: string;
+            /**
+             * Answer English
+             * @default
+             */
+            answer_english: string;
+            /**
+             * Language
+             * @default en
+             */
+            language: string;
+            /**
+             * Translated
+             * @default false
+             */
+            translated: boolean;
             /**
              * Status
              * @enum {string}
@@ -3164,7 +3194,7 @@ export interface components {
              * Stage
              * @enum {string}
              */
-            stage: "searching" | "counting" | "writing";
+            stage: "searching" | "counting" | "writing" | "translating";
         };
         /** SubMetroFigures */
         SubMetroFigures: {

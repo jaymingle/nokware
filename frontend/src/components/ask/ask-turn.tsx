@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { LanguagesIcon } from "lucide-react";
 
 import { AnswerChart } from "@/components/ask/answer-chart";
 import { AnswerSources } from "@/components/ask/answer-sources";
@@ -92,22 +93,43 @@ function TurnError({ message, onRetry, testId }: { message: string; onRetry: () 
   );
 }
 
+/** A machine translated this answer: say so, and offer the English it was checked in. */
+function TranslationNote({ showing, onToggle, testId }: { showing: "asked" | "english"; onToggle: () => void; testId: string }) {
+  return (
+    <p className="flex flex-wrap items-center gap-x-2 gap-y-1 border-t pt-2.5 text-[12.5px] text-ink-soft" data-testid={`${testId}-translation`}>
+      <LanguagesIcon aria-hidden className="size-3.5" />
+      Translated by machine from the English answer, which the sources are in.
+      <button type="button" onClick={onToggle} className="cursor-pointer text-teal underline-offset-2 hover:underline"
+        data-testid={`${testId}-show-english`}>
+        {showing === "asked" ? "Show the English" : "Show the translation"}
+      </button>
+    </p>
+  );
+}
+
 /** The words of the reply: progress while it works, then the answer (or why there isn't one). */
 function ReplyBody({ turn, jump, onRetry, testId }: { turn: Turn; jump: Jump; onRetry: () => void; testId: string }) {
+  const [showing, setShowing] = useState<"asked" | "english">("asked");
   const titles = useMemo(
     () => Object.fromEntries([...turn.documents.map((doc) => [doc.label, doc.title]), ...turn.figures.map((f) => [f.label, f.description])]),
     [turn.documents, turn.figures],
   );
   const done = turn.stage === "done";
-  const working = turn.stage === "searching" || turn.stage === "counting" || (turn.stage === "writing" && !turn.text);
+  const working = turn.stage === "searching" || turn.stage === "counting" || turn.stage === "translating"
+    || (turn.stage === "writing" && !turn.text);
+  const shown = showing === "english" ? turn.english : turn.text;
   if (turn.stage === "error") return <TurnError message={turn.error ?? ""} onRetry={onRetry} testId={testId} />;
   if (done && turn.status === "no_information") return <NoInformation testIdPrefix={testId} />;
   return (
     <>
       {working ? <AskProgress turn={turn} testId={`${testId}-progress`} /> : null}
-      {done && turn.text.includes(DISAGREEMENT_LEAD) ? <Disagreement /> : null}
-      {turn.text ? <AnswerText markdown={turn.text} titles={titles} onCite={jump.jump} testIdPrefix={testId} /> : null}
+      {/* The disagreement note reads the English: the wording it looks for is the answer as it was checked. */}
+      {done && turn.english.includes(DISAGREEMENT_LEAD) ? <Disagreement /> : null}
+      {shown ? <AnswerText markdown={shown} titles={titles} onCite={jump.jump} testIdPrefix={testId} /> : null}
       {turn.stage === "writing" && turn.text ? <p className="text-[12.5px] text-ink-soft" role="status">Writing…</p> : null}
+      {done && turn.translated ? (
+        <TranslationNote showing={showing} onToggle={() => setShowing(showing === "asked" ? "english" : "asked")} testId={testId} />
+      ) : null}
     </>
   );
 }

@@ -289,6 +289,33 @@ the documents (see Ask, above). Two rules hold (`app/services/phrases.py`):
   it and when (`reviewed_by`, `reviewed_on`). Until then the reader gets the
   English, which is checked.
 
+**Ask answers in the language it was asked in** (`app/services/ask_language.py`,
+the web only; the channels answer in English as they always have). A question is
+read into English first, and the whole pipeline runs on that English —
+retrieval, the live figures, the chart rules, and the word tests that decide
+whether a question is about someone's safety or wants a chart. Those tests are
+written in English, so a French question about domestic-violence counts would
+otherwise walk straight past the refusal that exists to stop it. The answer is
+written and checked in English, then translated back, and two things guard the
+way out:
+
+- **Nothing fixed is translated by a model.** The sentences Nokware puts around
+  an answer come from the catalogue, in the reader's language, and the body
+  alone is translated. A no-information answer is the catalogue's sentence, not
+  a translation of it.
+- **Every figure and citation must survive.** The numbers in the translation and
+  its [S1]/[R1] labels must match the English exactly, as sets with their counts.
+  "GH¢ 1,234.56" rewritten as "1 234,56" is a different number, and a dropped
+  citation is a claim with no source. Where they don't match, or the model
+  fails, the reader gets the English answer with one line saying why: a wrong
+  figure is worse than a language you have to read twice.
+
+The answer carries no note about being translated; the page says it once, beside
+"Show the English", which swaps to the checked original. Downloads and read-aloud
+are of the English: it is the text that was checked, and the sources are in it.
+A language the catalogue doesn't hold (Spanish, say) is answered in English —
+the question is still understood, and the answer still cites its sources.
+
 The reason is specific, not squeamish. Machine Twi drops ɛ and ɔ, mixes Asante,
 Akuapem and Fante forms, calques civic terms that have no settled Twi word, and
 can lose a negative — turning "don't confront them yourself" into its opposite.

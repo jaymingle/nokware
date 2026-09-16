@@ -39,8 +39,9 @@ function foundLabel(turn: Turn): string {
 /** Real progress from the stream: the search (and any counting), what it found, then the writing. */
 export function AskProgress({ turn, testId }: { turn: Turn; testId: string }) {
   const searching = turn.stage === "searching" || turn.stage === "counting";
+  const translating = turn.stage === "translating";
   const lookingFor = turn.stage === "counting" ? "Searching the Ledger and counting reports" : "Searching the Ledger";
-  const status = searching ? lookingFor : "Writing the answer";
+  const status = searching ? lookingFor : translating ? "Translating the answer" : "Writing the answer";
   return (
     <div className="flex flex-col gap-3" data-testid={testId} data-stage={turn.stage}>
       <p className="sr-only" aria-live="polite">
@@ -52,7 +53,8 @@ export function AskProgress({ turn, testId }: { turn: Turn; testId: string }) {
           label={searching ? `${lookingFor}…` : foundLabel(turn)}
           detail={searching ? undefined : foundSummary(turn.documents.map((doc) => doc.title))}
         />
-        <Step state={searching ? "waiting" : "active"} label="Writing the answer…" />
+        <Step state={searching ? "waiting" : translating ? "done" : "active"} label={translating ? "Wrote the answer" : "Writing the answer…"} />
+        {translating ? <Step state="active" label="Translating it, keeping every figure as written…" /> : null}
       </ol>
       <p className="text-[12px] text-ink-muted">Answers usually take 6 to 13 seconds.</p>
     </div>

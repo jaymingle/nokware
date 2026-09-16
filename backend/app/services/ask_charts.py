@@ -25,17 +25,11 @@ from datetime import datetime
 from typing import Any
 
 from app.services.ask_document_charts import PARTIAL_NOTE, Plotted
+from app.services.phrases import phrase
 from app.services.stats import FEWER_THAN_SMALL, SMALL
 
-DOCUMENT_CHART_REFUSAL = (
-    "The tables in AMA's documents aren't yet read in a form that can be charted accurately, so I'd rather give you "
-    "the figures in text than a chart that might be wrong."
-)
-SPREADSHEET_REFUSAL = (
-    "I can't give you the documents' figures as a spreadsheet yet: their tables come out of the PDFs as loose "
-    "numbers, so a sheet would invite sums the figures can't support. The figures are in the answer, and the "
-    "documents themselves are linked below. Counts of residents' reports do download as a spreadsheet."
-)
+DOCUMENT_CHART_REFUSAL = phrase("ask.document_chart_refusal")
+SPREADSHEET_REFUSAL = phrase("ask.spreadsheet_refusal")
 ASKS_FOR_SPREADSHEET = re.compile(r"\b(spread ?sheets?|excel|xlsx?|workbook|csv|\.xls)\b", re.IGNORECASE)
 ASKS_FOR_CHART = re.compile(
     r"\b(charts?|graphs?|plot(ted)?|visuali[sz](e|ation)|diagram|pie|donut|doughnut|histogram|infographic|stacked|"
@@ -54,9 +48,9 @@ UPRIGHT = re.compile(r"\b(bars?|columns?|vertical)\b", re.IGNORECASE)  # a plain
 # A document's labels are names, not places: only an explicit ask stands a long-labelled chart upright.
 UPRIGHT_ASKED = re.compile(r"\b(columns?|vertical|upright)\b", re.IGNORECASE)
 LONG_LABEL = 16  # characters: longer category names read better on horizontal bars
-ONE_COUNT = "There's only one count here, so there's nothing to chart."
-ONE_MONTH = "There's only one month of reports so far, so there's nothing to chart over time."
-ALL_ZERO = "Every count here is zero, so there's nothing to chart."
+ONE_COUNT = phrase("ask.one_count")
+ONE_MONTH = phrase("ask.one_month")
+ALL_ZERO = phrase("ask.all_zero")
 ChartDict = dict[str, Any]
 
 

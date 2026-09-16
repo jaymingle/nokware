@@ -116,7 +116,10 @@ class ExportView(BaseModel):
 
 
 class AskResponse(BaseModel):
-    answer: str
+    answer: str  # what the resident reads: their own language where it could be translated safely
+    answer_english: str = ""
+    language: str = "en"
+    translated: bool = False
     status: AnswerStatus
     sources: list[AskSource]
     figures: list[AskFigure]
@@ -133,7 +136,7 @@ class AskExportRequest(BaseModel):
 
 class StageEvent(BaseModel):
     type: Literal["stage"]
-    stage: Literal["searching", "counting", "writing"]  # counting: searching and counting live report data
+    stage: Literal["searching", "counting", "writing", "translating"]  # counting: searching and counting live report data
 
 
 class SourcesEvent(BaseModel):
@@ -155,7 +158,10 @@ class DoneEvent(BaseModel):
     """The checked answer, which replaces the streamed text, and the labels it cites."""
 
     type: Literal["done"]
-    answer: str
+    answer: str  # what the resident reads: their own language where it could be translated safely
+    answer_english: str = ""  # the answer as written and checked; the sources are in English
+    language: str = "en"  # the language the answer is written in: "en", "fr" or "tw"
+    translated: bool = False  # whether a machine translated it from the English
     status: AnswerStatus
     cited: list[str]
     chart: AskChart | None = None

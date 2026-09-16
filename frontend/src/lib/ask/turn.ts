@@ -4,7 +4,7 @@ import { groupSources, markCited, type SourceDocument } from "@/lib/ask/sources"
 import type { AnswerStatus, AskChart, AskFigure, AskStreamEvent, ExportView } from "@/lib/api/types";
 
 /** counting: searching the Ledger and counting live report data at once. */
-export type TurnStage = "searching" | "counting" | "writing" | "done" | "error";
+export type TurnStage = "searching" | "counting" | "writing" | "translating" | "done" | "error";
 
 /** One question and its answer as it arrives. */
 export type Turn = {
@@ -14,8 +14,12 @@ export type Turn = {
   documents: SourceDocument[];
   /** Live counts of reports residents filed: sources, but not documents. */
   figures: AskFigure[];
-  /** The raw text while it streams; replaced by the checked answer when done. */
+  /** The raw text while it streams; replaced by the checked answer when done, in the language asked. */
   text: string;
+  /** The answer as it was written and checked; the sources are in English. Same as text for an English answer. */
+  english: string;
+  /** Whether a machine translated the answer from the English. */
+  translated: boolean;
   status: AnswerStatus | null;
   error: string | null;
   /** A chart the question asked for, of the cited live figures; the API decides its kind and values. */
@@ -30,8 +34,8 @@ export type Turn = {
 
 export function newTurn(id: string, question: string): Turn {
   return {
-    id, question, stage: "searching", documents: [], figures: [], text: "", status: null, error: null,
-    chart: null, chartNote: null, exportView: null, speakable: false,
+    id, question, stage: "searching", documents: [], figures: [], text: "", english: "", translated: false,
+    status: null, error: null, chart: null, chartNote: null, exportView: null, speakable: false,
   };
 }
 
@@ -49,6 +53,8 @@ export function applyEvent(turn: Turn, event: AskStreamEvent): Turn {
         ...turn,
         stage: "done",
         text: event.answer,
+        english: event.answer_english || event.answer,
+        translated: event.translated ?? false,
         status: event.status,
         documents: markCited(turn.documents, event.cited),
         figures: markFiguresCited(turn.figures, event.cited),
