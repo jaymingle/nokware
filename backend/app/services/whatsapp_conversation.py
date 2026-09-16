@@ -20,7 +20,10 @@ hour. The chat reply is the receipt, so no separate "received" message is sent.
 
 A voice note is heard by whatsapp_voice and then handled as if its English had
 been typed. Its words are shown back ("I understood: …") with a question's
-answer and before a report is filed. Only a question's answer is also spoken.
+answer and before an everyday report is filed. A personal-safety report is never
+shown back in its own words: only what it was understood as, so a mishearing is
+still caught without leaving a readable copy of the disclosure in the chat. Only
+a question's answer is also spoken.
 
 "Nokware code 482173" confirms the number to the web page that showed the code
 (phone_proof), whatever step the chat is at, and is answered once.
@@ -154,11 +157,17 @@ def _confirm_question(number: str, state: State) -> str:
     photos = get_redis().llen(_photos_key(number))
     with_photos = f" with {photos} photo{'s' if photos != 1 else ''}" if photos else ""
     spoken = state.get("spoken_language")
-    heard = f"{understood(state['description'], spoken)}\n" if spoken else ""
     if _private(state):
         who = " and ".join(short_name(r) for r in state["filed"]["recipients"])
-        return (f"{heard}Ready to send your report{with_photos} to {who}. You can send photos first: only they will see them.\n"
+        if spoken:
+            # Never the words back. "I understood: 'my husband beats me every night'" leaves a readable, searchable
+            # copy of the disclosure in a chat on a phone he may pick up — the harm the neutral SMS exists to
+            # prevent. Naming what it was understood AS still lets someone who was misheard catch it.
+            return ("I understood this as a report about someone's safety. You can send photos first: "
+                    f"only they will see them.\nReply *1* to send it to {who}, or *2* to cancel and type it instead.")
+        return (f"Ready to send your report{with_photos} to {who}. You can send photos first: only they will see them.\n"
                 "Reply *1* to send it or *2* to cancel.")
+    heard = f"{understood(state['description'], spoken)}\n" if spoken else ""
     place = wards()[state["ward"]].name
     return f"{heard}Ready to file your report about {place}{with_photos}.\nReply *1* to file it or *2* to cancel. You can send photos first."
 

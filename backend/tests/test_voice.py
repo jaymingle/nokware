@@ -361,9 +361,13 @@ def test_a_voice_safety_report_gets_its_numbers_first_and_nothing_spoken(monkeyp
     speak_note()
     assert phone["text"][-1].startswith("*If anyone is in danger now*") and "sub-metro" in phone["text"][-1]
     say("0")
-    assert phone["text"][-1].startswith('I understood: "My husband beats me every night."\nReady to send your report to Ghana Police Service')
+    # What it was understood as, and where it goes — never the words, which would sit readable in the chat.
+    assert phone["text"][-1].startswith("I understood this as a report about someone's safety.")
+    assert "Reply *1* to send it to Ghana Police Service and Social Welfare, or *2* to cancel and type it instead" in phone["text"][-1]
     say("1")
     assert filed[0].spoken == "English" and filed[0].ward is None and phone["audio"] == [] and phone["spoken"] == []
+    assert filed[0].description == "My husband beats me every night."  # the report itself keeps every word
+    assert not any("beats me" in message for message in phone["text"])  # and nothing in the chat repeats them
 
 
 @pytest.mark.parametrize(("problem", "expected"), [
