@@ -27,8 +27,8 @@ function Finding({ finding }: { finding: UnpublishedData }) {
           {finding.checked.map((source) => (
             <div key={source.url} className="flex flex-col sm:flex-row sm:gap-3">
               <dt className="sm:w-[13rem] sm:shrink-0">
-                <a href={source.url} target="_blank" rel="noopener"
-                  className="text-teal underline underline-offset-2" data-testid={`${testId}-source-${source.name.replace(/\W+/g, "-").toLowerCase()}`}>
+                <a href={source.url} target="_blank" rel="noopener" data-touch-target
+                  className="inline-flex items-center text-teal underline underline-offset-2" data-testid={`${testId}-source-${source.name.replace(/\W+/g, "-").toLowerCase()}`}>
                   {source.name}
                 </a>
               </dt>
@@ -39,7 +39,7 @@ function Finding({ finding }: { finding: UnpublishedData }) {
       </div>
       <p className="text-[12.5px] text-ink-soft">{finding.instead} Checked {formatDate(finding.checked_on)}.</p>
       <div className="border-t pt-2.5">
-        <Link href={rtiHref(finding)} className="text-[13px] text-teal underline underline-offset-2" data-testid={`${testId}-rti`}>
+        <Link href={rtiHref(finding)} data-touch-target className="inline-flex items-center text-[13px] text-teal underline underline-offset-2" data-testid={`${testId}-rti`}>
           Request it from the Assembly under the RTI Act
         </Link>
       </div>
