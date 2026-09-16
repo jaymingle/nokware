@@ -110,7 +110,10 @@ function ReplyBody({ turn, jump, onRetry, testId }: { turn: Turn; jump: Jump; on
       {working ? <AskProgress turn={turn} testId={`${testId}-progress`} /> : null}
       {/* The disagreement note reads the English: the wording it looks for is the answer as it was checked. */}
       {done && turn.english.includes(DISAGREEMENT_LEAD) ? <Disagreement /> : null}
-      {shown ? <AnswerText markdown={shown} titles={titles} onCite={jump.jump} testIdPrefix={testId} /> : null}
+      {shown ? (
+        <AnswerText markdown={shown} titles={titles} onCite={jump.jump} testIdPrefix={testId}
+          repeatedBelow={done && turn.figures.some((figure) => figure.cited && figure.rows.length > 0)} />
+      ) : null}
       {turn.stage === "writing" && turn.text ? <p className="text-[12.5px] text-ink-soft" role="status">Writing…</p> : null}
       {done && turn.translated ? (
         <TranslationNote showing={showing} onToggle={() => setShowing(showing === "asked" ? "english" : "asked")} testId={testId} />
@@ -143,10 +146,15 @@ function Attachments({ turn, jump, testId }: { turn: Turn; jump: Jump; testId: s
   );
 }
 
-/** What can be done with a finished answer: hear it read aloud (unless it touches on someone's safety), or download it. */
+/**
+ * What can be done with a finished answer: hear it read aloud (unless it touches
+ * on someone's safety), or download it. At the head of the reply, because an
+ * answer with a chart and forty-two figures runs thousands of pixels and nobody
+ * scrolls past all of it to find out they could have downloaded it.
+ */
 function ReplyTools({ turn, view, testId }: { turn: Turn; view: ExportView; testId: string }) {
   return (
-    <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 border-t px-4 py-3 sm:px-5">
+    <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b bg-paper-subtle px-4 py-2 sm:px-5">
       {turn.speakable ? <ReadAloud load={(part) => answerAudio(view, part)} label="Listen to this answer" testId={`${testId}-listen`} /> : <span />}
       <ExportMenu view={view} testId={testId} />
     </div>
@@ -167,11 +175,11 @@ function ReplyMessage({ turn, anchorPrefix, onRetry, testId }: { turn: Turn; anc
         {said ? <span className="flex items-center gap-1.5 text-ink-soft" data-testid={`${testId}-attribution`}><span aria-hidden className="size-1.5 rounded-full bg-teal" />{said}</span> : null}
       </p>
       <div className={cn("overflow-hidden rounded-xl rounded-ss-md border bg-card sm:ms-9", turn.stage === "error" && "border-brick/30")}>
+        {done && turn.exportView ? <ReplyTools turn={turn} view={turn.exportView} testId={testId} /> : null}
         <div className="flex flex-col gap-3.5 px-4 py-4 sm:px-5">
           <ReplyBody turn={turn} jump={jump} onRetry={onRetry} testId={testId} />
         </div>
         {answered ? <Attachments turn={turn} jump={jump} testId={testId} /> : null}
-        {done && turn.exportView ? <ReplyTools turn={turn} view={turn.exportView} testId={testId} /> : null}
       </div>
     </div>
   );
