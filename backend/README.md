@@ -272,6 +272,34 @@ that failed, so the refusals can be read. This is not the table extraction, whic
 stays on the roadmap: it charts only what an answer already set out as labels and
 single values.
 
+## Languages, and the rule for text someone acts on
+
+Nokware's fixed text — the sentences Ask puts around an answer, the safety
+steps, the emergency lines — is written by hand in `app/data/phrases/` (English,
+French, Twi) and never translated while someone is waiting. A model translates
+only what can't be written in advance: a resident's question, and an answer from
+the documents (see Ask, above). Two rules hold (`app/services/phrases.py`):
+
+- **English is the source.** A key another language hasn't written shows in
+  English, so nothing is half-written on a screen.
+- **Critical text waits for a named reviewer.** `critical` in `en.json` marks
+  text someone may act on while in danger: the five safety steps, the emergency
+  heading, the medical line, the call-list warning, the numbers-by-SMS question.
+  It ships in another language only when that language's entry names who checked
+  it and when (`reviewed_by`, `reviewed_on`). Until then the reader gets the
+  English, which is checked.
+
+The reason is specific, not squeamish. Machine Twi drops ɛ and ɔ, mixes Asante,
+Akuapem and Fante forms, calques civic terms that have no settled Twi word, and
+can lose a negative — turning "don't confront them yourself" into its opposite.
+That is not a wording problem, so the gate is a test, not a habit: French is
+drafted in full and its critical lines still show in English, and Twi carries no
+text at all, because a guess by Nokware would only waste the reviewer's time.
+`scripts/phrases_to_review.py` prints what each language still needs with the
+English beside it. The safety steps themselves come from the catalogue
+(`app/safety_steps.py` reads `safety.steps.*`), so the web form, the WhatsApp
+reply and the USSD screens can't drift apart.
+
 ## Citizen reports
 
 Residents report problems (civic service, public safety) or danger to a person

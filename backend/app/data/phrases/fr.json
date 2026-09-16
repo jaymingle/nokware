@@ -1,0 +1,72 @@
+{
+  "language": "French",
+  "about": "French, drafted by Nokware and not yet read by a native speaker. Text marked critical in en.json shows in English until a named reviewer signs it off here, so nothing anyone acts on in danger rests on an unchecked translation.",
+  "phrases": {
+    "ask.no_information": {
+      "text": "Je n'ai pas d'information à ce sujet dans le Registre."
+    },
+    "ask.disagreement_lead": {
+      "text": "Les sources divergent"
+    },
+    "ask.safety_figures": {
+      "text": "Nokware ne publie pas de chiffres sur les signalements concernant la sécurité d'une personne."
+    },
+    "ask.safety_in_documents": {
+      "text": "Voici ce que disent les documents publiés par l'AMA :"
+    },
+    "ask.no_safety_documents": {
+      "text": "Les documents de l'AMA consultés par Nokware ne donnent pas ces chiffres non plus."
+    },
+    "ask.document_chart_refusal": {
+      "text": "Les tableaux des documents de l'AMA ne sont pas encore lus d'une manière permettant de les mettre en graphique avec exactitude ; je préfère vous donner les chiffres en texte plutôt qu'un graphique qui pourrait être faux."
+    },
+    "ask.spreadsheet_refusal": {
+      "text": "Je ne peux pas encore vous donner les chiffres des documents sous forme de tableur : leurs tableaux sortent des PDF en chiffres épars, et une feuille de calcul inviterait à des additions que ces chiffres ne permettent pas. Les chiffres sont dans la réponse, et les documents eux-mêmes sont liés ci-dessous. Les comptages des signalements des habitants, eux, se téléchargent en tableur."
+    },
+    "ask.one_count": {
+      "text": "Il n'y a qu'un seul comptage ici : il n'y a rien à mettre en graphique."
+    },
+    "ask.one_month": {
+      "text": "Il n'y a qu'un mois de signalements pour l'instant : il n'y a rien à suivre dans le temps."
+    },
+    "ask.all_zero": {
+      "text": "Tous les comptages ici sont à zéro : il n'y a rien à mettre en graphique."
+    },
+    "ask.machine_translated": {
+      "text": "Traduit automatiquement depuis la réponse en anglais, la langue des sources."
+    },
+    "ask.show_english": {
+      "text": "Afficher la version anglaise"
+    },
+    "ask.translation_failed": {
+      "text": "Cette réponse n'a pas pu être traduite de façon fiable ; la voici donc en anglais."
+    },
+    "safety.steps.leave": {
+      "text": "Si vous pouvez partir maintenant, allez chez un voisin, dans votre famille, ou au poste de police le plus proche."
+    },
+    "safety.steps.dovvsu": {
+      "text": "Au poste de police, demandez DOVVSU, l'unité chargée des violences domestiques."
+    },
+    "safety.steps.phone": {
+      "text": "Gardez votre téléphone avec vous."
+    },
+    "safety.steps.hurt": {
+      "text": "Si vous êtes blessée, allez à l'hôpital ou appelez le 193."
+    },
+    "safety.steps.someone_else": {
+      "text": "S'il s'agit de quelqu'un d'autre, un enfant ou un adulte, n'allez pas affronter l'auteur vous-même."
+    },
+    "safety.help_heading": {
+      "text": "En danger maintenant ? Appelez le 112. Si ça ne passe pas, essayez le numéro suivant."
+    },
+    "safety.call_list": {
+      "text": "Votre journal d'appels peut montrer que vous avez appelé Nokware : effacez-le si c'est plus sûr."
+    },
+    "safety.numbers_offer": {
+      "text": "Envoyer ces numéros par SMS ? Toute personne ayant votre téléphone pourrait les voir."
+    },
+    "safety.medical": {
+      "text": "Nokware ne peut pas enregistrer ceci : cela ne relève pas de l'Assemblée. Ambulance : 193, 0501 614 877, 0505 982 870. Ou appelez le 112."
+    }
+  }
+}

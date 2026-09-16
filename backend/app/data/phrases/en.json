@@ -1,0 +1,101 @@
+{
+  "about": "Nokware's fixed text, in English, which is the source every other language is written from. 'critical' marks text someone may act on while in danger: it ships in another language only once a named person has reviewed that translation (see app/services/phrases.py). Everything here is written by hand and never translated while an answer is being written.",
+  "phrases": {
+    "ask.no_information": {
+      "critical": false,
+      "text": "I don't have information on that in the Ledger.",
+      "note": "The fixed reply the model is told to give; the API reads it back to set an answer's status, so it must match rag.NO_INFO_ANSWER in English."
+    },
+    "ask.disagreement_lead": {
+      "critical": false,
+      "text": "The sources disagree",
+      "note": "Opens a point where documents give different figures. The web looks for these words to show its note."
+    },
+    "ask.safety_figures": {
+      "critical": false,
+      "text": "Nokware doesn't publish figures on reports about someone's safety.",
+      "note": "Nokware's own counts are refused; AMA's published documents still answer."
+    },
+    "ask.safety_in_documents": {
+      "critical": false,
+      "text": "Here's what AMA's published documents say:"
+    },
+    "ask.no_safety_documents": {
+      "critical": false,
+      "text": "The AMA documents Nokware searched don't report these figures either."
+    },
+    "ask.document_chart_refusal": {
+      "critical": false,
+      "text": "The tables in AMA's documents aren't yet read in a form that can be charted accurately, so I'd rather give you the figures in text than a chart that might be wrong."
+    },
+    "ask.spreadsheet_refusal": {
+      "critical": false,
+      "text": "I can't give you the documents' figures as a spreadsheet yet: their tables come out of the PDFs as loose numbers, so a sheet would invite sums the figures can't support. The figures are in the answer, and the documents themselves are linked below. Counts of residents' reports do download as a spreadsheet."
+    },
+    "ask.one_count": {
+      "critical": false,
+      "text": "There's only one count here, so there's nothing to chart."
+    },
+    "ask.one_month": {
+      "critical": false,
+      "text": "There's only one month of reports so far, so there's nothing to chart over time."
+    },
+    "ask.all_zero": {
+      "critical": false,
+      "text": "Every count here is zero, so there's nothing to chart."
+    },
+    "ask.machine_translated": {
+      "critical": false,
+      "text": "Translated by machine from the English answer, which the sources are in.",
+      "note": "Shown with an answer written in another language, beside the way back to the English."
+    },
+    "ask.show_english": {
+      "critical": false,
+      "text": "Show the English"
+    },
+    "ask.translation_failed": {
+      "critical": false,
+      "text": "This answer couldn't be translated reliably, so here it is in English.",
+      "note": "Used when the check finds a figure or a citation that doesn't match the English answer."
+    },
+    "safety.steps.leave": {
+      "critical": true,
+      "text": "If you can leave now, go to a neighbour, family, or the nearest police station."
+    },
+    "safety.steps.dovvsu": {
+      "critical": true,
+      "text": "At the police station, ask for DOVVSU, the domestic violence unit.",
+      "note": "DOVVSU is the unit's own name and is never translated."
+    },
+    "safety.steps.phone": {
+      "critical": true,
+      "text": "Keep your phone with you."
+    },
+    "safety.steps.hurt": {
+      "critical": true,
+      "text": "If you are hurt, go to a hospital or call 193."
+    },
+    "safety.steps.someone_else": {
+      "critical": true,
+      "text": "If it is someone else, a child or an adult, don't confront them yourself.",
+      "note": "A lost negative here tells someone to confront an abuser. This is why critical text waits for a reviewer."
+    },
+    "safety.help_heading": {
+      "critical": true,
+      "text": "In danger now? Call 112. If it fails, try the next number."
+    },
+    "safety.call_list": {
+      "critical": true,
+      "text": "Your call list may show you dialled Nokware: delete it if that is safer."
+    },
+    "safety.numbers_offer": {
+      "critical": true,
+      "text": "Send these numbers by SMS? Anyone with your phone could see them."
+    },
+    "safety.medical": {
+      "critical": true,
+      "text": "Nokware can't file this: it isn't an Assembly matter. Ambulance: 193, 0501 614 877, 0505 982 870. Or call 112.",
+      "note": "The numbers are digits from the contacts data and are never translated; only the words around them are."
+    }
+  }
+}

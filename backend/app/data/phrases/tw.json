@@ -1,0 +1,5 @@
+{
+  "language": "Twi",
+  "about": "Twi, waiting for a speaker. Nothing here is drafted by Nokware: Twi written by a machine drops ɛ and ɔ, mixes Asante, Akuapem and Fante forms, calques civic terms that have no settled Twi word, and — the failure that matters — can lose a negative, turning \"don't confront them yourself\" into its opposite. Until a named person writes and signs these, every key falls back to English, which is what Nokware shows. Run scripts/phrases_to_review.py to print what is still needed, with the English beside it.",
+  "phrases": {}
+}
