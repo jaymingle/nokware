@@ -63,8 +63,19 @@ What the code holds to:
   the page. A panel used at more than one depth takes its level as a prop
   instead of assuming one.
 
-The audit was axe-core over every public page, in its first state and in the
-states only reaching for something reveals — the chat panel open, both report
-forms — plus the whole of filing a report with nothing but a keyboard. What is
-outstanding is in the pass's own notes: no screen-reader testing with a real
-user, and no audit of the signed-in portal pages.
+The audit was axe-core over every public page and every signed-in portal page as
+each of the three roles, in each page's first state and in the states only
+reaching for something reveals — the chat panel open, both report forms, an
+answered question with its chart and sources — plus the whole of filing a report
+with nothing but a keyboard. Touch targets were measured on a 390px screen.
+Sign-in for the portal pass used a server-minted token
+(`backend/scripts/mint_portal_token.py`), so no password went near the browser.
+
+Two limitations stand, and neither is closed by the automated pass:
+
+- **No screen-reader testing with a real user.** Automated rules catch some of
+  what matters and none of whether the page makes sense read aloud. Nothing here
+  should be read as claiming otherwise.
+- **The photos field on the report form is two tab stops for one action** — the
+  hidden file input, which is labelled and works, and the "Add photos" button
+  beside it. Untidy rather than broken.
