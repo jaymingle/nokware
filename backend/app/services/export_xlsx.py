@@ -34,7 +34,7 @@ from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.worksheet import Worksheet
 
 from app.schemas.ask import AskChart, AskFigure
-from app.services.ask_export import HEADER_NOTICE, LIVE_DATA_NOTE, Content, chart_footnote
+from app.services.ask_export import HEADER_NOTICE, LIVE_DATA_NOTE, Content, chart_footnote, figure_footnote
 from app.services.export_csv import answer_text, count_value
 
 INK = "FF17242B"
@@ -93,7 +93,7 @@ def _answer_sheet(sheet: Worksheet, content: Content) -> None:
 def _figure_block(sheet: Worksheet, row: int, number: int, figure: AskFigure) -> tuple[int, tuple[int, int] | None]:
     """One figure: its heading, a header row, its total and its breakdown. Returns the next row and the rows charted."""
     row = _write(sheet, row, [f"F{number}", figure.description], HEADING)
-    row = _write(sheet, row, ["Counted", figure.counted_at], SMALL)
+    row = _write(sheet, row, ["Source", figure_footnote(figure)], SMALL)
     header = row
     for column, title in enumerate(["Category", "Count", "Shown as"], start=1):
         cell = sheet.cell(row=header, column=column, value=title)

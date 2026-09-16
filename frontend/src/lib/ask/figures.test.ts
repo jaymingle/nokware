@@ -6,7 +6,7 @@ import { linkCitations } from "@/lib/ask/sources";
 import type { AskFigure } from "@/lib/api/types";
 
 const figure = (label: string): AskFigure => ({
-  label, cited: false, description: "Open reports · since Nokware began", value: "fewer than 5", rows: [], counted_at: "2026-09-14T02:31:00+00:00", grouped_by: "none",
+  label, cited: false, description: "Open reports · since Nokware began", value: "fewer than 5", rows: [], counted_at: "2026-09-14T02:31:00+00:00", grouped_by: "none", source: "reports",
 });
 
 describe("live figures", () => {

@@ -2,7 +2,8 @@
 
 The model never sees document ids. Each retrieved document is shown under a
 short label ([S1], [S2], ...), each live report figure under an R label ([R1],
-...), and the model cites those labels. Afterwards,
+...), each budget figure under a B label ([B1], ...), and the model cites those
+labels. Afterwards,
 sanitize_citations() keeps only labels that map to a retrieved document or figure and
 deletes every other citation outright: an unknown label is never guessed at,
 repaired, or matched to the nearest real one. A premise of verifiable sourcing
@@ -15,10 +16,10 @@ LABEL_PREFIX = "S"
 
 # One citation group: [S1], [S1, S3], [S1; S2], [S1 and S2], (S2), [s 4], [Sources S1, S2], [R1], [S2][R1] ...
 _CITATION_GROUP = re.compile(
-    r"[\[(]\s*(?:sources?\s*)?([SR]\s*\d+(?:\s*(?:,|;|&|and)\s*[SR]\s*\d+)*)\s*[\])]",
+    r"[\[(]\s*(?:sources?\s*)?([SRB]\s*\d+(?:\s*(?:,|;|&|and)\s*[SRB]\s*\d+)*)\s*[\])]",
     re.IGNORECASE,
 )
-_LABEL = re.compile(r"([SR])\s*(\d+)", re.IGNORECASE)
+_LABEL = re.compile(r"([SRB])\s*(\d+)", re.IGNORECASE)
 # Raw document ids never appear in the prompt; strip any that show up anyway.
 _DOCUMENT_ID = re.compile(r"\bama-[0-9a-f]{6,}\b", re.IGNORECASE)
 _SPACE_BEFORE_PUNCTUATION = re.compile(r"[ \t]+([.,;:!?])")

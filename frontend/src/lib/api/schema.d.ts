@@ -1321,7 +1321,7 @@ export interface components {
         };
         /**
          * AskFigure
-         * @description A live count of reports residents filed with Nokware: a source, but not a document.
+         * @description A figure cited beside the documents: a live count of reports, or an approved amount read from a budget.
          */
         AskFigure: {
             /** Label */
@@ -1335,13 +1335,26 @@ export interface components {
             /** Rows */
             rows: components["schemas"]["FigureRow"][];
             /** Counted At */
-            counted_at: string;
+            counted_at?: string | null;
             /**
              * Grouped By
              * @default none
+             */
+            grouped_by: string;
+            /**
+             * Source
+             * @default reports
              * @enum {string}
              */
-            grouped_by: "none" | "topic" | "sub_metro" | "month";
+            source: "reports" | "documents";
+            /** Document Id */
+            document_id?: string | null;
+            /** Document Title */
+            document_title?: string | null;
+            /** Year */
+            year?: number | null;
+            /** Coverage */
+            coverage?: string | null;
         };
         /**
          * AskHeard

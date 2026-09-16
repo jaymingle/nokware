@@ -230,7 +230,7 @@ export function AnswerChart({ chart, testId }: { chart: AskChart; testId: string
       </div>
       <p className="text-[12px] text-ink-soft">
         {chart.source === "documents"
-          ? "Drawn from the figures in the cited documents. Every figure here is written that way in a passage below; Nokware charts none it cannot find there."
+          ? "Drawn from figures read from the documents cited, each one checked against the document it comes from; Nokware charts none it cannot check."
           : `Live report data. ${countedAt(chart.counted_at ?? "")}.${hasRange(chart) ? ` ${RANGE_KEY}` : ""}`}
       </p>
       <ChartTable chart={chart} />

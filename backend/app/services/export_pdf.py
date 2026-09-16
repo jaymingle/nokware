@@ -25,7 +25,17 @@ from reportlab.platypus import Image, KeepTogether, ListFlowable, ListItem, Para
 
 from app.schemas.ask import AskChart, AskFigure
 from app.services import export_chart
-from app.services.ask_export import FOOTER_NOTICE, HEADER_NOTICE, LIVE_DATA_NOTE, SUPPRESSED_KEY, Block, Content, chart_footnote, when
+from app.services.ask_export import (
+    FOOTER_NOTICE,
+    HEADER_NOTICE,
+    LIVE_DATA_NOTE,
+    SUPPRESSED_KEY,
+    Block,
+    Content,
+    chart_footnote,
+    figure_footnote,
+    when,
+)
 
 FONTS = Path(__file__).resolve().parents[1] / "fonts"
 INK, INK_SOFT, TEAL, HAIRLINE = colors.HexColor("#17242B"), colors.HexColor("#4A5A5F"), colors.HexColor("#1F6F5C"), colors.HexColor("#D6DAD4")
@@ -131,7 +141,7 @@ def _figure(number: int, figure: AskFigure) -> list[object]:
         table.setStyle(TableStyle([("FONT", (0, 0), (-1, -1), "PublicSans-Regular", 9.5), ("TEXTCOLOR", (0, 0), (-1, -1), INK),
                                    ("LINEBELOW", (0, 0), (-1, -1), 0.4, HAIRLINE), ("ALIGN", (1, 0), (1, -1), "RIGHT")]))
         parts.append(table)
-    parts.append(Paragraph(markup(f"Counted {when(figure.counted_at)}."), SMALL))
+    parts.append(Paragraph(markup(figure_footnote(figure)), SMALL))
     return [*parts, Spacer(1, 4)]
 
 

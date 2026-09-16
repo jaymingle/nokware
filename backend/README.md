@@ -210,6 +210,50 @@ doesn't change that — a chart of proved pairs is a picture of what the answer
 already said, while a sheet invites sums across rows the extraction can't yet
 support.
 
+**Budget figures, read from the documents** (`app/services/budget_extract.py`,
+`budget_figures.py`, `scripts/extract_budget_lines.py`). Ghana's programme-based
+budget prints "Budget Details by Chart of Account": a machine-written block per
+fund source and organisation, stating that fund source's total and breaking it
+down to sub-programmes. The amount repeats at every level, so summing what looks
+like a total double counts; the rows that are unambiguous are the sub-programme
+lines, one line and one amount each, under one department, programme and fund
+source.
+
+Each block must then prove itself: **its rows must add up to the total the block
+states**, or the block is dropped whole — never partly kept, never rounded to
+fit. A document is published only if at least 95% of its blocks reconcile. Both
+documents that qualify do: the 2026 budget at 97.7% of blocks and the 2022
+revised budget at 98.0%. A second, independent check comes from the documents'
+own "Total Cost Centre" lines: the rows kept are 96.4% and 93.3% of what each
+document states it details, and that share is published beside every figure, so
+a share anyone works out is against a stated base. One budget stands for each
+year (the latest revision; the 2022 revision really does revise the original,
+GH¢ 40.9m against 36.5m), and the ones set aside are named in the data file.
+
+The rows — 290 of them — live in `app/data/budget_lines.json`, not a database:
+they never change once a document is published, and what Nokware says about a
+budget should be reviewable in a diff. Re-read them with
+`scripts/extract_budget_lines.py --write`.
+
+Ask queries them on the same terms as the live report counts: `BudgetFigures` is
+a tool beside `CountReports`, filtered by year, department, programme or fund
+source and broken down by any of those, and a comparison is simply two calls —
+approved for Public Works in 2022 and in 2026, or by department this year
+against last. Budget figures are cited as [B1], [B2] beside the documents' [S1]
+and the live counts' [R1], chart by the same honest-type rules, and export to
+PDF, Word, CSV and Excel like any other figure. The model is told to give each
+figure exactly as written and never to add figures together, subtract one from
+another or work out a share; where a chart would run past twenty bars, the
+largest are drawn and the chart says how many were left in the answer.
+
+What isn't there is said plainly. These are **approved amounts**: released and
+actual spending aren't in these documents. The Ledger holds **2022 and 2026**
+only — there is no 2024 or 2025 budget in it — so "what did AMA approve for waste
+management in 2024?" answers that the figures aren't available and names the
+years there are, rather than estimating from a year that exists. That gap is
+found in code from the years the question names, not left to the model to
+notice.
+
 **What table extraction would unlock, concretely.** The 2023 Monitoring and
 Evaluation Report records the city's child-abuse cases. pypdf flattens the row
 to "Recorded cases of child abuse Count of recorded cases of child abuse in the

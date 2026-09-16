@@ -16,7 +16,7 @@ import csv
 import io
 
 from app.schemas.ask import AskFigure
-from app.services.ask_export import HEADER_NOTICE, LIVE_DATA_NOTE, Content
+from app.services.ask_export import HEADER_NOTICE, LIVE_DATA_NOTE, Content, figure_footnote
 
 COLUMNS = ["section", "number", "item", "category", "value", "shown_as", "detail", "department", "year", "source_url",
            "nokware_copy", "counted_at"]
@@ -33,7 +33,8 @@ def count_value(shown: str) -> int | str:
 
 
 def _figure_rows(number: int, figure: AskFigure) -> list[dict[str, object]]:
-    base = {"section": "figure", "number": f"F{number}", "item": figure.description, "counted_at": figure.counted_at}
+    base = {"section": "figure", "number": f"F{number}", "item": figure.description,
+            "counted_at": figure.counted_at, "detail": figure_footnote(figure)}
     rows = [{**base, "category": "Total", "value": count_value(figure.value), "shown_as": figure.value}]
     return rows + [{**base, "category": row.name, "value": count_value(row.value), "shown_as": row.value} for row in figure.rows]
 

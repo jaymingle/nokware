@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 export function CitationTag({ label, title, onCite, testId }: { label: string; title?: string; onCite: (label: string) => void; testId: string }) {
   const number = labelNumber(label);
   const figure = isFigureLabel(label);
-  const kind = figure ? "Live report figure" : "Source";
+  const kind = !figure ? "Source" : label.startsWith("B") ? "Budget figure" : "Live report figure";
   return (
     <button
       type="button"
@@ -22,7 +22,7 @@ export function CitationTag({ label, title, onCite, testId }: { label: string; t
           : "bg-teal-tint text-teal hover:bg-teal hover:text-paper focus-visible:ring-teal",
       )}
     >
-      {figure ? `R${number}` : number}
+      {figure ? `${label.replace(/\d+$/, "")}${number}` : number}
     </button>
   );
 }

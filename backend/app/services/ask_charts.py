@@ -20,7 +20,7 @@ web (answer-chart.tsx) and the exports (export_chart.py) only draw.
 
 import math
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from typing import Any
 
@@ -48,6 +48,8 @@ UPRIGHT = re.compile(r"\b(bars?|columns?|vertical)\b", re.IGNORECASE)  # a plain
 # A document's labels are names, not places: only an explicit ask stands a long-labelled chart upright.
 UPRIGHT_ASKED = re.compile(r"\b(columns?|vertical|upright)\b", re.IGNORECASE)
 LONG_LABEL = 16  # characters: longer category names read better on horizontal bars
+MAX_CATEGORIES = 20  # more bars than this can't be read; the rest stay in the answer, and the chart says so
+MANY_CATEGORIES = "Only the {shown} largest of {total} are drawn; they are all in the answer."
 ONE_COUNT = phrase("ask.one_count")
 ONE_MONTH = phrase("ask.one_month")
 ALL_ZERO = phrase("ask.all_zero")
@@ -83,13 +85,16 @@ def _named(question: str) -> str | None:
 
 
 def _value(shown: str) -> tuple[str, float, float] | None:
-    """A count as shown, with the range it stands for: "fewer than 5" is 1 to 4, "none" is 0."""
+    """A figure as shown, with the range it stands for: "fewer than 5" is 1 to 4, "none" is 0, an amount itself."""
     if shown == FEWER_THAN_SMALL:
         return shown, 1, SMALL - 1
     if shown == "none":
         return shown, 0, 0
-    digits = shown.replace(",", "")
-    return (shown, int(digits), int(digits)) if digits.isdigit() else None
+    digits = shown.replace("GH¢", "").replace("GHS", "").replace(",", "").strip()
+    try:
+        return shown, float(digits), float(digits)
+    except ValueError:
+        return None
 
 
 def _names(descriptions: list[str]) -> tuple[str, list[str]]:
@@ -98,7 +103,9 @@ def _names(descriptions: list[str]) -> tuple[str, list[str]]:
     common = [part for part in parts[0] if all(part in other for other in parts)]
     names = [" · ".join(p for p in these if p not in common) or "Reports" for these in parts]
     title = " · ".join(common)
-    return title if "reports" in title.lower() else " · ".join(["Reports", *common]), names
+    if "reports" in title.lower() or "budget" in title.lower():
+        return title, names
+    return " · ".join(["Reports", *common]), names
 
 
 def _months_in_order(categories: list[str]) -> list[str]:
@@ -119,7 +126,7 @@ def _breakdown(figures: list[dict[str, Any]]) -> _Data | None:
     for name, figure in zip(names, same):
         rows = {row["name"]: row["value"] for row in figure["rows"]}
         series.append((name, [_value(rows.get(c, "none")) or ("none", 0, 0) for c in categories]))
-    return _Data(title, categories, series, over_time, len(same) == 1, [f["label"] for f in same], same[0]["counted_at"])
+    return _Data(title, categories, series, over_time, len(same) == 1, [f["label"] for f in same], same[0].get("counted_at"))
 
 
 def _separate(figures: list[dict[str, Any]]) -> _Data | None:
@@ -130,7 +137,19 @@ def _separate(figures: list[dict[str, Any]]) -> _Data | None:
         return None
     title, names = _names([f["description"] for f, _ in usable])
     values = [v for _, v in usable]
-    return _Data(title, names, [("Reports", values)], False, False, [f["label"] for f, _ in usable], usable[0][0]["counted_at"])
+    return _Data(title, names, [("Figures", values)], False, False, [f["label"] for f, _ in usable], usable[0][0].get("counted_at"))
+
+
+def _largest(data: _Data) -> tuple[_Data, str | None]:
+    """Too many bars can't be read: keep the largest, and say so rather than quietly dropping the rest. A series
+    over time is never cut — a line with months missing from the middle would be a different claim."""
+    if data.over_time or len(data.categories) <= MAX_CATEGORIES:
+        return data, None
+    order = sorted(range(len(data.categories)), key=lambda i: -max(values[i][2] for _, values in data.series))
+    keep = sorted(order[:MAX_CATEGORIES])
+    kept = replace(data, categories=[data.categories[i] for i in keep],
+                   series=[(name, [values[i] for i in keep]) for name, values in data.series])
+    return kept, MANY_CATEGORIES.format(shown=MAX_CATEGORIES, total=len(data.categories))
 
 
 def _default(data: _Data) -> str:
@@ -192,8 +211,9 @@ def _as_dict(kind: str, horizontal: bool, data: _Data, note: str | None) -> Char
 
 
 def chart_for(question: str, figures: list[dict[str, Any]]) -> tuple[ChartDict | None, str | None]:
-    """The chart a question asks for, from the answer's cited live figures, and any note about it. (None, None)
-    when no chart was asked for; (None, note) when one was but can't be drawn from these figures."""
+    """The chart a question asks for, from the answer's cited figures — live counts or budget amounts read from a
+    document — and any note about it. (None, None) when no chart was asked for; (None, note) when one was but
+    can't be drawn from these figures."""
     if not asks_for_chart(question) or not figures:
         return None, None
     data = _breakdown(figures) or _separate(figures)
@@ -201,11 +221,15 @@ def chart_for(question: str, figures: list[dict[str, Any]]) -> tuple[ChartDict |
         return None, ONE_MONTH if data is not None and data.over_time else ONE_COUNT
     if all(high == 0 for _, values in data.series for _, _, high in values):
         return None, ALL_ZERO
+    data, cap = _largest(data)
     named = _named(question)
     kind, note = _honest(named, data) if named else (_default(data), None)
+    note = " ".join(part for part in (note, cap) if part) or None
     long_labels = max(len(c) for c in data.categories) > LONG_LABEL
     lying = bool(HORIZONTAL.search(question)) or (long_labels and not UPRIGHT.search(question))
     horizontal = kind in ("bar", "stacked_bar") and lying
+    if all(figure.get("source") == "documents" for figure in figures):
+        data = replace(data, source="documents", counted_at=None)
     return _as_dict(kind, horizontal, data, note), None
 
 

@@ -18,7 +18,7 @@ from docx.text.paragraph import Paragraph
 
 from app.schemas.ask import AskChart, AskFigure
 from app.services import export_chart
-from app.services.ask_export import FOOTER_NOTICE, HEADER_NOTICE, LIVE_DATA_NOTE, Content, chart_footnote, when
+from app.services.ask_export import FOOTER_NOTICE, HEADER_NOTICE, LIVE_DATA_NOTE, Content, chart_footnote, figure_footnote, when
 
 INK, INK_SOFT, TEAL = RGBColor(0x17, 0x24, 0x2B), RGBColor(0x4A, 0x5A, 0x5F), RGBColor(0x1F, 0x6F, 0x5C)
 BODY_FONT, HEADING_FONT = "Public Sans", "Fraunces"
@@ -119,7 +119,7 @@ def _figure(document: Document, number: int, figure: AskFigure) -> None:
             cells = table.add_row().cells
             cells[0].text, cells[1].text = row.name, row.value
             cells[1].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.RIGHT
-    _small(document.add_paragraph(), f"Counted {when(figure.counted_at)}.")
+    _small(document.add_paragraph(), figure_footnote(figure))
 
 
 def _sources(document: Document, content: Content) -> None:

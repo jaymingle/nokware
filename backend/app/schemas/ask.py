@@ -49,15 +49,20 @@ class FigureRow(BaseModel):
 
 
 class AskFigure(BaseModel):
-    """A live count of reports residents filed with Nokware: a source, but not a document."""
+    """A figure cited beside the documents: a live count of reports, or an approved amount read from a budget."""
 
-    label: str  # "R1": the citation label used in the answer text
+    label: str  # "R1" for a live count, "B1" for a budget figure: the citation label used in the answer text
     cited: bool
-    description: str  # what was counted, e.g. "Open reports · Solid waste and dumping · Kinka · this month"
-    value: str  # as it may be shown: "12", "fewer than 5", "none"
-    rows: list[FigureRow]  # a breakdown by topic, sub-metro or month, if asked for
-    counted_at: str
-    grouped_by: Literal["none", "topic", "sub_metro", "month"] = "none"  # month: rows run oldest first
+    description: str  # what it covers, e.g. "Open reports · Solid waste · Kinka · this month", "Approved budget · 2026"
+    value: str  # as it may be shown: "12", "fewer than 5", "none", "GH¢ 124,760,805"
+    rows: list[FigureRow]  # a breakdown, if asked for
+    counted_at: str | None = None  # when the reports were counted; None for a figure read from a document
+    grouped_by: str = "none"  # what the rows break it down by
+    source: Literal["reports", "documents"] = "reports"
+    document_id: str | None = None  # the budget document it was read from; its PDF is at /api/ledger/{id}/file
+    document_title: str | None = None
+    year: int | None = None  # the budget year
+    coverage: str | None = None  # what the rows read come to as a share of what that document states it details
 
 
 class ChartValue(BaseModel):

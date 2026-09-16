@@ -2,12 +2,12 @@ import type { AskFigure } from "@/lib/api/types";
 
 /** Live report figures are cited as [R1], documents as [S1]. */
 export function isFigureLabel(label: string): boolean {
-  return label.startsWith("R");
+  return label.startsWith("R") || label.startsWith("B"); // R: a live count; B: an amount read from a budget
 }
 
 /** The number a citation tag or card shows: "R2" and "S2" both read 2, told apart by style. */
 export function labelNumber(label: string): string {
-  return label.replace(/^[SR]/, "");
+  return label.replace(/^[SRB]/, "");
 }
 
 export function markFiguresCited(figures: AskFigure[], cited: string[]): AskFigure[] {

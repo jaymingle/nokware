@@ -24,7 +24,9 @@ SAFETY = case("abuse", category="personal_safety", isSensitive=True, ward=None, 
 
 def test_only_a_question_that_might_want_figures_pays_for_planning() -> None:
     assert wants_figures("How many cases are still open?") and wants_figures("waste reports from Ablekuma this month")
-    assert not wants_figures("What does the 2026 budget say about Kaneshie market?")
+    # A budget question wants figures now: the budget rows answer "how much was approved", as the counts answer "how many".
+    assert wants_figures("What does the 2026 budget say about Kaneshie market?")
+    assert not wants_figures("Who is the mayor of Accra?") and not wants_figures("Where do I pay a permit?")
 
 
 def test_a_count_follows_the_public_rules() -> None:

@@ -52,6 +52,8 @@ from app.services.ask_figures import (
     wants_figures,
 )
 from app.services.ask_figures import plan as plan_figures
+from app.services.budget_figures import context as budget_context
+from app.services.budget_figures import years as budget_years
 from app.services.ask_language import Asked, failed_note, read_question, translate_answer
 from app.services.citations import make_label, sanitize_citations
 from app.services.ledger_documents import Provenance, provenance, utc_now
@@ -91,8 +93,14 @@ _SYSTEM_PROMPT = (
     f'named by title, e.g. "{DISAGREEMENT_LEAD} on 2023 revenue: the 2023 Monitoring and '
     'Evaluation Report gives X [S1]; the AMA Biweekly Newsletter gives Y [S2]."\n'
     f'- If the sources do not contain the answer, reply exactly: "{NO_INFO_ANSWER}"\n\n'
-    "Some sources may be live report data rather than documents: counts of the reports residents have "
-    "filed with Nokware, labelled [R1], [R2]. When you use one:\n"
+    "Some sources are figures rather than passages. Live report data, labelled [R1], [R2], are counts of the "
+    "reports residents filed with Nokware. Budget figures, labelled [B1], [B2], are approved amounts read from a "
+    "budget the Assembly published, and each says which document and year it comes from.\n"
+    "For a budget figure: give it exactly as written, with its year and document; say it is the approved budget, "
+    "not money released or spent; never add figures together, subtract one from another, work out a share or a "
+    "percentage, or carry a figure from one year to another. Comparing two figures in words is fine: say what each "
+    "one is and cite both.\n"
+    "When you use a live report figure:\n"
     "- Say in words that the figure comes from Nokware's live report data as of the time given, not from "
     "a document, and cite its label.\n"
     '- Give each figure exactly as written, including "fewer than 5" and "none".\n'
@@ -151,13 +159,18 @@ class Source(TypedDict):
 
 
 class FigureSource(TypedDict):
-    label: str  # "R1"
+    label: str  # "R1" for a live count, "B1" for a budget figure
     cited: bool
-    description: str  # what was counted
-    value: str  # the count as it may be shown: "12", "fewer than 5", "none"
+    description: str  # what it covers
+    value: str  # as it may be shown: "12", "fewer than 5", "none", "GH¢ 124,760,805"
     rows: list[dict[str, str]]  # a breakdown: {"name", "value"}
-    counted_at: str
-    grouped_by: str  # "none", "topic", "sub_metro" or "month" (rows oldest first)
+    counted_at: str | None  # when the reports were counted; None for a figure read from a document
+    grouped_by: str  # what the rows break it down by
+    source: str  # "reports": counted by Nokware; "documents": read from a budget the Assembly published
+    document_id: str | None
+    document_title: str | None
+    year: int | None
+    coverage: str | None  # what the rows read come to as a share of what the document states it details
 
 
 class RagAnswer(TypedDict):
@@ -185,7 +198,8 @@ class Prepared:
 
     @property
     def has_sources(self) -> bool:
-        return bool(self.chunks or self.figures.figures)
+        """Whether there is anything to answer from: passages, live counts, budget figures, or a gap to explain."""
+        return bool(self.chunks or self.figures.figures or self.figures.budget or self.figures.budget_missing)
 
 
 def _assign_labels(chunks: list[RetrievedChunk]) -> dict[str, str]:
@@ -240,11 +254,34 @@ def _figure_source(figure: Figure, cited: set[str]) -> FigureSource:
         rows=[{"name": name, "value": value} for name, value in figure.rows],
         counted_at=figure.counted_at,
         grouped_by=figure.grouped_by,
+        source="reports",
+        document_id=None,
+        document_title=None,
+        year=None,
+        coverage=None,
+    )
+
+
+def _budget_source(figure: Any, cited: set[str]) -> FigureSource:
+    return FigureSource(
+        label=figure.label,
+        cited=figure.label in cited,
+        description=figure.description,
+        value=figure.value,
+        rows=[{"name": name, "value": value} for name, value in figure.rows],
+        counted_at=None,
+        grouped_by=figure.grouped_by,
+        source="documents",
+        document_id=figure.document_id,
+        document_title=figure.document_title,
+        year=figure.year,
+        coverage=figure.coverage,
     )
 
 
 def _to_figures(prepared: Prepared, cited: set[str]) -> list[FigureSource]:
-    return [_figure_source(f, cited) for f in prepared.figures.figures]
+    live = [_figure_source(f, cited) for f in prepared.figures.figures]
+    return live + [_budget_source(f, cited) for f in prepared.figures.budget]
 
 
 def _to_sources(chunks: list[RetrievedChunk], labels: dict[str, str], cited: set[str]) -> list[Source]:
@@ -272,13 +309,27 @@ def _answer_chain() -> Runnable[dict[str, str], str]:
 
 
 def _prompt_input(prepared: Prepared, length: AnswerLength = AnswerLength.WEB) -> dict[str, str]:
-    blocks = [_format_context(prepared.chunks, prepared.labels), *map(figure_context, prepared.figures.figures)]
+    blocks = [_format_context(prepared.chunks, prepared.labels), *map(figure_context, prepared.figures.figures),
+              *map(budget_context, prepared.figures.budget), _budget_gap(prepared)]
     return {
         "context": "\n\n".join(b for b in blocks if b),
         "today": f"{utc_now():%A %d %B %Y}",
         "question": prepared.question,
         "length": _LENGTH_RULES[length],
     }
+
+
+def _budget_gap(prepared: Prepared) -> str:
+    """What the resident asked for that Nokware holds no budget figures for: said plainly, never filled in."""
+    missing = prepared.figures.budget_missing
+    if not missing:
+        return ""
+    held = ", ".join(str(year) for year in budget_years()) or "none"
+    return ("Nokware holds no budget figures for: " + "; ".join(missing) + f". The budget years it holds are {held}. "
+            "Do not give the no-information reply here. Say plainly that the figures they asked for aren't "
+            "available and name the budget years there are, so the gap is explained rather than left looking like "
+            "the figures are being withheld. Never estimate them from another year, another department or a "
+            "document not listed above.")
 
 
 BODY = "\x00body"  # where the answer itself goes among the fixed sentences around it
@@ -320,7 +371,8 @@ def _from_documents(prepared: Prepared, answer: str, sources: list[Source]) -> C
 def finish(prepared: Prepared, raw_answer: str, asked: Asked | None = None) -> RagAnswer:
     """The checked answer: only real citations kept, sources and figures marked cited or not, any chart, and —
     where the question wasn't in English — the answer in the language it was asked in, if every figure survives."""
-    valid = set(prepared.labels.values()) | {f.label for f in prepared.figures.figures}
+    valid = (set(prepared.labels.values()) | {f.label for f in prepared.figures.figures}
+             | {f.label for f in prepared.figures.budget})
     body, cited = sanitize_citations(raw_answer if prepared.has_sources else NO_INFO_ANSWER, valid)
     figures = _to_figures(prepared, cited)
     sources = _to_sources(prepared.chunks, prepared.labels, cited)

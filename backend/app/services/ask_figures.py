@@ -14,14 +14,15 @@ which come from a document.
 
 import logging
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Literal
 
 from langchain_core.prompts import ChatPromptTemplate
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
-from app.services import stats
+from app.services import budget_figures, stats
+from app.services.budget_figures import BudgetFigure, BudgetFigures
 from app.services.llm import get_quick_model
 from app.services.phrases import phrase
 from app.services.report_taxonomy import TOPICS, Category
@@ -38,10 +39,13 @@ SAFETY_IN_DOCUMENTS = phrase("ask.safety_in_documents")
 NO_SAFETY_DOCUMENTS = phrase("ask.no_safety_documents")
 FIGURE_LABEL_PREFIX = "R"
 MAX_FIGURES = 4
-# Only a question that might want figures pays for the planning call.
+# Only a question that might want figures pays for the planning call. A comparison often names no count at all
+# ("compare the approved budget for Public Works in 2022 and 2026"), so the budget words stand beside the counting ones.
 FIGURE_WORDS = re.compile(
     r"\b(how many|how much|number of|count|figures?|statistics|stats|totals?|most|reports?|reported|cases?|"
-    r"complaints?|open|resolved|escalated|filed|pending|outstanding|charts?|graphs?|plot)\b",
+    r"complaints?|open|resolved|escalated|filed|pending|outstanding|charts?|graphs?|plot|"
+    r"budgets?|budget(ed|ing)?|approv(e|es|ed|al)|allocat(e|es|ed|ion)|spend(ing)?|spent|cedis|GH¢|GHS|"
+    r"compare|comparison|against|versus|vs)\b",
     re.IGNORECASE,
 )
 _PUBLIC_TOPICS = [t for t in TOPICS if t.category != Category.PERSONAL_SAFETY]
@@ -90,7 +94,12 @@ _PLAN_PROMPT = ChatPromptTemplate.from_messages(
             "- If the resident asks for a chart or graph of reports, give it something to plot: a group_by (topic or "
             "sub-metro to compare, month for change over time), or one CountReports per status or topic to compare "
             "(with the same group_by, to compare them across topics, sub-metros or months).\n"
-            "- Questions about budgets, fees, bye-laws, plans or what documents say need no tool: call nothing.",
+            "- For how much the Assembly approved in its budget — overall, or for a department, programme or fund "
+            "source, in one year — call BudgetFigures once for each figure the answer needs. Two calls compare two "
+            "years, two departments, or a department across years. Nokware holds these budget years: {budget_years}. "
+            "Call it with the year the resident asks about even when it isn't one of those, so the answer can say "
+            "which years there are instead of leaving the gap unexplained.\n"
+            "- Questions about fees, bye-laws, plans or what a document says in words need no tool: call nothing.",
         ),
         ("human", "{question}"),
     ]
@@ -113,10 +122,12 @@ class Figure:
 class FigurePlan:
     figures: list[Figure]
     safety_asked: bool  # the resident asked for personal-safety figures
+    budget: list[BudgetFigure] = field(default_factory=list)  # approved amounts read from the budget documents
+    budget_missing: list[str] = field(default_factory=list)  # what was asked for that Nokware doesn't hold
 
     @property
     def empty(self) -> bool:
-        return not self.figures and not self.safety_asked
+        return not self.figures and not self.budget and not self.safety_asked
 
 
 NO_FIGURES = FigurePlan([], False)
@@ -186,8 +197,9 @@ def count_figure(call: CountReports, label: str, cases: list[dict[str, Any]], no
 
 
 def _tool_calls(question: str, now: datetime) -> list[dict[str, Any]]:
-    model = get_quick_model().bind_tools([CountReports, PersonalSafetyFigures])
-    message = (_PLAN_PROMPT | model).invoke({"question": question, "today": f"{now:%A %d %B %Y}"})
+    model = get_quick_model().bind_tools([CountReports, PersonalSafetyFigures, BudgetFigures])
+    message = (_PLAN_PROMPT | model).invoke({"question": question, "today": f"{now:%A %d %B %Y}",
+                                             "budget_years": ", ".join(str(year) for year in budget_figures.years()) or "none"})
     return list(getattr(message, "tool_calls", []) or [])
 
 
@@ -202,12 +214,48 @@ def plan(question: str, now: datetime) -> FigurePlan:
         return NO_FIGURES
     safety = any(c["name"] == PersonalSafetyFigures.__name__ for c in calls)
     counts = [CountReports.model_validate(c["args"]) for c in calls if c["name"] == CountReports.__name__][:MAX_FIGURES]
+    budget, missing = _budget_figures([c for c in calls if c["name"] == BudgetFigures.__name__][:MAX_FIGURES])
+    missing = _only_the_specific(list(dict.fromkeys(missing + _years_not_held(question))))
     if not counts:
-        return FigurePlan([], safety)
+        return FigurePlan([], safety, budget, missing)
     cases = stats.public_cases()
     at = datetime.fromtimestamp(stats.counted_at(), tz=timezone.utc).isoformat()
     figures = [count_figure(call, f"{FIGURE_LABEL_PREFIX}{i}", cases, now, at) for i, call in enumerate(counts, 1)]
-    return FigurePlan(figures, safety)
+    return FigurePlan(figures, safety, budget, missing)
+
+
+BUDGET_WORDS = re.compile(r"\b(budgets?|budget(ed|ing)?|approv(e|es|ed|al)|allocat(e|es|ed|ion)|spend(ing)?|spent|cedis|GH¢|GHS)\b", re.IGNORECASE)
+_YEAR_ASKED = re.compile(r"\b(20[0-3]\d)\b")
+
+
+def _only_the_specific(missing: list[str]) -> list[str]:
+    """"Approved budget · 2024" adds nothing beside "Approved budget · 2024 · Waste Management"."""
+    return [entry for entry in missing if not any(other != entry and other.startswith(entry) for other in missing)]
+
+
+def _years_not_held(question: str) -> list[str]:
+    """Budget years the resident named that Nokware doesn't hold. Found here rather than asked of the model: a gap
+    the answer never mentions reads as though the figures were withheld."""
+    if not BUDGET_WORDS.search(question):
+        return []
+    held = set(budget_figures.years())
+    return [f"Approved budget · {year}" for year in sorted({int(y) for y in _YEAR_ASKED.findall(question)} - held)]
+
+
+def _budget_figures(calls: list[dict[str, Any]]) -> tuple[list[BudgetFigure], list[str]]:
+    """The budget figures asked for, and what was asked for that Nokware doesn't hold: a gap is said, not filled."""
+    found, missing = [], []
+    for index, call in enumerate(calls, 1):
+        try:
+            wanted = BudgetFigures.model_validate(call["args"])
+        except ValidationError:
+            continue
+        figure = budget_figures.figure(wanted, f"{budget_figures.LABEL_PREFIX}{index}")
+        if figure:
+            found.append(figure)
+        else:
+            missing.append(budget_figures.describe(wanted))
+    return found, missing
 
 
 def _when(iso: str) -> str:
