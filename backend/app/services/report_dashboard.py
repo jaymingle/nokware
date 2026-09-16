@@ -1,11 +1,15 @@
 """The public dashboard: what residents reported over the last twelve months, and what the Assembly resolved.
 
 Personal safety is left out entirely, totals included: were it counted anywhere,
-the total less the visible topics would give its number away. Nothing is broken
-down finer than a sub-metro, and no case, place or reporter appears. Every count
-from 1 to 4 reads "fewer than 5" (None here), as in Ask, so the two never give
+the total less the visible topics would give its number away. The finest place a
+count is broken down to is the electoral area a civic report names — a
+personal-safety report is never located finer than its sub-metro, and is not
+counted here at all — and no case, address or reporter appears. Every count from
+1 to 4 reads "fewer than 5" (None here), as in Ask, so the two never give
 different numbers for the same thing. A median is shown only once five cases
-have been resolved; below that it says little and could single a case out.
+have been resolved; below that it says little and could single a case out, and
+for that reason no median is given per electoral area at all: twenty areas would
+almost never reach five, and the few that did would stand out.
 
 Figures are cached for a minute, so a busy public page reads Appwrite at most
 once a minute.
@@ -29,7 +33,7 @@ from app.services.ledger_documents import LedgerStatus, parse_datetime
 from app.services.report_taxonomy import TOPICS_BY_ID
 from app.services.stats import is_public, public_cases, shown
 from app.teams import DEPARTMENT_NAMES
-from app.wards import sub_metros
+from app.wards import sub_metros, wards
 
 PERIOD_MONTHS = 12
 MEDIAN_MIN = 5  # resolved cases needed before a median is shown
@@ -90,12 +94,32 @@ def _sub_metro_rows(in_period: list[Dated]) -> list[dict[str, Any]]:
         here = [c for c in in_period if c.case.get("subMetro") == sub_metro.id]
         rows.append(
             {
+                "id": sub_metro.id,
                 "name": sub_metro.name,
                 "reports": shown(len(here)),
                 "resolved": shown(sum(1 for c in here if c.resolved)),
                 "median_days": median_days(here),
             }
         )
+    return rows
+
+
+def _electoral_area_rows(in_period: list[Dated]) -> list[dict[str, Any]]:
+    """Every electoral area, in the order the sub-metros list them, whether or not it has reports.
+
+    An area with none is listed with a count of 0 rather than left out: a missing
+    area reads as somewhere nobody reports from, when it may be somewhere nobody
+    has told about Nokware. No median is given here — see the note above."""
+    rows = []
+    for ward in wards().values():
+        here = [c for c in in_period if c.case.get("wardLocation") == ward.id]
+        rows.append({
+            "id": ward.id,
+            "name": ward.name,
+            "sub_metro": ward.sub_metro,
+            "reports": shown(len(here)),
+            "resolved": shown(sum(1 for c in here if c.resolved)),
+        })
     return rows
 
 
@@ -112,6 +136,7 @@ def aggregate(cases: list[dict[str, Any]], now: datetime) -> dict[str, Any]:
         "months": _months(dated, now),  # a month outside the period is simply not listed
         "topics": _topics(in_period),
         "sub_metros": _sub_metro_rows(in_period),
+        "electoral_areas": _electoral_area_rows(in_period),
     }
 
 

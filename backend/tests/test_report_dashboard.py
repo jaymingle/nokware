@@ -74,6 +74,31 @@ def test_a_median_needs_five_resolved_cases() -> None:
     assert aggregate(five, NOW)["sub_metros"][0]["median_days"] == 3.0
 
 
+def test_every_electoral_area_is_listed_even_one_nobody_has_reported_from() -> None:
+    """An area left out would read as somewhere nothing goes wrong, rather than somewhere nobody has reported."""
+    cases = [*[case(wardLocation="kaneshie", subMetro="okaikoi-south") for _ in range(7)],
+             *[case(wardLocation="chorkor", subMetro="ablekuma-south", resolved_after=1) for _ in range(2)]]
+    areas = {row["id"]: row for row in aggregate(cases, NOW)["electoral_areas"]}
+    assert len(areas) == 20 and len({row["sub_metro"] for row in areas.values()}) == 3
+    assert areas["kaneshie"]["reports"] == 7 and areas["kaneshie"]["sub_metro"] == "okaikoi-south"
+    assert areas["chorkor"]["reports"] is None and areas["chorkor"]["resolved"] is None  # 2 reads "fewer than 5"
+    assert areas["kinka"]["reports"] == 0  # nothing reported here, and it is still on the map
+
+
+def test_an_electoral_area_is_never_given_a_median() -> None:
+    """Twenty areas would almost never reach five resolved cases, and the few that did would stand out."""
+    enough = [case(wardLocation="kaneshie", days_ago=20, resolved_after=d) for d in (1, 2, 3, 4, 10)]
+    figures = aggregate(enough, NOW)
+    assert figures["median_days"] == 3.0  # the metro-wide median is given
+    assert all("median_days" not in row for row in figures["electoral_areas"])
+
+
+def test_personal_safety_reaches_no_electoral_area_count() -> None:
+    safety_here = {**SAFETY, "wardLocation": "chorkor"}
+    areas = {row["id"]: row for row in aggregate([safety_here], NOW)["electoral_areas"]}
+    assert areas["chorkor"]["reports"] == 0 and areas["chorkor"]["resolved"] == 0
+
+
 def test_a_reopened_case_is_not_counted_resolved() -> None:
     reopened = {**case(resolved_after=1), "status": "assigned"}  # keeps its old resolvedAt
     figures = aggregate([reopened], NOW)

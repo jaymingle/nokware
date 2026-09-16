@@ -15,10 +15,21 @@ class TopicFigures(BaseModel):
 
 
 class SubMetroFigures(BaseModel):
+    id: str
     name: str
     reports: int | None  # None: fewer than 5
     resolved: int | None
     median_days: float | None  # None until five of its reports have been resolved
+
+
+class ElectoralAreaFigures(BaseModel):
+    """One of AMA's electoral areas. No median: see report_dashboard's note on why not at this size."""
+
+    id: str
+    name: str
+    sub_metro: str  # the sub-metro's id
+    reports: int | None  # None: fewer than 5
+    resolved: int | None
 
 
 class RecentDocument(BaseModel):
@@ -37,6 +48,7 @@ class Dashboard(BaseModel):
     months: list[MonthFigures]
     topics: list[TopicFigures]  # most reported first; topics with no reports are left out
     sub_metros: list[SubMetroFigures]
+    electoral_areas: list[ElectoralAreaFigures]  # every area, in sub-metro order, whether or not it has reports
     documents_published: int
     departments_publishing: int
     recent_documents: list[RecentDocument]
