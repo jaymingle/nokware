@@ -13,9 +13,10 @@ export const MAX_QUESTION = 1000;
 export const QUESTION_INPUT_ID = "ask-question";
 const COUNT_FROM = 900; // show the character count only near the limit
 
-function ComposerHint({ busy, length }: { busy: boolean; length: number }) {
-  // A chat suggests memory; Ask has none, so the box says so.
-  const hint = busy ? "Answering your question…" : "Each question is answered on its own: Nokware doesn't remember earlier ones.";
+function ComposerHint({ busy, panel, length }: { busy: boolean; panel: boolean; length: number }) {
+  // A chat suggests memory; Ask has none, so the box says so. In the panel there is room for the short form only.
+  const memory = panel ? "Each question is answered on its own." : "Each question is answered on its own: Nokware doesn't remember earlier ones.";
+  const hint = busy ? "Answering your question…" : memory;
   return (
     <div className={cn("mt-1.5 justify-between gap-3 text-[12px] text-ink-muted", length >= COUNT_FROM ? "flex" : "hidden sm:flex")}>
       <span>{hint}</span>
@@ -88,7 +89,7 @@ export function AskComposer({ busy, onAsk, started, panel }: AskComposerProps) {
           onKeyDown={onKeyDown}
           maxLength={MAX_QUESTION}
           rows={1}
-          placeholder={started ? "Ask another question…" : "Ask about a budget, a fee, a plan or a policy…"}
+          placeholder={started ? "Ask another question…" : panel ? "Ask a question…" : "Ask about a budget, a fee, a plan or a policy…"}
           className={cn("max-h-40 min-h-11 resize-none py-2.5 text-base md:text-[15px]", voice.state.kind === "recording" && "hidden")}
           data-testid="ask-input"
         />
@@ -98,7 +99,7 @@ export function AskComposer({ busy, onAsk, started, panel }: AskComposerProps) {
           Ask
         </Button>
       </div>
-      <ComposerHint busy={busy} length={value.length} />
+      <ComposerHint busy={busy} panel={panel} length={value.length} />
     </form>
   );
 }
