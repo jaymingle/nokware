@@ -75,3 +75,27 @@ export function failTurn(turn: Turn, message: string): Turn {
 export function citedDocuments(turn: Turn): SourceDocument[] {
   return turn.documents.filter((doc) => doc.cited);
 }
+
+function plural(count: number, one: string, many: string): string {
+  return `${count} ${count === 1 ? one : many}`;
+}
+
+/**
+ * What the answer rests on, each kind named as what it is.
+ *
+ * A budget figure is read from a published document; a report figure is counted
+ * from what residents filed. Calling both "live report figures" said the wrong
+ * thing about where a number came from, on the one line whose job is to say it.
+ */
+export function attribution(turn: Turn): string | null {
+  const cited = turn.figures.filter((figure) => figure.cited);
+  const budget = cited.filter((figure) => figure.source === "documents").length;
+  const counts = cited.length - budget;
+  const documents = citedDocuments(turn).length;
+  const parts = [
+    documents ? `${plural(documents, "document", "documents")} in the Ledger` : null,
+    budget ? plural(budget, "budget figure", "budget figures") : null,
+    counts ? plural(counts, "live report figure", "live report figures") : null,
+  ].filter(Boolean);
+  return parts.length ? `Answered from ${parts.join(" and ")}` : null;
+}

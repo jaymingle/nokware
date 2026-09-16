@@ -15,7 +15,7 @@ import { ReadAloud } from "@/components/read-aloud/read-aloud";
 import { Button } from "@/components/ui/button";
 import { answerAudio } from "@/lib/api/public";
 import { DISAGREEMENT_LEAD } from "@/lib/ask/sources";
-import { citedDocuments, type Turn } from "@/lib/ask/turn";
+import { attribution, citedDocuments, type Turn } from "@/lib/ask/turn";
 import { cn } from "@/lib/utils";
 
 import type { ExportView } from "@/lib/api/types";
@@ -45,21 +45,6 @@ function useSourceJump(anchorPrefix: string) {
 }
 
 type Jump = ReturnType<typeof useSourceJump>;
-
-function plural(count: number, one: string, many: string): string {
-  return `${count} ${count === 1 ? one : many}`;
-}
-
-/** What the answer rests on: documents, live report figures, or both, said apart. */
-function attribution(turn: Turn): string | null {
-  const documents = citedDocuments(turn).length;
-  const figures = turn.figures.filter((figure) => figure.cited).length;
-  const parts = [
-    documents ? `${plural(documents, "document", "documents")} in the Ledger` : null,
-    figures ? plural(figures, "live report figure", "live report figures") : null,
-  ].filter(Boolean);
-  return parts.length ? `Answered from ${parts.join(" and ")}` : null;
-}
 
 /** The person's question, on the right. A heading, so a screen reader can move from question to question. */
 function QuestionMessage({ turn, headingId, testId }: { turn: Turn; headingId: string; testId: string }) {

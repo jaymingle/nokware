@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { applyEvent, citedDocuments, newTurn } from "@/lib/ask/turn";
+import { applyEvent, attribution, citedDocuments, newTurn } from "@/lib/ask/turn";
 
-import type { AskSource, AskStreamEvent } from "@/lib/api/types";
+import type { AskFigure, AskSource, AskStreamEvent } from "@/lib/api/types";
 
 const source = (label: string) => ({ label, cited: false, document_id: label, title: label, chunk_text: "t" }) as AskSource;
 
@@ -41,5 +41,32 @@ describe("applyEvent", () => {
   it("keeps the question when the answer fails", () => {
     const turn = play([{ type: "stage", stage: "searching" }, { type: "error", message: "Ask is busy right now." }]);
     expect([turn.stage, turn.error, turn.question]).toEqual(["error", "Ask is busy right now.", "Q?"]);
+  });
+});
+
+describe("attribution", () => {
+  const figure = (label: string, source: "reports" | "documents") =>
+    ({ label, cited: true, description: label, value: "1", rows: [], grouped_by: "none", source, counted_at: null }) as AskFigure;
+
+  function answered(sources: AskSource[], figures: AskFigure[], cited: string[]) {
+    return play([{ type: "sources", sources, figures },
+      { type: "done", answer: "a", answer_english: "a", language: "en", translated: false, status: "answered", cited, speakable: true }]);
+  }
+
+  it("names a budget figure as what it is: read from a document, not counted from reports", () => {
+    // It read "Answered from 2 live report figures" for two figures taken out of two budget PDFs.
+    const turn = answered([], [figure("B1", "documents"), figure("B2", "documents")], ["B1", "B2"]);
+    expect(attribution(turn)).toBe("Answered from 2 budget figures");
+  });
+
+  it("counts each kind apart when an answer rests on more than one", () => {
+    const turn = answered([source("S1")], [figure("B1", "documents"), figure("R1", "reports")], ["S1", "B1", "R1"]);
+    expect(attribution(turn)).toBe("Answered from 1 document in the Ledger and 1 budget figure and 1 live report figure");
+  });
+
+  it("counts only what the answer cited, and says nothing when it cited none", () => {
+    const turn = answered([source("S1")], [figure("R1", "reports")], ["R1"]);
+    expect(attribution(turn)).toBe("Answered from 1 live report figure");
+    expect(attribution(answered([source("S1")], [], []))).toBeNull();
   });
 });
