@@ -35,7 +35,7 @@ from app.services import (
     report_store,
 )
 from app.services.channel_answers import for_sms
-from app.services.channel_contacts import call_lines, desk_line, numbers_sms
+from app.services.channel_contacts import ambulance_calls, call_lines, desk_line, emergency_call, numbers_sms
 from app.services.channel_messages import send_sms
 from app.services.channel_status import status_text
 from app.services.citizen_reports import IntakeChannel, NotificationEvent
@@ -68,15 +68,17 @@ SCREEN_MAX = 160
 QUESTION_MIN = 5
 WHO_MAX = 40  # longer office names give way to a count, so the receipt keeps its last words
 MENU = "Nokware - Accra Assembly\n1 Ask a question\n2 Report an issue\n3 Check a case\n4 Medical emergency\n5 Confirm a web code\n6 Sign a petition"
-MEDICAL = "Nokware can't file this: it isn't an Assembly matter. Ambulance: 193, 0501 614 877, 0505 982 870. Or call 112."
+AMBULANCE, EMERGENCY = ", ".join(ambulance_calls()), emergency_call()  # from contacts.json, as WhatsApp gives them
+MEDICAL = f"Nokware can't file this: it isn't an Assembly matter. Ambulance: {AMBULANCE}. Or call {EMERGENCY}."
 CONFIRM = "File this report?\n1 File, and SMS me updates\n2 File, no SMS\n0 Cancel"
 # Personal safety asks about updates once, after filing: offering them here too asked twice and never turned them on.
 SEND = "Send this report?\n1 Send\n0 Cancel"
 UPDATES_ASK = "SMS updates on it? They never say what it is about.\n1 Yes\n2 No"
 NEXT = "\n1 Next"
 HELP_HEADING = "In danger now? Call 112. If it fails, try the next number."
-MEDICAL_REPORT = ("This sounds like a medical emergency, which Nokware can't send help for. Ambulance: 193, 0501 614 877, "
-                  "0505 982 870, or 112.\n1 File it as a report anyway\n0 End")
+MEDICAL_REPORT = (f"This sounds like a medical emergency, which Nokware can't send help for. Ambulance: {AMBULANCE}, "
+                  f"or {EMERGENCY}.\n1 File it as a report anyway\n0 End")
+MEDICAL_NOT_FILED = f"Nothing was filed. Ambulance: {ambulance_calls()[0]}, or call {EMERGENCY}."
 NUMBERS_OFFER = "Send these numbers by SMS? Anyone with your phone could see them.\n1 Yes\n2 No"
 CALL_LIST = "Your call list may show you dialled Nokware: delete it if that is safer."
 _filing = ThreadPoolExecutor(max_workers=8, thread_name_prefix="ussd-filing")  # a reading takes two
@@ -248,7 +250,7 @@ def _medical(dial: Dial, state: State, later: Later) -> tuple[Reply, State | Non
     """The model can misread: a citizen who chose to report something can still file it."""
     if dial.text.strip() == "1":
         return _help_page(state, 0)
-    return end("Nothing was filed. Ambulance: 193, or call 112."), None
+    return end(MEDICAL_NOT_FILED), None
 
 
 def _help(dial: Dial, state: State, later: Later) -> tuple[Reply, State | None]:

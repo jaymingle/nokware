@@ -10,6 +10,7 @@ stay off it: USSD sessions time out, and the screen is better spent on DOVVSU's 
 from app import safety_steps
 from app.contacts import (
     MEDICAL_SERVICES,
+    PUBLIC_EMERGENCY,
     SAFETY_DESK_FALLBACK,
     SERVICE_NAMES,
     contacts,
@@ -68,6 +69,15 @@ def numbers_text(topic: str, sub_metro: str | None) -> str:
 def _calls(contact: PublicContact) -> list[str]:
     note = f" ({CALL_NOTES[contact.id]})" if contact.id in CALL_NOTES else ""
     return [number.number + note for number in contact.numbers if number.current and number.kind == "call"]
+
+
+def ambulance_calls() -> list[str]:
+    """Every ambulance number to call, as contacts.json orders them: "193", "0501 614 877", "0505 982 870"."""
+    return [number for _, group in service_groups(MEDICAL_SERVICES, None)[1:] for contact in group for number in _calls(contact)]
+
+
+def emergency_call() -> str:
+    return _calls(contacts()[PUBLIC_EMERGENCY])[0]
 
 
 def _welfare_calls(sub_metro: str | None) -> list[str]:

@@ -1,5 +1,6 @@
 """USSD: every screen fits, each menu path does what it says, and the callback's secret is checked."""
 
+import json
 import logging
 import time
 from typing import Any
@@ -9,7 +10,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.config import get_settings
-from app.contacts import EMERGENCY_TOPICS
+from app.contacts import CONTACTS_FILE, EMERGENCY_TOPICS
 from app.main import RedactChannelSecrets, app
 from app.routes import channels
 from app.safety_steps import STEPS
@@ -345,6 +346,14 @@ def test_a_ussd_session_from_an_older_version_ends_cleanly(session: list[tuple[A
     channel_sessions.save("ussd", "old", {"step": "retired-step"}, 60)
     assert ussd.respond(Dial("old", PHONE, "1", False), lambda *a: None) == ussd.Reply("Your session ended. Please dial again.", False)
     assert channel_sessions.load("ussd", "old") is None
+
+
+def test_the_medical_screens_give_the_ambulance_numbers_in_contacts_json() -> None:
+    listed = {c["id"]: [n["number"] for n in c["numbers"]] for c in json.loads(CONTACTS_FILE.read_text(encoding="utf-8"))["contacts"]}
+    ambulance, emergency = [*listed["ambulance-193"], *listed["nas"]], listed["emergency-112"][0]
+    assert f"Ambulance: {', '.join(ambulance)}. Or call {emergency}." in ussd.MEDICAL
+    assert f"Ambulance: {', '.join(ambulance)}, or {emergency}." in ussd.MEDICAL_REPORT
+    assert f"Nothing was filed. Ambulance: {ambulance[0]}, or call {emergency}." == ussd.MEDICAL_NOT_FILED
 
 
 def test_a_medical_emergency_described_as_a_report_gets_the_ambulance_and_is_not_filed(
