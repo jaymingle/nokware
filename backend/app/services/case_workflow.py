@@ -26,7 +26,7 @@ from app.teams import RECIPIENT_NAMES
 
 ESCALATION_WINDOW = timedelta(days=14)
 CONTACT_RETENTION = timedelta(days=30)  # after the case closes, the citizen's numbers are deleted
-SMALL_COUNT = 5  # personal-safety counts below this are never shown as numbers
+SMALL_COUNT = 5  # counts below this are never shown as numbers
 # Never a department that has no business with a personal-safety case.
 SAFETY_RECIPIENTS = frozenset({POLICE, SOCIAL_WELFARE})
 
@@ -224,4 +224,5 @@ def may_see_contact(principal: Principal, case: dict[str, Any], contact: dict[st
 
 
 def shown_count(count: int) -> int | None:
+    # Zero is hidden too, unlike stats.shown: a personal-safety count under 5 is never shown, not even as "none".
     return count if count >= SMALL_COUNT else None
