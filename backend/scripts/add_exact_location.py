@@ -16,9 +16,10 @@ takes a location.
 import argparse
 import sys
 
+from create_citizen_reports import Creator, adjust_history, ensure, wait_for_attributes
+
 from app.services.appwrite_client import DATABASE_ID, get_databases, quiet_sdk_deprecation_warnings
 from app.services.citizen_reports import CONTACTS_COLLECTION as CONTACTS
-from create_citizen_reports import Creator, adjust_history, ensure, wait_for_attributes
 
 LOCATION_MAX = 1000  # the stored JSON: an address of up to 400 characters and a pin
 

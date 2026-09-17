@@ -1,7 +1,7 @@
 """A shared precise location: kept apart, opened only by the Police or Social Welfare on the case, every view told."""
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
@@ -15,7 +15,7 @@ from app.services.auth import Principal, Role
 from app.services.case_history import CaseHistoryAction
 from app.services.workflow import NotAllowed
 
-NOW = datetime(2026, 9, 14, 20, 0, tzinfo=timezone.utc)
+NOW = datetime(2026, 9, 14, 20, 0, tzinfo=UTC)
 CASE = {"$id": "c2", "reference": "M3RD-8WQA", "category": "personal_safety", "isSensitive": True, "topic": "abuse",
         "status": "assigned", "severity": 5, "description": "[TEST] He hits me.", "classificationNote": "Classified.", "createdAt": "2026-09-14T19:00:00+00:00", "subMetro": "okaikoi-south",
         "recipients": ["agency-police", "dept-social-welfare"]}

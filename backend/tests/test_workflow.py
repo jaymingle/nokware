@@ -1,6 +1,6 @@
 """The portal's document rules: roles, ownership, states, clocks and changes."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
@@ -23,7 +23,7 @@ from app.services.workflow import (
     transition,
 )
 
-NOW = datetime(2026, 9, 13, 12, 0, tzinfo=timezone.utc)
+NOW = datetime(2026, 9, 13, 12, 0, tzinfo=UTC)
 FINANCE = Principal("u-fin", "Finance", "f@x.org", Role.DEPARTMENT, "dept-finance")
 WORKS = Principal("u-works", "Works", "w@x.org", Role.DEPARTMENT, "dept-works")
 CONTRIBUTOR = Principal("u-con", "Contributor", "c@x.org", Role.CONTRIBUTOR)

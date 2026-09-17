@@ -17,10 +17,10 @@ import httpx
 from google.genai import errors, types
 
 from app.config import get_settings
+from app.services.citations import KINDS
 from app.services.llm import get_genai_client
 from app.services.rag import NO_INFO_ANSWER, RagAnswer
 from app.services.voice_audio import AudioRejected, Encoded, for_browser, voice_note, wav
-from app.services.citations import KINDS
 
 SPOKEN_MAX_CHARS = 620  # with the closing sentence, about 50 seconds: Gemini reads about 13 characters a second
 TIMEOUT_MS = 45_000

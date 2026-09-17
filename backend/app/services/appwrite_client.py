@@ -14,8 +14,6 @@ from typing import Any
 
 import appwrite.client as sdk_client_module
 import requests
-from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
 from appwrite.client import Client
 from appwrite.exception import AppwriteException
 from appwrite.models import Document
@@ -24,6 +22,8 @@ from appwrite.services.databases import Databases
 from appwrite.services.storage import Storage
 from appwrite.services.teams import Teams
 from appwrite.services.users import Users
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 from app.config import get_settings
 

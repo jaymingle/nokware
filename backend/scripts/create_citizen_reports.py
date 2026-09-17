@@ -23,13 +23,22 @@ from appwrite.exception import AppwriteException
 from appwrite.query import Query
 
 from app.services.appwrite_client import DATABASE_ID, get_databases, get_teams, quiet_sdk_deprecation_warnings
-from app.services.case_history import COLLECTION_ID as HISTORY, NOTE_MAX, ActorRole, CaseHistoryAction
+from app.services.case_history import COLLECTION_ID as HISTORY
+from app.services.case_history import NOTE_MAX, ActorRole, CaseHistoryAction
 from app.services.case_workflow import AssignmentStatus, CaseStatus
 from app.services.citizen_reports import (
     ASSIGNMENTS_COLLECTION as ASSIGNMENTS,
+)
+from app.services.citizen_reports import (
     CONTACTS_COLLECTION as CONTACTS,
+)
+from app.services.citizen_reports import (
     NOTIFICATIONS_COLLECTION as NOTIFICATIONS,
+)
+from app.services.citizen_reports import (
     REPORTS_COLLECTION as REPORTS,
+)
+from app.services.citizen_reports import (
     IntakeChannel,
     NotificationChannel,
     NotificationEvent,

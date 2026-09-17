@@ -6,7 +6,7 @@ the backend makes, so ingestion, the AMA import and the portal routes agree.
 
 import re
 from collections.abc import Iterable
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
 
@@ -82,7 +82,7 @@ class IngestionState(StrEnum):
 
 
 def utc_now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def now_iso() -> str:

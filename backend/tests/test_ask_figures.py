@@ -1,6 +1,6 @@
 """Ask's live figures: counted by stats.py's rules, cited as R sources, and never about someone's safety."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
@@ -9,7 +9,7 @@ from app.services import ask_figures, rag, stats
 from app.services.ask_figures import CountReports, FigurePlan, count_figure, plan, wants_figures
 from app.services.retrieval import Chunk, Retrieval, RetrievedChunk
 
-NOW = datetime(2026, 9, 14, 12, 0, tzinfo=timezone.utc)
+NOW = datetime(2026, 9, 14, 12, 0, tzinfo=UTC)
 AT = NOW.isoformat()
 
 

@@ -1,6 +1,6 @@
 """Petitions P2: one signature per confirmed number, the signer's choice of name, and the threshold sending it to the MCE."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import fakeredis
@@ -20,7 +20,7 @@ from app.services.petition_rules import (
 )
 from app.services.phone_proof import Channel
 
-NOW = datetime(2026, 9, 15, 11, 0, tzinfo=timezone.utc)
+NOW = datetime(2026, 9, 15, 11, 0, tzinfo=UTC)
 PHONE, OTHER = "+233241234567", "+233201234568"
 OPEN = {"$id": "p1", "code": "482913", "title": "[TEST] Desilt the Kaneshie drain", "status": "open", "threshold": 3,
         "signatureCount": 0, "publishedAt": "2026-09-14T09:00:00+00:00", "closesAt": (NOW + timedelta(days=60)).isoformat()}
@@ -112,7 +112,7 @@ def test_a_closed_petition_takes_no_signatures(store: dict[str, Any]) -> None:
 def test_signing_on_the_web_needs_a_confirmed_phone_and_a_real_name() -> None:
     client = TestClient(app)
     assert client.post("/api/petitions/482913/signatures", json={"show_name": False}).status_code == 401
-    proof = phone_proof.issue_proof(PHONE, Channel.WHATSAPP, datetime.now(timezone.utc))
+    proof = phone_proof.issue_proof(PHONE, Channel.WHATSAPP, datetime.now(UTC))
     response = client.post("/api/petitions/482913/signatures", json={"show_name": True, "name": "Call 0241234567"},
                            headers={"X-Phone-Proof": proof})
     assert response.status_code == 422 and "letters" in response.json()["detail"]

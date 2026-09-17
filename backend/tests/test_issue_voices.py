@@ -1,6 +1,6 @@
 """Add your voice: civic issues only, one voice per browser, names for the handling department alone."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
@@ -15,7 +15,7 @@ from app.services.issue_voices import InvalidVoice, add_voice, device_hash, is_p
 from app.services.report_followups import public_status
 from app.services.report_intake import _drawn_ids
 
-NOW = datetime(2026, 9, 14, 12, 0, tzinfo=timezone.utc)
+NOW = datetime(2026, 9, 14, 12, 0, tzinfo=UTC)
 TOKEN = "b" * 32
 ISSUE = {"$id": "c1", "publicId": "k7qm4txp2a", "category": "civic_service", "isSensitive": False, "status": "assigned",
          "topic": "roads", "wardLocation": "kaneshie", "subMetro": "okaikoi-south", "recipients": ["dept-urban-roads"],

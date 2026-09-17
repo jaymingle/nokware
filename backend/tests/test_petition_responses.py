@@ -1,6 +1,6 @@
 """Petitions P3: the MCE's public response, the 30 days made visible, the creator's updates, and the figures."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
@@ -25,7 +25,7 @@ from app.services.petition_rules import (
 from app.services.petition_updates import Update
 from app.services.sms_text import is_gsm7, pages
 
-NOW = datetime(2026, 9, 15, 12, 0, tzinfo=timezone.utc)
+NOW = datetime(2026, 9, 15, 12, 0, tzinfo=UTC)
 MCE = Principal("u-m", "Hon. Test MCE", "m@x.org", Role.MCE)
 TEXT = "The Works Department will desilt the Kaneshie market drain before 30 May, and publish the schedule on this page."
 AWAITING = {"$id": "p1", "code": "534079", "title": "[TEST] Desilt the drain", "status": "awaiting_response", "threshold": 150,

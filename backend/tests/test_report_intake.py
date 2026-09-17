@@ -1,6 +1,6 @@
 """Filing a report end to end, with storage, photos and the model replaced by fakes."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
@@ -10,7 +10,7 @@ from app.services.report_contacts import ContactChoice, InvalidNumber
 from app.services.report_intake import ReportSubmission, submit
 from app.services.report_rules import InvalidReport, ModelVerdict
 
-NOW = datetime(2026, 9, 13, 12, 0, tzinfo=timezone.utc)
+NOW = datetime(2026, 9, 13, 12, 0, tzinfo=UTC)
 
 
 class Store:

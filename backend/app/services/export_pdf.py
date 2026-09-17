@@ -28,14 +28,12 @@ from app.services import export_chart
 from app.services.ask_export import (
     FOOTER_NOTICE,
     HEADER_NOTICE,
-    SUPPRESSED_KEY,
     Block,
     Content,
     chart_footnote,
     figure_footnote,
     figures_heading,
     figures_notes,
-    when,
 )
 
 FONTS = Path(__file__).resolve().parents[1] / "fonts"
@@ -193,7 +191,7 @@ class _Pages(Canvas):
         super().__init__(*args, **kwargs)
         self._pages: list[dict[str, object]] = []
 
-    def showPage(self) -> None:  # noqa: N802 (ReportLab's name)
+    def showPage(self) -> None:
         self._pages.append(dict(self.__dict__))
         self._startPage()
 

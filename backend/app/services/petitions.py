@@ -51,9 +51,9 @@ from app.services.petition_rules import (
     was_published,
 )
 from app.services.phone_proof import Proof, phone_key
+from app.services.test_fixtures import TEST_PREFIX
 from app.services.workflow import WrongState as ClosedIssue
 from app.wards import wards
-from app.services.test_fixtures import TEST_PREFIX
 
 logger = logging.getLogger(__name__)
 

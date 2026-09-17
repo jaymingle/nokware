@@ -1,7 +1,7 @@
 """Staff changes to cases and what each caller sees, with storage replaced by an in-memory fake."""
 
 import itertools
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
@@ -12,7 +12,7 @@ from app.services.auth import Principal, Role
 from app.services.case_workflow import Reassignment
 from app.services.workflow import NotAllowed, WrongState
 
-NOW = datetime(2026, 9, 13, 12, 0, tzinfo=timezone.utc)
+NOW = datetime(2026, 9, 13, 12, 0, tzinfo=UTC)
 WORKS = Principal("u-w", "Kofi (Works)", "w@x.org", Role.DEPARTMENT, "dept-works")
 POLICE = Principal("u-p", "Police liaison", "p@x.org", Role.AGENCY, agency="agency-police")
 WELFARE = Principal("u-s", "Social Welfare", "s@x.org", Role.DEPARTMENT, "dept-social-welfare")

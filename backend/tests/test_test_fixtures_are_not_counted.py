@@ -5,6 +5,7 @@ citing a test document as the Assembly's, is the same fabrication as a backdated
 history, just laundered through a prefix nobody sees on the public page.
 """
 
+from datetime import UTC
 from typing import Any
 
 import pytest
@@ -115,11 +116,11 @@ def test_the_mce_is_never_credited_with_deciding_a_test_petition(monkeypatch: py
 
 
 def test_the_responsiveness_page_counts_no_test_petition(monkeypatch: pytest.MonkeyPatch) -> None:
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     from app.services import petition_figures
 
-    now = datetime(2026, 9, 16, tzinfo=timezone.utc)
+    now = datetime(2026, 9, 16, tzinfo=UTC)
     asked: list[list[str]] = []
     monkeypatch.setattr(petition_figures, "test_petition_ids", lambda: {"fixture"})
 
@@ -131,6 +132,6 @@ def test_the_responsiveness_page_counts_no_test_petition(monkeypatch: pytest.Mon
         return []
 
     monkeypatch.setattr(petition_figures, "every_record", every_record)
-    found = petition_figures.figures(datetime(2026, 1, 1, tzinfo=timezone.utc), now)
+    found = petition_figures.figures(datetime(2026, 1, 1, tzinfo=UTC), now)
     assert found["refused"] == 0 and found["published_by_mce"] == 1
     assert PETITION_EXCLUDED in asked[1]  # and a test petition never counts as reaching its threshold

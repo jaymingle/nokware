@@ -10,6 +10,7 @@ The receipt says who has the report and offers, each a separate explicit choice:
 Anything else is a new message. The choices last an hour, like the updates choice on the web.
 """
 
+import contextlib
 from typing import Any
 
 from app.services import channel_sessions, report_followups, report_locations, whatsapp_reply
@@ -99,10 +100,8 @@ def after_step(inbound: Any, state: State) -> bool:
 
 def _forget_message(message_sid: str) -> None:
     """The message that carried the location leaves Twilio's log too."""
-    try:
+    with contextlib.suppress(WhatsAppNotConfigured):
         twilio().delete_message(message_sid)
-    except WhatsAppNotConfigured:
-        pass
 
 
 def place_step(inbound: Any, state: State) -> bool:

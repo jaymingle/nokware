@@ -36,8 +36,18 @@ from dataclasses import asdict, dataclass, replace
 from typing import Any
 
 from app.config import get_settings
-from app.services import channel_limits, channel_sessions, report_followups, report_intake, report_store
 from app.contacts import EMERGENCY_TOPICS
+from app.services import (
+    channel_limits,
+    channel_sessions,
+    phone_proof,
+    report_followups,
+    report_intake,
+    report_store,
+    whatsapp_reply,
+    whatsapp_safety,
+    whatsapp_voice,
+)
 from app.services.channel_answers import for_chat
 from app.services.channel_contacts import medical_text, numbers_text, steps_text
 from app.services.channel_intent import Intent, read_message
@@ -51,7 +61,6 @@ from app.services.report_intake import DESCRIPTION_MIN, Receipt, ReportSubmissio
 from app.services.report_photos import PhotoRejected, clean_photo
 from app.services.report_rules import Classification, ClassificationMethod, InvalidReport
 from app.services.report_taxonomy import Category
-from app.services import phone_proof, whatsapp_reply, whatsapp_safety, whatsapp_voice
 from app.services.voice_transcribe import Heard, understood
 from app.services.whatsapp import WhatsAppError, WhatsAppNotConfigured, first_delivery, open_window, twilio
 from app.teams import short_name

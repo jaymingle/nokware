@@ -4,7 +4,7 @@ import csv
 import io
 import json
 from collections import defaultdict, deque
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
@@ -24,7 +24,7 @@ from app.services.export_docx import docx
 from app.services.export_pdf import pdf
 from app.services.retrieval import Chunk, Retrieval, RetrievedChunk
 
-NOW = datetime(2026, 9, 14, 22, 46, tzinfo=timezone.utc)
+NOW = datetime(2026, 9, 14, 22, 46, tzinfo=UTC)
 AT = "2026-09-14T22:40:00+00:00"
 
 

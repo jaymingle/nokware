@@ -18,12 +18,13 @@ import sys
 
 from appwrite.exception import AppwriteException
 from appwrite.query import Query
+from create_citizen_reports import ENCRYPTED_MIN, ID, KEY, UNIQUE, Creator, ensure, ensure_indexes, wait_for_attributes
 
 from app.services.appwrite_client import DATABASE_ID, every_record, get_databases, quiet_sdk_deprecation_warnings
-from app.services.citizen_reports import REPORTS_COLLECTION as REPORTS, VOICES_COLLECTION as VOICES
+from app.services.citizen_reports import REPORTS_COLLECTION as REPORTS
+from app.services.citizen_reports import VOICES_COLLECTION as VOICES
 from app.services.report_rules import PUBLIC_ID_LENGTH, new_public_id
 from app.services.report_taxonomy import Category
-from create_citizen_reports import ENCRYPTED_MIN, ID, KEY, UNIQUE, Creator, ensure, ensure_indexes, wait_for_attributes
 
 HASH = 64  # a sha256 hex digest
 

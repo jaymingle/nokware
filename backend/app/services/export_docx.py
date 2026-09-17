@@ -18,7 +18,15 @@ from docx.text.paragraph import Paragraph
 
 from app.schemas.ask import AskChart, AskFigure
 from app.services import export_chart
-from app.services.ask_export import FOOTER_NOTICE, HEADER_NOTICE, Content, chart_footnote, figure_footnote, figures_heading, figures_notes, when
+from app.services.ask_export import (
+    FOOTER_NOTICE,
+    HEADER_NOTICE,
+    Content,
+    chart_footnote,
+    figure_footnote,
+    figures_heading,
+    figures_notes,
+)
 
 INK, INK_SOFT, TEAL = RGBColor(0x17, 0x24, 0x2B), RGBColor(0x4A, 0x5A, 0x5F), RGBColor(0x1F, 0x6F, 0x5C)
 BODY_FONT, HEADING_FONT = "Public Sans", "Fraunces"

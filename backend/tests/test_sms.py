@@ -14,7 +14,6 @@ from app.services.report_taxonomy import TOPICS, Category
 from app.services.sms import ArkeselSms, DailyBudget, SmsError, SmsLimitReached, SmsNotConfigured
 from app.services.sms_text import is_gsm7, pages, plain
 from app.teams import RECIPIENT_NAMES, short_name
-from app.teams import RECIPIENT_NAMES
 
 SITE = "https://nokware.tstitagency.com"  # where Nokware will be deployed (PUBLIC_SITE_URL)
 TODAY = date(2026, 9, 14)

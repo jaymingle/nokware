@@ -29,7 +29,15 @@ from app.schemas.petitions import (
 from app.services import issue_voices, ledger_documents, petition_ledger, petitions
 from app.services.case_workflow import CaseStatus
 from app.services.petition_ledger import describe
-from app.services.petition_rules import MAX_RESUBMISSIONS, REFUSALS, RESPONSE_KINDS, PetitionAction, creator_actions, days_late, responded_late
+from app.services.petition_rules import (
+    MAX_RESUBMISSIONS,
+    REFUSALS,
+    RESPONSE_KINDS,
+    PetitionAction,
+    creator_actions,
+    days_late,
+    responded_late,
+)
 from app.services.report_taxonomy import TOPICS_BY_ID
 from app.teams import RECIPIENT_NAMES
 from app.wards import sub_metros, wards

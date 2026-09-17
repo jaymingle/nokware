@@ -10,9 +10,9 @@ one line says what live report data is. An SMS keeps one source, the first cited
 
 import re
 
+from app.services.citations import FIGURE_KINDS, KINDS
 from app.services.rag import NO_INFO_ANSWER, RagAnswer, Source
 from app.services.sms_text import pages, plain
-from app.services.citations import FIGURE_KINDS, KINDS
 
 CHAT_TITLE_MAX = 90
 SMS_PAGES = 2

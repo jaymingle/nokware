@@ -1,7 +1,8 @@
 """documentYear rules: a title's year range gives its first year."""
 
-from app.services.ledger_documents import year_from_title
 from import_ama_docs import document_year
+
+from app.services.ledger_documents import year_from_title
 
 
 def test_year_from_title_takes_first_year_of_a_range() -> None:

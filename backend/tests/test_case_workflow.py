@@ -1,6 +1,6 @@
 """A citizen report's lifecycle, escalation, retention and who sees what."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -22,7 +22,7 @@ from app.services.case_workflow import (
 )
 from app.services.workflow import MissingInput, NotAllowed, WrongState
 
-NOW = datetime(2026, 9, 13, 12, 0, tzinfo=timezone.utc)
+NOW = datetime(2026, 9, 13, 12, 0, tzinfo=UTC)
 WORKS = Principal("u-w", "Works", "w@x.org", Role.DEPARTMENT, "dept-works")
 POLICE = Principal("u-p", "Police", "p@x.org", Role.AGENCY, agency="agency-police")
 WELFARE = Principal("u-s", "Welfare", "s@x.org", Role.DEPARTMENT, "dept-social-welfare")

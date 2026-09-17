@@ -36,9 +36,9 @@ from dataclasses import dataclass
 
 from pydantic import BaseModel, Field
 
+from app.services.citations import KINDS
 from app.services.llm import get_quick_model
 from app.services.phrases import Language, phrase
-from app.services.citations import KINDS
 
 logger = logging.getLogger(__name__)
 

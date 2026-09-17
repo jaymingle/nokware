@@ -15,7 +15,7 @@ which come from a document.
 import logging
 import re
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any, Literal
 
 from langchain_core.prompts import ChatPromptTemplate
@@ -219,7 +219,7 @@ def plan(question: str, now: datetime) -> FigurePlan:
     if not counts:
         return FigurePlan([], safety, budget, missing)
     cases = stats.public_cases()
-    at = datetime.fromtimestamp(stats.counted_at(), tz=timezone.utc).isoformat()
+    at = datetime.fromtimestamp(stats.counted_at(), tz=UTC).isoformat()
     figures = [count_figure(call, f"{FIGURE_LABEL_PREFIX}{i}", cases, now, at) for i, call in enumerate(counts, 1)]
     return FigurePlan(figures, safety, budget, missing)
 

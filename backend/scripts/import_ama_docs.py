@@ -29,6 +29,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from ama_departments import ama_department
 from pydantic import ValidationError
 
 from app.categories import categories_by_id
@@ -48,7 +49,6 @@ from app.services.ledger_documents import (
 )
 from app.services.storage import ledger_file_exists, upload_ledger_file
 from app.teams import DEPARTMENT_TEAMS
-from ama_departments import ama_department
 
 SCRIPTS_DIR = Path(__file__).resolve().parent
 DEFAULT_DOCS_DIR = Path.home() / "nokware-docs"

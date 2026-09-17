@@ -34,8 +34,8 @@ anything, or infer a figure that isn't printed.
 import io
 import logging
 import re
+from collections.abc import Iterator
 from dataclasses import dataclass
-from typing import Iterator
 
 import pdfplumber
 

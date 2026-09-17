@@ -5,7 +5,7 @@ import io
 import logging
 import math
 import wave
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from urllib.parse import parse_qsl
 
@@ -292,7 +292,7 @@ def test_twilios_copy_goes_once_the_message_has_arrived_or_never_will(
 def test_a_spoken_reply_twilio_never_reports_on_is_swept_after_a_day(
     monkeypatch: pytest.MonkeyPatch, phone: dict[str, Any], redis_server: fakeredis.FakeRedis
 ) -> None:
-    now = datetime(2026, 9, 15, 12, 0, tzinfo=timezone.utc)
+    now = datetime(2026, 9, 15, 12, 0, tzinfo=UTC)
     spoken = redis_store.key(*whatsapp_voice.SPOKEN)
     redis_server.zadd(spoken, {"MMold": (now - timedelta(hours=25)).timestamp(), "MMnew": (now - timedelta(hours=2)).timestamp()})
     phone["twilio"].can_delete = False

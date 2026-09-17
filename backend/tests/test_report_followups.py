@@ -1,6 +1,6 @@
 """What a citizen sees and can do with a reference, and the deletion of numbers."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
@@ -10,7 +10,7 @@ from app.services.report_followups import Preferences, public_status, set_prefer
 from app.services.report_intake import token_hash
 from app.services.workflow import NotAllowed
 
-NOW = datetime(2026, 9, 13, 12, 0, tzinfo=timezone.utc)
+NOW = datetime(2026, 9, 13, 12, 0, tzinfo=UTC)
 CIVIC = {
     "$id": "c1", "reference": "K7QM-4TXP", "createdAt": "2026-09-01T10:00:00+00:00", "status": "resolved",
     "resolvedAt": (NOW - timedelta(days=2)).isoformat(), "category": "civic_service", "isSensitive": False,

@@ -1,7 +1,7 @@
 """Portal reads: the queues each role works from, single documents and files."""
 
 from collections.abc import Iterable
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from appwrite.query import Query
@@ -15,7 +15,7 @@ from app.services.workflow import NotAllowed, can_view
 
 QUEUE_LIMIT = 100
 FILE_LINK_SECONDS = 600
-_FAR_FUTURE = datetime.max.replace(tzinfo=timezone.utc)
+_FAR_FUTURE = datetime.max.replace(tzinfo=UTC)
 
 _names: dict[str, str] = {}  # user ID -> display name; names are effectively static
 

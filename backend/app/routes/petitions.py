@@ -63,7 +63,6 @@ from app.services import (
     phone_proof,
     rate_limit,
 )
-from app.services.petition_updates import Update
 from app.services.auth import Principal, Role
 from app.services.ledger_documents import utc_now
 from app.services.petition_rules import (
@@ -77,6 +76,7 @@ from app.services.petition_rules import (
     Scope,
     petition_topics,
 )
+from app.services.petition_updates import Update
 from app.services.report_taxonomy import TOPICS_BY_ID
 from app.wards import sub_metros, wards
 

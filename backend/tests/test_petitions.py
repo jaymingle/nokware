@@ -1,6 +1,6 @@
 """Petitions P1: the rules, confirming a phone, the checks on a draft, the MCE's decision and the clock, and what the public sees."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import fakeredis
@@ -9,8 +9,20 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 from app.routes import petition_presenters as present
-from app.services import channel_limits, channel_sessions, petition_clock, petition_ledger, petition_rules, petition_screen, petitions, phone_proof, redis_store, ussd
-from app.services import whatsapp_conversation, whatsapp_reply
+from app.services import (
+    channel_limits,
+    channel_sessions,
+    petition_clock,
+    petition_ledger,
+    petition_rules,
+    petition_screen,
+    petitions,
+    phone_proof,
+    redis_store,
+    ussd,
+    whatsapp_conversation,
+    whatsapp_reply,
+)
 from app.services.auth import Principal, Role
 from app.services.petition_rules import (
     Draft,
@@ -32,7 +44,7 @@ from app.services.petition_rules import (
 from app.services.phone_proof import Channel, Claim, ProofError
 from app.services.whatsapp_conversation import Inbound
 
-NOW = datetime(2026, 9, 15, 9, 0, tzinfo=timezone.utc)
+NOW = datetime(2026, 9, 15, 9, 0, tzinfo=UTC)
 PHONE = "+233241234567"
 MCE = Principal("u-m", "The MCE", "m@x.org", Role.MCE)
 DRAFT = Draft("Desilt the Odaw drain before the rains", "The drain at Kaneshie floods every June and the market has to close.",
@@ -127,7 +139,7 @@ def test_a_whatsapp_code_confirms_the_number_once_and_redis_never_holds_it(serve
     held = phone_proof.state(challenge.secret)
     proof = phone_proof.open_proof(held.proof, NOW)
     assert (held.state, proof.number, proof.channel, proof.hint) == ("proven", PHONE, Channel.WHATSAPP, "+233…67")
-    stored = " ".join(" ".join(server.hgetall(k).values()) if server.type(k) == "hash" else server.get(k) for k in server.keys())
+    stored = " ".join(" ".join(server.hgetall(k).values()) if server.type(k) == "hash" else server.get(k) for k in server.keys())  # noqa: SIM118 (Redis, not a dict)
     assert "241234567" not in stored and "241234567" not in " ".join(server.keys())
 
 
@@ -263,7 +275,7 @@ def test_a_petition_that_was_never_published_is_not_found(monkeypatch: pytest.Mo
 def test_sending_a_petition_needs_a_confirmed_phone_and_is_checked_again(monkeypatch: pytest.MonkeyPatch) -> None:
     client, body = TestClient(app), {"title": DRAFT.title, "body": DRAFT.body, "topic": "drainage", "scope": "metro"}
     assert client.post("/api/petitions", json=body).status_code == 401
-    proof = phone_proof.issue_proof(PHONE, Channel.USSD, datetime.now(timezone.utc))
+    proof = phone_proof.issue_proof(PHONE, Channel.USSD, datetime.now(UTC))
     response = client.post("/api/petitions", json={**body, "body": f"{DRAFT.body} Call 0241234567."}, headers={"X-Phone-Proof": proof})
     assert response.status_code == 422 and "phone number" in response.json()["detail"]
 

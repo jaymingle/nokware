@@ -4,7 +4,7 @@ Every BMS call here is mocked: BMS has no sandbox, so a real call is a charged m
 
 import json
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import httpx
@@ -17,7 +17,7 @@ from app.services.sms import DailyBudget, SmsError, SmsLimitReached, SmsNotConfi
 from app.services.sms_bms import BmsSms
 
 KEY = "bms-key-8f3a"
-NOW = datetime(2026, 9, 15, 12, 0, tzinfo=timezone.utc)
+NOW = datetime(2026, 9, 15, 12, 0, tzinfo=UTC)
 SENT = {"status": "success", "code": "2000", "message": "messages sent successfully",
         "summary": {"_id": "A59CCB70-662D", "type": "API QUICK SMS", "total_sent": 1, "contacts": 1, "total_rejected": 0,
                     "numbers_sent": ["0241234567"], "credit_used": 1, "credit_left": 1483}}

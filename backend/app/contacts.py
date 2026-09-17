@@ -124,7 +124,7 @@ def welfare_desk(sub_metro: str | None) -> PublicContact | None:
 def _welfare(sub_metro: str | None) -> list[str]:
     """The citizen's sub-metro desk, or every desk if we don't know it, then the head office."""
     desks = _desks()
-    return [desks[sub_metro] if sub_metro in desks else None, *([] if sub_metro in desks else desks.values()), SAFETY_DESK_FALLBACK]
+    return [desks.get(sub_metro), *([] if sub_metro in desks else desks.values()), SAFETY_DESK_FALLBACK]
 
 
 # A medical emergency isn't the Assembly's to act on: nothing is filed, but the numbers are given.

@@ -6,9 +6,9 @@
     GET /api/responsiveness      each department's handling of reports and contributors' documents, last 12 months
 """
 
-from fastapi import APIRouter
-
 from dataclasses import asdict
+
+from fastapi import APIRouter
 
 from app.schemas.accountability import PublishingRecord, Responsiveness
 from app.services import department_responsiveness, publishing_record, reporting_gaps, unpublished_data

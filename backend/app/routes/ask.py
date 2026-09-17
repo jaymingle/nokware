@@ -12,7 +12,6 @@ recording is held in memory only: never stored, and its words never logged.
 
 import logging
 from collections.abc import Iterator
-
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile, status

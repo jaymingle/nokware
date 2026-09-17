@@ -1,6 +1,6 @@
 """Read aloud: only what the server produced, never anything about someone's safety, paid for once."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import fakeredis
@@ -15,7 +15,7 @@ from app.services.read_aloud import NotReadAloud, ReadAloudUnavailable
 from app.services.voice_audio import Encoded
 from app.services.voice_speech import SpeechFailed
 
-NOW = datetime(2026, 9, 15, 12, 0, tzinfo=timezone.utc)
+NOW = datetime(2026, 9, 15, 12, 0, tzinfo=UTC)
 ANSWER = "**Market stall** fees are set in the Fee-Fixing Resolution [S1]: GH¢ 30.00 a month (https://ama.gov.gh/fees.pdf)."
 STATUS = {"private": False, "reference": "K7QM-4TXP", "status": "resolved", "topic": "Drainage and flooding", "ward": "Kaneshie",
           "recipients": ["Works Department"], "resolution_notes": [{"recipient": "Works Department", "note": "Desilted on 12 September."}],

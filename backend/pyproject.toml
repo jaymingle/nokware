@@ -38,7 +38,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=9,<10", "fakeredis>=2,<3", "fonttools>=4,<5"]
+dev = ["pytest>=9,<10", "fakeredis>=2,<3", "fonttools>=4,<5", "ruff>=0.13,<0.14"]
 
 [tool.setuptools.packages.find]
 include = ["app*"]
@@ -48,4 +48,19 @@ app = ["data/*.json", "fonts/*.ttf", "fonts/*.txt"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["scripts"]
+pythonpath = [".", "scripts"]
+
+[tool.ruff]
+line-length = 140
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["F", "E9", "I", "B", "UP", "SIM", "PIE", "RUF100"]
+# zip() of lists that are equal by construction; a nested ternary reads worse than the if block.
+ignore = ["B905", "SIM108"]
+
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["fastapi.Depends", "app.dependencies.require_roles"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app", "tests"]

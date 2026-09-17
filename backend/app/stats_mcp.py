@@ -17,7 +17,7 @@ state and a proxy needs no stickiness.
 """
 
 import math
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Annotated, Literal
 from urllib.parse import urlsplit
 
@@ -79,7 +79,7 @@ def count_reports(
     call = CountReports(topic=topic, category=category, status=status, electoral_area=electoral_area,
                         sub_metro=sub_metro, department=department, period=period, group_by=group_by)
     cases = stats.public_cases()
-    at = datetime.fromtimestamp(stats.counted_at(), tz=timezone.utc).isoformat()
+    at = datetime.fromtimestamp(stats.counted_at(), tz=UTC).isoformat()
     figure = count_figure(call, "R1", cases, utc_now(), at)
     return ReportCount(counted=figure.description, count=figure.value, breakdown=[Row(name=n, count=c) for n, c in figure.rows],
                        grouped_by=figure.grouped_by, counted_at=figure.counted_at)

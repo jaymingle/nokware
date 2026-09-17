@@ -32,8 +32,6 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import Runnable
 
 from app.services.ask_charts import (
-    DOCUMENT_CHART_REFUSAL,
-    SPREADSHEET_REFUSAL,
     ChartDict,
     asks_for_chart,
     asks_for_spreadsheet,
@@ -43,18 +41,16 @@ from app.services.ask_charts import (
 from app.services.ask_document_charts import figures_to_chart
 from app.services.ask_figures import (
     NO_FIGURES,
-    NO_SAFETY_DOCUMENTS,
     SAFETY_FIGURES_ANSWER,
-    SAFETY_IN_DOCUMENTS,
     Figure,
     FigurePlan,
     figure_context,
     wants_figures,
 )
 from app.services.ask_figures import plan as plan_figures
+from app.services.ask_language import Asked, failed_note, read_question, translate_answer
 from app.services.budget_figures import context as budget_context
 from app.services.budget_figures import years as budget_years
-from app.services.ask_language import Asked, failed_note, read_question, translate_answer
 from app.services.citations import make_label, sanitize_citations
 from app.services.ledger_documents import Provenance, provenance, utc_now
 from app.services.llm import get_chat_model

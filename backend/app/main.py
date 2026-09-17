@@ -26,12 +26,14 @@ from app.routes import (
     ledger,
     me,
     options,
-    petitions as petition_routes,
     phone,
-    speech,
     queues,
     reports,
     representatives,
+    speech,
+)
+from app.routes import (
+    petitions as petition_routes,
 )
 from app.services import bms_deliveries, notifications, petition_clock, petitions, scheduler, search_index, whatsapp_voice
 from app.services.appwrite_client import quiet_sdk_deprecation_warnings
@@ -39,10 +41,10 @@ from app.services.issue_voices import InvalidVoice, IssueNotFound, purge_expired
 from app.services.ledger_documents import utc_now
 from app.services.petition_rules import PetitionError
 from app.services.phone_proof import ProofError
-from app.services.read_aloud import NotReadAloud, ReadAloudUnavailable
-from app.services.redis_store import RedisUnavailable
 from app.services.portal_actions import run_deadline_job
 from app.services.portal_queries import DocumentNotFound
+from app.services.read_aloud import NotReadAloud, ReadAloudUnavailable
+from app.services.redis_store import RedisUnavailable
 from app.services.report_contacts import InvalidNumber
 from app.services.report_followups import CaseNotFound, purge_expired_contacts
 from app.services.report_photos import PhotoRejected

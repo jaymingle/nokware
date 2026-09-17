@@ -4,8 +4,8 @@ from typing import Any
 
 from app.schemas.cases import CaseAssignment, CaseDetail, CaseEvent, CaseSummary, Contact
 from app.services import case_history, issue_voices, report_locations
-from app.services.case_history import CaseHistoryAction
 from app.services.auth import Principal
+from app.services.case_history import CaseHistoryAction
 from app.services.case_workflow import CaseView, allowed_case_actions, assignment_for, case_view, may_see_contact
 from app.services.report_contacts import contact_for
 from app.services.report_photos import photo_link

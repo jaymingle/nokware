@@ -61,9 +61,10 @@ def rows(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def pdf_of(text: str) -> bytes:
     """A one-page PDF carrying this text, so the reader is exercised as it is in life."""
+    import io
+
     from reportlab.lib.pagesizes import A4
     from reportlab.pdfgen.canvas import Canvas
-    import io
 
     out = io.BytesIO()
     canvas = Canvas(out, pagesize=A4)

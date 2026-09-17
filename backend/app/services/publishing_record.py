@@ -32,11 +32,10 @@ no year of it is ever called missing.
 import json
 import re
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
-
 
 from app.services import ledger_documents
 from app.services.appwrite_client import every_record
@@ -71,7 +70,7 @@ def rules() -> dict[str, Any]:
 
 
 def _moment(year: int, month: int = 1) -> datetime:
-    return datetime(year + (month - 1) // 12, (month - 1) % 12 + 1, 1, tzinfo=timezone.utc)
+    return datetime(year + (month - 1) // 12, (month - 1) % 12 + 1, 1, tzinfo=UTC)
 
 
 def periods(requirement: dict[str, Any], now: datetime) -> list[Period]:

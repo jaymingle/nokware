@@ -15,7 +15,8 @@ from appwrite.query import Query
 
 from app.services.appwrite_client import DATABASE_ID, get_databases, quiet_sdk_deprecation_warnings
 from app.services.petition_signatures import SIGNATURES_COLLECTION as SIGNATURES
-from app.services.petitions import HISTORY_COLLECTION as HISTORY, PETITIONS_COLLECTION as PETITIONS
+from app.services.petitions import HISTORY_COLLECTION as HISTORY
+from app.services.petitions import PETITIONS_COLLECTION as PETITIONS
 
 TEST_PREFIX = "[TEST]"
 PAGE = 100

@@ -8,6 +8,7 @@ the loop carries on.
 """
 
 import asyncio
+import contextlib
 import logging
 from collections.abc import Callable
 
@@ -37,7 +38,5 @@ async def stop(task: asyncio.Task[None] | None) -> None:
     if task is None:
         return
     task.cancel()
-    try:
+    with contextlib.suppress(asyncio.CancelledError):
         await task
-    except asyncio.CancelledError:
-        pass

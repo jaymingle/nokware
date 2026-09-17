@@ -9,18 +9,18 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.config import get_settings
+from app.contacts import EMERGENCY_TOPICS
 from app.main import RedactChannelSecrets, app
-from app.safety_steps import STEPS
 from app.routes import channels
+from app.safety_steps import STEPS
 from app.services import channel_intent, channel_limits, channel_sessions, redis_store, report_followups, report_intake, ussd
 from app.services.channel_contacts import numbers_sms
 from app.services.citizen_reports import IntakeChannel, NotificationEvent
-from app.contacts import EMERGENCY_TOPICS
+from app.services.report_contacts import ContactChoice, normalise_phone
 from app.services.report_intake import Receipt, ReportSubmission
 from app.services.report_rules import Classification, ClassificationMethod
 from app.services.report_taxonomy import TOPICS_BY_ID
 from app.services.sms_text import is_gsm7, pages
-from app.services.report_contacts import ContactChoice, normalise_phone
 from app.services.ussd import CONFIRM, MENU, SEND, UPDATES_ASK, Dial, sub_metro_screen, ward_screen
 from app.wards import sub_metros
 
@@ -44,7 +44,7 @@ def session(monkeypatch: pytest.MonkeyPatch) -> list[tuple[Any, ...]]:
 
 def keys(later: list[tuple[Any, ...]], *presses: str, session_id: str = "s1") -> ussd.Reply:
     """Dial, then press each key in turn; the last screen."""
-    add = lambda *args: later.append(args)  # noqa: E731
+    add = lambda *args: later.append(args)
     reply = ussd.respond(Dial(session_id, PHONE, "*928*1#", True), add)
     for press in presses:
         reply = ussd.respond(Dial(session_id, PHONE, press, False), add)

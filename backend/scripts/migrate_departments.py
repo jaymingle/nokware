@@ -28,19 +28,19 @@ import argparse
 import csv
 import sys
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from ama_departments import RENAMED, ama_department, current_team
 from appwrite.exception import AppwriteException
 from appwrite.query import Query
 
-from app.services.appwrite_client import DATABASE_ID, every_record, get_databases, get_teams, get_users
-from app.services.appwrite_client import quiet_sdk_deprecation_warnings
+from app.services.appwrite_client import DATABASE_ID, every_record, get_databases, get_teams, get_users, quiet_sdk_deprecation_warnings
 from app.services.citizen_reports import ASSIGNMENTS_COLLECTION, REPORTS_COLLECTION
-from app.services.ledger_documents import COLLECTION_ID as DOCUMENTS, Origin
+from app.services.ledger_documents import COLLECTION_ID as DOCUMENTS
+from app.services.ledger_documents import Origin
 from app.teams import DEPARTMENT_NAMES, DEPARTMENT_TEAMS
-from ama_departments import RENAMED, ama_department, current_team
 
 HISTORY = "document_history"
 LOG_DIR = Path(__file__).resolve().parent / "logs"
@@ -174,7 +174,7 @@ def delete_old_teams(run: Run, teams: set[str]) -> None:
 
 def write_log(log: list[list[str]]) -> None:
     LOG_DIR.mkdir(exist_ok=True)
-    path = LOG_DIR / f"department_migration_{datetime.now(timezone.utc):%Y%m%dT%H%M%SZ}.csv"
+    path = LOG_DIR / f"department_migration_{datetime.now(UTC):%Y%m%dT%H%M%SZ}.csv"
     with path.open("w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
         writer.writerow(["document_id", "title", "department_before", "department_after", "uploaded_by_before", "uploaded_by_after"])

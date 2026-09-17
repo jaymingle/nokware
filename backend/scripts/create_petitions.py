@@ -29,16 +29,17 @@ import argparse
 import sys
 
 from appwrite.services.databases import Databases
+from create_citizen_reports import ENCRYPTED_MIN, ID, KEY, TEAM, UNIQUE, Creator, ensure, ensure_indexes, values, wait_for_attributes
 
 from app.services.appwrite_client import DATABASE_ID, get_databases, quiet_sdk_deprecation_warnings
 from app.services.petition_rules import (
     BODY_MAX,
     CODE_DIGITS,
-    RESPONSE_KINDS,
-    RESPONSE_MAX,
     NAME_MAX,
     NOTE_MAX,
     REFUSALS,
+    RESPONSE_KINDS,
+    RESPONSE_MAX,
     TITLE_MAX,
     PetitionAction,
     PetitionStatus,
@@ -46,9 +47,9 @@ from app.services.petition_rules import (
     Scope,
 )
 from app.services.petition_signatures import SIGNATURES_COLLECTION as SIGNATURES
-from app.services.petitions import HISTORY_COLLECTION as HISTORY, PETITIONS_COLLECTION as PETITIONS
+from app.services.petitions import HISTORY_COLLECTION as HISTORY
+from app.services.petitions import PETITIONS_COLLECTION as PETITIONS
 from app.services.phone_proof import Channel
-from create_citizen_reports import ENCRYPTED_MIN, ID, KEY, TEAM, UNIQUE, Creator, ensure, ensure_indexes, values, wait_for_attributes
 
 HASH = 64  # a sha256 hex digest
 TOPIC = 64

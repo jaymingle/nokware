@@ -22,11 +22,11 @@ from app.services.case_workflow import (
     escalate,
     escalation_open,
 )
+from app.services.issue_voices import sync_voice_retention
 from app.services.ledger_documents import parse_datetime
 from app.services.report_contacts import contact_for, contacts_due_for_deletion, delete_contact, update_contact
 from app.services.report_intake import token_hash
 from app.services.report_rules import normalise_reference
-from app.services.issue_voices import sync_voice_retention
 from app.services.report_taxonomy import TOPICS_BY_ID, Category
 from app.services.workflow import NotAllowed
 from app.teams import RECIPIENT_NAMES
