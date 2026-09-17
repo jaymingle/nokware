@@ -12,6 +12,7 @@ import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
 import { Textarea } from "@/components/ui/textarea";
 import { usePetitionLedger } from "@/lib/api/petition-queries";
 import { useDepartments, useRespondToPetition } from "@/lib/api/queries";
+import { spacedCode } from "@/lib/petitions";
 
 import type { AwaitingResponse, ResponseKind } from "@/lib/api/types";
 
@@ -103,7 +104,7 @@ export function RespondDialog({ petition, late }: { petition: AwaitingResponse; 
       <DialogTrigger asChild><Button className="w-fit" data-testid={`respond-${petition.code}`}>Respond publicly</Button></DialogTrigger>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle className="text-[20px]">Respond to petition {petition.code.slice(0, 3)} {petition.code.slice(3)}</DialogTitle>
+          <DialogTitle className="text-[20px]">Respond to petition {spacedCode(petition.code)}</DialogTitle>
           <DialogDescription>
             It is published on the petition&apos;s page as you write it, and can&apos;t be changed afterwards. The page says it came from
             the MCE; the audit trail keeps your name. The petition then takes no more signatures.
