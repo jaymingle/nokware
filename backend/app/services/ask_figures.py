@@ -247,7 +247,7 @@ def _budget_figures(calls: list[dict[str, Any]]) -> tuple[list[BudgetFigure], li
     return found, missing
 
 
-def _when(iso: str) -> str:
+def when(iso: str) -> str:
     """Accra keeps GMT all year."""
     moment = datetime.fromisoformat(iso)
     return f"{moment.day} {moment:%B %Y, %H:%M} GMT"
@@ -256,7 +256,7 @@ def _when(iso: str) -> str:
 def figure_context(figure: Figure) -> str:
     breakdown = "; ".join(f"{name}: {value}" for name, value in figure.rows)
     lines = [
-        f"[{figure.label}] Live report data (reports residents filed with Nokware, counted {_when(figure.counted_at)}): "
+        f"[{figure.label}] Live report data (reports residents filed with Nokware, counted {when(figure.counted_at)}): "
         f"{figure.description}",
         f"Result: {figure.value}",
         *([f"Breakdown: {breakdown}"] if breakdown else []),

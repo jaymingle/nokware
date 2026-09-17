@@ -17,6 +17,7 @@ from urllib.parse import urlsplit
 
 from app.config import get_settings
 from app.schemas.ask import AskChart, AskFigure, ExportSource, ExportView
+from app.services.ask_figures import when
 from app.services.citations import KINDS
 from app.services.rag import NO_INFO_ANSWER
 
@@ -114,11 +115,6 @@ class Content:
     chart: AskChart | None
     chart_note: str | None
     no_information: str | None  # where to look next, when the Ledger had nothing
-
-
-def when(iso: str) -> str:
-    moment = datetime.fromisoformat(iso)
-    return f"{moment.day} {moment:%B %Y, %H:%M} GMT"
 
 
 def provenance_line(source: ExportSource) -> str | None:
