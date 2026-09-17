@@ -1,10 +1,5 @@
-/**
- * How to request information the Assembly hasn't published, under the Right
- * to Information Act, 2019 (Act 989). The contact comes from AMA's 2022 Right
- * to Information Manual (Appendix B), which is itself in the Ledger, so it is
- * cited like any other source. The older 2020 manual names a different
- * officer; the newer one is used so readers get one current contact.
- */
+// The contact comes from the 2022 manual (Appendix B), which is in the Ledger and cited like any other source. The
+// 2020 manual names a different officer; the newer one is used so readers get one current contact.
 export const RTI_MANUAL = {
   documentId: "ama-c6df436029646f2f884367b37d9ad138",
   title: "Right to Information Manual",

@@ -24,7 +24,7 @@ function Count({ value, active, testId }: { value: number; active: boolean; test
   );
 }
 
-/** Documents this department can still review: each will publish on its own. */
+/** Only documents whose clock is still running: the rest publish on their own. */
 function ReviewCount({ active }: { active: boolean }) {
   const now = useNow();
   const { data } = useReviewQueue();
@@ -32,13 +32,12 @@ function ReviewCount({ active }: { active: boolean }) {
   return <Count value={open} active={active} testId="nav-count-review" />;
 }
 
-/** Disputes waiting on this contributor, which don't move until they respond. */
 function ResponsesCount({ active }: { active: boolean }) {
   const { data } = useSubmissions();
   return <Count value={data ? awaitingResponse(data).length : 0} active={active} testId="nav-count-responses" />;
 }
 
-/** Escalated disputes the MCE can still rule on: each will publish on its own. */
+/** Only escalations whose clock is still running: the rest publish on their own. */
 function EscalationsCount({ active }: { active: boolean }) {
   const now = useNow();
   const { data } = useEscalations();
@@ -46,19 +45,17 @@ function EscalationsCount({ active }: { active: boolean }) {
   return <Count value={open} active={active} testId="nav-count-escalations" />;
 }
 
-/** Cases with something left for this department or agency to do. */
 function CasesCount({ active }: { active: boolean }) {
   const { data } = useCaseQueue();
   return <Count value={data ? openForMe(data.cases) : 0} active={active} testId="nav-count-cases" />;
 }
 
-/** Cases citizens have escalated, waiting for the MCE. */
 function CaseEscalationsCount({ active }: { active: boolean }) {
   const { data } = useCaseOversight();
   return <Count value={data?.stats.escalated ?? 0} active={active} testId="nav-count-case-escalations" />;
 }
 
-/** Petitions the MCE can still decide on (each will publish on its own), and those owed a public response. */
+/** Petitions past their review deadline publish on their own, so they aren't counted. */
 function PetitionsCount({ active }: { active: boolean }) {
   const now = useNow();
   const review = usePetitionReview();

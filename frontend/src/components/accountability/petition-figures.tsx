@@ -5,10 +5,6 @@ import { lowerFirst } from "@/lib/text";
 
 import type { PetitionFigures as Figures } from "@/lib/api/types";
 
-/**
- * How the MCE handled residents' petitions over the same twelve months: the review, and the response owed to
- * each that reached its signatures. Exact counts: they count the MCE's decisions on public petitions, not residents.
- */
 export function PetitionFigures({ figures }: { figures: Figures }) {
   const reasons = figures.refusals.filter((r) => r.count > 0);
   return (

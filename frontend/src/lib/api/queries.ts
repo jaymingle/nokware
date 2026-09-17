@@ -43,7 +43,6 @@ const QUEUE_REFRESH_MS = 60_000; // keeps queues current as clocks run out elsew
 const PROCESSING_REFRESH_MS = 10_000;
 const PUBLISHING_REFRESH_MS = 10_000; // while a clock has run out, until the deadline job publishes it
 
-/** Refresh a queue every minute, or every 10 seconds while something is about to publish. */
 function queueRefresh(documents: DocumentOut[] | undefined): number {
   return anyPublishingNow(documents, Date.now()) ? PUBLISHING_REFRESH_MS : QUEUE_REFRESH_MS;
 }
@@ -70,7 +69,7 @@ function refreshDocuments(queryClient: QueryClient): Promise<void> {
   return queryClient.invalidateQueries({ predicate: (query) => DOCUMENT_QUERY_ROOTS.has(String(query.queryKey[0])) });
 }
 
-/** Reloads every document view, e.g. after an action failed because a document changed elsewhere. */
+/** For when an action failed because the document changed elsewhere. */
 export function useRefreshDocuments(): () => Promise<void> {
   const queryClient = useQueryClient();
   return () => refreshDocuments(queryClient);
@@ -89,7 +88,6 @@ export function useLibrary(page: number) {
     queryKey: queryKeys.library(page),
     queryFn: () => getLibrary(LIBRARY_PAGE_SIZE, page * LIBRARY_PAGE_SIZE),
     placeholderData: keepPreviousData,
-    // Poll while any document on the page is still being indexed for Ask.
     refetchInterval: (query) =>
       query.state.data?.documents.some((doc) => doc.ingestion === "processing") ? PROCESSING_REFRESH_MS : false,
   });
@@ -111,7 +109,6 @@ export function useEscalations() {
   });
 }
 
-/** One document with its audit trail, fetched only once it's wanted. */
 export function useDocumentDetail(id: string, enabled: boolean) {
   return useQuery({ queryKey: queryKeys.document(id), queryFn: () => getDocument(id), enabled });
 }
@@ -194,7 +191,6 @@ export function usePetitionReview() {
   return useQuery({ queryKey: queryKeys.petitionReview, queryFn: getPetitionReview, refetchInterval: PETITION_REVIEW_REFRESH_MS });
 }
 
-/** The MCE's decision; the queue it returns replaces the one shown. */
 export function useDecidePetition() {
   const queryClient = useQueryClient();
   return useMutation<ReviewQueue, Error, { code: string; decision: PetitionDecision }>({
@@ -207,7 +203,6 @@ export function useAwaitingResponses() {
   return useQuery({ queryKey: queryKeys.awaitingResponses, queryFn: getAwaitingResponses, refetchInterval: PETITION_REVIEW_REFRESH_MS });
 }
 
-/** The MCE's response; the list it returns replaces the one shown. */
 export function useRespondToPetition() {
   const queryClient = useQueryClient();
   return useMutation<AwaitingResponse[], Error, { code: string; response: PetitionResponseRequest }>({

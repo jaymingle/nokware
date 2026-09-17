@@ -6,7 +6,6 @@ import type { AnswerStatus, AskChart, AskFigure, AskStreamEvent, ExportView } fr
 /** counting: searching the Ledger and counting live report data at once. */
 export type TurnStage = "searching" | "counting" | "writing" | "translating" | "done" | "error";
 
-/** One question and its answer as it arrives. */
 export type Turn = {
   id: string;
   question: string;
@@ -18,7 +17,6 @@ export type Turn = {
   text: string;
   /** The answer as it was written and checked; the sources are in English. Same as text for an English answer. */
   english: string;
-  /** Whether a machine translated the answer from the English. */
   translated: boolean;
   status: AnswerStatus | null;
   error: string | null;
@@ -28,7 +26,7 @@ export type Turn = {
   chartNote: string | null;
   /** The answer as the export route takes it back, signed by the API. */
   exportView: ExportView | null;
-  /** Whether the API will read it aloud: never an answer about someone's safety. */
+  /** Never true for an answer about someone's safety. */
   speakable: boolean;
 };
 
@@ -39,7 +37,6 @@ export function newTurn(id: string, question: string): Turn {
   };
 }
 
-/** The turn after one stream event. */
 export function applyEvent(turn: Turn, event: AskStreamEvent): Turn {
   switch (event.type) {
     case "stage":
@@ -80,13 +77,8 @@ function plural(count: number, one: string, many: string): string {
   return `${count} ${count === 1 ? one : many}`;
 }
 
-/**
- * What the answer rests on, each kind named as what it is.
- *
- * A budget figure is read from a published document; a report figure is counted
- * from what residents filed. Calling both "live report figures" said the wrong
- * thing about where a number came from, on the one line whose job is to say it.
- */
+// A budget figure is read from a published document; a report figure is counted from what residents filed. Calling
+// both "live report figures" misstated where a number came from.
 export function attribution(turn: Turn): string | null {
   const cited = turn.figures.filter((figure) => figure.cited);
   const budget = cited.filter((figure) => figure.source === "documents").length;

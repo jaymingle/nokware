@@ -13,7 +13,6 @@ export type PhoneProof = {
   forget: () => void;
 };
 
-/** The phone this tab has confirmed, if any: kept in the tab, forgotten on request or once it expires. */
 export function usePhoneProof(): PhoneProof {
   const mounted = useMounted();
   const now = useNow();

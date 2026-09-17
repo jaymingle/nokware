@@ -72,7 +72,6 @@ function Filed({ receipt }: { receipt: ReportReceipt }) {
 
 type ReceiptProps = { receipt: ReportReceipt; safetySteps: string[]; onAnother: () => void };
 
-/** The confirmation: the reference to keep, where the report went, and what messages to expect. */
 export function ReportReceiptView({ receipt, safetySteps, onAnother }: ReceiptProps) {
   const messages = messagesLine(receipt);
   return (

@@ -33,7 +33,6 @@ type ActionDialogProps = {
   title: string;
   description: ReactNode;
   confirmLabel: string;
-  /** A note to send with the action; required ones must be filled in. */
   note?: { label: string; hint: string; required: boolean };
   success: string;
 };
@@ -48,7 +47,6 @@ function NoteField({ label, hint, required, testId }: NonNullable<ActionDialogPr
   );
 }
 
-/** Confirms a workflow action (with an optional note) before sending it. */
 export function ActionDialog(props: ActionDialogProps) {
   const { doc, action, tone, note } = props;
   const [open, setOpen] = useState(false);

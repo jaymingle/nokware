@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 
 const TICK_MS = 15_000;
 
-/** The current time, updated every 15 seconds so countdowns stay live. */
 export function useNow(): number {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {

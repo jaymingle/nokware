@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
 
-/** A page's opening: small eyebrow, Fraunces heading, and an optional lead or aside. */
 export function PageIntro({
   eyebrow,
   title,

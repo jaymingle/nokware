@@ -58,7 +58,6 @@ function ResubmitForm({ doc, resubmit, onDone }: ResubmitFormProps) {
   );
 }
 
-/** Send a corrected PDF back to the department after a dispute. Allowed once per document. */
 export function ResubmitDialog({ doc }: { doc: DocumentOut }) {
   const [open, setOpen] = useState(false);
   const resubmit = useResubmit();

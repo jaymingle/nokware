@@ -2,8 +2,8 @@ import { formatDate } from "@/lib/time";
 
 import type { PetitionCard, PetitionStatus, PetitionTimelineEntry, PhoneChallenge } from "@/lib/api/types";
 
-// How a petition reads in public, and what this browser keeps while someone starts one. The MCE is usually a
-// petition's target, so the page always says who published it: the MCE, or the clock when the MCE didn't decide.
+// The MCE is usually a petition's target, so the page always says who published it: the MCE, or the clock when the
+// MCE didn't decide.
 
 const DAY_MS = 86_400_000;
 
@@ -20,7 +20,6 @@ export const STATUS_LABELS: Record<PetitionStatus, string> = {
 export const NAME_NOTE =
   "If you show your name, anyone can see it on the petition, including the department it concerns. If you stay anonymous, you still count; only your name is withheld. You can take your name off later.";
 
-/** The same, naming the department when it is known: who exactly can see a public name. */
 export function nameNote(concerns: string | null): string {
   return concerns ? NAME_NOTE.replace("the department it concerns", `${concerns}, which it concerns`) : NAME_NOTE;
 }
@@ -30,7 +29,7 @@ export const NO_RESPONSE = "No response 30 days after the petition reached its t
 export const LEDGER_NOTE =
   "Found by searching the Assembly's published documents for this petition's words. A match means a document touches the subject, not that it commits to what the petition asks, and the search can miss documents.";
 
-/** A petition number or a code in two threes, "482 913": easier to read aloud and type on a keypad. */
+/** "482 913": easier to read aloud and type on a keypad. */
 export function spacedCode(code: string): string {
   return `${code.slice(0, 3)} ${code.slice(3)}`;
 }
@@ -44,7 +43,6 @@ export function startedBy(name: string | null): string {
   return name ? `Started by ${name}` : "Started by a resident";
 }
 
-/** Who published it: the MCE, or the 72-hour clock the MCE let run out. */
 export function publishedLine(petition: Pick<PetitionCard, "published_at" | "published_by">): string | null {
   if (!petition.published_at) return null;
   const on = formatDate(petition.published_at);
@@ -68,7 +66,7 @@ export function daysLeft(iso: string, now: number): number {
 
 type Standing = Pick<PetitionCard, "status" | "threshold" | "threshold_reached_at" | "response_due" | "responded_at" | "unanswered_at">;
 
-/** How late, in whole days never rounded up: ", 2 days after the 30-day deadline", or "less than a day"; "" if in time. */
+// Whole days, never rounded up: a day late is only said once a full day has passed.
 function lateness(respondedAt: string, due: string | null): string {
   const lateMs = due ? Date.parse(respondedAt) - Date.parse(due) : 0;
   if (lateMs <= 0) return "";
@@ -76,13 +74,11 @@ function lateness(respondedAt: string, due: string | null): string {
   return days >= 1 ? `, ${days} ${days === 1 ? "day" : "days"} after the 30-day deadline` : ", less than a day after the 30-day deadline";
 }
 
-/** When, and how late, the MCE responded. */
 export function respondedLine(petition: Pick<PetitionCard, "responded_at" | "response_due">): string | null {
   if (!petition.responded_at) return null;
   return `The MCE responded on ${formatDate(petition.responded_at)}${lateness(petition.responded_at, petition.response_due)}.`;
 }
 
-/** Once it reached its threshold: when, and the MCE's 30 days to respond, counted down, then said plainly if they pass. */
 export function responseLine(petition: Standing, now: number, where = "on this page"): string | null {
   if (petition.status === "responded") return respondedLine(petition);
   if (petition.status !== "awaiting_response" || !petition.threshold_reached_at || !petition.response_due) return null;
@@ -92,7 +88,6 @@ export function responseLine(petition: Standing, now: number, where = "on this p
   return `${reached} The MCE has until ${formatDate(petition.response_due)} to respond publicly ${where}: ${left} ${left === 1 ? "day" : "days"} left.`;
 }
 
-/** Where the petition stands in time: open until when, or when and why it closed. */
 export function closingLine(petition: Pick<PetitionCard, "status" | "closes_at" | "closed_at" | "threshold">, now: number): string | null {
   if (petition.status === "responded") return "It takes no more signatures: the MCE has responded.";
   if (petition.status === "awaiting_response" && petition.closes_at) {
@@ -125,13 +120,11 @@ export function timelineText(entry: PetitionTimelineEntry): string {
   return entry.reason ? `${TIMELINE[entry.action]}: ${entry.reason}` : TIMELINE[entry.action];
 }
 
-/** A WhatsApp share link carrying the ask and the page's address. */
 export function whatsappShareUrl(title: string, pageUrl: string): string {
   return `https://wa.me/?text=${encodeURIComponent(`Petition to the Accra Metropolitan Assembly: ${title}\n${pageUrl}`)}`;
 }
 
-// What this browser keeps. The proof of a confirmed phone lives in this tab only (sessionStorage), so a shared
-// computer forgets it when the tab closes; the server refuses it after 12 hours anyway. The draft is kept so
+// The phone proof is kept in sessionStorage so a shared computer forgets it when the tab closes. The draft is kept so
 // switching to WhatsApp to confirm, or reloading, loses nothing.
 
 const PROOF_KEY = "nokware-phone-proof";

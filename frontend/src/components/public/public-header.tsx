@@ -27,7 +27,6 @@ function NavLink({ href, testId, children }: { href: string; testId: string; chi
   );
 }
 
-/** The public site's header: Ask, reporting, the dashboard, petitions, accountability, and the way in for staff. On a phone or tablet the links take a second row. */
 export function PublicHeader() {
   return (
     <header className="border-b bg-paper-raised">

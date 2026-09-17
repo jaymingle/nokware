@@ -2,17 +2,13 @@ import { deadlineFrom } from "@/lib/time";
 
 import type { DocumentOut } from "@/lib/api/types";
 
-/** Whether a document's clock is still running, so someone can still act on it. */
 export function clockRunning(doc: DocumentOut, now: number): boolean {
   return !doc.held_until || deadlineFrom(doc.held_until, now).urgency !== "passed";
 }
 
 type ClockSplit = { open: DocumentOut[]; closed: DocumentOut[] };
 
-/**
- * Documents split by whether their clock is still running. Closed ones are
- * publishing automatically: nobody can act on them, so they sit apart.
- */
+/** Closed ones are publishing automatically: nobody can act on them, so they sit apart. */
 export function splitByClock(documents: DocumentOut[], now: number): ClockSplit {
   return {
     open: documents.filter((doc) => clockRunning(doc, now)),
@@ -20,7 +16,6 @@ export function splitByClock(documents: DocumentOut[], now: number): ClockSplit 
   };
 }
 
-/** Held documents split by whether their review window is open. */
 export function splitHeld(documents: DocumentOut[], now: number): ClockSplit {
   return splitByClock(
     documents.filter((doc) => doc.status === "held"),
@@ -30,7 +25,6 @@ export function splitHeld(documents: DocumentOut[], now: number): ClockSplit {
 
 export type Tone = "teal" | "gold" | "brick" | "neutral";
 
-/** Where a submission stands, from the contributor's side. */
 type SubmissionView = {
   tone: Tone;
   label: string;
@@ -68,10 +62,7 @@ export function describeSubmission(doc: DocumentOut, now: number): SubmissionVie
   return { tone: "neutral", label: "Withdrawn", detail: why };
 }
 
-/**
- * Whether any document's clock has run out while it still shows as held or
- * escalated: the deadline job is about to publish it, so views poll faster.
- */
+/** A run-out clock on a held or escalated document means the deadline job is about to publish it. */
 export function anyPublishingNow(documents: DocumentOut[] | undefined, now: number): boolean {
   return (documents ?? []).some(
     (doc) => (doc.status === "held" || (doc.status === "disputed" && doc.escalated_to_mce)) && !clockRunning(doc, now),

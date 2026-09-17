@@ -30,7 +30,7 @@ function NumberLink({ number, testId, marked = false }: { number: ContactNumber;
   );
 }
 
-/** Numbers given to Nokware that differ from the cited page: shown, with why they aren't current. */
+/** Numbers given to Nokware that differ from the cited page. */
 function EarlierNumbers({ contactId, numbers }: { contactId: string; numbers: ContactNumber[] }) {
   return (
     <ul className="flex flex-col gap-1.5">
@@ -44,7 +44,6 @@ function EarlierNumbers({ contactId, numbers }: { contactId: string; numbers: Co
   );
 }
 
-/** Where the number comes from, beside it: the emergency-line label, the cited page, or an unverified warning. */
 function SourceLine({ contact }: { contact: PublicContact }) {
   if (contact.tier === 2 && contact.source) {
     return (
@@ -70,7 +69,6 @@ function SourceLine({ contact }: { contact: PublicContact }) {
   );
 }
 
-/** One office or line: its name, what it's for, its numbers, and where they come from. */
 export function ContactItem({ contact }: { contact: PublicContact }) {
   const current = contact.numbers.filter((n) => n.current);
   const earlier = contact.numbers.filter((n) => !n.current);

@@ -96,7 +96,6 @@ function RespondForm({ petition, late, onDone }: { petition: AwaitingResponse; l
   );
 }
 
-/** The MCE's public response: published on the petition's page as given, and it can't be changed afterwards. */
 export function RespondDialog({ petition, late }: { petition: AwaitingResponse; late: boolean }) {
   const [open, setOpen] = useState(false);
   return (

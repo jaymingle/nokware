@@ -31,7 +31,6 @@ function isPrivate(step: Step): boolean {
   return (step.kind === "form" && step.safety) || (step.kind === "filed" && step.receipt.private);
 }
 
-/** The public report page: one question, then the everyday or the safety form, then the reference. */
 export function ReportPage() {
   const options = useReportOptions();
   const [step, setStep] = useState<Step>({ kind: "choose" });

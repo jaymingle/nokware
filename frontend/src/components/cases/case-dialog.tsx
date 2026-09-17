@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import { DialogClose, DialogFooter } from "@/components/ui/dialog";
 import { useCaseAction, type CaseActionInput } from "@/lib/api/queries";
 
-/** Open state and the action behind a case dialog: closes and confirms on success, keeps the error otherwise. */
 export function useCaseDialog(success: string) {
   const [open, setOpen] = useState(false);
   const mutation = useCaseAction();
@@ -33,7 +32,6 @@ export function useCaseDialog(success: string) {
 
 type FooterProps = { pending: boolean; error: Error | null; confirmLabel: string; testId: string };
 
-/** The error, if any, then Cancel and the confirming button. */
 export function CaseDialogFooter({ pending, error, confirmLabel, testId }: FooterProps) {
   return (
     <>

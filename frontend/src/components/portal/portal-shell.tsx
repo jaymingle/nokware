@@ -44,7 +44,6 @@ function Unavailable({ message, onRetry }: { message: string; onRetry: () => voi
   );
 }
 
-/** Shows the portal only to a signed-in user with a role; handles every other state. */
 export function PortalShell({ children }: { children: ReactNode }) {
   const { status, error, signOut, retry } = useAuth();
   if (status === "loading") return <StatusScreen title="Opening the portal…" />;

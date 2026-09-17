@@ -75,7 +75,6 @@ function CivicFollowUp({ status }: { status: ReportStatus }) {
   return null;
 }
 
-/** An everyday report: what, where, who has it, and what they said when they resolved it. */
 export function CivicStatus({ status }: { status: ReportStatus }) {
   const where = [status.ward, status.sub_metro ? `${status.sub_metro} sub-metro` : null].filter(Boolean).join(", ");
   return (
@@ -99,7 +98,7 @@ export function CivicStatus({ status }: { status: ReportStatus }) {
   );
 }
 
-/** Each time a service opened the location the citizen shared: they gave it for a reason and should know it was used. */
+/** The citizen gave their location for a reason and should know each time it was used. */
 function LocationViews({ views }: { views: LocationViewNote[] }) {
   if (views.length === 0) return null;
   return (
@@ -111,7 +110,7 @@ function LocationViews({ views }: { views: LocationViewNote[] }) {
   );
 }
 
-/** A personal-safety report: how far along it is, and nothing else. Anyone with the reference can open this. */
+/** Progress only: anyone with the reference can open this. */
 export function PrivateStatus({ status }: { status: ReportStatus }) {
   return (
     <StatusFrame status={status}>

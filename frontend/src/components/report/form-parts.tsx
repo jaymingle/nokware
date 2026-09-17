@@ -17,7 +17,7 @@ export function FormSection({ title, hint, children }: { title: string; hint: st
 
 type FormActionsProps = { busy: boolean; error: Error | null; onBack: () => void };
 
-/** Send and back. Filing waits on the classifier, so the wait is explained. */
+/** Filing waits on the classifier, so the wait is explained. */
 export function FormActions({ busy, error, onBack }: FormActionsProps) {
   return (
     <div className="flex flex-col gap-3">

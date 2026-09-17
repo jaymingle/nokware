@@ -9,7 +9,7 @@ import { StatusLookup } from "@/components/report/status-lookup";
 import { CivicStatus, PrivateStatus } from "@/components/report/status-view";
 import { useForgetStatus, useReportStatus } from "@/lib/api/public-queries";
 
-/** Follow a report by its reference. The reference is typed, never carried in the address. */
+/** The reference is typed, never carried in the address. */
 export function StatusPage() {
   const [reference, setReference] = useState<string | null>(null);
   const status = useReportStatus(reference);

@@ -25,7 +25,6 @@ export function stageLabels(isPrivate: boolean): Record<Stage, string> {
 
 const STAGE_TONES: Record<Stage, Tone> = { received: "gold", in_progress: "teal", completed: "neutral" };
 
-/** The headline tag for a case's status, in the citizen's words. */
 export function statusTag(status: ReportStatus): { tone: Tone; label: string } {
   if (!status.private && status.status === "escalated") return { tone: "brick", label: "With the MCE's office" };
   const stage = stageOf(status);

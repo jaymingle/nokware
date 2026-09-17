@@ -10,13 +10,8 @@ import { CITATION_HREF_PREFIX, linkCitations } from "@/lib/ask/sources";
 // or unwrapped to its text.
 const ALLOWED = ["p", "strong", "em", "ul", "ol", "li", "a", "h1", "h2", "h3", "h4", "br", "blockquote", "code"];
 
-/**
- * A list longer than this is folded, but only where the same rows are already
- * set out in full below, in the figures card and the chart. Forty-two
- * departments written out three times buries the chart under them; the answer
- * itself is untouched, and what is exported, read aloud and checked is the
- * whole of it.
- */
+// Folded only where the same rows are set out in full below, in the figures card and the chart: forty-two
+// departments written out three times bury the chart. Exports, read-aloud and checks still use the whole answer.
 const LONG_LIST = 8;
 
 type AnswerTextProps = {
@@ -25,7 +20,6 @@ type AnswerTextProps = {
   titles: Record<string, string>;
   onCite: (label: string) => void;
   testIdPrefix: string;
-  /** Whether the figures below repeat these rows; only then is a long list folded. */
   repeatedBelow?: boolean;
 };
 
@@ -88,7 +82,6 @@ function useComponents({ titles, onCite, testIdPrefix, repeatedBelow }: Omit<Ans
   }, [titles, onCite, testIdPrefix, repeatedBelow]);
 }
 
-/** The answer's markdown, rendered safely, with each [S#] as a tag linked to its source. */
 export function AnswerText({ markdown, ...rest }: AnswerTextProps) {
   const components = useComponents(rest);
   return (

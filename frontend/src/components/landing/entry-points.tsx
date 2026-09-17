@@ -67,12 +67,8 @@ function EntryCard({ entry, lead = false }: { entry: Entry; lead?: boolean }) {
   );
 }
 
-/**
- * The ways in, weighted by who they are for. Ask is what almost everyone comes
- * for; the portal is for about twenty members of staff, and it had the same
- * size and prominence as Ask, which told a first-time reader the wrong thing
- * about what this is.
- */
+// Weighted by who they are for: almost everyone comes for Ask, while the portal serves about twenty staff. Equal
+// prominence told a first-time reader the wrong thing about what this is.
 export function EntryPoints() {
   const [ask, ...rest] = ENTRIES;
   return (

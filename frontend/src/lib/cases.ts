@@ -19,7 +19,6 @@ export function caseStatusTag(summary: Pick<CaseSummary, "status" | "my_status">
   return { tone, label };
 }
 
-/** How long ago a case was filed: "5h", "3d". */
 export function caseAge(submittedAt: string, now: number): string {
   const elapsed = Math.max(0, now - Date.parse(submittedAt));
   if (elapsed < HOUR_MS) return "<1h";
@@ -27,7 +26,6 @@ export function caseAge(submittedAt: string, now: number): string {
   return `${Math.floor(elapsed / DAY_MS)}d`;
 }
 
-/** Cases the caller still has to act on (for a nav count). */
 export function openForMe(cases: CaseSummary[]): number {
   return cases.filter((c) => c.allowed_actions.length > 0).length;
 }
@@ -57,7 +55,6 @@ const EVENT_LABELS: Record<string, string> = {
   location_removed: "The citizen removed the location they shared",
 };
 
-/** What an audit entry says: its note, or a plain label for the step. */
 export function caseEventText(event: { action: string; note?: string | null }): string {
   return event.note ?? EVENT_LABELS[event.action] ?? event.action;
 }

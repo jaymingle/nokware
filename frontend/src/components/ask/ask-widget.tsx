@@ -33,7 +33,6 @@ function PanelHeader({ answers }: { answers: number }) {
   );
 }
 
-/** A question box on every public page: the same conversation as /ask, in a panel. */
 export function AskWidget() {
   const [open, setOpen] = useState(false);
   const { turns } = useThread();

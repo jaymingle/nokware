@@ -16,7 +16,6 @@ function RtiFootnote({ testId }: { testId: string }) {
   );
 }
 
-/** The start of a conversation: what Ask does, questions it is known to answer, and where to go for what isn't published. */
 export function AskWelcome({ compact, onAsk, disabled }: { compact: boolean; onAsk: (question: string) => void; disabled: boolean }) {
   return (
     <div className="flex flex-col gap-6" data-testid="ask-welcome">

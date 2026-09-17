@@ -4,7 +4,6 @@ import { describeProvenance, type SourceDocument } from "@/lib/ask/sources";
 
 type ProvenanceLineProps = Pick<SourceDocument, "provenance" | "departmentName" | "sourceUrl"> & { testId: string };
 
-/** Where the document came from, e.g. "Published by Finance on ama.gov.gh", with the original linked. */
 export function ProvenanceLine({ testId, ...doc }: ProvenanceLineProps) {
   const view = describeProvenance(doc);
   if (!view) return null;

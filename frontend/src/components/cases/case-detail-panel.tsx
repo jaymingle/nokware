@@ -104,7 +104,6 @@ function Body({ detail }: { detail: CaseDetail }) {
   );
 }
 
-/** How many residents said this civic issue affects them; the handling department also sees the names given. */
 function Voices({ detail }: { detail: CaseDetail }) {
   if (!detail.voices) return null;
   const names = detail.voice_names ?? [];
@@ -142,7 +141,6 @@ function Loaded({ detail, recipients }: { detail: CaseDetail; recipients?: Optio
   );
 }
 
-/** The selected case: what was reported, what can be done, and its chain of custody. */
 export function CaseDetailPanel({ caseId, recipients }: { caseId: string | null; recipients?: Option[] }) {
   const { data, error, isPending } = useCase(caseId);
   if (!caseId) return <p className="text-[13.5px] text-ink-soft">Select a case to read it, see its history and move it along.</p>;

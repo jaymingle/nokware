@@ -12,42 +12,25 @@ import { cn } from "@/lib/utils";
 import type { ElectoralAreaFigures, SubMetroFigures } from "@/lib/api/types";
 
 /*
- * Where reports come from.
- *
- * Two halves, because two different things are known. The three sub-metros have
- * outlines — traced by an OpenStreetMap contributor, not published by AMA, and
- * said so on the page — so they are drawn. The twenty electoral areas have no
- * boundary anywhere: not from the Electoral Commission, the Ghana Statistical
- * Service, HDX, GADM or GRID3. So they are tiles. A tile claims a name and a
- * count and nothing about where the area begins or ends, which is the whole of
- * what Nokware knows.
- *
- * A count of 1 to 4 reads "fewer than 5" here as everywhere, and is drawn
- * hatched rather than shaded: a shade would put it somewhere on the scale, and
- * the point of suppressing it is that it has no place on the scale.
+ * The sub-metros have outlines (traced on OpenStreetMap, not published by AMA), so they are drawn. The electoral
+ * areas have no published boundary anywhere, so they are tiles: a tile claims a name and a count, nothing about
+ * where the area begins or ends.
  */
 
 const HEIGHT = 340;
-const SHADES = 4; // steps between the palest and the fullest teal
-// A suppressed tile is hatched, not shaded: a shade would place it on the scale, which is what suppressing it denies.
+const SHADES = 4;
+// A suppressed count is hatched, not shaded: a shade would place it on the scale, which is what suppressing it denies.
 const HATCHED = "repeating-linear-gradient(45deg, var(--paper-raised) 0 4px, var(--teal-tint) 4px 8px)";
 
 type Areas = { subMetros: SubMetroFigures[]; areas: ElectoralAreaFigures[] };
 
-/** Which shade a count earns, from the largest count drawn. Null (suppressed) and 0 are not on the scale. */
 function step(count: Count, largest: number): number | null {
   if (count === null || count === 0) return null;
   return Math.max(1, Math.ceil((count / Math.max(largest, 1)) * SHADES));
 }
 
-/*
- * The scale stops short of full teal on purpose. Ink on full teal reads at
- * 2.6:1 and fails AA, and paper on the shades below it is worse still, so a
- * deeper scale would mean the busiest areas — the ones most worth reading —
- * were the hardest to read. Capped here, one ink is readable on every step:
- * 12.2, 9.4, 7.2 and 5.5 to one. Mixed in sRGB, which is what those were
- * measured in.
- */
+// Stops short of full teal: ink on full teal is 2.6:1 and fails AA. Capped here, ink reads on every step at
+// 12.2, 9.4, 7.2 and 5.5 to one, measured in sRGB.
 const MIX = [18, 34, 50, 66];
 
 function fill(step: number | null): string {
@@ -59,7 +42,6 @@ function label(count: Count): string {
   return count === null ? FEWER_THAN_FIVE : String(count);
 }
 
-/** The diagonal hatching a suppressed count is drawn with, the same as the charts use. */
 function Hatch({ id }: { id: string }) {
   return (
     <defs>
@@ -127,7 +109,6 @@ function AreaTile({ area, largest }: { area: ElectoralAreaFigures; largest: numb
   );
 }
 
-/** Every area's figures in text, for a screen reader and for anyone who wants the numbers rather than the picture. */
 function AreasTable({ subMetros, areas }: Areas) {
   return (
     <table className="sr-only">
@@ -156,7 +137,6 @@ function subMetroName(subMetros: SubMetroFigures[], area: ElectoralAreaFigures):
   return subMetros.find((row) => row.id === area.sub_metro)?.name ?? area.sub_metro;
 }
 
-/** Why the twenty areas are tiles and not shapes — the finding, in one paragraph, where the map is. */
 function WhyTiles() {
   return (
     <p className="max-w-[72ch] text-[12.5px] text-ink-soft" data-testid="areas-why-tiles">

@@ -11,10 +11,8 @@ const NEXT_FAILED = "The next part couldn't be made just now. Press Continue to 
 let current: HTMLAudioElement | null = null; // one reading at a time on the page
 
 /**
- * Read a text aloud in parts: the second is fetched with the first, and while one plays the next two are made, so a
- * short part followed by a long one leaves no silence and a long answer starts in seconds. Play, pause and resume;
- * stop another reading that is playing. A part that fails can be carried on from. One audio element throughout, made
- * on the first press, so later parts play without another.
+ * While one part plays the next two are made, so a short part followed by a long one leaves no silence. One audio
+ * element throughout, made on the first press, so later parts play without another press.
  */
 export function useReadAloud(load: (part: number) => Promise<SpokenPart>) {
   const [state, setState] = useState<ReadAloudState>("idle");
@@ -41,7 +39,7 @@ export function useReadAloud(load: (part: number) => Promise<SpokenPart>) {
     await audio.play();
     setState("playing");
   };
-  const show = (audio: HTMLAudioElement, blob: Blob, onEnded: () => void) => {
+  const playBlob = (audio: HTMLAudioElement, blob: Blob, onEnded: () => void) => {
     if (audio.src) URL.revokeObjectURL(audio.src);
     audio.src = URL.createObjectURL(blob);
     audio.onended = onEnded;
@@ -56,8 +54,8 @@ export function useReadAloud(load: (part: number) => Promise<SpokenPart>) {
       const spoken = await fetchPart(part);
       pending.current.delete(part);
       const more = part + 1 < spoken.parts;
-      for (const ahead of [part + 1, part + 2]) if (ahead < spoken.parts) void fetchPart(ahead); // two parts in hand
-      await show(audio, spoken.audio, () => (more ? void play(part + 1, audio) : finish()));
+      for (const ahead of [part + 1, part + 2]) if (ahead < spoken.parts) void fetchPart(ahead);
+      await playBlob(audio, spoken.audio, () => (more ? void play(part + 1, audio) : finish()));
     } catch (failure) {
       setState("idle");
       setResumeAt(part);

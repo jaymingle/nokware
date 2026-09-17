@@ -15,11 +15,7 @@ async function mintJwt(): Promise<string> {
   return jwt;
 }
 
-/**
- * A JWT for the signed-in Appwrite session, kept in memory only and reused
- * until shortly before it expires. Concurrent callers share one request.
- * Rejects with Appwrite's 401 when there is no session.
- */
+/** Kept in memory only. Concurrent callers share one request; rejects with Appwrite's 401 when signed out. */
 export function getJwt(): Promise<string> {
   if (cached && cached.expiresAt - REFRESH_MARGIN_MS > Date.now()) {
     return Promise.resolve(cached.token);

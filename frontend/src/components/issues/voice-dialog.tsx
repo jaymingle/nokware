@@ -39,7 +39,6 @@ function NameChoice({ named, setNamed, name, setName, testId }: {
   );
 }
 
-/** The dialog's state: open or not, anonymous or named, and adding the voice. */
 function useVoiceForm(issue: Issue, onAdded: (result: VoiceResult) => void) {
   const [open, setOpen] = useState(false);
   const [named, setNamed] = useState(false);
@@ -63,7 +62,6 @@ function useVoiceForm(issue: Issue, onAdded: (result: VoiceResult) => void) {
   return { open, onOpenChange, named, setNamed, name, setName, add, submit };
 }
 
-/** "This affects me too": anonymous by default, a name only if the resident chooses. Not a petition. */
 export function VoiceDialog({ issue, onAdded }: { issue: Issue; onAdded: (result: VoiceResult) => void }) {
   const { open, onOpenChange, named, setNamed, name, setName, add, submit } = useVoiceForm(issue, onAdded);
   const testId = `voice-${issue.public_id}`;
