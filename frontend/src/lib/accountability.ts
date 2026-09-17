@@ -56,10 +56,15 @@ export function requestWording(documentName: string, period: string, issuedElsew
   return `Under the Right to Information Act, 2019 (Act 989), I request a copy of ${subject} for ${period}.`;
 }
 
-export function rtiHref(requirement: RecordRequirement, period: RecordPeriod): string {
-  const params = new URLSearchParams({ document: requirement.name, period: period.label });
-  if (requirement.issued_by) params.set("elsewhere", "1");
+/** The RTI page, with the request's document and period filled in. */
+export function rtiRequestHref(document: string, period: string, issuedElsewhere = false): string {
+  const params = new URLSearchParams({ document, period });
+  if (issuedElsewhere) params.set("elsewhere", "1");
   return `/rti?${params}`;
+}
+
+export function rtiHref(requirement: RecordRequirement, period: RecordPeriod): string {
+  return rtiRequestHref(requirement.name, period.label, Boolean(requirement.issued_by));
 }
 
 /** Most departments never receive reports. */

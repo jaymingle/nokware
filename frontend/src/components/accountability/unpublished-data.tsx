@@ -1,12 +1,9 @@
 import Link from "next/link";
 
+import { rtiRequestHref } from "@/lib/accountability";
 import { formatDate } from "@/lib/time";
 
 import type { UnpublishedData } from "@/lib/api/types";
-
-function rtiHref(finding: UnpublishedData): string {
-  return `/rti?${new URLSearchParams({ document: finding.rti_document, period: finding.rti_period })}`;
-}
 
 function Finding({ finding }: { finding: UnpublishedData }) {
   const testId = `unpublished-${finding.id}`;
@@ -37,7 +34,7 @@ function Finding({ finding }: { finding: UnpublishedData }) {
       </div>
       <p className="text-[12.5px] text-ink-soft">{finding.instead} Checked {formatDate(finding.checked_on)}.</p>
       <div className="border-t pt-2.5">
-        <Link href={rtiHref(finding)} data-touch-target className="inline-flex items-center text-[13px] text-teal underline underline-offset-2" data-testid={`${testId}-rti`}>
+        <Link href={rtiRequestHref(finding.rti_document, finding.rti_period)} data-touch-target className="inline-flex items-center text-[13px] text-teal underline underline-offset-2" data-testid={`${testId}-rti`}>
           Request it from the Assembly under the RTI Act
         </Link>
       </div>
