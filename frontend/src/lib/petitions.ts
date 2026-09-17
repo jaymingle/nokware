@@ -1,3 +1,4 @@
+import { plural } from "@/lib/text";
 import { formatDate } from "@/lib/time";
 
 import type { PetitionCard, PetitionStatus, PetitionTimelineEntry, PhoneChallenge } from "@/lib/api/types";
@@ -71,7 +72,7 @@ function lateness(respondedAt: string, due: string | null): string {
   const lateMs = due ? Date.parse(respondedAt) - Date.parse(due) : 0;
   if (lateMs <= 0) return "";
   const days = Math.floor(lateMs / DAY_MS);
-  return days >= 1 ? `, ${days} ${days === 1 ? "day" : "days"} after the 30-day deadline` : ", less than a day after the 30-day deadline";
+  return days >= 1 ? `, ${plural(days, "day", "days")} after the 30-day deadline` : ", less than a day after the 30-day deadline";
 }
 
 export function respondedLine(petition: Pick<PetitionCard, "responded_at" | "response_due">): string | null {
@@ -85,7 +86,7 @@ export function responseLine(petition: Standing, now: number, where = "on this p
   const reached = `Reached ${petition.threshold?.toLocaleString()} signatures on ${formatDate(petition.threshold_reached_at)}.`;
   const left = daysLeft(petition.response_due, now);
   if (left === 0 || petition.unanswered_at) return `${reached} ${NO_RESPONSE}`;
-  return `${reached} The MCE has until ${formatDate(petition.response_due)} to respond publicly ${where}: ${left} ${left === 1 ? "day" : "days"} left.`;
+  return `${reached} The MCE has until ${formatDate(petition.response_due)} to respond publicly ${where}: ${plural(left, "day", "days")} left.`;
 }
 
 export function closingLine(petition: Pick<PetitionCard, "status" | "closes_at" | "closed_at" | "threshold">, now: number): string | null {
@@ -95,7 +96,7 @@ export function closingLine(petition: Pick<PetitionCard, "status" | "closes_at" 
   }
   if (petition.status === "open" && petition.closes_at) {
     const left = daysLeft(petition.closes_at, now);
-    return `Open until ${formatDate(petition.closes_at)} (${left} ${left === 1 ? "day" : "days"} left)`;
+    return `Open until ${formatDate(petition.closes_at)} (${plural(left, "day", "days")} left)`;
   }
   if (!petition.closed_at) return null;
   if (petition.status === "withdrawn") return `Withdrawn by the person who started it on ${formatDate(petition.closed_at)}`;

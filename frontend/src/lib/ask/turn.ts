@@ -1,5 +1,6 @@
 import { markFiguresCited } from "@/lib/ask/figures";
 import { groupSources, markCited, type SourceDocument } from "@/lib/ask/sources";
+import { plural } from "@/lib/text";
 
 import type { AnswerStatus, AskChart, AskFigure, AskStreamEvent, ExportView } from "@/lib/api/types";
 
@@ -71,10 +72,6 @@ export function failTurn(turn: Turn, message: string): Turn {
 
 export function citedDocuments(turn: Turn): SourceDocument[] {
   return turn.documents.filter((doc) => doc.cited);
-}
-
-function plural(count: number, one: string, many: string): string {
-  return `${count} ${count === 1 ? one : many}`;
 }
 
 // A budget figure is read from a published document; a report figure is counted from what residents filed. Calling

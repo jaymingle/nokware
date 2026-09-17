@@ -3,6 +3,11 @@ export function joinNames(names: string[]): string {
   return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
 }
 
+/** "1 day", "3 days". */
+export function plural(count: number, one: string, many: string): string {
+  return `${count} ${count === 1 ? one : many}`;
+}
+
 /** Only the first letter: the rest may be a proper noun. */
 export function lowerFirst(text: string): string {
   return text ? text[0].toLowerCase() + text.slice(1) : text;

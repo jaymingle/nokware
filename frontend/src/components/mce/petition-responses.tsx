@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/card";
 import { useNow } from "@/hooks/use-now";
 import { useAwaitingResponses } from "@/lib/api/queries";
 import { daysLeft, NO_RESPONSE, placeLine, signaturesLine, spacedCode } from "@/lib/petitions";
-import { joinNames } from "@/lib/text";
+import { joinNames, plural } from "@/lib/text";
 import { formatDate } from "@/lib/time";
 
 import type { AwaitingResponse } from "@/lib/api/types";
@@ -18,7 +18,7 @@ function ResponseCard({ petition, now }: { petition: AwaitingResponse; now: numb
     <Card className="gap-0 py-0" data-testid={`petition-response-${petition.code}`}>
       <div className="border-l-[3px] border-gold bg-gold-tint px-5 py-3 text-[14px]" data-testid={`petition-response-${petition.code}-due`}>
         {left > 0 ? (
-          <>Respond publicly by <strong className="font-medium">{formatDate(petition.response_due)}</strong>: {left} {left === 1 ? "day" : "days"} left.
+          <>Respond publicly by <strong className="font-medium">{formatDate(petition.response_due)}</strong>: {plural(left, "day", "days")} left.
             If there&apos;s no response by then, the petition&apos;s page will say: &ldquo;{NO_RESPONSE}&rdquo;</>
         ) : (
           <>The 30 days ran out on {formatDate(petition.response_due)}. The petition&apos;s page says: &ldquo;{NO_RESPONSE}&rdquo;</>
