@@ -15,24 +15,24 @@ TITLE_MAX = 300
 SOURCE_URL_MAX = 2048  # size of the sourceUrl attribute
 
 
-def _blank_to_none(value: Any) -> Any:
+def blank_to_none(value: Any) -> Any:
     """Empty form fields arrive as ""; treat them as not given."""
     if isinstance(value, str):
         return value.strip() or None
     return value
 
 
-OptionalText = Annotated[str | None, BeforeValidator(_blank_to_none)]
+OptionalText = Annotated[str | None, BeforeValidator(blank_to_none)]
 
 
 class NewDocumentForm(BaseModel):
     """Multipart fields of an upload (the PDF itself is a separate file part)."""
 
-    title: Annotated[str, Field(min_length=3, max_length=TITLE_MAX), BeforeValidator(_blank_to_none)]
+    title: Annotated[str, Field(min_length=3, max_length=TITLE_MAX), BeforeValidator(blank_to_none)]
     category: str
-    document_year: Annotated[int | None, BeforeValidator(_blank_to_none)] = None
+    document_year: Annotated[int | None, BeforeValidator(blank_to_none)] = None
     department: OptionalText = None  # contributors choose; departments may omit it
-    source_url: Annotated[HttpUrl | None, BeforeValidator(_blank_to_none)] = None
+    source_url: Annotated[HttpUrl | None, BeforeValidator(blank_to_none)] = None
 
     @field_validator("category")
     @classmethod
@@ -66,7 +66,7 @@ class NewDocumentForm(BaseModel):
 
 
 class ActionRequest(BaseModel):
-    note: Annotated[str | None, Field(max_length=NOTE_MAX), BeforeValidator(_blank_to_none)] = None
+    note: Annotated[str | None, Field(max_length=NOTE_MAX), BeforeValidator(blank_to_none)] = None
 
 
 class DocumentOut(BaseModel):

@@ -6,7 +6,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, Header, Upl
 
 from app import contacts, safety_steps
 from app.dependencies import rate_limited
-from app.schemas.documents import Option
+from app.schemas.documents import Option, blank_to_none
 from app.schemas.reports import (
     EscalationRequest,
     PreferencesRequest,
@@ -58,10 +58,6 @@ def options() -> ReportOptions:
     )
 
 
-def _blank_to_none(value: str | None) -> str | None:
-    return (value.strip() or None) if value else None
-
-
 def report_form(
     description: Annotated[str, Form()],
     ward: Annotated[str | None, Form()] = None,
@@ -74,11 +70,11 @@ def report_form(
 ) -> ReportSubmission:
     return ReportSubmission(
         description=description,
-        ward=_blank_to_none(ward),
-        sub_metro=_blank_to_none(sub_metro),
-        safety_topic=_blank_to_none(safety_topic),
-        phone=_blank_to_none(phone),
-        whatsapp=_blank_to_none(whatsapp),
+        ward=blank_to_none(ward),
+        sub_metro=blank_to_none(sub_metro),
+        safety_topic=blank_to_none(safety_topic),
+        phone=blank_to_none(phone),
+        whatsapp=blank_to_none(whatsapp),
         notify=notify,
         callback_consent=callback_consent,
     )
