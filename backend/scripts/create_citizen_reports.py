@@ -54,6 +54,7 @@ ATTRIBUTE_WAIT_SECONDS = 300  # a collection of ~30 attributes can take minutes 
 LISTING = [Query.limit(500)]
 ID = 36  # a UUID
 TEAM = 64
+HASH = 64  # a sha256 hex digest
 ENCRYPTED_MIN = 150  # Appwrite's minimum size for an encrypted string; a phone number needs far less
 Creator = Callable[[], object]
 
@@ -149,7 +150,7 @@ def contact_attributes() -> dict[str, Creator]:
         "purgeAt": lambda: db.create_datetime_attribute(*c, "purgeAt", False),
         # A one-time token (stored hashed) that lets the confirmation page ask
         # again about messages when the classifier filed a report as personal safety.
-        "preferencesTokenHash": lambda: db.create_string_attribute(*c, "preferencesTokenHash", 64, False),
+        "preferencesTokenHash": lambda: db.create_string_attribute(*c, "preferencesTokenHash", HASH, False),
         "preferencesExpiresAt": lambda: db.create_datetime_attribute(*c, "preferencesExpiresAt", False),
     }
 

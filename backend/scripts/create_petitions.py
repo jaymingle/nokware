@@ -24,7 +24,7 @@ import argparse
 import sys
 
 from appwrite.services.databases import Databases
-from create_citizen_reports import ENCRYPTED_MIN, ID, KEY, TEAM, UNIQUE, Creator, ensure, ensure_indexes, values, wait_for_attributes
+from create_citizen_reports import ENCRYPTED_MIN, HASH, ID, KEY, TEAM, UNIQUE, Creator, ensure, ensure_indexes, values, wait_for_attributes
 
 from app.services.appwrite_client import DATABASE_ID, get_databases, quiet_sdk_deprecation_warnings
 from app.services.petition_rules import (
@@ -46,7 +46,6 @@ from app.services.petitions import HISTORY_COLLECTION as HISTORY
 from app.services.petitions import PETITIONS_COLLECTION as PETITIONS
 from app.services.phone_proof import Channel
 
-HASH = 64  # a sha256 hex digest
 TOPIC = 64
 STATUS = 20
 ISSUE_ID = 20
