@@ -25,8 +25,8 @@ from app.services.citizen_reports import (
     VOICES_COLLECTION,
 )
 from app.services.storage import get_minio
+from app.services.test_fixtures import TEST_PREFIX
 
-TEST_PREFIX = "[TEST]"
 PAGE = 100
 
 

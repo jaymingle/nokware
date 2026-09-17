@@ -17,8 +17,8 @@ from app.services.appwrite_client import DATABASE_ID, get_databases, quiet_sdk_d
 from app.services.petition_signatures import SIGNATURES_COLLECTION as SIGNATURES
 from app.services.petitions import HISTORY_COLLECTION as HISTORY
 from app.services.petitions import PETITIONS_COLLECTION as PETITIONS
+from app.services.test_fixtures import TEST_PREFIX
 
-TEST_PREFIX = "[TEST]"
 PAGE = 100
 
 
