@@ -39,7 +39,6 @@ CLASSIFIER_RETRIES = 1
 
 @lru_cache
 def get_quick_model() -> ChatGoogleGenerativeAI:
-    """No thinking, temperature 0, a short timeout and one retry: the report classifier and Ask's planner."""
     return ChatGoogleGenerativeAI(
         model=CHAT_MODEL,
         temperature=0.0,

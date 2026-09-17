@@ -1,31 +1,15 @@
 """Messages to citizens about their reports, by SMS and WhatsApp.
 
-Three moments only: the report is received, it is resolved, an escalation is
-received. Nothing in between: status changes would feel like spam and each
-message costs money. A message goes to every channel the citizen gave (both if
-both) and to none if they gave no number or didn't agree to messages.
+Three moments only (received, resolved, escalation received): anything more would feel like spam, and each message
+costs money. Personal-safety messages say nothing but the reference, not even the word "report": a phone can be
+shared. Every other message fits one GSM-7 SMS page (one credit), except an emergency's "received" message, whose
+numbers to call are worth a second page.
 
-Personal-safety messages say nothing but the reference: no category, no
-service, not even the word "report". A phone can be shared.
+The outbox row never holds the number; it is read from report_contacts at the moment of sending.
 
-Every message fits one SMS page in plain GSM-7 (a credit each): the office
-names are short names, and when they still don't fit, a shorter way of saying
-who replaces them. The one exception: the "received" message for an emergency
-(a fire, a flood, a crime) carries two numbers per service to try, on up to
-two pages. A personal-safety message never does: it says only the reference.
-
-Every message is written to the notifications outbox first (never with the
-number, which is read from report_contacts at the moment of sending), then
-handed to the channel's provider: Arkesel or BMS Africa for SMS
-(SMS_PROVIDER=arkesel or bms), Twilio for WhatsApp (WHATSAPP_PROVIDER=twilio),
-or "log", which records the message as not sent.
-
-WhatsApp carries a free-form message only within 24 hours of the citizen's last
-message, and until WhatsApp templates are approved nothing else can go. So a
-WhatsApp update outside that window goes by SMS to the same number instead,
-when the number is Ghanaian and the citizen isn't getting SMS already: before
-sending, when Redis shows the window closed, and afterwards, when Twilio reports
-the message undelivered for that reason (error 63016).
+WhatsApp carries a free-form message only within 24 hours of the citizen's last message, and no templates are
+approved yet. So an update outside that window goes by SMS to the same number when it is Ghanaian and gets no SMS
+already: before sending if Redis shows the window closed, or afterwards when Twilio reports error 63016.
 """
 
 import logging
@@ -73,7 +57,7 @@ class Provider(Protocol):
     delivers: bool  # False for a sandbox: accepted, never delivered
 
     def send(self, to: str, body: str) -> str:
-        """Send the message; return the provider's message ID. Raise on failure."""
+        """Returns the provider's message ID; raises on failure."""
         ...
 
 
@@ -84,7 +68,6 @@ class Message:
 
 
 def _who_options(case: dict[str, Any]) -> list[str]:
-    """Ways to say who has the report, fullest first."""
     names = [short_name(r) for r in case.get("recipients") or []]
     if len(names) <= 1:
         return [*names, "the office responsible"]
@@ -93,13 +76,11 @@ def _who_options(case: dict[str, Any]) -> list[str]:
 
 
 def _one_page(render: Callable[[str], str], case: dict[str, Any], pages_allowed: int = 1) -> str:
-    """The fullest wording that fits one SMS page (two for an emergency's numbers)."""
     bodies = [render(who) for who in _who_options(case)]
     return next((body for body in bodies if pages(body) <= pages_allowed), bodies[-1])
 
 
 def _neutral(event: NotificationEvent, reference: str) -> Message:
-    """Personal safety: the reference and nothing else. A phone can be shared."""
     bodies = {
         NotificationEvent.SUBMITTED: f"Nokware: reference {reference} received.",
         NotificationEvent.RESOLVED: f"Nokware: reference {reference} has been updated.",
@@ -109,19 +90,19 @@ def _neutral(event: NotificationEvent, reference: str) -> Message:
 
 
 def compose(event: NotificationEvent, case: dict[str, Any]) -> Message:
-    """The message for an event, on one SMS page: content-neutral for personal safety."""
     reference = case["reference"]
     if case.get("category") == Category.PERSONAL_SAFETY:
         return _neutral(event, reference)
     # Without "https://", so the office's full name fits one page beside the link. The reference stays out of the
     # address: the status page asks for it, so it never lands in browser history or server logs.
-    status_page = f"{bare_address(get_settings().public_site_url)}/report/status"
+    site = bare_address(get_settings().public_site_url)
+    status_page = f"{site}/report/status"
     if event == NotificationEvent.RESOLVED and case.get("escalatedAt"):  # after the one escalation: final
         return Message("resolved_after_escalation", f"Nokware: report {reference} was reviewed and resolved. Outcome: {status_page}")
     if event == NotificationEvent.ESCALATED:
         return Message(event.value, f"Nokware: we've received your escalation of report {reference}. The MCE's office will review it.")
     if event == NotificationEvent.SUBMITTED and case.get("topic") in EMERGENCY_TOPICS:  # worth a second page
-        numbers = f"If anyone is in danger: {short_line(case['topic'], None)} More numbers: {bare_address(get_settings().public_site_url)}/contacts/emergency"
+        numbers = f"If anyone is in danger: {short_line(case['topic'], None)} More numbers: {site}/contacts/emergency"
         return Message("submitted_emergency", _one_page(lambda who: f"Nokware: report {reference} is with {who}. {numbers}", case, pages_allowed=2))
     renders: dict[NotificationEvent, Callable[[str], str]] = {
         NotificationEvent.SUBMITTED: lambda who: f"Nokware: report {reference} is with {who}. "
@@ -133,7 +114,6 @@ def compose(event: NotificationEvent, case: dict[str, Any]) -> Message:
 
 
 def channels_for(contact: dict[str, Any] | None) -> list[tuple[NotificationChannel, str]]:
-    """Each channel to use, with its number: none unless the citizen agreed to messages."""
     if not contact or not contact.get("notify"):
         return []
     pairs = [(NotificationChannel.SMS, contact.get("phone")), (NotificationChannel.WHATSAPP, contact.get("whatsapp"))]
@@ -141,7 +121,6 @@ def channels_for(contact: dict[str, Any] | None) -> list[tuple[NotificationChann
 
 
 def provider_for(channel: NotificationChannel) -> Provider | None:
-    """The configured provider, or None while the channel is on "log"."""
     settings = get_settings()
     configured = settings.sms_provider if channel == NotificationChannel.SMS else settings.whatsapp_provider
     if configured == "log":
@@ -156,7 +135,7 @@ def provider_for(channel: NotificationChannel) -> Provider | None:
 
 
 def check_providers() -> None:
-    """At startup: a provider that is named but can't be built stops the API, not the first message."""
+    """A provider that is named but can't be built stops the API at startup, not the first message."""
     for channel in NotificationChannel:
         provider_for(channel)
 
@@ -180,7 +159,6 @@ def _outbox(case_id: str, event: NotificationEvent, channel: NotificationChannel
 
 
 def _deliver(provider: Provider | None, number: str, message: Message) -> dict[str, Any]:
-    """Hand one message to its provider; the outbox fields that record what happened."""
     if provider is None:
         logger.info("Message not sent (no provider configured) to %s: %s", masked(number), message.body)
         return {"status": NotificationStatus.NOT_SENT.value, "provider": "log"}
@@ -206,7 +184,6 @@ OUTSIDE_WINDOW_ERROR = "63016"  # Twilio: a free-form WhatsApp message outside t
 
 
 def _send(case_id: str, event: NotificationEvent, channel: NotificationChannel, number: str, message: Message, why: str = "") -> None:
-    """One message: written to the outbox, handed to the provider, and the outcome in the case history."""
     outbox_id = _outbox(case_id, event, channel, message)
     provider = provider_for(channel)
     outcome = _deliver(provider, number, message)
@@ -216,12 +193,10 @@ def _send(case_id: str, event: NotificationEvent, channel: NotificationChannel, 
 
 
 def _sms_can_stand_in(number: str, contact: dict[str, Any]) -> bool:
-    """SMS can carry a WhatsApp update: Twilio is on, the number is Ghanaian and gets no SMS already."""
     return get_settings().whatsapp_provider == "twilio" and number.startswith(f"+{GHANA_CODE}") and not contact.get("phone")
 
 
 def notify(case: dict[str, Any], event: NotificationEvent) -> None:
-    """Message the citizen about one of the three events, on every channel they agreed to."""
     contact = contact_for(case["$id"]) or {}
     for channel, number in channels_for(contact):
         message = compose(event, case)
@@ -239,7 +214,6 @@ def _outbox_row(provider_message_id: str) -> dict[str, Any] | None:
 
 
 def record_delivery(provider_message_id: str, status: str, now: datetime) -> bool:
-    """A provider's delivery report, on the outbox row it is about. False if no message has that ID."""
     row = _outbox_row(provider_message_id)
     if row is None:
         return False
@@ -250,7 +224,6 @@ def record_delivery(provider_message_id: str, status: str, now: datetime) -> boo
 
 
 def whatsapp_undelivered(provider_message_id: str, error_code: str) -> bool:
-    """Twilio couldn't deliver a WhatsApp update because the window had closed: send it by SMS instead, once."""
     row = _outbox_row(provider_message_id) if error_code == OUTSIDE_WINDOW_ERROR else None
     if row is None or row["channel"] != NotificationChannel.WHATSAPP.value:
         return False
@@ -266,7 +239,6 @@ def whatsapp_undelivered(provider_message_id: str, error_code: str) -> bool:
 
 
 def notify_quietly(case: dict[str, Any], event: NotificationEvent) -> None:
-    """For background tasks: a messaging failure is logged, never raised."""
     try:
         notify(case, event)
     except Exception:

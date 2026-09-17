@@ -1,16 +1,7 @@
 """How the MCE has handled petitions over the last twelve months, for the departmental responsiveness page.
 
-Two parts:
-- the review: petitions sent, published by the MCE, published automatically
-  because the MCE let 72 hours pass, and refused, by reason (decisions made in
-  the period, from the trail);
-- the response: every petition that reached its threshold in the period, and
-  where it stands: answered within 30 days, answered late, not answered after 30
-  days, or still within them. The four add up to the number that reached it.
-
-Exact counts, not "fewer than 5": they count the MCE's decisions on public
-petitions, not residents, so there is no one to protect by hiding a small
-number, and hiding it would hide exactly the silence the page exists to show.
+Exact counts, not "fewer than 5": they count the MCE's decisions on public petitions, not residents, so there is no
+one to protect by hiding a small number, and hiding it would hide exactly the silence the page exists to show.
 """
 
 from collections import Counter
@@ -34,7 +25,6 @@ def _in(moment: str | None, start: datetime) -> bool:
 
 
 def standing(petition: dict[str, Any], now: datetime) -> str:
-    """Where a petition that reached its threshold stands with the MCE."""
     if petition.get("status") == PetitionStatus.RESPONDED:
         return "answered_late" if responded_late(petition) else "answered_in_time"
     due = parse_datetime(petition.get("responseDue"))
@@ -55,8 +45,7 @@ def build(history: list[dict[str, Any]], reached: list[dict[str, Any]], start: d
 
 
 def figures(start: datetime, now: datetime) -> dict[str, Any]:
-    """The MCE's handling of residents' petitions, test petitions left out: a count of the MCE deciding fixtures would
-    be a record of decisions that were never about a resident's petition."""
+    """Test petitions are left out: the MCE deciding a fixture was never about a resident's petition."""
     tests = test_petition_ids()
     history = [row for row in every_record(HISTORY_COLLECTION, [Query.equal("action", [a.value for a in REVIEW_ACTIONS]),
                                                                  Query.select(["action", "reason", "at", "petitionId"])])

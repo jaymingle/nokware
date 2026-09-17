@@ -1,16 +1,9 @@
 """Is the Ledger's search index really there? Checked once, when the API starts.
 
-Postgres is reached through a tunnel on a local port, and another program can
-take that port: another project's database, say. Then nothing looks wrong
-until a resident asks a question and the search fails 30 seconds later with
-"password authentication failed", which says nothing about why. So at startup
-the API connects once, quickly, and checks that it reached the database
-POSTGRES_URL names and that the database holds the search index (the chunks
-table and its embeddings). If not, it says plainly what answered instead.
+Postgres is reached through a tunnel on a local port that another database can take. Then nothing looks wrong until
+a resident's search fails 30 seconds later with "password authentication failed", which says nothing about why.
 
-It only reports. The API still starts, because reports, the portal and
-petitions don't need the search index; Ask and the Ledger search answer 503
-until it is fixed.
+It only reports: reports, the portal and petitions don't need the search index, so the API still starts.
 """
 
 import logging
@@ -54,7 +47,6 @@ def target(url: str) -> Target:
 
 
 def explain(error: str, to: Target) -> str:
-    """A connection failure in plain words: nothing there, or something that isn't Nokware's database."""
     lowered = error.lower()
     if any(sign in lowered for sign in _REFUSED):
         return (f"Something answers on {to.where}, but it isn't Nokware's search index: it turned away user "
@@ -66,7 +58,6 @@ def explain(error: str, to: Target) -> str:
 
 
 def inspect(connection: psycopg.Connection, to: Target) -> IndexCheck:
-    """Connected: is this the database POSTGRES_URL names, and does it hold the search index?"""
     database = connection.execute("SELECT current_database()").fetchone()[0]
     embeddings = connection.execute(_EMBEDDINGS_SQL, (TABLE_NAME, EMBEDDING_COLUMN)).fetchone()
     expected = f"vector({EMBEDDING_DIMENSIONS})"
@@ -91,7 +82,6 @@ def check(url: str) -> IndexCheck:
 
 
 def startup_check() -> IndexCheck:
-    """Run the check and say what it found, loudly if the index isn't there."""
     result = check(get_settings().postgres_url)
     if result.ok:
         logger.info(result.message)

@@ -1,15 +1,8 @@
 """Ask's live figures: counts of citizen reports, through tools the model can call.
 
-When a question looks like it wants figures, a quick planning call offers the
-model two tools. CountReports asks for one count (by topic, area, department,
-status and period, optionally broken down); PersonalSafetyFigures is what it
-calls when a resident asks for figures on reports about someone's safety, which
-Nokware does not publish. The counting is stats.py's, so its rules hold here:
-personal safety is never counted, and 1 to 4 reads "fewer than 5".
-
-Each count becomes a source under an R label ([R1], [R2], ...) beside the
-documents' S labels, so an answer says which figures are live report data and
-which come from a document.
+The counting is stats.py's, so its rules hold here: personal safety is never counted, and 1 to 4 reads "fewer
+than 5". Each count is cited under an R label beside the documents' S labels, so an answer says which figures are
+live report data and which come from a document.
 """
 
 import logging
@@ -33,8 +26,8 @@ from app.wards import find_ward, sub_metros
 logger = logging.getLogger(__name__)
 
 SAFETY_FIGURES_ANSWER = phrase("ask.safety_figures")
-# The refusal covers Nokware's own counts, not AMA's published documents: those are public, and anyone can download
-# them from the Ledger. Saying so plainly matters either way, so nobody is left thinking figures are being withheld.
+# The refusal covers Nokware's own counts, not AMA's published documents, which are public: saying so plainly
+# means nobody is left thinking figures are being withheld.
 SAFETY_IN_DOCUMENTS = phrase("ask.safety_in_documents")
 NO_SAFETY_DOCUMENTS = phrase("ask.no_safety_documents")
 FIGURE_LABEL_PREFIX = "R"
@@ -108,8 +101,6 @@ _PLAN_PROMPT = ChatPromptTemplate.from_messages(
 
 @dataclass(frozen=True)
 class Figure:
-    """One count as a citable source: what was counted, the result as it may be shown, and when."""
-
     label: str
     description: str
     value: str
@@ -145,7 +136,6 @@ _PERIOD_WORDS = {
 
 
 def _describe(call: CountReports, ward_name: str | None) -> str:
-    """What was counted, in words: "Open reports · Solid waste and dumping · Ablekuma South sub-metro · this month"."""
     parts = [_STATUS_WORDS[call.status]]
     if call.topic:
         parts.append(stats.topic_label(call.topic))
@@ -174,7 +164,7 @@ def _filter(call: CountReports, ward: str | None) -> ReportFilter:
 
 
 def _rows(cases: list[dict[str, Any]], call: CountReports, wanted: ReportFilter, now: datetime) -> list[tuple[str, str]]:
-    """The breakdown, shown counts first and the "fewer than 5" ones after by name, so their order says nothing."""
+    """The "fewer than 5" rows go last, by name, so their order says nothing about their size."""
     if call.group_by == "none":
         return []
     if call.group_by == "month":  # in time order, which says nothing about size
@@ -186,7 +176,6 @@ def _rows(cases: list[dict[str, Any]], call: CountReports, wanted: ReportFilter,
 
 
 def count_figure(call: CountReports, label: str, cases: list[dict[str, Any]], now: datetime, counted_at: str) -> Figure:
-    """Run one CountReports call against the shared case list."""
     ward = find_ward(call.electoral_area) if call.electoral_area else None
     if call.electoral_area and ward is None:
         return Figure(label, f"Reports in \"{call.electoral_area}\"", "no electoral area by that name in Nokware's list", [], counted_at)
@@ -204,7 +193,7 @@ def _tool_calls(question: str, now: datetime) -> list[dict[str, Any]]:
 
 
 def plan(question: str, now: datetime) -> FigurePlan:
-    """The live figures a question needs, counted. A planning failure means no figures, never a failed answer."""
+    """A planning failure means no figures, never a failed answer."""
     if not wants_figures(question):
         return NO_FIGURES
     try:
@@ -234,8 +223,8 @@ def _only_the_specific(missing: list[str]) -> list[str]:
 
 
 def _years_not_held(question: str) -> list[str]:
-    """Budget years the resident named that Nokware doesn't hold. Found here rather than asked of the model: a gap
-    the answer never mentions reads as though the figures were withheld."""
+    """Found in code rather than asked of the model: a gap the answer never mentions reads as though the figures
+    were withheld."""
     if not BUDGET_WORDS.search(question):
         return []
     held = set(budget_figures.years())
@@ -243,7 +232,7 @@ def _years_not_held(question: str) -> list[str]:
 
 
 def _budget_figures(calls: list[dict[str, Any]]) -> tuple[list[BudgetFigure], list[str]]:
-    """The budget figures asked for, and what was asked for that Nokware doesn't hold: a gap is said, not filled."""
+    """A gap is said, not filled."""
     found, missing = [], []
     for index, call in enumerate(calls, 1):
         try:
@@ -259,13 +248,12 @@ def _budget_figures(calls: list[dict[str, Any]]) -> tuple[list[BudgetFigure], li
 
 
 def _when(iso: str) -> str:
-    """"14 September 2026, 02:30 GMT" (Accra keeps GMT all year)."""
+    """Accra keeps GMT all year."""
     moment = datetime.fromisoformat(iso)
     return f"{moment.day} {moment:%B %Y, %H:%M} GMT"
 
 
 def figure_context(figure: Figure) -> str:
-    """One figure as the answering model sees it."""
     breakdown = "; ".join(f"{name}: {value}" for name, value in figure.rows)
     lines = [
         f"[{figure.label}] Live report data (reports residents filed with Nokware, counted {_when(figure.counted_at)}): "

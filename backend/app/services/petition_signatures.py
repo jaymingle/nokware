@@ -1,18 +1,10 @@
 """Signing a petition: one signature per confirmed Ghanaian number per petition.
 
-A signature holds no phone number. It holds a keyed hash of the number and the
-petition together (signerKey), under a unique index, so the same number can't
-sign twice, and it can't be matched across petitions: no one can list what a
-number has signed. The signer is anonymous unless they choose to show their
-name, which is then public, beside the signature. They can take it off later,
-by confirming the same number.
+A signature holds no phone number, only a keyed hash of the number and the petition together under a unique index:
+the same number can't sign twice, and no one can list what a number has signed across petitions.
 
-The count is recounted after every signature under the petition's lock, and the
-signature that reaches the threshold sends the petition to the MCE, who then
-has 30 days to respond publicly.
-
-The count is of confirmed numbers, not of people: someone with several SIM
-cards can sign once with each. The README says so.
+The count is of confirmed numbers, not of people: someone with several SIM cards can sign once with each. The
+README says so.
 """
 
 import logging
@@ -52,7 +44,7 @@ class Signed:
 
 
 def signer_key(petition_id: str, number: str) -> str:
-    """A number's signature on one petition: the same number on another petition gives an unrelated key."""
+    """The same number on another petition gives an unrelated key."""
     return keyed_hash(f"signature:{petition_id}:{number}")
 
 
@@ -75,7 +67,6 @@ def total(petition_id: str) -> int:
 
 
 def _count(petition: dict[str, Any], now: datetime) -> dict[str, Any]:
-    """Recount, and send the petition to the MCE if this signature reached its threshold."""
     changes = threshold_fields(petition, total(petition["$id"]), now)
     updated = petitions.update_petition(petition["$id"], changes)
     if changes.get("status") == PetitionStatus.AWAITING_RESPONSE:
@@ -85,7 +76,6 @@ def _count(petition: dict[str, Any], now: datetime) -> dict[str, Any]:
 
 
 def sign(code: str, number: str, channel: Channel, show_name: bool, name: str | None, now: datetime) -> Signed:
-    """Sign a published, still-open petition with a confirmed number."""
     shown = clean_signer_name(show_name, name)
     petition = petitions.public(code)
     check_signable(petition, now)
@@ -107,12 +97,11 @@ def _mine(petition_id: str, number: str) -> dict[str, Any] | None:
 
 
 def my_signature(code: str, number: str) -> dict[str, Any] | None:
-    """This number's signature on the petition, if it has signed."""
     return _mine(petitions.public(code)["$id"], number)
 
 
 def make_anonymous(code: str, number: str) -> dict[str, Any] | None:
-    """Take the signer's name off their signature. It still counts."""
+    """The signature still counts."""
     signature = my_signature(code, number)
     if signature and signature.get("named"):
         changes = {"named": False, "name": None}
@@ -122,7 +111,6 @@ def make_anonymous(code: str, number: str) -> dict[str, Any] | None:
 
 
 def named(code: str, limit: int, offset: int) -> tuple[list[dict[str, Any]], int]:
-    """The names signers chose to show, newest first, and how many there are."""
     petition = petitions.public(code)
     listing = get_databases().list_documents(DATABASE_ID, SIGNATURES_COLLECTION, queries=[
         Query.equal("petitionId", petition["$id"]), Query.equal("named", True), Query.select(["name", "createdAt"]),

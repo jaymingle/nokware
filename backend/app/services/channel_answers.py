@@ -1,11 +1,7 @@
 """Ask's answers laid out for a phone: WhatsApp text with numbered sources, or an SMS of two pages at most.
 
-The answer comes from rag.answer_question() at the channel's length, with the
-web's rules intact (sources, live figures, "fewer than 5", the safety refusal);
-this only lays it out. Document citations become [1], [2] in the order they
-first appear, with the documents listed underneath. Live report figures are
-already named as such in the answer's own words, so their tags are dropped and
-one line says what live report data is. An SMS keeps one source, the first cited.
+This only lays the answer out; the web's rules are already applied. Live report figures are named as such in the
+answer's own words, so their tags are dropped and one line says what live report data is.
 """
 
 import re
@@ -21,8 +17,7 @@ LIVE_DATA_NOTE = (
     "Counts called live report data come from reports residents filed with Nokware, not from a published "
     'document, and a count from 1 to 4 reads "fewer than 5".'
 )
-# A budget figure is the opposite of a live count: it IS from a published document. Telling a WhatsApp reader a
-# budget amount came "from reports residents filed with Nokware, not from a published document" had it backwards.
+# A budget figure is the opposite of a live count: it IS from a published document, so it needs its own note.
 BUDGET_DATA_NOTE = "Budget figures are approved amounts from AMA's published budgets, not money released or spent."
 _DOCUMENT_TAG = re.compile(r"\[(S\d+)\]")
 _ANY_TAG = re.compile(rf"\s*\[[{KINDS}]\d+\]")
@@ -37,12 +32,11 @@ def _clip(text: str, limit: int) -> str:
 
 
 def _cited_order(text: str) -> list[str]:
-    """Document labels in the order the answer first cites them."""
     return list(dict.fromkeys(_DOCUMENT_TAG.findall(text)))
 
 
 def _documents(answer: RagAnswer) -> dict[str, Source]:
-    """One source per document label (the retrieval returns a row per passage)."""
+    """The retrieval returns a row per passage."""
     documents: dict[str, Source] = {}
     for source in answer["sources"]:
         documents.setdefault(source["label"], source)
@@ -60,7 +54,6 @@ def _no_information(site: str) -> str:
 
 
 def for_chat(answer: RagAnswer, site: str) -> str:
-    """The answer as a WhatsApp message: WhatsApp's *bold*, numbered citations, and the sources listed."""
     if answer["status"] == "no_information":
         return _no_information(site)
     text = answer["answer"]
@@ -77,7 +70,6 @@ def for_chat(answer: RagAnswer, site: str) -> str:
 
 
 def _fit(body: str, room: int) -> str:
-    """The body cut to the room left, at a sentence end where one falls in the second half."""
     if len(body) <= room:
         return body
     cut = body[:room]
@@ -96,7 +88,6 @@ def _sms_source(answer: RagAnswer) -> str:
 
 
 def for_sms(answer: RagAnswer, site: str) -> str:
-    """The answer as one SMS of at most two pages, plain GSM-7: its first point and one source."""
     if answer["status"] == "no_information":
         return plain(f"Nokware: {NO_INFO_ANSWER} More at {site}/ask")
     flat = _ANY_TAG.sub("", answer["answer"])

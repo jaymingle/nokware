@@ -1,9 +1,7 @@
-"""The case audit trail: one case_history entry per step in a citizen report's life.
+"""The case audit trail, written by the server only and never edited.
 
-Written by the server only and never edited. Each entry records who acted (a
-snapshot of their name and role), the status before and after, the recipients
-involved and any note. For a personal-safety case an entry never carries the
-report's description: the trail says what happened, not what was reported.
+For a personal-safety case an entry never carries the report's description: the trail says what happened, not what
+was reported.
 """
 
 from dataclasses import dataclass
@@ -55,7 +53,6 @@ class CaseActor:
 
 
 def actor(principal: Principal) -> CaseActor:
-    """A signed-in person as the trail records them: a snapshot of their name and role."""
     return CaseActor(id=principal.user_id, name=principal.name, role=ActorRole(principal.role.value))
 
 
@@ -100,7 +97,6 @@ def record(case_id: str, entry: CaseEntry) -> None:
 
 
 def entries_for(case_id: str) -> list[dict[str, Any]]:
-    """A case's trail, oldest first."""
     listing = get_databases().list_documents(
         DATABASE_ID,
         COLLECTION_ID,

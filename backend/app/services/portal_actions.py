@@ -1,10 +1,5 @@
-"""Portal changes: uploads, workflow actions and the deadline job.
-
-Every change re-reads the document under a per-document lock, applies a
-workflow transition, writes it and appends the audit entry, so two changes to
-one document never interleave. The lock is per process: run the API as a
-single worker until changes move to Appwrite transactions.
-"""
+"""Portal changes: uploads, workflow actions and the deadline job. Every change re-reads its document under
+record_lock (see locks.py)."""
 
 import hashlib
 import logging
@@ -70,7 +65,6 @@ def act(
 
 
 def publish_expired() -> list[str]:
-    """Publish every document whose clock has run out; returns their IDs."""
     now = utc_now()
     published = []
     for candidate in _clocks_run_out(now):
@@ -94,12 +88,7 @@ def _clocks_run_out(now: datetime) -> list[dict[str, Any]]:
 
 
 def needs_ingestion(record: dict[str, Any], now: datetime) -> bool:
-    """Whether a published, unindexed document is due another ingestion attempt.
-
-    One still processing gets INGESTION_GRACE to finish first; one that failed is
-    retried once INGESTION_RETRY_AFTER has passed since the failure was recorded,
-    so a document that always fails doesn't cost an attempt on every run.
-    """
+    """A failure waits INGESTION_RETRY_AFTER, so a document that always fails doesn't cost an attempt every run."""
     if record.get("status") != LedgerStatus.PUBLISHED or record.get("ingestedAt"):
         return False
     if record.get("ingestionError"):
@@ -110,7 +99,6 @@ def needs_ingestion(record: dict[str, Any], now: datetime) -> bool:
 
 
 def ingestion_backlog() -> list[str]:
-    """Published documents whose ingestion failed or stalled and is due a retry."""
     now = utc_now()
     records, _ = ledger_documents.list_documents(
         [Query.equal("status", LedgerStatus.PUBLISHED.value), Query.is_null("ingestedAt"), Query.limit(JOB_BATCH)]
@@ -119,17 +107,12 @@ def ingestion_backlog() -> list[str]:
 
 
 def deadline_job() -> tuple[list[str], list[str]]:
-    """Publish documents whose clock has run out, and list what needs ingesting.
-
-    Returns (published IDs, IDs to ingest): the newly published plus any
-    backlog. Callers ingest them, in the background or inline.
-    """
+    """Returns (published IDs, IDs to ingest); callers ingest them, in the background or inline."""
     published = publish_expired()
     return published, list(dict.fromkeys([*published, *ingestion_backlog()]))
 
 
 def run_deadline_job() -> None:
-    """The whole job, ingestion included; for the app's own periodic runner."""
     published, to_ingest = deadline_job()
     if published:
         logger.info("Deadline job published %d document(s): %s", len(published), ", ".join(published))
@@ -138,7 +121,7 @@ def run_deadline_job() -> None:
 
 
 def ingest_quietly(document_id: str) -> None:
-    """Background ingestion. Failures are recorded on the document for the job to retry."""
+    """Failures are recorded on the document for the job to retry."""
     try:
         ingest_document(document_id)
     except Exception:

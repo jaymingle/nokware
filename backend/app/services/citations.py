@@ -1,21 +1,14 @@
 """Label-based citations for Ask.
 
-The model never sees document ids. Each retrieved document is shown under a
-short label ([S1], [S2], ...), each live report figure under an R label ([R1],
-...), each budget figure under a B label ([B1], ...), and the model cites those
-labels. Afterwards,
-sanitize_citations() keeps only labels that map to a retrieved document or figure and
-deletes every other citation outright: an unknown label is never guessed at,
-repaired, or matched to the nearest real one. A premise of verifiable sourcing
-cannot survive a single fabricated citation.
+The model never sees document ids, only labels. A citation to an unknown label is deleted outright, never guessed at,
+repaired, or matched to the nearest real one: verifiable sourcing cannot survive a single fabricated citation.
 """
 
 import re
 
 LABEL_PREFIX = "S"
-# Every kind of citation, in one place: S a document, R a live report count, B a budget figure. Each module that
-# finds, strips or renumbers citations builds its pattern from this. B was added to two of them and missed in five,
-# so budget answers showed "[B1]" raw on the page, in WhatsApp and SMS, in every export, and read it aloud.
+# S a document, R a live report count, B a budget figure. Every module that finds, strips or renumbers citations
+# builds its pattern from this, so a new kind can't be missed in some of them.
 KINDS = "SRB"
 FIGURE_KINDS = KINDS.replace(LABEL_PREFIX, "")  # the citations that are figures, not documents: R and B
 
@@ -32,16 +25,11 @@ _REPEATED_SPACES = re.compile(r"(?<=\S)[ \t]{2,}")  # mid-line only: keeps list 
 
 
 def make_label(position: int) -> str:
-    """Label for the document at 1-based position in the retrieval ranking."""
     return f"{LABEL_PREFIX}{position}"
 
 
 def sanitize_citations(answer: str, valid_labels: set[str]) -> tuple[str, set[str]]:
-    """Return (answer with only valid citations, labels actually cited).
-
-    Every citation group is rewritten to its valid labels in canonical form
-    ([S1][S3]); a group with no valid label disappears entirely.
-    """
+    """Returns the answer with only valid citations, in canonical form ([S1][S3]), and the labels actually cited."""
     cited: set[str] = set()
 
     def keep_valid(match: re.Match[str]) -> str:

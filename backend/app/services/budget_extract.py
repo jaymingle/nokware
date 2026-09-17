@@ -15,20 +15,12 @@ then breaks it down:
     Sub-Program 93001004  SP1.4: Planning, Coordination and Statistics   153,000
     Operation   910101  …                                  30,000
 
-An amount repeats at every level, so summing what looks like a total double
-counts — that is what makes these documents look unreadable. The rows that are
-both unambiguous and useful are the **sub-programme** lines: one line, one
-amount, under one programme, one department and one fund source.
+An amount repeats at every level, so summing what looks like a total double counts. The rows that are both
+unambiguous and useful are the sub-programme lines: one amount under one programme, department and fund source.
 
-So each block is read into rows, and then the block must prove itself: its rows
-must add up to the fund-source total it states. A block that doesn't reconcile is
-dropped whole — never partly kept, never rounded to fit. A document is published
-only if nearly all of its blocks reconcile (see MIN_VERIFIED); anything else is
-left out, and Ask says the figures aren't available rather than half-quoting a
-budget.
-
-This reads what the document states. It doesn't add years together, convert
-anything, or infer a figure that isn't printed.
+A block's rows must add up to the fund-source total it states, or the block is dropped whole: never partly kept,
+never rounded to fit. A document nearly all of whose blocks don't reconcile is left out, and Ask says the figures
+aren't available rather than half-quoting a budget.
 """
 
 import io
@@ -56,8 +48,6 @@ _PROGRAM = re.compile(r"^Program\s+(\d+)\s+(.*)$")
 
 @dataclass(frozen=True)
 class BudgetRow:
-    """One sub-programme's approved amount, as the document prints it."""
-
     year: int
     fund_source: str  # "IGF", "GOG", "DACF": how it is paid for
     sector: str  # the organisation path's second part: Administration, Waste Management, Health…
@@ -71,8 +61,6 @@ class BudgetRow:
 
 @dataclass(frozen=True)
 class Extracted:
-    """What a document gave up, and how much of it proved itself."""
-
     document_id: str
     rows: list[BudgetRow]
     blocks: int
@@ -104,8 +92,8 @@ def _departments(path: str) -> tuple[str, str]:
 
 
 def _blocks(lines: list[tuple[str, int]]) -> Iterator[tuple[list[str], int]]:
-    """The document's blocks with the page each starts on. A block runs from one institution to the next, and
-    runs on across a page break: reading page by page would cut one in half and lose the half that has the total."""
+    """A block runs on across a page break: reading page by page would cut one in half and lose the half that has
+    the total."""
     current: list[str] = []
     page = 0
     for line, number in lines:
@@ -120,7 +108,6 @@ def _blocks(lines: list[tuple[str, int]]) -> Iterator[tuple[list[str], int]]:
 
 
 def _rows_in(block: list[str], year: int, page: int) -> tuple[list[BudgetRow], float | None]:
-    """The sub-programme rows in one block, and the fund-source total it says they add up to."""
     total: float | None = None
     fund = sector = department = program = economic = ""
     rows: list[BudgetRow] = []
@@ -144,13 +131,11 @@ def _rows_in(block: list[str], year: int, page: int) -> tuple[list[BudgetRow], f
 
 
 def _reconciles(rows: list[BudgetRow], total: float | None) -> bool:
-    """Whether the block's rows add up to the total it states. Anything else is dropped whole."""
     return total is not None and bool(rows) and abs(sum(row.amount for row in rows) - total) <= PENCE
 
 
 def _lines(data: bytes) -> tuple[list[tuple[str, int]], int | None]:
-    """Every line of the budget's detail pages, with its page, and the year the pages state. Page furniture is
-    dropped: the heading repeats on each page and would otherwise land inside a block that runs on."""
+    """The heading repeats on each page and would otherwise land inside a block that runs on, so it is dropped."""
     lines: list[tuple[str, int]] = []
     year: int | None = None
     with pdfplumber.open(io.BytesIO(data)) as pdf:
@@ -167,7 +152,6 @@ def _lines(data: bytes) -> tuple[list[tuple[str, int]], int | None]:
 
 
 def read_pdf(data: bytes, document_id: str) -> Extracted:
-    """Every block in a PBB document, with the ones that don't prove themselves left out."""
     rows: list[BudgetRow] = []
     blocks = verified = 0
     lines, year = _lines(data)

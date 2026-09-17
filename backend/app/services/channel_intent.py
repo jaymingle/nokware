@@ -1,12 +1,7 @@
 """What a WhatsApp message (or typed USSD text) is: a status check, a question, a report, or unclear.
 
-Rules first, at no cost: a short message holding a case reference asks for its
-status, a greeting or "help" asks for the menu, and "thanks" or "ok" needs no
-answer. Anything else goes to the quick model, which says question, report,
-medical or unclear. A danger to a person is a report; someone ill or hurt with
-no one else to blame is medical, which isn't the Assembly's to act on. If the
-model fails, the answer is "unclear" and the citizen is asked, so a message is
-never filed or answered on a guess.
+Rules first, at no cost; the quick model only for the rest. If the model fails the answer is "unclear" and the
+citizen is asked, so a message is never filed or answered on a guess.
 """
 
 import logging
@@ -68,8 +63,7 @@ _PROMPT = ChatPromptTemplate.from_messages([("system", _SYSTEM), ("human", "Mess
 
 
 def find_reference(text: str) -> str | None:
-    """A case reference in the text, in canonical form. Without a separator it must hold a digit
-    and a letter, so an eight-letter word is never taken for one."""
+    """Without a separator a reference must hold a digit and a letter, so an eight-letter word is never taken for one."""
     for match in _REFERENCE.finditer(text):
         code = match.group(1)
         joined = re.sub(r"[\s-]", "", code)
@@ -92,13 +86,11 @@ def _model_kind(text: str, has_photo: bool) -> Intent:
 
 
 def is_medical(text: str) -> bool:
-    """For text already offered as a report (USSD's "Report an issue"): whether it is medical instead.
-    A failure reads as not medical, so the report goes on as the citizen chose."""
+    """For text already offered as a report. A failure reads as not medical, so the report goes on as the citizen chose."""
     return _model_kind(text, False) == Intent.MEDICAL
 
 
 def read_message(text: str, has_photo: bool = False) -> Reading:
-    """What the citizen wants, from their message (and whether it came with a photo)."""
     stripped = text.strip()
     reference = find_reference(stripped)
     if reference and len(stripped) <= STATUS_MESSAGE_MAX:

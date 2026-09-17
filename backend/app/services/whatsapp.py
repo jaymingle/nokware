@@ -1,17 +1,10 @@
 """WhatsApp through Twilio: sending, checking Twilio's signatures, media, and WhatsApp's 24-hour window.
 
-A message is a POST to Twilio's Messages API (form fields From, To, Body and,
-when the API has a public address, StatusCallback). A reply longer than
-WhatsApp's 1,600 characters goes as several messages, split between paragraphs.
+Twilio signs a webhook over the exact public URL it called, so signatures are checked against PUBLIC_API_URL:
+behind ngrok or a proxy the API's own URL differs.
 
-Twilio signs every webhook with X-Twilio-Signature over the exact public URL it
-called and the form fields; Twilio's own RequestValidator checks it, against
-PUBLIC_API_URL (behind ngrok or a proxy the API's own URL differs).
-
-WhatsApp allows free-form messages only within 24 hours of the citizen's last
-message. Each inbound message opens that window in Redis (for a little under
-24 hours, to be safe); outside it, notifications go by SMS instead (see
-notifications.py). Incoming photos are fetched once and then deleted from Twilio.
+WhatsApp allows free-form messages only within 24 hours of the citizen's last message; outside that window
+notifications go by SMS instead (see notifications.py).
 """
 
 import logging
@@ -46,7 +39,7 @@ class WhatsAppNotConfigured(RuntimeError):
 
 
 def split(text: str, limit: int = BODY_MAX) -> list[str]:
-    """Text in pieces of at most limit characters, broken between paragraphs, then lines, then words."""
+    """Broken between paragraphs, then lines, then words."""
     pieces: list[str] = []
     rest = text.strip()
     while len(rest) > limit:
@@ -70,8 +63,7 @@ class TwilioWhatsApp:
     delivers: bool = True
 
     def send(self, to: str, body: str, media_url: str | None = None) -> str:
-        """Send one WhatsApp message, or a file Twilio fetches from media_url (WhatsApp drops any text sent with
-        audio, so a voice note goes without it); return Twilio's message SID. Raises WhatsAppError."""
+        """Returns Twilio's message SID. A media message goes without text: WhatsApp drops any text sent with audio."""
         form = {"From": self.sender, "To": f"whatsapp:{to}", **({"MediaUrl": media_url} if media_url else {"Body": body[:BODY_MAX]})}
         if self.status_callback:
             form["StatusCallback"] = self.status_callback
@@ -85,7 +77,6 @@ class TwilioWhatsApp:
         return str(payload.get("sid", ""))
 
     def download(self, url: str) -> tuple[bytes, str]:
-        """An incoming media file and its content type (Twilio's link redirects to storage)."""
         response = self.client.get(url, auth=(self.account_sid, self.auth_token), follow_redirects=True)
         response.raise_for_status()
         if len(response.content) > MEDIA_MAX_BYTES:
@@ -93,7 +84,6 @@ class TwilioWhatsApp:
         return response.content, response.headers.get("content-type", "")
 
     def delete_message(self, message_sid: str) -> None:
-        """Remove an incoming message from Twilio's log (one that carried a location). Logged, not raised, on failure."""
         url = f"{API}/Accounts/{self.account_sid}/Messages/{message_sid}.json"
         try:
             self.client.delete(url, auth=(self.account_sid, self.auth_token)).raise_for_status()
@@ -101,7 +91,7 @@ class TwilioWhatsApp:
             logger.warning("Couldn't delete a WhatsApp message from Twilio's log (%s)", type(error).__name__)
 
     def delete_sent_media(self, message_sid: str) -> bool:
-        """Remove the files of a message we sent from Twilio's media store. True once none is left there."""
+        """True once none of the message's files is left in Twilio's media store."""
         base = f"{API}/Accounts/{self.account_sid}/Messages/{message_sid}/Media"
         try:
             listed = self.client.get(f"{base}.json", auth=(self.account_sid, self.auth_token))
@@ -116,7 +106,6 @@ class TwilioWhatsApp:
         return True
 
     def delete_media(self, url: str) -> None:
-        """Remove an incoming file from Twilio once it has been used. A failure is logged, not raised."""
         try:
             self.client.delete(url, auth=(self.account_sid, self.auth_token)).raise_for_status()
         except httpx.HTTPError as error:
@@ -139,7 +128,6 @@ def twilio() -> TwilioWhatsApp:
 
 
 def signed_by_twilio(path: str, params: dict[str, str], signature: str) -> bool:
-    """True only for a webhook Twilio signed for this public URL with this account's token."""
     url, token = _public(path), get_settings().twilio_auth_token
     if not url or not token or not signature:
         return False
@@ -147,7 +135,6 @@ def signed_by_twilio(path: str, params: dict[str, str], signature: str) -> bool:
 
 
 def open_window(number: str) -> None:
-    """The citizen just wrote: free-form messages to them are allowed for the next 24 hours."""
     try:
         get_redis().set(key("wa-window", subject_key(number)), "1", ex=WINDOW_SECONDS)
     except (redis.RedisError, RedisUnavailable):
@@ -155,7 +142,7 @@ def open_window(number: str) -> None:
 
 
 def window_open(number: str) -> bool:
-    """Whether a free-form message can reach them now. Unknown (no Redis) counts as closed."""
+    """Unknown (no Redis) counts as closed."""
     try:
         return bool(get_redis().exists(key("wa-window", subject_key(number))))
     except (redis.RedisError, RedisUnavailable):
@@ -163,7 +150,7 @@ def window_open(number: str) -> bool:
 
 
 def first_delivery(message_sid: str) -> bool:
-    """False if this webhook was already handled (Twilio may deliver one twice)."""
+    """Twilio may deliver a webhook twice."""
     try:
         return bool(get_redis().set(key("wa-seen", message_sid), "1", nx=True, ex=86400))
     except (redis.RedisError, RedisUnavailable):

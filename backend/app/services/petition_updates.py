@@ -1,23 +1,11 @@
 """Messages to the person who started a petition, at the moments its outcome changes.
 
-Seven moments: the MCE refused it, published it, or let the 72 hours run out
-so it published itself; it reached its threshold; the MCE responded; 30 days
-passed after the threshold with no response (the moment the outcome becomes a
-fact about the Assembly, not a pending matter); it closed after 90 days short
-of its threshold. Nothing when they withdraw it: they did that themselves.
+Nothing when they withdraw it: they did that themselves. Signers are never messaged: WhatsApp can't reach someone
+outside its 24-hour window without approved templates, and an SMS to every signer could cost hundreds of credits.
+The petition's page carries everything.
 
-Only the creator is messaged. Signers are not: WhatsApp can't reach someone
-outside its 24-hour window without approved templates, and an SMS to every
-signer could cost hundreds of credits. The petition's page carries everything.
-
-The wording is neutral, the same rule as report messages: what happened, the
-petition's number and its link, no judgement. Each fits one SMS page in plain
-GSM-7 (a credit each). It goes on the channel the creator confirmed their
-number with: WhatsApp while its 24-hour window is open, otherwise SMS to the
-same (Ghanaian) number; a number confirmed by USSD or SMS gets SMS. The number
-is read from the petition (encrypted at rest) at the moment of sending and is
-never logged whole. Each message leaves a line in the petition's trail, which
-the public never sees. A failure is logged, never raised.
+The wording is neutral, as for report messages: what happened, the petition's number and link, no judgement, on
+one SMS page.
 """
 
 import logging
@@ -46,8 +34,7 @@ class Update(StrEnum):
     CLOSED = "closed"
 
 
-# Each moment's message, and a shorter one in case a longer site address than PUBLIC_SITE_URL's deployed one
-# (nokware.tstitagency.com, with which every full message fits) would take it past one SMS page.
+# The short wording is for a site address longer than the deployed one, with which every full message fits a page.
 MESSAGES: dict[Update, tuple[str, str]] = {
     Update.REFUSED: ("Nokware: the MCE refused your petition {number}. Reason: {reason}. Edit and send it back: {mine}",
                      "Nokware: the MCE refused your petition {number}: {reason}. See {mine}"),
@@ -71,7 +58,6 @@ CHANNEL_NAMES = {NotificationChannel.SMS: "SMS", NotificationChannel.WHATSAPP: "
 
 
 def compose(update: Update, petition: dict[str, Any]) -> str:
-    """The message, in one plain SMS page: the full wording if it fits, else the short one."""
     site = get_settings().public_site_url.rstrip("/")
     code = petition["code"]
     values = {
@@ -84,7 +70,7 @@ def compose(update: Update, petition: dict[str, Any]) -> str:
 
 
 def channel_for(petition: dict[str, Any], number: str) -> tuple[NotificationChannel, str]:
-    """WhatsApp for a number confirmed on WhatsApp while its window is open; SMS otherwise. With why, for the trail."""
+    """Also returns why, for the trail."""
     if petition.get("creatorChannel") != NotificationChannel.WHATSAPP.value:
         return NotificationChannel.SMS, ""
     if get_settings().whatsapp_provider == "twilio" and not window_open(number):
@@ -93,7 +79,6 @@ def channel_for(petition: dict[str, Any], number: str) -> tuple[NotificationChan
 
 
 def _deliver(channel: NotificationChannel, number: str, text: str) -> str:
-    """Hand it to the channel's provider; what happened, in words for the trail."""
     provider = provider_for(channel)
     if provider is None:
         logger.info("Petition update to %s not sent (no provider is configured): %s", masked(number), text)
@@ -117,7 +102,6 @@ def notify_creator(petition: dict[str, Any], update: Update) -> None:
 
 
 def notify_quietly(petition: dict[str, Any], update: Update) -> None:
-    """For background tasks and the clock: logged, never raised."""
     try:
         notify_creator(petition, update)
     except Exception:

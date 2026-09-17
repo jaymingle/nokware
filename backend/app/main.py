@@ -56,11 +56,7 @@ settings = get_settings()
 
 
 def show_app_logs() -> None:
-    """Send the app's own INFO logs (e.g. what the deadline job published) to the console.
-
-    Uvicorn configures only its own loggers, so without this the app's messages
-    below WARNING are dropped.
-    """
+    """Uvicorn configures only its own loggers, so without this the app's messages below WARNING are dropped."""
     app_logger = logging.getLogger("app")
     if not app_logger.handlers:
         handler = logging.StreamHandler()
@@ -89,21 +85,18 @@ logging.getLogger("uvicorn.access").addFilter(RedactChannelSecrets())
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
-    # A messaging provider that is named but missing its settings stops the API here.
     notifications.check_providers()
     # Postgres comes through a tunnel on a local port that something else can take: say so now, plainly, rather
     # than 30 seconds into a resident's first question. The API starts either way.
     await asyncio.to_thread(search_index.startup_check)
-    # Documents publish when their clock runs out, without cron: the deadline
-    # job runs in this process every DEADLINE_JOB_INTERVAL_SECONDS.
+    # Documents publish when their clock runs out, without cron.
     task = scheduler.start(settings.deadline_job_interval_seconds, run_deadline_job, "Deadline job")
     # Petitions the MCE leaves undecided for 72 hours publish, and open ones close after 90 days, on the same interval.
     clock = scheduler.start(settings.deadline_job_interval_seconds, run_petition_clock, "Petition clock")
-    # Citizens' numbers, and names given with voices, are deleted 30 days after their case closes (a petition
-    # creator's, 30 days after the petition closes); spoken
-    # replies Twilio never reported on are deleted from Twilio a day after they were sent.
+    # Citizens' numbers and names given with voices go 30 days after their case or petition closes; spoken replies
+    # Twilio never reported on go a day after they were sent.
     purge = scheduler.start(settings.contact_purge_interval_seconds, run_contact_purge, "Contact purge")
-    # BMS sends no delivery reports: what became of each SMS it carried is asked of it on this interval.
+    # BMS sends no delivery reports, so they are asked for.
     polling = settings.bms_delivery_poll_seconds if settings.sms_provider == "bms" else 0
     deliveries = scheduler.start(polling, run_bms_delivery_poll, "BMS delivery check")
     # The MCP server at /mcp answers only while its session manager runs, and its own app's lifespan never does here.
@@ -190,7 +183,6 @@ def redis_unavailable(_: Request, __: RedisUnavailable) -> JSONResponse:
 @app.exception_handler(psycopg.OperationalError)
 @app.exception_handler(SearchIndexUnreachable)  # the same failure, through the vector store's SQLAlchemy engine
 def ledger_search_unavailable(_: Request, exc: Exception) -> JSONResponse:
-    # The Ledger's search index (Postgres, through a tunnel) can't be reached: logged, and said plainly to the reader.
     logging.getLogger("app").error("The Ledger's search index can't be reached: %s", type(exc).__name__)
     return JSONResponse({"detail": "The Ledger can't be searched right now. Try again shortly."}, status_code=503)
 

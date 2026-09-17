@@ -1,22 +1,11 @@
 """How each Assembly department responds: to residents' reports, and to documents contributors send it.
 
-The platform publishing evidence about the institution's own behaviour, with the
-same rules as every public figure (stats.py): personal safety is left out
-entirely (not counted, and not in which departments appear), a count from 1 to 4
-reads "fewer than 5" (None here), a median needs five cases, and nothing about a
-case's content appears. Where two counts add up to one that is shown (resolved and
-still open make up received), hiding one hides the other, or subtraction would
-reveal it. Over the last twelve months, as the dashboard.
+The same rules as every public figure (stats.py): personal safety is left out entirely, even from which departments
+appear; 1 to 4 reads "fewer than 5" (None here); a median needs five cases; no case content appears.
 
-Reports are counted per department: a report sent to two departments counts for
-both, and one the MCE moved counts for the department that has it now. Reports
-don't expire, so the nearest measure of "unactioned" is still waiting to be
-started 7 days after it arrived: the measure chosen here, not a statutory
-deadline. What does expire is a review clock: a contributor's document the
-department doesn't review within 72 hours publishes automatically, and so does an
-escalated dispute the MCE doesn't rule on in time. Departments are listed by
-name, never ranked. Police and GNFS are national agencies, not Assembly
-departments, so they are not held to this scorecard.
+Reports don't expire, so "unactioned" is measured as not started 7 days after arrival: a chosen measure, not a
+statutory deadline. Departments are listed by name, never ranked. Police and GNFS are national agencies, not
+Assembly departments, so they are not held to this scorecard.
 """
 
 import statistics
@@ -47,14 +36,11 @@ RULINGS = (HistoryAction.UPHELD.value, HistoryAction.OVERRULED.value, HistoryAct
 
 
 def median(values: list[float], unit: float) -> float | None:
-    """A median in days or hours, to one decimal; None below five cases."""
     return round(statistics.median(values) / unit, 1) if len(values) >= MEDIAN_MIN else None
 
 
 @dataclass(frozen=True)
 class _Part:
-    """One department's part in one public report."""
-
     assigned: datetime
     started: datetime | None  # work started, or resolved without a separate start
     resolved: datetime | None
@@ -74,7 +60,6 @@ def _parts(cases: dict[str, dict[str, Any]], assignments: list[dict[str, Any]]) 
 
 
 def _disputes(history: list[dict[str, Any]], cases: set[str]) -> dict[str, dict[str, int]]:
-    """Per case, whether residents disputed its resolution and how the MCE ruled: confirmed, or reopened."""
     found: dict[str, dict[str, int]] = defaultdict(lambda: {"disputed": 0, "confirmed": 0, "reopened": 0})
     for entry in history:
         if entry["caseId"] not in cases:
@@ -116,8 +101,7 @@ def _reports(parts: list[_Part], disputes: dict[str, dict[str, int]], now: datet
 
 
 def _outcomes(history: list[dict[str, Any]], opened: tuple[str, ...], closing: tuple[str, ...], from_status: str) -> list[tuple[str, str, float]]:
-    """Each review, in order per document: (department, how it ended, hours taken). A clock that ran out ends
-    it as auto_published; hours are kept only for a decision someone made."""
+    """(department, how it ended, hours taken) per review. A clock that ran out ends it as auto_published."""
     by_document: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for entry in history:
         by_document[entry["documentId"]].append(entry)
@@ -177,8 +161,6 @@ def _history(collection: str, actions: list[str]) -> list[dict[str, Any]]:
 
 
 def responsiveness(now: datetime) -> dict[str, Any]:
-    """The figures, at most a minute old."""
-
     def make() -> dict[str, Any]:
         case_actions = [CaseHistoryAction.ESCALATED.value, CaseHistoryAction.ESCALATION_CONFIRMED.value, CaseHistoryAction.REASSIGNED.value]
         document_actions = [a.value for a in HistoryAction]

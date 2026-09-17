@@ -16,7 +16,6 @@ PDF_SIGNATURE_WINDOW = 1024  # readers accept the signature anywhere in the firs
 
 
 def present(records: list[dict[str, Any]], principal: Principal) -> list[DocumentOut]:
-    """Records as the caller sees them, including the actions open to them."""
     now = utc_now()
     names = display_names(user_id for r in records for user_id in (r.get("uploadedBy"), r.get("disputedBy")))
     return [
@@ -26,7 +25,6 @@ def present(records: list[dict[str, Any]], principal: Principal) -> list[Documen
 
 
 def read_pdf(upload: UploadFile) -> bytes:
-    """The uploaded file's bytes, if it is a PDF within the size limit."""
     data = upload.file.read(MAX_PDF_BYTES + 1)
     if len(data) > MAX_PDF_BYTES:
         raise HTTPException(status.HTTP_413_CONTENT_TOO_LARGE, "The PDF is larger than 50 MB.")

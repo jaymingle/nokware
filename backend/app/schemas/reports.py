@@ -1,5 +1,3 @@
-"""Request and response models for citizen reports (public routes)."""
-
 from pydantic import BaseModel, Field
 
 from app.schemas.contacts import PublicContact
