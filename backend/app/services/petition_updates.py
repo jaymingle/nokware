@@ -15,7 +15,7 @@ from typing import Any
 from app.config import get_settings
 from app.services import petitions
 from app.services.citizen_reports import NotificationChannel
-from app.services.notifications import provider_for
+from app.services.notifications import CHANNEL_NAMES, provider_for
 from app.services.petition_rules import REFUSALS, PetitionAction
 from app.services.report_contacts import masked
 from app.services.sms_text import pages, plain
@@ -54,7 +54,6 @@ MESSAGES: dict[Update, tuple[str, str]] = {
     Update.CLOSED: ("Nokware: your petition {number} closed after 90 days with {signatures} of {threshold} signatures: {link}",
                     "Nokware: petition {number} closed with {signatures} of {threshold} signatures: {link}"),
 }
-CHANNEL_NAMES = {NotificationChannel.SMS: "SMS", NotificationChannel.WHATSAPP: "WhatsApp message"}
 
 
 def compose(update: Update, petition: dict[str, Any]) -> str:
