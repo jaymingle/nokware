@@ -8,6 +8,7 @@ The public timeline says the MCE decided, never which person.
 from dataclasses import asdict
 from typing import Any
 
+from app.routes.issues import STAGES as ISSUE_STAGES
 from app.schemas.petitions import (
     AwaitingResponse,
     DocumentRef,
@@ -43,8 +44,6 @@ from app.teams import RECIPIENT_NAMES
 from app.wards import sub_metros, wards
 
 PUBLIC_ACTIONS = {a.value for a in PetitionAction} - {PetitionAction.MADE_ANONYMOUS.value, PetitionAction.CREATOR_NOTIFIED.value}
-ISSUE_STAGES = {CaseStatus.SUBMITTED: "received", CaseStatus.ASSIGNED: "received", CaseStatus.IN_PROGRESS: "in_progress",
-                CaseStatus.ESCALATED: "escalated"}
 
 
 def _place(petition: dict[str, Any]) -> tuple[str | None, str | None]:
