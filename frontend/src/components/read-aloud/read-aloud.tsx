@@ -10,9 +10,8 @@ import type { SpokenPart } from "@/lib/api/public";
 const LABELS: Record<ReadAloudState, string> = { idle: "Listen", loading: "Preparing the audio…", playing: "Pause", paused: "Resume" };
 
 /**
- * A speaker button for one block of prose someone may not be able to read: an Ask answer, a report's confirmation
- * or its status. Not a whole-page reader (screen readers do that better). The audio is made by the API from what it
- * produced, never from text on the page, a part at a time.
+ * One block of prose, not the whole page: screen readers do that better. The API makes the audio from what it
+ * produced, never from text on the page.
  */
 export function ReadAloud({ load, label, testId }: { load: (part: number) => Promise<SpokenPart>; label: string; testId: string }) {
   const { state, error, resuming, toggle } = useReadAloud(load);

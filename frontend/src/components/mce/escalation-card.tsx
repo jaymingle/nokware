@@ -18,7 +18,6 @@ const RULING_NOTE = {
   required: false,
 };
 
-/** The department's reason for disputing it, beside the contributor's case for publishing it. */
 function BothSides({ doc }: { doc: DocumentOut }) {
   const department = doc.department_name ?? "The department";
   const disputedBy = [doc.disputed_by_name ?? department, doc.disputed_at ? formatDate(doc.disputed_at) : null];
@@ -72,7 +71,6 @@ function Rulings({ doc }: { doc: DocumentOut }) {
   );
 }
 
-/** A dispute escalated to the MCE, led by the MCE's clock. */
 export function EscalationCard({ doc }: { doc: DocumentOut }) {
   const open = clockRunning(doc, useNow());
   const byline = `Submitted by ${doc.uploaded_by_name ?? "a contributor"} to ${doc.department_name ?? "a department"} on ${formatDate(doc.created_at)}`;

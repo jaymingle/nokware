@@ -9,7 +9,7 @@ type ViewPdfButtonProps = {
   compact?: boolean;
 };
 
-/** Opens the document's current PDF in a new tab, via /file/[id] (which fetches a fresh short-lived link). */
+/** Via /file/[id], which fetches a fresh short-lived link. */
 export function ViewPdfButton({ documentId, label = "View PDF", compact = false }: ViewPdfButtonProps) {
   return (
     <Button variant="secondary" asChild>

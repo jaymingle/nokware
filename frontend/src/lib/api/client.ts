@@ -25,10 +25,7 @@ async function send(path: string, init: RequestInit): Promise<Response> {
   }
 }
 
-/**
- * Call the Nokware API as the signed-in user. A 401 (e.g. a JWT revoked by
- * signing out elsewhere) is retried once with a fresh JWT before giving up.
- */
+/** A 401 (e.g. a JWT revoked by signing out elsewhere) is retried once with a fresh JWT. */
 export async function apiRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
   let response = await send(path, init);
   if (response.status === 401) {

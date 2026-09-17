@@ -109,7 +109,6 @@ function Actions({ petition, proof, onEdit }: Props & { onEdit: () => void }) {
   );
 }
 
-/** One of the creator's own petitions: where it stands, why it was refused, and what they can still do. */
 export function OwnPetitionCard({ petition, proof }: Props) {
   const [editing, setEditing] = useState(false);
   return (

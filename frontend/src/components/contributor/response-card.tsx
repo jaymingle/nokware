@@ -68,7 +68,7 @@ function ResponseActions({ doc }: { doc: DocumentOut }) {
   );
 }
 
-/** A disputed submission. Disputes have no clock: nothing happens until the contributor responds. */
+/** Disputes have no clock: nothing happens until the contributor responds. */
 export function ResponseCard({ doc }: { doc: DocumentOut }) {
   const used = doc.resubmission_count > 0;
   return (

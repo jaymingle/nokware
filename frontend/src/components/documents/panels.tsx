@@ -39,7 +39,6 @@ export function EmptyPanel({ title, children }: { title: string; children?: Reac
   );
 }
 
-/** An inline failure message inside a form or dialog. */
 export function ErrorNote({ children, testId }: { children: ReactNode; testId?: string }) {
   return (
     <p role="alert" className="rounded-lg bg-brick-tint px-3 py-2.5 text-[13.5px] text-brick" data-testid={testId}>

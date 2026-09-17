@@ -155,7 +155,7 @@ function ReviewCard({ item, reasons, now }: { item: ReviewItem; reasons: Refusal
   );
 }
 
-/** Petitions waiting for the MCE: publish, or refuse for a fixed reason. Silence publishes. */
+/** Refusal only for a fixed reason; silence publishes. */
 export function PetitionReview() {
   const now = useNow();
   const { data, error, isPending, refetch } = usePetitionReview();

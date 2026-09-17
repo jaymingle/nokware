@@ -12,7 +12,7 @@ function emergencyOnly(directory: ContactDirectory): ContactDirectory {
   return { ...directory, services: directory.services.filter((service) => EMERGENCY_SERVICES.includes(service.id)) };
 }
 
-/** Emergency numbers only: where an SMS or USSD screen sends someone who needs help now. */
+/** Where an SMS or USSD screen sends someone who needs help now. */
 export function EmergencyPage() {
   const directory = useContacts();
   return (

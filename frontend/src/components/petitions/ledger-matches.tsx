@@ -8,7 +8,7 @@ import { LEDGER_NOTE } from "@/lib/petitions";
 
 import type { LedgerMatch, PetitionDocument } from "@/lib/api/types";
 
-/** Title (opening the PDF), then who published it and when, as Ask says it. */
+/** Who published it, worded as Ask words it. */
 export function DocumentLine({ doc }: { doc: PetitionDocument }) {
   const provenance = describeProvenance({ provenance: doc.provenance, departmentName: doc.department_name, sourceUrl: null });
   const meta = [provenance?.text, doc.year ? String(doc.year) : null].filter(Boolean).join(" · ");
@@ -43,7 +43,6 @@ function Match({ match, cite }: { match: LedgerMatch; cite?: Cite }) {
   );
 }
 
-/** What the Ledger already holds on a petition's subject, with how it was found and what a match does and doesn't mean. */
 export function LedgerMatches({ matches, cite, testId }: { matches: LedgerMatch[]; cite?: Cite; testId: string }) {
   return (
     <div className="flex flex-col gap-2" data-testid={testId}>

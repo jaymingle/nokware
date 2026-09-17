@@ -2,7 +2,7 @@ import { Brand } from "@/components/portal/brand";
 
 import type { ReactNode } from "react";
 
-/** A full-page message for states before the portal can render (loading, no access, outage). */
+/** For states before the portal can render: loading, no access, an outage. */
 export function StatusScreen({ title, children }: { title: string; children?: ReactNode }) {
   return (
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center gap-6 px-6 py-16" aria-live="polite">

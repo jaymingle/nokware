@@ -24,7 +24,6 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-/** The signed-in user, or null when there is no Appwrite session. */
 async function loadMe(): Promise<Me | null> {
   try {
     return await getMe();
@@ -87,7 +86,6 @@ export function useAuth(): AuthContextValue {
   return value;
 }
 
-/** The signed-in user, for components rendered only inside the portal shell. */
 export function useMe(): Me {
   const { me } = useAuth();
   if (!me) throw new Error("useMe needs a signed-in user; render it inside <PortalShell>");

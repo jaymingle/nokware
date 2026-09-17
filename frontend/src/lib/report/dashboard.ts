@@ -13,18 +13,15 @@ function parts(key: string): [number, number] {
   return [year, month - 1];
 }
 
-/** "2026-09" as "Sep". */
 export function monthLabel(key: string): string {
   return MONTHS[parts(key)[1]];
 }
 
-/** "2026-09" as "September 2026". */
 export function longMonth(key: string): string {
   const [year, month] = parts(key);
   return `${LONG_MONTHS[month]} ${year}`;
 }
 
-/** "October 2025 to September 2026". */
 export function periodLabel(months: MonthFigures[]): string {
   if (months.length === 0) return "";
   return `${longMonth(months[0].month)} to ${longMonth(months[months.length - 1].month)}`;
@@ -34,26 +31,23 @@ export function periodLabel(months: MonthFigures[]): string {
 export type Count = number | null;
 export const FEWER_THAN_FIVE = "fewer than 5";
 const SUPPRESSED_MAX = 4; // the most a "fewer than 5" count can be
-/** Where a "fewer than 5" count may lie, so a chart can draw it as a range instead of guessing a point. */
+/** So a chart draws "fewer than 5" as a range instead of guessing a point. */
 export const SUPPRESSED_RANGE: readonly [number, number] = [1, SUPPRESSED_MAX];
 
-/** A count as shown: "1,204", or "<5" for fewer than 5. */
 export function formatCount(count: Count): string {
   return count === null ? "<5" : count.toLocaleString();
 }
 
-/** Share of a total as "72%"; "0%" of nothing; null when either is "fewer than 5". */
 export function percent(count: Count, total: Count): string | null {
   if (count === null || total === null) return null;
   return total > 0 ? `${Math.round((count / total) * 100)}%` : "0%";
 }
 
-/** The height a count may be drawn to: "fewer than 5" is drawn as at most 4. */
 export function drawnValue(count: Count): number {
   return count ?? SUPPRESSED_MAX;
 }
 
-/** Runs of consecutive shown values, as index lists, so a line breaks at "fewer than 5" instead of guessing. */
+/** So a line breaks at "fewer than 5" instead of guessing. */
 export function shownRuns(values: Count[]): number[][] {
   const runs: number[][] = [];
   values.forEach((value, i) => {
@@ -65,13 +59,11 @@ export function shownRuns(values: Count[]): number[][] {
   return runs;
 }
 
-/** Median days to resolve, as shown: under a day reads "under 1". */
 export function formatDays(days: number): string {
   if (days < 1) return "under 1";
   return String(Math.round(days));
 }
 
-/** The chart's top value and gridlines: whole numbers in four even steps. */
 export function chartScale(values: Count[]): { max: number; ticks: number[] } {
   const highest = Math.max(0, ...values.map(drawnValue));
   const rough = highest / CHART_STEPS;

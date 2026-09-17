@@ -5,8 +5,7 @@ import { FEWER_THAN_FIVE, SUPPRESSED_RANGE, chartScale, drawnValue, longMonth, m
 
 import type { MonthFigures } from "@/lib/api/types";
 
-// The design's chart: received as bars, resolved in the month as a line. It is
-// drawn at the width it is shown, so its labels stay 11px on a phone and a desktop.
+// Drawn at the width it is shown, so its labels stay 11px on a phone and a desktop.
 const H = 250;
 const PAD = { l: 34, r: 8, t: 12, b: 28 };
 const INNER_H = H - PAD.t - PAD.b;
@@ -33,7 +32,6 @@ function MonthsTable({ months }: { months: MonthFigures[] }) {
   );
 }
 
-/** A point for each month's resolved count; a "fewer than 5" month is a dashed mark over the range 1 to 4. */
 function ResolvedMarks({ months, x, y }: { months: MonthFigures[]; x: (i: number) => number; y: (v: number) => number }) {
   const [low, high] = SUPPRESSED_RANGE;
   return months.map((m, i) => (m.resolved === null ? (
@@ -43,7 +41,6 @@ function ResolvedMarks({ months, x, y }: { months: MonthFigures[]; x: (i: number
   )));
 }
 
-/** Twelve months of reports received (bars) and resolved (line), scaled to whole numbers. */
 export function TrendChart({ months }: { months: MonthFigures[] }) {
   const [box, W] = useWidth(600);
   const { max, ticks } = chartScale(months.flatMap((m) => [m.received, m.resolved]));

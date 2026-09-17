@@ -22,7 +22,6 @@ import type { ExportView } from "@/lib/api/types";
 
 const HIGHLIGHT_MS = 2400;
 
-/** Jumping from a citation to its source: scroll, focus, and briefly highlight the card. */
 function useSourceJump(anchorPrefix: string) {
   const [highlighted, setHighlighted] = useState<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -46,7 +45,7 @@ function useSourceJump(anchorPrefix: string) {
 
 type Jump = ReturnType<typeof useSourceJump>;
 
-/** The person's question, on the right. A heading, so a screen reader can move from question to question. */
+/** A heading, so a screen reader can move from question to question. */
 function QuestionMessage({ turn, headingId, testId }: { turn: Turn; headingId: string; testId: string }) {
   return (
     <div className="flex justify-end ps-10 sm:ps-16">
@@ -78,7 +77,6 @@ function TurnError({ message, onRetry, testId }: { message: string; onRetry: () 
   );
 }
 
-/** A machine translated this answer: say so, and offer the English it was checked in. */
 function TranslationNote({ showing, onToggle, testId }: { showing: "asked" | "english"; onToggle: () => void; testId: string }) {
   return (
     <p className="flex flex-wrap items-center gap-x-2 gap-y-1 border-t pt-2.5 text-[12.5px] text-ink-soft" data-testid={`${testId}-translation`}>
@@ -92,7 +90,6 @@ function TranslationNote({ showing, onToggle, testId }: { showing: "asked" | "en
   );
 }
 
-/** The words of the reply: progress while it works, then the answer (or why there isn't one). */
 function ReplyBody({ turn, jump, onRetry, testId }: { turn: Turn; jump: Jump; onRetry: () => void; testId: string }) {
   const [showing, setShowing] = useState<"asked" | "english">("asked");
   const titles = useMemo(
@@ -108,7 +105,7 @@ function ReplyBody({ turn, jump, onRetry, testId }: { turn: Turn; jump: Jump; on
   return (
     <>
       {working ? <AskProgress turn={turn} testId={`${testId}-progress`} /> : null}
-      {/* The disagreement note reads the English: the wording it looks for is the answer as it was checked. */}
+      {/* Checked against the English: a translation would not contain the lead wording. */}
       {done && turn.english.includes(DISAGREEMENT_LEAD) ? <Disagreement /> : null}
       {shown ? (
         <AnswerText markdown={shown} titles={titles} onCite={jump.jump} testIdPrefix={testId}
@@ -122,7 +119,6 @@ function ReplyBody({ turn, jump, onRetry, testId }: { turn: Turn; jump: Jump; on
   );
 }
 
-/** What the answer rests on, attached to it: the chart, the live figures, then the documents. */
 function Attachments({ turn, jump, testId }: { turn: Turn; jump: Jump; testId: string }) {
   const figures = turn.figures.filter((figure) => figure.cited);
   const cited = citedDocuments(turn);
@@ -147,10 +143,8 @@ function Attachments({ turn, jump, testId }: { turn: Turn; jump: Jump; testId: s
 }
 
 /**
- * What can be done with a finished answer: hear it read aloud (unless it touches
- * on someone's safety), or download it. At the head of the reply, because an
- * answer with a chart and forty-two figures runs thousands of pixels and nobody
- * scrolls past all of it to find out they could have downloaded it.
+ * At the head of the reply: an answer with a chart and dozens of figures runs thousands of pixels, and nobody
+ * scrolls past it to find the download. Not read aloud when it touches on someone's safety.
  */
 function ReplyTools({ turn, view, testId }: { turn: Turn; view: ExportView; testId: string }) {
   return (
@@ -161,7 +155,6 @@ function ReplyTools({ turn, view, testId }: { turn: Turn; view: ExportView; test
   );
 }
 
-/** Nokware's reply, on the left under its mark: the answer, with what it rests on and what can be done with it. */
 function ReplyMessage({ turn, anchorPrefix, onRetry, testId }: { turn: Turn; anchorPrefix: string; onRetry: () => void; testId: string }) {
   const jump = useSourceJump(anchorPrefix);
   const done = turn.stage === "done";
@@ -185,7 +178,6 @@ function ReplyMessage({ turn, anchorPrefix, onRetry, testId }: { turn: Turn; anc
   );
 }
 
-/** One exchange in the conversation: the question as the person's message, the answer as Nokware's. */
 export function AskTurn({ turn, scope, onRetry }: { turn: Turn; scope: string; onRetry: (turn: Turn) => void }) {
   const testId = `ask-${turn.id}`;
   const domId = `${scope}-${turn.id}`;

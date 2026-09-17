@@ -5,7 +5,6 @@ import { cn } from "@/lib/utils";
 
 import type { PetitionCard as Card } from "@/lib/api/types";
 
-/** How far a petition is towards the signatures that take it to the MCE. */
 export function Progress({ signatures, threshold, large = false }: { signatures: number; threshold: number | null; large?: boolean }) {
   const percent = progressPercent(signatures, threshold);
   return (
@@ -19,7 +18,6 @@ export function Progress({ signatures, threshold, large = false }: { signatures:
   );
 }
 
-/** A published petition in a list: the ask, where and on what, and how far it has got. */
 export function PetitionCard({ petition, now }: { petition: Card; now: number }) {
   return (
     <li className="flex flex-col gap-2 border-b py-4 last:border-0" data-testid={`petition-${petition.code}`}>

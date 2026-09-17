@@ -13,10 +13,7 @@ function text(fields: FormData, name: string): string | undefined {
   return typeof value === "string" ? value : undefined;
 }
 
-/**
- * State shared by both report forms: photos and numbers are held here, the
- * text fields are read from the form when it is sent.
- */
+/** Photos and numbers are held here; the text fields are read from the form when it is sent. */
 export function useReportForm(onFiled: (receipt: ReportReceipt) => void) {
   const filing = useFileReport();
   const [photos, setPhotos] = useState<ReportPhoto[]>([]);

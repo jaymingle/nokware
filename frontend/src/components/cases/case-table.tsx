@@ -49,7 +49,6 @@ function Row({ summary, selected, onSelect, showRecipients, now }: { summary: Ca
   );
 }
 
-/** Cases as the design's queue table; choosing one shows it in the panel beside. */
 export function CaseTable({ cases, selected, onSelect, showRecipients = false }: CaseTableProps) {
   const now = useNow();
   return (

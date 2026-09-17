@@ -13,7 +13,7 @@ const NOTE_MAX = 2000;
 
 type EscalateFormProps = { reference: string; until: string; intro: string; action: string };
 
-/** The citizen's one escalation, within 14 days of the resolution. */
+/** One escalation, within 14 days of the resolution. */
 export function EscalateForm({ reference, until, intro, action }: EscalateFormProps) {
   const escalate = useEscalateReport();
   const [note, setNote] = useState("");

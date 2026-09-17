@@ -13,7 +13,7 @@ export const CALLBACK_CONSENT = "Allow Police and Social Welfare to call you on 
 
 type ContactProps = { contact: Contact; onChange: (contact: Contact) => void };
 
-/** Phone and WhatsApp numbers. On the safety form, the browser is asked not to remember them. */
+/** On the safety form, the browser is asked not to remember the numbers. */
 export function NumberFields({ contact, onChange, sensitive }: ContactProps & { sensitive: boolean }) {
   const autoComplete = sensitive ? "off" : "tel";
   return (

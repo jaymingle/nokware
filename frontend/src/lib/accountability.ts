@@ -13,6 +13,8 @@ export const STATE_LABELS: Record<RecordState, string> = {
   not_due: "Not yet expected",
 };
 
+const PLAN_YEARS = 4;
+
 const longDate = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
 
 export function dateLabel(isoDate: string): string {
@@ -29,7 +31,7 @@ export const ASSUMPTION_NOTE =
 
 export const LEDGER_YEAR_NOTE = "The year comes from the Ledger's record of the document, not from the document's title.";
 
-/** Whether a held period rests on a year from the Ledger's record rather than the document itself: marked with a †. */
+/** Marked with a † in the table. */
 export function yearFromLedger(period: RecordPeriod): boolean {
   return period.state === "held" && period.documents.length > 0 && period.documents.every((doc) => doc.year_source === "ledger");
 }
@@ -38,20 +40,17 @@ export function yearsOf(record: PublishingRecord): number[] {
   return Array.from({ length: record.last_year - record.first_year + 1 }, (_, i) => record.first_year + i);
 }
 
-/** The periods a requirement shows under one year: one, four quarters, or the plan period covering it. */
 export function periodsIn(requirement: RecordRequirement, year: number): RecordPeriod[] {
   if (requirement.cadence === "plan_period") {
-    return requirement.periods.filter((p) => p.year <= year && year < p.year + 4);
+    return requirement.periods.filter((p) => p.year <= year && year < p.year + PLAN_YEARS);
   }
   return requirement.periods.filter((p) => p.year === year);
 }
 
-/** How many columns (years) a plan period spans in the table, from the first year shown. */
 export function planSpan(period: RecordPeriod, years: number[]): number {
-  return years.filter((year) => period.year <= year && year < period.year + 4).length;
+  return years.filter((year) => period.year <= year && year < period.year + PLAN_YEARS).length;
 }
 
-/** The request someone can send under the RTI Act, worded for this document and period. */
 export function requestWording(documentName: string, period: string, issuedElsewhere: boolean): string {
   const subject = issuedElsewhere ? `the ${documentName} on the Accra Metropolitan Assembly` : `the Accra Metropolitan Assembly's ${documentName}`;
   return `Under the Right to Information Act, 2019 (Act 989), I request a copy of ${subject} for ${period}.`;
@@ -63,7 +62,7 @@ export function rtiHref(requirement: RecordRequirement, period: RecordPeriod): s
   return `/rti?${params}`;
 }
 
-/** Whether a department had anything to show in the period: most never receive reports. */
+/** Most departments never receive reports. */
 export function isActive(department: DepartmentFigures): boolean {
   const counts = [department.reports.received, department.documents.accepted, department.documents.disputed, department.documents.auto_published];
   return counts.some((value) => value !== 0);

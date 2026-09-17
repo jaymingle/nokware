@@ -8,7 +8,7 @@ type Params = Promise<{ code: string }>;
 
 const DESCRIPTION_MAX = 200;
 
-/** The petition itself, for the preview a shared link shows; nothing if it can't be read. */
+/** For the preview a shared link shows. */
 async function petitionFor(code: string): Promise<PetitionDetail | null> {
   try {
     const response = await fetch(`${env.apiUrl}/api/petitions/${encodeURIComponent(code)}`, { next: { revalidate: 300 } });

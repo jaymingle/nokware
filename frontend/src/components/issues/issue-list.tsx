@@ -77,7 +77,6 @@ function Paging({ page, offset, onOffset }: { page: IssuePage; offset: number; o
   );
 }
 
-/** Open civic issues residents have raised, most supported first, each taking "this affects me too". */
 export function IssueList() {
   const [subMetro, setSubMetro] = useState("");
   const [topic, setTopic] = useState("");

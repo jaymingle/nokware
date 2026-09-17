@@ -47,7 +47,6 @@ function Trail({ documentId }: { documentId: string }) {
   );
 }
 
-/** A document's audit trail, oldest first, loaded when opened: who did what, and when. */
 export function ChainOfCustody({ documentId }: { documentId: string }) {
   const [open, setOpen] = useState(false);
   return (

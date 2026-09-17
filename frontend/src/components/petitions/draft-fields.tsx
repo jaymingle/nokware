@@ -73,7 +73,6 @@ function Words({ draft, change, testId }: Omit<FieldsProps, "options">) {
   );
 }
 
-/** The open issue residents reported that this petition builds on, by what it is, not its ID. */
 function IssueLink({ issue, onRemove, testId }: { issue: string; onRemove: () => void; testId: string }) {
   const linked = useLinkedIssue(issue);
   const place = [linked.data?.ward, linked.data?.sub_metro].filter(Boolean).join(", ");
@@ -87,7 +86,6 @@ function IssueLink({ issue, onRemove, testId }: { issue: string; onRemove: () =>
   );
 }
 
-/** The petition's fields: the ask, why, its topic and where. Shared by a new petition and a refused one being edited. */
 export function DraftFields({ draft, change, options, testId }: FieldsProps) {
   return (
     <div className="flex flex-col gap-5">

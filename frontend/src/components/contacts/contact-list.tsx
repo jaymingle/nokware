@@ -7,11 +7,10 @@ import type { PublicContact } from "@/lib/api/types";
 // The directory link is left off mid-form, where following it would lose what was typed.
 type ContactListProps = {
   title: string; lead?: string; contacts: PublicContact[]; testId: string; directoryLink?: boolean; columns?: boolean;
-  /** Its level where it is used: a section of the page, or a section of something already inside one. */
+  /** A section of the page, or a section of something already inside one. */
   heading?: "h2" | "h3";
 };
 
-/** The numbers for one report or form, each with its source, and a way to the full directory. */
 export function ContactList({ title, lead, contacts, testId, directoryLink = true, columns = false,
   heading: Heading = "h3" }: ContactListProps) {
   if (contacts.length === 0) return null;

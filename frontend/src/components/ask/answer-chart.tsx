@@ -8,15 +8,11 @@ import { countedAt } from "@/lib/ask/figures";
 
 import type { AskChart } from "@/lib/api/types";
 
-// A chart the question asked for, of the answer's cited live figures. The API
-// chose the kind (never one that can't show "fewer than 5" honestly) and the
-// values; this draws them: an exact count as a bar or a point, "fewer than 5"
-// as a hatched range from 1 to 4 or a dashed span. Drawn at the width it is
-// shown, like the dashboard's chart, with the numbers in a table for screen readers.
+// The API chose the kind, never one that can't show "fewer than 5" honestly, so
+// "fewer than 5" is drawn as a range from 1 to 4, never as a guessed point.
 
 const FONT = 11; // the smallest, on a phone
-// A chart drawn 1,100px wide was still labelling itself at 11px, which reads as
-// a thumbnail of a chart rather than the chart. The type grows with the drawing.
+// At 1,100px wide, 11px labels read as a thumbnail of a chart.
 function fontFor(width: number): number {
   return width >= 620 ? 13 : width >= 440 ? 12 : FONT;
 }
@@ -24,7 +20,7 @@ const PAD = { l: 34, r: 12, t: 16, b: 34 };
 const MAX_BAR = 56; // pixels: a bar never grows into a slab
 const CHAR = 0.56; // of the font size: enough to size a label column from the text
 
-/** As much of a name as fits the space, ending in an ellipsis; the full name is in the table for screen readers. */
+/** The full name is in the table for screen readers. */
 function fit(name: string, space: number, size: number = FONT): string {
   const room = Math.floor(space / (size * CHAR));
   return name.length <= room ? name : `${name.slice(0, Math.max(1, room - 1))}…`;
@@ -32,12 +28,11 @@ function fit(name: string, space: number, size: number = FONT): string {
 
 type Draw = { chart: AskChart; width: number; hatch: string };
 
-/** Where a count sits along the value axis, in pixels from `start` towards `end`. */
 function scale(chart: AskChart, start: number, end: number): (value: number) => number {
   return (value) => start + ((end - start) * value) / Math.max(1, chart.axis_max);
 }
 
-/** One hatching per series, in its colour: a pattern takes its colour where it is defined, not where it is used. */
+/** One pattern per series: a pattern takes its colour where it is defined, not where it is used. */
 function Hatches({ chart, id }: { chart: AskChart; id: string }) {
   return (
     <defs>
@@ -100,7 +95,7 @@ function FlatBars({ chart, width, hatch }: Draw) {
   const row = chart.kind === "stacked_bar" || chart.series.length === 1 ? Math.max(30, font * 2.4) : (font + 5) * chart.series.length + 12;
   const label = Math.min(width * 0.42, 8 + font * CHAR * Math.max(...chart.categories.map((c) => c.length)));
   const height = PAD.t + row * chart.categories.length + 22;
-  // Room at the right for the longest value, so a figure never runs off the edge.
+  // Room at the right for the longest value, so it never runs off the edge.
   const values = barPieces(chart, row, MAX_BAR / 2).map((piece) => short(piece.value).length);
   const x = scale(chart, label + 8, width - PAD.r - (8 + (font - 1) * CHAR * Math.max(...values, 2)));
   return (
@@ -202,7 +197,6 @@ function Legend({ chart }: { chart: AskChart }) {
   );
 }
 
-/** The chart's numbers for screen readers, "fewer than 5" in words. */
 function ChartTable({ chart }: { chart: AskChart }) {
   return (
     <table className="sr-only">

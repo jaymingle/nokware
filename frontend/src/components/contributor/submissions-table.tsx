@@ -54,7 +54,6 @@ function SubmissionRow({ doc, now }: { doc: DocumentOut; now: number }) {
   );
 }
 
-/** Every submission, newest first, with where its review stands (the design's "My submissions"). */
 export function SubmissionsTable({ documents }: { documents: DocumentOut[] }) {
   const now = useNow();
   return (

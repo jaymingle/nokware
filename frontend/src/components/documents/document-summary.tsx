@@ -10,7 +10,6 @@ function sourceHost(url: string): string {
   }
 }
 
-/** A document's title, filing details and public source. */
 export function DocumentSummary({ doc, byline }: { doc: DocumentOut; byline: string }) {
   const details = [doc.category, doc.document_year, byline].filter(Boolean).join(" · ");
   return (

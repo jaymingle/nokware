@@ -7,7 +7,7 @@ function Gap({ gap }: { gap: ReportingGap }) {
   return (
     <article className="flex flex-col gap-2.5 rounded-xl border border-gold/40 bg-paper-warm p-4 sm:p-5" data-testid={testId}>
       <div>
-        {/* The finding's own sentence, as written: nothing here is composed out of a label. */}
+        {/* The finding's own sentence: never composed out of a label. */}
         <h3 className="text-[18px] leading-snug" data-testid={`${testId}-headline`}>
           {gap.headline}
         </h3>
@@ -31,7 +31,7 @@ function Gap({ gap }: { gap: ReportingGap }) {
   );
 }
 
-/** Figures the Assembly's documents once reported and haven't since: the gap the record itself can't show. */
+/** The gap the publishing record itself can't show. */
 export function ReportingGaps({ gaps, about }: { gaps?: ReportingGap[]; about?: string }) {
   // Optional on purpose: an API that predates these findings, or one of them, must not blank the record or
   // show a finding without its sentence.

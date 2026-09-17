@@ -60,7 +60,6 @@ function Paging({ total, offset, onOffset }: { total: number; offset: number; on
   );
 }
 
-/** Published petitions, open or closed, and the MCE's record of handling them. */
 export function PetitionListPage() {
   const [group, setGroup] = useState<PetitionGroup>("open");
   const [topic, setTopic] = useState("");

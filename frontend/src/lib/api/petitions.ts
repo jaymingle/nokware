@@ -40,7 +40,6 @@ export function getPetition(code: string): Promise<PetitionDetail> {
   return publicRequest<PetitionDetail>(petitionPath(code));
 }
 
-/** What the Ledger holds on a published petition's subject. */
 export function getPetitionLedger(code: string): Promise<LedgerMatch[]> {
   return publicRequest<LedgerMatch[]>(`${petitionPath(code)}/ledger`);
 }
@@ -95,7 +94,6 @@ export function signPetition(code: string, choice: SignChoice, proof: string): P
   return postJson<SignResult>(`${petitionPath(code)}/signatures`, choice, proofHeader(proof));
 }
 
-/** Whether the confirmed number has signed this petition, and under what name. */
 export function getMySignature(code: string, proof: string): Promise<MySignature> {
   return publicRequest<MySignature>(`${petitionPath(code)}/signature`, { headers: proofHeader(proof) });
 }
@@ -104,7 +102,7 @@ export function takeNameOffSignature(code: string, proof: string): Promise<MySig
   return postJson<MySignature>(`${petitionPath(code)}/signature/anonymous`, {}, proofHeader(proof));
 }
 
-/** The names signers chose to show, newest first. */
+/** Newest first. */
 export function getSignerNames(code: string, limit: number, offset: number): Promise<NamedSignatures> {
   return publicRequest<NamedSignatures>(`${petitionPath(code)}/names?limit=${limit}&offset=${offset}`);
 }

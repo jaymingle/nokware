@@ -47,7 +47,6 @@ function Submitted({ doc, onAnother }: { doc: DocumentOut; onAnother: () => void
   );
 }
 
-/** A contributor submits a sourced document for one department's review. */
 export function SubmitForm() {
   const upload = useUploadDocument();
   const { file, chooseFile, fileMissing, result, clearResult, onSubmit } = usePdfForm(upload.mutateAsync);

@@ -38,7 +38,6 @@ function ResponseCard({ petition, now }: { petition: AwaitingResponse; now: numb
   );
 }
 
-/** Petitions that reached their threshold, each with the MCE's 30 days to respond publicly, soonest first. */
 export function PetitionResponses() {
   const now = useNow();
   const { data } = useAwaitingResponses();

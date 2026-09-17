@@ -10,8 +10,8 @@ function Figure({ value, label, testId }: { value: number; label: string; testId
 }
 
 /**
- * How the MCE has handled the petitions sent to them. The MCE is usually a petition's target, so every refusal is
- * counted here by its reason, and petitions the MCE left undecided are counted as publishing themselves.
+ * The MCE is usually a petition's target, so every refusal is counted by its reason, and petitions left undecided
+ * are counted as publishing themselves.
  */
 export function ModerationRecord({ moderation }: { moderation: PetitionModeration }) {
   return (

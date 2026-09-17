@@ -50,12 +50,12 @@ export function usePetition(code: string) {
   return useQuery({ queryKey: petitionKeys.detail(code), queryFn: () => getPetition(code) });
 }
 
-/** The Ledger search is slow and changes rarely: kept for the page's life, and tried once more at most if it fails. */
+/** The Ledger search is slow and changes rarely. */
 export function usePetitionLedger(code: string) {
   return useQuery({ queryKey: petitionKeys.ledger(code), queryFn: () => getPetitionLedger(code), staleTime: Infinity, retry: 1 });
 }
 
-/** The open issue a petition links to, to say what it is; not retried, since a closed issue stays closed. */
+/** Not retried: a closed issue stays closed. */
 export function useLinkedIssue(publicId: string | null) {
   return useQuery({ queryKey: ["issue", publicId], queryFn: () => getIssue(publicId ?? ""), enabled: publicId !== null, retry: false });
 }
@@ -80,7 +80,6 @@ export function useSubmitPetition() {
 
 type ChangeInput = { code: string; proof: string } & ({ action: CreatorAction } | { draft: PetitionDraft });
 
-/** Withdraw, take the name off, or send a refused petition back: then the creator's list is read again. */
 export function useChangePetition() {
   const queryClient = useQueryClient();
   return useMutation<OwnPetition, Error, ChangeInput>({
@@ -94,7 +93,6 @@ export function useMySignature(code: string, proof: string | null) {
   return useQuery({ queryKey: petitionKeys.signature(code, proof ?? ""), queryFn: () => getMySignature(code, proof ?? ""), enabled: proof !== null });
 }
 
-/** The signers who chose to show their name, a page at a time. */
 export function useSignerNames(code: string) {
   return useInfiniteQuery({
     queryKey: petitionKeys.names(code),
@@ -107,7 +105,6 @@ export function useSignerNames(code: string) {
   });
 }
 
-/** Signing, or taking a name off a signature: then the petition, its names and this number's signature are read again. */
 function useAfterSigning(code: string) {
   const queryClient = useQueryClient();
   return () => Promise.all([

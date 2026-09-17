@@ -4,17 +4,6 @@ import Link from "next/link";
 
 import { useDashboard, usePublishingRecord } from "@/lib/api/public-queries";
 
-/**
- * What the record actually holds, on the page that makes claims about it.
- *
- * The landing page asserted four things about Nokware and showed no evidence
- * for any of them. These are the live figures, the same ones the dashboard and
- * the publishing record show, so the claims can be checked in one glance — the
- * gap included, which is the figure the Assembly would rather not lead with.
- *
- * Every figure is a link to where it comes from. If either call fails the panel
- * simply isn't there: a landing page must not break because a count didn't load.
- */
 type Figure = { value: string; label: string; href: string; testId: string };
 
 function figures(documents?: number, departments?: number, missing?: number, due?: number): Figure[] {
@@ -39,6 +28,10 @@ function figures(documents?: number, departments?: number, missing?: number, due
   return found;
 }
 
+/**
+ * The landing page makes claims about the record, so it shows the live figures behind them, the gap included.
+ * If either call fails the panel isn't there: a landing page must not break because a count didn't load.
+ */
 export function RecordFigures() {
   const dashboard = useDashboard();
   const record = usePublishingRecord();

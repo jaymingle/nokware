@@ -5,7 +5,7 @@ import { SUB_METRO_SHAPES, SUB_METRO_SOURCE, labelFor, pathFor, projection } fro
 const WIDTH = 560;
 const HEIGHT = 340;
 
-/** Whether a point is inside a ring, by the crossing rule — the test's own, so the drawing's isn't marking its own work. */
+/** The test's own crossing rule, so the drawing isn't marking its own work. */
 function encloses(ring: number[][], [x, y]: [number, number]): boolean {
   let within = false;
   for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {

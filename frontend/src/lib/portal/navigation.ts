@@ -1,6 +1,5 @@
 import type { Me, Role } from "@/lib/api/types";
 
-/** A live count shown on a nav item, e.g. documents awaiting review. */
 export type NavCountKind = "review" | "responses" | "escalations" | "cases" | "case-escalations" | "petitions";
 
 type NavItem = { href: string; label: string; testId: string; count?: NavCountKind };
@@ -31,7 +30,6 @@ export const ROLE_NAV: Record<Role, NavItem[]> = {
   ],
 };
 
-/** Where the user sits in the Assembly, as shown beside their name. */
 export function roleLabel(me: Me): string {
   if (me.role === "department") return me.department_name ?? "Department";
   if (me.role === "agency") return me.agency_name ?? "Agency";
@@ -46,7 +44,7 @@ export function initials(name: string): string {
     .join("");
 }
 
-/** Only portal paths may be a post-sign-in destination (never an external URL). */
+/** Never an external URL after sign-in. */
 export function safeNext(next: string | null): string {
   return next && next.startsWith("/portal") && !next.startsWith("//") ? next : "/portal";
 }
