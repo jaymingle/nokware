@@ -1,8 +1,7 @@
-import Link from "next/link";
 import { ActivityIcon, LandmarkIcon } from "lucide-react";
+import Link from "next/link";
 
 import { LedgerPdfLink } from "@/components/ask/ledger-pdf-link";
-
 import { countedAt, labelNumber } from "@/lib/ask/figures";
 import { cn } from "@/lib/utils";
 

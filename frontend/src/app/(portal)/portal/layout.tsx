@@ -1,7 +1,7 @@
-import type { ReactNode } from "react";
-import type { Metadata } from "next";
-
 import { PortalShell } from "@/components/portal/portal-shell";
+
+import type { Metadata } from "next";
+import type { ReactNode } from "react";
 
 export const metadata: Metadata = { title: "Portal" };
 

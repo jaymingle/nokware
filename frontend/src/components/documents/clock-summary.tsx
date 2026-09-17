@@ -1,7 +1,7 @@
 "use client";
 
-import { cn } from "@/lib/utils";
 import { deadlineFrom } from "@/lib/time";
+import { cn } from "@/lib/utils";
 
 import type { DocumentOut } from "@/lib/api/types";
 

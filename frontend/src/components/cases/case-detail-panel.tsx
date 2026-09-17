@@ -1,7 +1,7 @@
 "use client";
 
-import Image from "next/image";
 import { PhoneIcon, UsersIcon } from "lucide-react";
+import Image from "next/image";
 
 import { CaseActions } from "@/components/cases/case-actions";
 import { SharedLocation } from "@/components/cases/shared-location";

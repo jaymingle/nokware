@@ -1,9 +1,8 @@
-import type { ReactNode } from "react";
-
 import { cn } from "@/lib/utils";
 
 import type { IngestionState } from "@/lib/api/types";
 import type { Tone } from "@/lib/documents";
+import type { ReactNode } from "react";
 
 // The design's status tags. Gold tags carry ink text: gold on its tint is
 // under 4.5:1 at this size.

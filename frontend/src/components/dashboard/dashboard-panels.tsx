@@ -1,5 +1,4 @@
 import Link from "next/link";
-import type { ReactNode } from "react";
 
 import { CountValue } from "@/components/dashboard/count";
 import { Button } from "@/components/ui/button";
@@ -9,6 +8,7 @@ import { formatDate } from "@/lib/time";
 import { cn } from "@/lib/utils";
 
 import type { RecentDocument, SubMetroFigures, TopicFigures } from "@/lib/api/types";
+import type { ReactNode } from "react";
 
 export function Panel({ title, lead, children, className, testId }: {
   title: string; lead?: string; children: ReactNode; className?: string; testId?: string;

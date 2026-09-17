@@ -1,18 +1,17 @@
 "use client";
 
-import type { ReactNode } from "react";
-
 import { Lines, type Line } from "@/components/accountability/figure-lines";
 import { PetitionFigures } from "@/components/accountability/petition-figures";
 import { CountValue } from "@/components/dashboard/count";
 import { ErrorPanel, LoadingPanel } from "@/components/documents/panels";
 import { PageIntro } from "@/components/portal/page-intro";
-import { useResponsiveness } from "@/lib/api/public-queries";
 import { isActive } from "@/lib/accountability";
+import { useResponsiveness } from "@/lib/api/public-queries";
 import { formatDays } from "@/lib/report/dashboard";
 import { formatDate } from "@/lib/time";
 
 import type { DepartmentFigures, Responsiveness } from "@/lib/api/types";
+import type { ReactNode } from "react";
 
 function median(value: number | null, unit: "days" | "hours"): ReactNode {
   if (value === null) return <span className="text-ink-soft">not enough to say</span>;

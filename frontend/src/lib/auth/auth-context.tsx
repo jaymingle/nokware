@@ -1,10 +1,10 @@
 "use client";
 
-import { createContext, use, useCallback, useMemo, type ReactNode } from "react";
 import { useQuery, useQueryClient, type UseQueryResult } from "@tanstack/react-query";
+import { createContext, use, useCallback, useMemo, type ReactNode } from "react";
 
-import { ApiError } from "@/lib/api/errors";
 import { getMe } from "@/lib/api/endpoints";
+import { ApiError } from "@/lib/api/errors";
 import { endSession, SignInError, startSession } from "@/lib/auth/session";
 
 import type { Me } from "@/lib/api/types";

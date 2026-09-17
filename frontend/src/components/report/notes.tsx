@@ -1,7 +1,8 @@
 import { PhoneCallIcon } from "lucide-react";
-import type { ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
+
+import type { ReactNode } from "react";
 
 export function Note({ tone = "plain", children, testId }: { tone?: "plain" | "private"; children: ReactNode; testId?: string }) {
   return (

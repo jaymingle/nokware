@@ -1,7 +1,7 @@
-import type { ReactNode } from "react";
-
 import { ErrorNote } from "@/components/documents/panels";
 import { Button } from "@/components/ui/button";
+
+import type { ReactNode } from "react";
 
 export function FormSection({ title, hint, children }: { title: string; hint: string; children: ReactNode }) {
   return (

@@ -1,6 +1,6 @@
-import type { Metadata } from "next";
-
 import { FileRedirect } from "@/components/documents/file-redirect";
+
+import type { Metadata } from "next";
 
 export const metadata: Metadata = { title: "Opening PDF" };
 

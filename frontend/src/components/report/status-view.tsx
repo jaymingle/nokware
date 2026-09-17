@@ -1,5 +1,3 @@
-import type { ReactNode } from "react";
-
 import { ContactList } from "@/components/contacts/contact-list";
 import { Tag } from "@/components/documents/tag";
 import { ReadAloud } from "@/components/read-aloud/read-aloud";
@@ -12,6 +10,7 @@ import { formatDate, formatDateTime } from "@/lib/time";
 import { cn } from "@/lib/utils";
 
 import type { LocationViewNote, ReportStatus } from "@/lib/api/types";
+import type { ReactNode } from "react";
 
 function Steps({ status }: { status: ReportStatus }) {
   const labels = stageLabels(status.private);

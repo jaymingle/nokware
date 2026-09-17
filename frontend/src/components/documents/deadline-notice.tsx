@@ -3,8 +3,8 @@
 import { ClockIcon } from "lucide-react";
 
 import { useNow } from "@/hooks/use-now";
-import { cn } from "@/lib/utils";
 import { deadlineFrom, formatDateTime } from "@/lib/time";
+import { cn } from "@/lib/utils";
 
 const TONE = {
   normal: "border-gold bg-gold-tint",

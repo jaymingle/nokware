@@ -1,11 +1,11 @@
 "use client";
 
-import type { ReactNode } from "react";
-
 import { PageIntro } from "@/components/portal/page-intro";
 import { Card, CardContent } from "@/components/ui/card";
 import { useMe } from "@/lib/auth/auth-context";
 import { roleLabel } from "@/lib/portal/navigation";
+
+import type { ReactNode } from "react";
 
 type RolePageProps = {
   title: string;

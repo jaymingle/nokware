@@ -1,7 +1,5 @@
 "use client";
 
-import type { FormEvent } from "react";
-
 import { CaseDialogFooter, useCaseDialog } from "@/components/cases/case-dialog";
 import { FormField } from "@/components/documents/document-fields";
 import { Button } from "@/components/ui/button";
@@ -10,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 
 import type { CaseDetail, Option } from "@/lib/api/types";
+import type { FormEvent } from "react";
 
 // A personal-safety case moves only between these (the server enforces it too).
 const SAFETY_RECIPIENTS = new Set(["agency-police", "dept-social-welfare"]);

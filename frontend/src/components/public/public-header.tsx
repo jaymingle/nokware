@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { ReactNode } from "react";
 
 import { Brand } from "@/components/portal/brand";
 import { cn } from "@/lib/utils";
+
+import type { ReactNode } from "react";
 
 function NavLink({ href, testId, children }: { href: string; testId: string; children: ReactNode }) {
   const pathname = usePathname();

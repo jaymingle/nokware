@@ -1,9 +1,9 @@
-import type { ReactNode } from "react";
-
 import { AskThreadProvider } from "@/components/ask/ask-thread-provider";
 import { AskWidget } from "@/components/ask/ask-widget";
 import { PublicHeader } from "@/components/public/public-header";
 import { SkipLink } from "@/components/skip-link";
+
+import type { ReactNode } from "react";
 
 // Public pages: no sign-in and no auth state.
 export default function PublicGroupLayout({ children }: { children: ReactNode }) {

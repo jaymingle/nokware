@@ -1,10 +1,10 @@
 "use client";
 
-import type { ReactNode } from "react";
-
 import { FormField } from "@/components/documents/document-fields";
 import { Input } from "@/components/ui/input";
 import { hasNumber, type Contact } from "@/lib/report/form";
+
+import type { ReactNode } from "react";
 
 // The consent wording is fixed: it is exactly what the citizen agrees to.
 export const NOTIFY_CONSENT =

@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
 import { ChevronRightIcon } from "lucide-react";
+import { useState } from "react";
 
 import { ErrorNote } from "@/components/documents/panels";
 import { Button } from "@/components/ui/button";

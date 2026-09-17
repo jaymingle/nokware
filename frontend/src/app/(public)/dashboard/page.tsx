@@ -1,6 +1,6 @@
-import type { Metadata } from "next";
-
 import { DashboardPage } from "@/components/dashboard/dashboard-page";
+
+import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "The city, in the aggregate",

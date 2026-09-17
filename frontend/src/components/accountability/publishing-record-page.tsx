@@ -8,8 +8,8 @@ import { ReportingGaps } from "@/components/accountability/reporting-gaps";
 import { UnpublishedRecord } from "@/components/accountability/unpublished-data";
 import { ErrorPanel, LoadingPanel } from "@/components/documents/panels";
 import { PageIntro } from "@/components/portal/page-intro";
-import { usePublishingRecord } from "@/lib/api/public-queries";
 import { ASSUMPTION_NOTE, LEDGER_YEAR_NOTE, STATE_LABELS, dateLabel, periodsIn, planSpan, yearFromLedger, yearsOf, type RecordState } from "@/lib/accountability";
+import { usePublishingRecord } from "@/lib/api/public-queries";
 import { cn } from "@/lib/utils";
 
 import type { PublishingRecord, RecordPeriod, RecordRequirement } from "@/lib/api/types";

@@ -1,7 +1,5 @@
 "use client";
 
-import type { FormEvent, ReactNode } from "react";
-
 import { CaseDialogFooter, useCaseDialog } from "@/components/cases/case-dialog";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -9,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
 import type { CaseAction } from "@/lib/api/types";
+import type { FormEvent, ReactNode } from "react";
 
 const NOTE_MAX = 2000;
 

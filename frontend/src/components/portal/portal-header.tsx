@@ -7,8 +7,8 @@ import { Brand } from "@/components/portal/brand";
 import { NavCount } from "@/components/portal/nav-count";
 import { Button } from "@/components/ui/button";
 import { useAuth, useMe } from "@/lib/auth/auth-context";
-import { cn } from "@/lib/utils";
 import { initials, ROLE_NAV, roleLabel } from "@/lib/portal/navigation";
+import { cn } from "@/lib/utils";
 
 function PortalNav() {
   const pathname = usePathname();

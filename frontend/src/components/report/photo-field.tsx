@@ -1,8 +1,8 @@
 "use client";
 
+import { ImagePlusIcon, XIcon } from "lucide-react";
 import Image from "next/image";
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
-import { ImagePlusIcon, XIcon } from "lucide-react";
 
 import { ErrorNote } from "@/components/documents/panels";
 import { Button } from "@/components/ui/button";

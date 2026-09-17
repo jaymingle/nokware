@@ -1,6 +1,6 @@
-import type { Metadata } from "next";
-
 import { EmergencyPage } from "@/components/contacts/emergency-page";
+
+import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Help now",

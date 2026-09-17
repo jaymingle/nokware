@@ -1,9 +1,8 @@
-import type { Metadata } from "next";
-
 import { PetitionPage } from "@/components/petitions/petition-page";
 import { env } from "@/lib/env";
 
 import type { PetitionDetail } from "@/lib/api/types";
+import type { Metadata } from "next";
 
 type Params = Promise<{ code: string }>;
 

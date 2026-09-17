@@ -1,6 +1,6 @@
-import type { Metadata, Viewport } from "next";
-
 import { AskPage } from "@/components/ask/ask-page";
+
+import type { Metadata, Viewport } from "next";
 
 export const metadata: Metadata = {
   title: "Ask",

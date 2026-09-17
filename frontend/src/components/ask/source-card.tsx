@@ -2,8 +2,8 @@ import { ChevronRightIcon } from "lucide-react";
 
 import { LedgerPdfLink } from "@/components/ask/ledger-pdf-link";
 import { ProvenanceLine } from "@/components/ask/provenance-line";
-import { cn } from "@/lib/utils";
 import { formatDate } from "@/lib/time";
+import { cn } from "@/lib/utils";
 
 import type { SourceDocument } from "@/lib/ask/sources";
 

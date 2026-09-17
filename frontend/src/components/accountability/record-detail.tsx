@@ -2,8 +2,8 @@ import { FileTextIcon, ScaleIcon } from "lucide-react";
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
-import { ledgerFileUrl } from "@/lib/api/public";
 import { ASSUMPTION_NOTE, LEDGER_YEAR_NOTE, STATE_LABELS, dateLabel, gapSentence, rtiHref } from "@/lib/accountability";
+import { ledgerFileUrl } from "@/lib/api/public";
 
 import type { RecordDocument, RecordPeriod, RecordRequirement } from "@/lib/api/types";
 

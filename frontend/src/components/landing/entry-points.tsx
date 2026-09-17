@@ -1,5 +1,5 @@
-import Link from "next/link";
 import { ArrowRightIcon, KeyRoundIcon, MegaphoneIcon, MessageCircleQuestionIcon } from "lucide-react";
+import Link from "next/link";
 
 import { cn } from "@/lib/utils";
 

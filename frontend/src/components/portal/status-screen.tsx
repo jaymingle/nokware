@@ -1,6 +1,6 @@
-import type { ReactNode } from "react";
-
 import { Brand } from "@/components/portal/brand";
+
+import type { ReactNode } from "react";
 
 /** A full-page message for states before the portal can render (loading, no access, outage). */
 export function StatusScreen({ title, children }: { title: string; children?: ReactNode }) {

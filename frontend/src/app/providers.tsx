@@ -1,9 +1,10 @@
 "use client";
 
-import type { ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import { ApiError } from "@/lib/api/errors";
+
+import type { ReactNode } from "react";
 
 const MAX_RETRIES = 2;
 

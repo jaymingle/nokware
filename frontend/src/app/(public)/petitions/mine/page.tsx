@@ -1,6 +1,6 @@
-import type { Metadata } from "next";
-
 import { MyPetitionsPage } from "@/components/petitions/my-petitions-page";
+
+import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Your petitions",

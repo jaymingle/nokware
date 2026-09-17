@@ -3,8 +3,8 @@
 import { useCallback, useId } from "react";
 
 import { AskComposer } from "@/components/ask/ask-composer";
-import { AskTurn } from "@/components/ask/ask-turn";
 import { useThread } from "@/components/ask/ask-thread-provider";
+import { AskTurn } from "@/components/ask/ask-turn";
 import { AskWelcome } from "@/components/ask/ask-welcome";
 import { cn } from "@/lib/utils";
 

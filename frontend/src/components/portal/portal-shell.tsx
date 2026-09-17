@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { useEffect, type ReactNode } from "react";
 
 import { PortalHeader } from "@/components/portal/portal-header";
 import { StatusScreen } from "@/components/portal/status-screen";

@@ -1,6 +1,6 @@
-import type { Metadata } from "next";
-
 import { PublishingRecordPage } from "@/components/accountability/publishing-record-page";
+
+import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "What the Assembly publishes",

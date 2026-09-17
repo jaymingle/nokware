@@ -1,6 +1,6 @@
-import type { Metadata } from "next";
-
 import { AccountabilityHub } from "@/components/accountability/accountability-hub";
+
+import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Accountability",

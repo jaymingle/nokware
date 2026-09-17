@@ -1,5 +1,5 @@
-import * as React from "react"
 import { cn } from "cn"
+import * as React from "react"
 
 // Matches the design's fields: 38px tall (like buttons), 12px side padding, white surface.
 function Input({ className, type, ...props }: React.ComponentProps<"input">) {

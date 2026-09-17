@@ -1,8 +1,8 @@
 "use client";
 
+import { CheckIcon, CopyIcon } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
-import { CheckIcon, CopyIcon } from "lucide-react";
 
 import { ContactList } from "@/components/contacts/contact-list";
 import { Tag } from "@/components/documents/tag";

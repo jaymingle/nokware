@@ -1,6 +1,6 @@
-import type { Metadata } from "next";
-
 import { StatusPage } from "@/components/report/status-page";
+
+import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Report status",

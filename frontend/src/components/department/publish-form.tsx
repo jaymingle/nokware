@@ -8,8 +8,8 @@ import { PdfField } from "@/components/documents/pdf-field";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { usePdfForm } from "@/hooks/use-pdf-form";
-import { useMe } from "@/lib/auth/auth-context";
 import { useUploadDocument } from "@/lib/api/queries";
+import { useMe } from "@/lib/auth/auth-context";
 import { roleLabel } from "@/lib/portal/navigation";
 
 import type { DocumentOut } from "@/lib/api/types";

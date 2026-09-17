@@ -1,7 +1,7 @@
 "use client";
 
-import { useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { ArrowUpIcon } from "lucide-react";
+import { useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 
 import { VoiceCheck, VoiceControl } from "@/components/ask/voice-question";
 import { Button } from "@/components/ui/button";

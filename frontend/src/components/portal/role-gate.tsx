@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
+import { useEffect, type ReactNode } from "react";
 
 import { useMe } from "@/lib/auth/auth-context";
 import { ROLE_HOME } from "@/lib/portal/navigation";

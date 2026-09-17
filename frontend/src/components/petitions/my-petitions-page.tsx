@@ -10,8 +10,8 @@ import { PageIntro } from "@/components/portal/page-intro";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { usePhoneProof, type PhoneProof } from "@/hooks/use-phone-proof";
-import { useMyPetitions } from "@/lib/api/petition-queries";
 import { ApiError } from "@/lib/api/errors";
+import { useMyPetitions } from "@/lib/api/petition-queries";
 
 import type { KeptProof } from "@/lib/petitions";
 

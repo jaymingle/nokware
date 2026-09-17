@@ -1,6 +1,6 @@
-import type { Metadata } from "next";
-
 import { RtiPage } from "@/components/rti/rti-page";
+
+import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Request a document",

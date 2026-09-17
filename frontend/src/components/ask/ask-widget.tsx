@@ -1,14 +1,14 @@
 "use client";
 
-import { Dialog as DialogPrimitive } from "radix-ui";
 import { MessageCircleIcon, XIcon } from "lucide-react";
 import { usePathname } from "next/navigation";
+import { Dialog as DialogPrimitive } from "radix-ui";
 import { useState } from "react";
 
 import { AskChat } from "@/components/ask/ask-chat";
 import { useThread } from "@/components/ask/ask-thread-provider";
-import { DialogOverlay } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { DialogOverlay } from "@/components/ui/dialog";
 
 const ASK_PAGE = "/ask"; // the page is the conversation; no button to open a second one
 
