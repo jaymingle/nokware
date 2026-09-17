@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useId } from "react";
+import { useCallback } from "react";
 
 import { AskComposer } from "@/components/ask/ask-composer";
 import { useThread } from "@/components/ask/ask-thread-provider";
 import { AskTurn } from "@/components/ask/ask-turn";
 import { AskWelcome } from "@/components/ask/ask-welcome";
+import { useSvgId } from "@/hooks/use-svg-id";
 import { cn } from "@/lib/utils";
 
 type AskChatMode = "page" | "panel";
@@ -17,7 +18,7 @@ const LAST_TURN = { page: "min-h-[calc(100dvh-10rem)]", panel: "min-h-full" } as
 /** One component for the /ask page, which scrolls with the window, and the panel, which scrolls inside itself. */
 export function AskChat({ mode }: { mode: AskChatMode }) {
   const { turns, ask, retry, busy } = useThread();
-  const scope = `ask-${useId().replace(/[^a-zA-Z0-9-]/g, "")}`;
+  const scope = useSvgId("ask");
   const panel = mode === "panel";
   const onAsk = useCallback(
     (question: string) => {

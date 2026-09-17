@@ -1,12 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useId } from "react";
 
 import { CountValue } from "@/components/dashboard/count";
+import { useSvgId } from "@/hooks/use-svg-id";
 import { useWidth } from "@/hooks/use-width";
 import { SUB_METRO_SHAPES, labelFor, pathFor, projection } from "@/lib/map/sub-metro-shapes";
-import { FEWER_THAN_FIVE, type Count } from "@/lib/report/dashboard";
+import { spokenCount, type Count } from "@/lib/report/dashboard";
 import { cn } from "@/lib/utils";
 
 import type { ElectoralAreaFigures, SubMetroFigures } from "@/lib/api/types";
@@ -38,10 +38,6 @@ function fill(step: number | null): string {
   return `color-mix(in srgb, var(--teal) ${MIX[step - 1]}%, var(--paper-raised))`;
 }
 
-function label(count: Count): string {
-  return count === null ? FEWER_THAN_FIVE : String(count);
-}
-
 function Hatch({ id }: { id: string }) {
   return (
     <defs>
@@ -55,7 +51,7 @@ function Hatch({ id }: { id: string }) {
 
 function SubMetroMap({ subMetros }: { subMetros: SubMetroFigures[] }) {
   const [box, width] = useWidth(560);
-  const hatch = `hatch-${useId().replace(/[^a-zA-Z0-9-]/g, "")}`;
+  const hatch = useSvgId("hatch");
   const project = projection(width, HEIGHT);
   const font = width < 480 ? 10 : 12; // on a phone the shapes shrink but the type does not, so a name would run over its neighbour
   const byId = new Map(subMetros.map((row) => [row.id, row]));
@@ -79,7 +75,7 @@ function SubMetroMap({ subMetros }: { subMetros: SubMetroFigures[] }) {
               />
               <text x={x} y={y - 4} textAnchor="middle" fontSize={font} className="fill-ink">{figures?.name ?? shape.name}</text>
               <text x={x} y={y + font} textAnchor="middle" fontSize={font} className="fill-ink-soft tabular-nums">
-                {label(count)}
+                {spokenCount(count)}
               </text>
             </g>
           );
@@ -119,13 +115,13 @@ function AreasTable({ subMetros, areas }: Areas) {
       <tbody>
         {subMetros.map((subMetro) => (
           <tr key={subMetro.name}>
-            <th scope="row">{subMetro.name}</th><td>All areas</td><td>{label(subMetro.reports)}</td><td>{label(subMetro.resolved)}</td>
+            <th scope="row">{subMetro.name}</th><td>All areas</td><td>{spokenCount(subMetro.reports)}</td><td>{spokenCount(subMetro.resolved)}</td>
           </tr>
         ))}
         {areas.map((area) => (
           <tr key={area.id}>
             <td>{subMetroName(subMetros, area)}</td><th scope="row">{area.name}</th>
-            <td>{label(area.reports)}</td><td>{label(area.resolved)}</td>
+            <td>{spokenCount(area.reports)}</td><td>{spokenCount(area.resolved)}</td>
           </tr>
         ))}
       </tbody>

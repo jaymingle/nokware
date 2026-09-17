@@ -1,7 +1,6 @@
 "use client";
 
-import { useId } from "react";
-
+import { useSvgId } from "@/hooks/use-svg-id";
 import { useWidth } from "@/hooks/use-width";
 import { RANGE_KEY, arcPath, barPieces, colour, exactRuns, hasRange, isRange, short, slices, tickLabel, type BarPiece } from "@/lib/ask/chart";
 import { countedAt } from "@/lib/ask/figures";
@@ -221,7 +220,7 @@ function Drawing(props: Draw) {
 
 export function AnswerChart({ chart, testId }: { chart: AskChart; testId: string }) {
   const [box, width] = useWidth(640);
-  const hatch = `hatch-${useId().replace(/[^a-zA-Z0-9-]/g, "")}`;
+  const hatch = useSvgId("hatch");
   return (
     <figure className="flex flex-col gap-3 rounded-lg border bg-card p-3.5 sm:p-4" data-testid={`${testId}-chart`} data-kind={chart.kind}>
       <figcaption className="text-[15px] font-medium">{chart.title}</figcaption>

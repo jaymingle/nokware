@@ -34,6 +34,11 @@ const SUPPRESSED_MAX = 4; // the most a "fewer than 5" count can be
 /** So a chart draws "fewer than 5" as a range instead of guessing a point. */
 export const SUPPRESSED_RANGE: readonly [number, number] = [1, SUPPRESSED_MAX];
 
+/** A count in words, for a screen reader or a label: "fewer than 5" when suppressed. */
+export function spokenCount(count: Count): string {
+  return count === null ? FEWER_THAN_FIVE : String(count);
+}
+
 export function formatCount(count: Count): string {
   return count === null ? "<5" : count.toLocaleString();
 }

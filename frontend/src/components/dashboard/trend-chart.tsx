@@ -1,7 +1,7 @@
 "use client";
 
 import { useWidth } from "@/hooks/use-width";
-import { FEWER_THAN_FIVE, SUPPRESSED_RANGE, chartScale, drawnValue, longMonth, monthLabel, shownRuns, type Count } from "@/lib/report/dashboard";
+import { SUPPRESSED_RANGE, chartScale, drawnValue, longMonth, monthLabel, shownRuns, spokenCount } from "@/lib/report/dashboard";
 
 import type { MonthFigures } from "@/lib/api/types";
 
@@ -12,10 +12,6 @@ const INNER_H = H - PAD.t - PAD.b;
 const FONT = 11;
 const LABEL_ROOM = 30; // below this much room per month, every other month is labelled
 
-function spoken(count: Count): string {
-  return count === null ? FEWER_THAN_FIVE : String(count);
-}
-
 function MonthsTable({ months }: { months: MonthFigures[] }) {
   return (
     <table className="sr-only">
@@ -25,7 +21,7 @@ function MonthsTable({ months }: { months: MonthFigures[] }) {
       </thead>
       <tbody>
         {months.map((m) => (
-          <tr key={m.month}><th scope="row">{longMonth(m.month)}</th><td>{spoken(m.received)}</td><td>{spoken(m.resolved)}</td></tr>
+          <tr key={m.month}><th scope="row">{longMonth(m.month)}</th><td>{spokenCount(m.received)}</td><td>{spokenCount(m.resolved)}</td></tr>
         ))}
       </tbody>
     </table>
