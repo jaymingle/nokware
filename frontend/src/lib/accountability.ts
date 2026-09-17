@@ -31,6 +31,11 @@ export const ASSUMPTION_NOTE =
 
 export const LEDGER_YEAR_NOTE = "The year comes from the Ledger's record of the document, not from the document's title.";
 
+/** The test-id prefix for one requirement's period, shared by its table cell and its detail. */
+export function recordTestId(requirement: RecordRequirement, period: RecordPeriod): string {
+  return `record-${requirement.id}-${period.label.replace(/\W+/g, "-")}`;
+}
+
 /** Marked with a † in the table. */
 export function yearFromLedger(period: RecordPeriod): boolean {
   return period.state === "held" && period.documents.length > 0 && period.documents.every((doc) => doc.year_source === "ledger");

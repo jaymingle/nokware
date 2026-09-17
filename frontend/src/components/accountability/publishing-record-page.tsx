@@ -8,7 +8,7 @@ import { ReportingGaps } from "@/components/accountability/reporting-gaps";
 import { UnpublishedRecord } from "@/components/accountability/unpublished-data";
 import { ErrorPanel, LoadingPanel } from "@/components/documents/panels";
 import { PageIntro } from "@/components/portal/page-intro";
-import { ASSUMPTION_NOTE, LEDGER_YEAR_NOTE, STATE_LABELS, dateLabel, periodsIn, planSpan, yearFromLedger, yearsOf, type RecordState } from "@/lib/accountability";
+import { ASSUMPTION_NOTE, LEDGER_YEAR_NOTE, STATE_LABELS, dateLabel, periodsIn, planSpan, recordTestId, yearFromLedger, yearsOf, type RecordState } from "@/lib/accountability";
 import { usePublishingRecord } from "@/lib/api/public-queries";
 import { cn } from "@/lib/utils";
 
@@ -39,7 +39,7 @@ function Cell({ requirement, period, selected, onSelect, short }: {
       aria-pressed={selected}
       aria-label={`${requirement.name}, ${period.label}: ${STATE_LABELS[period.state]}${yearFromLedger(period) ? ` (${LEDGER_YEAR_NOTE})` : ""}`}
       className={cn("inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[11.5px] text-ink-soft hover:bg-paper-subtle", selected && "bg-teal-tint ring-1 ring-teal")}
-      data-testid={`record-${requirement.id}-${period.label.replace(/\W+/g, "-")}`}
+      data-testid={recordTestId(requirement, period)}
     >
       <Mark state={period.state} small={Boolean(short)} />
       {short}

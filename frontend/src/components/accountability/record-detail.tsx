@@ -2,7 +2,7 @@ import { FileTextIcon, ScaleIcon } from "lucide-react";
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
-import { ASSUMPTION_NOTE, LEDGER_YEAR_NOTE, STATE_LABELS, dateLabel, gapSentence, rtiHref } from "@/lib/accountability";
+import { ASSUMPTION_NOTE, LEDGER_YEAR_NOTE, STATE_LABELS, dateLabel, gapSentence, recordTestId, rtiHref } from "@/lib/accountability";
 import { ledgerFileUrl } from "@/lib/api/public";
 
 import type { RecordDocument, RecordPeriod, RecordRequirement } from "@/lib/api/types";
@@ -97,7 +97,7 @@ function Explanation({ requirement, period, checked, testId }: { requirement: Re
 }
 
 export function RecordDetail({ requirement, period, checked }: { requirement: RecordRequirement; period: RecordPeriod; checked: string }) {
-  const testId = `record-${requirement.id}-${period.label.replace(/\W+/g, "-")}`;
+  const testId = recordTestId(requirement, period);
   return (
     <section aria-live="polite" className="flex flex-col gap-3 rounded-xl border bg-card p-4 sm:p-5" data-testid={`${testId}-detail`}>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
