@@ -30,7 +30,6 @@ PLACE = {"address": "House 12, behind the Kaneshie market clinic", "latitude": 5
 
 @pytest.fixture
 def records(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
-    """The contact record and the audit trail, in memory."""
     store: dict[str, Any] = {"contact": {"caseId": "c2", "whatsapp": "+233507387216"}, "history": []}
 
     def update(case_id: str, changes: dict[str, Any]) -> None:

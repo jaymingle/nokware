@@ -43,7 +43,6 @@ def documents(collection: str, queries: list[str]) -> list[Any]:
 
 
 def photo_objects() -> dict[str, list[str]]:
-    """Every stored report photo, by the case ID in its path."""
     by_case: dict[str, list[str]] = {}
     bucket = get_settings().minio_photos_bucket
     for obj in get_minio().list_objects(bucket, prefix="reports/", recursive=True):

@@ -42,8 +42,6 @@ RESOLVED_SMALL = figure("R2", "Resolved reports · since Nokware began", "12", [
 MONTHS = figure("R1", "Reports · this year", "40", [("Jul 2026", "fewer than 5"), ("Aug 2026", "12"), ("Sep 2026", "25")], "month")
 
 
-# Charts: the kind asked for, unless it can't show the data honestly.
-
 @pytest.mark.parametrize(("question", "figures", "kind", "horizontal", "why"), [
     ("Show open reports by sub-metro as a chart", [OPEN], "bar", False, None),  # unnamed: bars to compare
     ("Graph reports by month this year", [MONTHS], "line", False, None),  # unnamed: a line over time
@@ -144,8 +142,6 @@ def test_a_breakdown_by_month_runs_oldest_first_with_the_empty_months() -> None:
                                 stats.ReportFilter(topic="solid_waste"), NOW)
     assert waste_only[0] == ("2026-05", 0)  # from Nokware's first report of any kind: May really had none
 
-
-# Exports: signed, laid out once, and every page saying what it is.
 
 def _source(label: str, document_id: str, title: str, cited: bool = True, **extra: Any) -> dict[str, Any]:
     return {"label": label, "cited": cited, "document_id": document_id, "title": title, "chunk_text": "…", "department": None,

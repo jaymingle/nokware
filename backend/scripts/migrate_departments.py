@@ -53,7 +53,6 @@ class Run:
     changes: int = 0
 
     def do(self, description: str, action: Any) -> None:
-        """Print the change; make it only with --yes."""
         self.changes += 1
         print(f"  {'' if self.apply else '[dry run] '}{description}")
         if self.apply:
@@ -152,7 +151,6 @@ def retag_cases(run: Run) -> None:
 
 
 def still_referenced(team: str) -> list[str]:
-    """What still points at a team: documents, case rows, history, or members not yet in the new team."""
     checks = {DOCUMENTS: Query.equal("department", team), ASSIGNMENTS_COLLECTION: Query.equal("recipient", team),
               REPORTS_COLLECTION: Query.contains("recipients", [team]), HISTORY: Query.equal("department", team)}
     found = [c for c, q in checks.items() if get_databases().list_documents(DATABASE_ID, c, queries=[q, Query.limit(1)]).total]

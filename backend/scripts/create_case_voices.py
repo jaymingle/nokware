@@ -71,7 +71,6 @@ def civic_without_public_id() -> list[dict[str, str]]:
 
 
 def dry_run_missing() -> list[dict[str, str]]:
-    """The civic reports a run would give a public ID: all of them, before publicId exists."""
     try:
         return civic_without_public_id()
     except AppwriteException:  # publicId isn't an attribute yet

@@ -92,9 +92,9 @@ def test_pinned_keyword_hit_below_the_cutoff_is_added_without_displacing_the_top
     pinned_late = ranked[FINAL_K + 3].chunk.chunk_id  # e.g. the newsletter's revenue chunk at rank 25
     final = select_final(ranked, {pinned_late})
     assert len(final) == FINAL_K + 1
-    assert final[:FINAL_K] == ranked[:FINAL_K]  # every top chunk kept
+    assert final[:FINAL_K] == ranked[:FINAL_K]
     assert final[-1].chunk.chunk_id == pinned_late
-    assert final == sorted(final, key=lambda c: c.score, reverse=True)  # ranking order kept
+    assert final == sorted(final, key=lambda c: c.score, reverse=True)
 
 
 def test_pinned_hits_already_in_the_top_change_nothing() -> None:

@@ -29,7 +29,6 @@ TOLERANCE = 0.00012  # degrees: about 13 metres, below what a 700px drawing of A
 
 
 def fetch(relation_id: int) -> list[dict[str, Any]]:
-    """One relation with every way and node it is built from, straight from the OSM API."""
     request = urllib.request.Request(OSM_API.format(id=relation_id), headers={"User-Agent": AGENT})
     with urllib.request.urlopen(request, timeout=120) as reply:
         return list(json.loads(reply.read())["elements"])

@@ -27,14 +27,11 @@ CATEGORY_DEPARTMENTS = {
 
 
 def current_team(team: str) -> str:
-    """A department team ID as it stands now: an old ID gives its new one."""
     return RENAMED.get(team, team)
 
 
 def ama_department(team: str, category: str | None, title: str) -> str:
-    """The department for an AMA document, from where it was filed, its AMA category and its title.
-
-    Road-safety reports filed under Works are Urban Roads' work. Press releases
+    """Road-safety reports filed under Works are Urban Roads' work. Press releases
     *about* a department's subject (rates, GAMADA) stay where they were: they
     aren't that department's publications.
     """

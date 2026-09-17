@@ -166,8 +166,6 @@ def test_the_status_callback_records_delivery_and_falls_back_on_the_window_error
     assert calls == [("SM6", "delivered"), ("SM7", "undelivered"), ("fallback", "63016")]
 
 
-# The conversation: Redis faked, replies collected, the models and Twilio stubbed.
-
 @pytest.fixture
 def chat(monkeypatch: pytest.MonkeyPatch, redis_server: fakeredis.FakeRedis) -> list[str]:
     replies: list[str] = []

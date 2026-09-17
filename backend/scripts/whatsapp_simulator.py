@@ -56,7 +56,6 @@ class _VoiceNote(http.server.BaseHTTPRequestHandler):
 
 @contextmanager
 def _serving(path: Path | None) -> Iterator[tuple[str | None, threading.Event]]:
-    """The voice note at a local link for the API to fetch, while the messages are sent."""
     handler = type("Handler", (_VoiceNote,), {"data": path.read_bytes() if path else b"", "done": threading.Event()})
     if path is None:
         yield None, handler.done
@@ -70,7 +69,6 @@ def _serving(path: Path | None) -> Iterator[tuple[str | None, threading.Event]]:
 
 
 def _forms(args: argparse.Namespace, to: str, voice_url: str | None) -> list[tuple[str, dict[str, str]]]:
-    """Twilio's form fields for each message in turn, then the voice note, then the pin; with a label for each."""
     base = {"From": f"whatsapp:{args.sender}", "To": to, "NumMedia": "0"}
     forms = [(text, {**base, "Body": text}) for text in args.messages]
     if voice_url:

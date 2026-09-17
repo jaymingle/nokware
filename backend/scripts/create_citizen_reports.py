@@ -90,7 +90,6 @@ def report_attributes() -> dict[str, Creator]:
 
 
 def adjust_reports() -> None:
-    """The two Stage A attributes that no longer fit, changed without deleting anything."""
     db, c = get_databases(), (DATABASE_ID, REPORTS)
     db.update_enum_attribute(*c, "status", values(CaseStatus), False, None)
     db.update_string_attribute(*c, "assignedDepartment", False, None)

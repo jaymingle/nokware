@@ -41,7 +41,6 @@ class TestDocument:
 
 
 def test_records() -> list[dict[str, Any]]:
-    """All ledger records titled "[TEST] ...", paging through the collection."""
     found, cursor = [], None
     while True:
         queries = [Query.limit(PAGE), *([Query.cursor_after(cursor)] if cursor else [])]

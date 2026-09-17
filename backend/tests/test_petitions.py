@@ -68,8 +68,6 @@ def _petition(**changes: Any) -> dict[str, Any]:
     return {**base, **changes}
 
 
-# The rules
-
 
 def test_a_petition_is_about_something_the_assembly_handles_and_never_personal_safety() -> None:
     topics = {t.id for t in petition_rules.petition_topics()}
@@ -127,8 +125,6 @@ def test_a_petition_number_is_six_digits_however_it_is_typed() -> None:
         "482913", "482913", "482913", None, None, None]
     assert normalise_code(petition_rules.new_code()) is not None
 
-
-# Confirming a phone
 
 
 def test_a_whatsapp_code_confirms_the_number_once_and_redis_never_holds_it(server: fakeredis.FakeRedis) -> None:
@@ -192,8 +188,6 @@ def test_whatsapp_and_ussd_hand_a_code_to_the_page(server: fakeredis.FakeRedis, 
     assert reply == ussd.Reply(ussd.CODE_REPLIES[Claim.PROVEN], False) and phone_proof.state(second.secret).state == "proven"
 
 
-# The checks on a draft
-
 
 def test_danger_to_a_person_and_personal_data_stop_a_petition(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(petition_screen, "_private_person", lambda text: None)
@@ -211,12 +205,9 @@ def test_a_private_person_only_warns_and_a_missing_model_lets_it_through(monkeyp
     assert petition_screen.screen(DRAFT.title, DRAFT.body) == petition_screen.Screening(None, None)
 
 
-# The MCE's decision and the clock
-
 
 @pytest.fixture
 def stored(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
-    """One petition in a dict, and every trail entry written."""
     state: dict[str, Any] = {"petition": _petition(), "trail": []}
     monkeypatch.setattr(petitions, "find", lambda code: dict(state["petition"]))
     monkeypatch.setattr(petitions, "update_petition", lambda pid, changes: state.update(petition={**state["petition"], **changes}) or dict(state["petition"]))
@@ -254,8 +245,6 @@ def test_only_the_creator_can_change_their_petition(stored: dict[str, Any]) -> N
         petitions.withdraw("482913", stranger, NOW)
     assert petitions.withdraw("482913", creator, NOW)["status"] == PetitionStatus.WITHDRAWN
 
-
-# What the public sees
 
 
 def test_the_public_timeline_shows_the_mce_decided_never_who_nor_the_note() -> None:

@@ -43,7 +43,6 @@ ABOUT = ("Approved budget figures read from the Accra Metropolitan Assembly's pr
 
 
 def stated_total(data: bytes) -> float:
-    """What the document itself says it details: the sum of its Total Cost Centre lines."""
     total = 0.0
     with pdfplumber.open(io.BytesIO(data)) as pdf:
         for page in pdf.pages:

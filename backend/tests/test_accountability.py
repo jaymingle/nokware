@@ -141,8 +141,6 @@ def test_test_documents_are_left_out_of_the_record(monkeypatch: pytest.MonkeyPat
     assert "t" not in {d["$id"] for d in publishing_record.published_documents()}
 
 
-# Responsiveness.
-
 def case(case_id: str, created: datetime, category: str = "civic_service", sensitive: bool = False) -> dict[str, Any]:
     return {"$id": case_id, "category": category, "isSensitive": sensitive, "createdAt": created.isoformat()}
 

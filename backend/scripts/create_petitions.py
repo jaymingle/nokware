@@ -5,20 +5,15 @@
   encrypted at rest and deleted 30 days after the petition closes, is
   withdrawn, or is refused and not sent back. A name only if they chose to
   show it.
-- petition_history: the audit trail, one row per step (submitted, published,
-  refused with its reason, published automatically, withdrawn, closed, reached
-  its threshold).
+- petition_history: the audit trail, one row per step.
 - petition_signatures (P2): one row per signature. No phone number: a keyed
   hash of number and petition together, unique, so a number signs once and
   can't be matched across petitions. A name only if the signer chose to show
-  it (public). P2 also adds thresholdReachedAt and responseDue to petitions,
-  and awaiting_response and threshold_reached to the two status lists.
-- P3 adds the MCE's response to petitions (its kind, statement, department,
-  cited documents, when, and the MCE's name for the trail, never shown), when
-  the 30 days passed unanswered, and the responded status, with the responded,
-  no_response and creator_notified trail steps.
+  it (public).
+- P3 adds the MCE's response to petitions. The MCE's name is kept for the
+  trail and never shown.
 
-Both are server-only: no client permissions. A dry run by default: it prints
+All server-only: no client permissions. A dry run by default: it prints
 what it would do. --yes applies it. It only adds; nothing is deleted. Safe to
 re-run.
 
@@ -149,7 +144,6 @@ def signature_attributes() -> dict[str, Creator]:
 
 
 def adjust_status_lists() -> None:
-    """Statuses and trail steps P2 adds, set in place: nothing is deleted."""
     db = get_databases()
     db.update_enum_attribute(DATABASE_ID, PETITIONS, "status", values(PetitionStatus), True, None)
     db.update_enum_attribute(DATABASE_ID, HISTORY, "action", values(PetitionAction), True, None)

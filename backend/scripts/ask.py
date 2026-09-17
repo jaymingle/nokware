@@ -1,9 +1,7 @@
 """Ask the Ledger a question from the terminal and print the cited answer.
 
 Runs the same pipeline as POST /api/ask, so it is a quick way to judge retrieval
-quality without a frontend. It prints the answer, the search queries used, and
-each labelled source document (cited or merely retrieved) with snippets of the
-chunks retrieved from it.
+quality without a frontend.
 
     backend/.venv/bin/python backend/scripts/ask.py "What does the 2026 fee-fixing resolution cover?"
     backend/.venv/bin/python backend/scripts/ask.py --full "..."   # whole chunks, not snippets
