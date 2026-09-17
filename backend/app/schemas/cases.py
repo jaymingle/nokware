@@ -5,7 +5,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from app.schemas.documents import Option
+from app.schemas.documents import NOTE_MAX, Option
 from app.services.case_workflow import CaseAction
 
 CaseViewName = Literal["full", "oversight"]
@@ -95,10 +95,10 @@ class CaseOversight(BaseModel):
 
 
 class NoteRequest(BaseModel):
-    note: str = Field(max_length=2000)
+    note: str = Field(max_length=NOTE_MAX)
 
 
 class ReassignRequest(BaseModel):
     from_recipient: str
     to_recipient: str
-    reason: str = Field(max_length=2000)
+    reason: str = Field(max_length=NOTE_MAX)

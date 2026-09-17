@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field
 
 from app.schemas.contacts import PublicContact
-from app.schemas.documents import Option
+from app.schemas.documents import NOTE_MAX, Option
 
 
 class SubMetroOption(BaseModel):
@@ -74,7 +74,7 @@ class ReportStatus(BaseModel):
 
 
 class EscalationRequest(BaseModel):
-    note: str = Field(max_length=2000)
+    note: str = Field(max_length=NOTE_MAX)
 
 
 class PreferencesRequest(BaseModel):
