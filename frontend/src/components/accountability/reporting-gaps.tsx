@@ -1,4 +1,5 @@
 import { LedgerPdfLink } from "@/components/ask/ledger-pdf-link";
+import { dateLabel } from "@/lib/accountability";
 
 import type { ReportingGap } from "@/lib/api/types";
 
@@ -24,7 +25,7 @@ function Gap({ gap }: { gap: ReportingGap }) {
         <LedgerPdfLink documentId={gap.document_id} testId={`${testId}-pdf`} />
         <p className="text-[12px] text-ink-soft">
           {gap.document_title}. The Ledger was searched for {gap.searched.map((word) => `“${word}”`).join(", ")} on{" "}
-          {new Date(gap.checked).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}.
+          {dateLabel(gap.checked)}.
         </p>
       </div>
     </article>
