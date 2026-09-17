@@ -1,4 +1,5 @@
 import { RtiPage } from "@/components/rti/rti-page";
+import { firstParam, type SearchParams } from "@/lib/search-params";
 
 import type { Metadata } from "next";
 
@@ -7,13 +8,7 @@ export const metadata: Metadata = {
   description: "How to request a document the Accra Metropolitan Assembly hasn't published, under the Right to Information Act, 2019.",
 };
 
-type Search = Promise<{ [key: string]: string | string[] | undefined }>;
-
-function one(value: string | string[] | undefined): string | undefined {
-  return Array.isArray(value) ? value[0] : value;
-}
-
-export default async function Page({ searchParams }: { searchParams: Search }) {
+export default async function Page({ searchParams }: { searchParams: SearchParams }) {
   const params = await searchParams;
-  return <RtiPage document={one(params.document)} period={one(params.period)} elsewhere={one(params.elsewhere) === "1"} />;
+  return <RtiPage document={firstParam(params.document)} period={firstParam(params.period)} elsewhere={firstParam(params.elsewhere) === "1"} />;
 }
