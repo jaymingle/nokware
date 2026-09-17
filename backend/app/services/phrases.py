@@ -74,11 +74,6 @@ def english(key: str) -> str:
     return str(_catalogue(Language.ENGLISH)[key]["text"])
 
 
-def reviewer(key: str, language: Language) -> str | None:
-    """Who checked this translation, if anyone has."""
-    return _catalogue(language).get(key, {}).get("reviewed_by")
-
-
 def phrase(key: str, language: Language = Language.ENGLISH) -> str:
     """The text to show. English where the language hasn't written it, or where critical text hasn't been reviewed."""
     if language is Language.ENGLISH:
@@ -87,11 +82,6 @@ def phrase(key: str, language: Language = Language.ENGLISH) -> str:
     if not written or (is_critical(key) and not written.get("reviewed_by")):
         return english(key)
     return str(written["text"])
-
-
-def shows_english(key: str, language: Language) -> bool:
-    """Whether a reader in this language sees the English, so a page can say so rather than look untranslated."""
-    return language is not Language.ENGLISH and phrase(key, language) == english(key)
 
 
 def missing(language: Language) -> list[Missing]:

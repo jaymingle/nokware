@@ -99,19 +99,6 @@ def ledger_file_exists(file_id: str) -> bool:
     return True
 
 
-def upload_report_photos(files: list[bytes], filenames: list[str]) -> list[str]:
-    """Upload up to ``MAX_PHOTOS`` report photos; returns their object ids."""
-    if len(files) != len(filenames):
-        raise ValueError("files and filenames must be the same length")
-    if len(files) > MAX_PHOTOS:
-        raise ValueError(f"at most {MAX_PHOTOS} photos may be uploaded at once")
-    settings = get_settings()
-    return [
-        _upload(settings.minio_photos_bucket, data, name)
-        for data, name in zip(files, filenames)
-    ]
-
-
 def get_ledger_file_url(
     file_id: str, expires: int = DEFAULT_URL_EXPIRY_SECONDS
 ) -> str:

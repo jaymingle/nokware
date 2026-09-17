@@ -150,13 +150,6 @@ def safety_contacts(sub_metro: str | None) -> list[PublicContact]:
     return for_report("abuse", sub_metro)
 
 
-def emergency_lines(topic: str) -> list[str]:
-    """112 for anything that endangers the public, and the line of each agency the report goes to."""
-    found = TOPICS_BY_ID[topic]
-    lines = [PUBLIC_EMERGENCY] if found.category == Category.PUBLIC_SAFETY else []
-    return lines + [AGENCY_LINES[r] for r in found.recipients if r in AGENCY_LINES]
-
-
 def for_report(topic: str, sub_metro: str | None) -> list[PublicContact]:
     """The numbers to show a citizen for their report: every emergency number, then the topic's own."""
     urgent = [c.id for _, group in emergency_groups(topic, sub_metro) for c in group]

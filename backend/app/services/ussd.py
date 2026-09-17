@@ -269,7 +269,7 @@ def _describe(dial: Dial, state: State, later: Later) -> tuple[Reply, State | No
     return _help_page(state, 0)  # help first, filing second
 
 
-def _medical_now(check: "Future[bool]", started: float) -> bool:
+def _medical_now(check: Future[bool], started: float) -> bool:
     """Whether the text reads as medical, if that is known within the same few seconds as the reading."""
     try:
         return check.result(timeout=max(0.0, started + CLASSIFY_WAIT_SECONDS - time.monotonic()))
@@ -335,7 +335,7 @@ def _receipt(receipt: Receipt, later: Later) -> tuple[Reply, State | None]:
     return end(f"Report {reference} filed with {who}.{emergency}{updates} Keep this reference."), None
 
 
-def _reference_later(filing: "Future[Receipt]", msisdn: str) -> None:
+def _reference_later(filing: Future[Receipt], msisdn: str) -> None:
     """A filing that outlasted the screen: send its reference (neutral for personal safety) or say it failed."""
     try:
         receipt = filing.result()

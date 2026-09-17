@@ -57,7 +57,6 @@ _INSERT_SQL = (
     f'INSERT INTO "{TABLE_NAME}" ("{DOCUMENT_ID_COLUMN}", "{CHUNK_INDEX_COLUMN}", '
     f'"{CONTENT_COLUMN}", "{EMBEDDING_COLUMN}") VALUES (%s, %s, %s, %s)'
 )
-_COUNT_SQL = f'SELECT count(*) FROM "{TABLE_NAME}" WHERE "{DOCUMENT_ID_COLUMN}" = %s'
 
 
 def libpq_url(url: str) -> str:
@@ -149,8 +148,3 @@ def first_chunks() -> dict[str, str]:
     with connect() as conn:
         rows = conn.execute(f'SELECT "{DOCUMENT_ID_COLUMN}", "{CONTENT_COLUMN}" FROM "{TABLE_NAME}" WHERE "{CHUNK_INDEX_COLUMN}" = 0').fetchall()
     return {document_id: text for document_id, text in rows}
-
-
-def count_document_chunks(document_id: str) -> int:
-    with connect() as conn:
-        return conn.execute(_COUNT_SQL, (document_id,)).fetchone()[0]

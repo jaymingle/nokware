@@ -25,8 +25,3 @@ def mend(text: str) -> str:
         text = text.replace(private, letters)
     text = _PRESENTATION_LIGATURES.sub(lambda m: unicodedata.normalize("NFKC", m[0]), text)
     return _LOST.sub(" ", _FONT_BULLETS.sub("•", text))
-
-
-def needs_mending(text: str) -> bool:
-    """Whether stored text still carries what mend() replaces: the chunks the re-index script looks for."""
-    return mend(text) != text

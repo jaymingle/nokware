@@ -19,7 +19,6 @@ from appwrite.exception import AppwriteException
 from appwrite.models import Document
 from appwrite.query import Query
 from appwrite.services.databases import Databases
-from appwrite.services.storage import Storage
 from appwrite.services.teams import Teams
 from appwrite.services.users import Users
 from requests.adapters import HTTPAdapter
@@ -121,10 +120,6 @@ def get_users() -> Users:
 
 
 @lru_cache
-def get_storage() -> Storage:
-    return Storage(get_client())
-
-
 def as_record(document: Document) -> dict[str, Any]:
     """A stored document's attributes plus its $id, $createdAt and $updatedAt."""
     return {**document.data, "$id": document.id, "$createdAt": document.createdat, "$updatedAt": document.updatedat}
