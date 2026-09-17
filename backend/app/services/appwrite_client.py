@@ -101,7 +101,6 @@ def get_users() -> Users:
     return Users(get_client())
 
 
-@lru_cache
 def as_record(document: Document) -> dict[str, Any]:
     return {**document.data, "$id": document.id, "$createdAt": document.createdat, "$updatedAt": document.updatedat}
 
