@@ -1,19 +1,11 @@
 """Nokware's live report figures as an MCP server, at /mcp: Ask's two figure tools, for outside AI clients.
 
-    count_reports            one count of the reports residents filed with Nokware, by topic, area, department,
-                             status and period, optionally broken down (Ask's CountReports)
-    personal_safety_figures  the answer to any request for figures on reports about someone's safety: Nokware
-                             doesn't publish them (Ask's PersonalSafetyFigures)
+The same tools and rules as public Ask, because the counting is stats.py's.
 
-The same tools and rules as public Ask, because the counting is stats.py's: personal safety is never counted, not
-even in a total, and 1 to 4 reads "fewer than 5". Read-only, no sign-in, and rate-limited per client address.
+No sign-in on purpose: signing in would only matter if it widened what comes back, and an MCE gets no more here than
+the public does (the README says why).
 
-No sign-in on purpose: signing in would only matter if it widened what comes back, and the decision is that it
-doesn't. An MCE gets no more here than the public does (the README says why: differencing, results leaving
-Nokware's retention rules, and the portal already giving the MCE what the job needs).
-
-Streamable HTTP, stateless and plain JSON: each request stands alone, so the single API process needs no session
-state and a proxy needs no stickiness.
+Stateless, so the single API process needs no session state and a proxy needs no stickiness.
 """
 
 import math
@@ -99,15 +91,13 @@ def build_server() -> MCPServer:
 
 
 def _allowed_hosts() -> list[str]:
-    """The API's own public host (from PUBLIC_API_URL) and localhost: the SDK refuses any other Host header."""
+    """The SDK refuses any other Host header."""
     hosts = ["localhost", "localhost:*", "127.0.0.1", "127.0.0.1:*"]
     public = urlsplit(get_settings().public_api_url).netloc
     return [*hosts, public, f"{public}:*"] if public else hosts
 
 
 class _RateLimited:
-    """Every MCP request counts against the client address's limit (rate_limit.MCP)."""
-
     def __init__(self, app: ASGIApp) -> None:
         self.app = app
 
@@ -123,9 +113,8 @@ class _RateLimited:
 
 
 def http_app(server: MCPServer) -> ASGIApp:
-    """The server over streamable HTTP at PATH, for the host app to route that exact path to (a mount would answer
-    /mcp with a redirect to /mcp/, which not every client follows). Its session manager must run in the host app's
-    lifespan."""
+    """The host app routes this exact path (a mount would answer /mcp with a redirect to /mcp/, which not every client
+    follows). Its session manager must run in the host app's lifespan."""
     security = TransportSecuritySettings(allowed_hosts=_allowed_hosts(), allowed_origins=[])  # no browser calls it
     return _RateLimited(server.streamable_http_app(streamable_http_path=PATH, stateless_http=True, json_response=True,
                                                    transport_security=security))

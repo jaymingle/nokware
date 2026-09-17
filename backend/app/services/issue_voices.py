@@ -1,15 +1,10 @@
 """Add your voice: residents saying an open civic issue affects them too. A count, not a petition.
 
-Only civic-service issues, and only while open: never public safety, never
-personal safety. The public sees each issue's topic, electoral area,
-department, status and count, never the citizen's words or photos. A voice is
-anonymous unless the resident adds a name; a name reaches the handling
-department only, and is deleted 30 days after the case closes, on the same
-schedule as the citizen's numbers.
+Only open civic-service issues, never safety. The public never sees the citizen's words or photos. A name given with
+a voice reaches the handling department only, and is deleted on the same schedule as the citizen's numbers.
 
-One voice per browser per issue: the browser sends a random token it keeps,
-and only a hash of token and case is stored, under a unique index. The counts
-are not verified signatures, and the page says so.
+One voice per browser per issue: only a hash of the browser's token and the case is stored, under a unique index.
+The counts are not verified signatures, and the page says so.
 """
 
 import hashlib
@@ -47,7 +42,6 @@ class InvalidVoice(ValueError):
 
 
 def is_public_issue(case: dict[str, Any]) -> bool:
-    """Civic service, not private, open, and given a public ID."""
     return (
         case.get("category") == Category.CIVIC_SERVICE
         and not case.get("isSensitive")
@@ -57,13 +51,12 @@ def is_public_issue(case: dict[str, Any]) -> bool:
 
 
 def list_issues(sub_metro: str | None, topic: str | None, limit: int, offset: int) -> tuple[list[dict[str, Any]], int]:
-    """Open civic issues, most supported first, then newest."""
     queries = [
         Query.equal("category", Category.CIVIC_SERVICE.value),
         Query.equal("isSensitive", False),
         Query.equal("status", [s.value for s in OPEN]),
         Query.is_not_null("publicId"),
-        Query.not_starts_with("description", TEST_PREFIX),  # a test fixture is not an issue residents raised
+        Query.not_starts_with("description", TEST_PREFIX),
         *([Query.equal("subMetro", sub_metro)] if sub_metro else []),
         *([Query.equal("topic", topic)] if topic else []),
         Query.select(ISSUE_FIELDS),
@@ -77,7 +70,7 @@ def list_issues(sub_metro: str | None, topic: str | None, limit: int, offset: in
 
 
 def civic_issue(public_id: str) -> dict[str, Any]:
-    """A civic issue by its public ID, open or not. Anything that isn't a civic-service report is simply not found."""
+    """Open or not. Anything that isn't a civic-service report is simply not found."""
     listing = get_databases().list_documents(
         DATABASE_ID, REPORTS_COLLECTION, queries=[Query.equal("publicId", public_id), Query.limit(1)]
     )
@@ -88,7 +81,6 @@ def civic_issue(public_id: str) -> dict[str, Any]:
 
 
 def find_issue(public_id: str) -> dict[str, Any]:
-    """An open civic issue by its public ID."""
     case = civic_issue(public_id)
     if not is_public_issue(case):
         raise WrongState("This issue has been resolved, so it no longer takes new voices.")
@@ -116,7 +108,7 @@ def voices_total(case_id: str) -> int:
 
 
 def _record_voice(case_id: str, token: str, name: str | None, now: datetime) -> bool:
-    """Store one voice; False if this browser already added one to this issue."""
+    """False if this browser already added one to this issue."""
     data = {"caseId": case_id, "named": name is not None, "name": name, "deviceHash": device_hash(case_id, token),
             "createdAt": now.isoformat()}
     try:
@@ -129,7 +121,7 @@ def _record_voice(case_id: str, token: str, name: str | None, now: datetime) -> 
 
 
 def add_voice(public_id: str, token: str, name: str | None, now: datetime) -> tuple[int, bool]:
-    """Add a resident's voice to an open civic issue. Returns (the issue's count, whether this one was new)."""
+    """Returns (the issue's count, whether this one was new)."""
     given = _clean(token, name)
     case = find_issue(public_id)
     with record_lock(case["$id"]):
@@ -145,19 +137,18 @@ def _named_rows(case_id: str) -> list[dict[str, Any]]:
 
 
 def named_voices(case_id: str) -> list[str]:
-    """The names residents gave, for the handling department only."""
+    """For the handling department only."""
     return [row["name"] for row in _named_rows(case_id) if row.get("name")]  # a deleted name leaves None
 
 
 def sync_voice_retention(case_id: str, purge_at: datetime | None) -> None:
-    """Names given with a case's voices are deleted when its citizen's numbers are: 30 days after it closes."""
     change = {"purgeAt": purge_at.isoformat() if purge_at else None}
     for row in _named_rows(case_id):
         get_databases().update_document(DATABASE_ID, VOICES_COLLECTION, row["$id"], change)
 
 
 def purge_expired_voice_names(now: datetime) -> int:
-    """Delete every name whose retention has ended. The voice itself, anonymous now, still counts."""
+    """The voice itself, anonymous now, still counts."""
     queries = [Query.equal("named", True), Query.is_not_null("purgeAt"), Query.less_than_equal("purgeAt", now.isoformat())]
     rows = every_record(VOICES_COLLECTION, [*queries, Query.select(["caseId"])])
     for row in rows:

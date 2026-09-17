@@ -1,29 +1,15 @@
-"""Read aloud: a block of prose on the web, spoken, for someone who can't read it.
-
-Three places only, where the content is prose someone needs to understand and
-not being able to read it locks them out: an Ask answer, a report's
-confirmation and a report's status page. Not a whole-page reader: screen
+"""Read aloud: a block of prose on the web, spoken, for someone who can't read it. Not a whole-page reader: screen
 readers do that better.
 
-It speaks only what the server itself produced, never text a browser sends:
-an Ask answer comes back as its signed export view (the same signature exports
-use), and a report is looked up by its reference. So it can't be used as a free
+It speaks only what the server itself produced, never text a browser sends, so it can't be used as a free
 text-to-speech service.
 
-Never about someone's safety, the same rule as WhatsApp's spoken replies: audio
-can be overheard, and a voice reading out a report about abuse near the abuser
-is a real harm. So no personal-safety report is read aloud, nor an Ask answer
-whose question or answer carries words of danger to a person, nor the fixed
-refusal of personal-safety figures.
+Never about someone's safety: audio can be overheard, and a voice reading out a report about abuse near the abuser
+is a real harm.
 
-Gemini's speech (the WhatsApp voice pipeline) as MP3, in parts that end at
-sentences. Gemini's speech model is a preview: it takes almost as long to speak
-as the audio lasts, and on long text it stalls and drops the connection. So a
-reading is made a part at a time, the first short so the first words come
-within seconds, and the page fetches each next part while the one before plays.
-The same words give the same audio, so each part is kept in Redis for six hours
-and paid for once; a daily cap on fresh parts (READ_ALOUD_DAILY_LIMIT) bounds
-what speech can cost.
+Gemini's speech model is a preview: it takes almost as long to speak as the audio lasts, and on long text it stalls
+and drops the connection. So a reading is made a part at a time, the first short so the first words come within
+seconds. Each part is cached so the same words are paid for once.
 """
 
 import base64
@@ -71,7 +57,6 @@ class ReadAloudUnavailable(Exception):
 
 
 def may_speak_answer(question: str, answer: str) -> bool:
-    """Whether an Ask answer can be read aloud: nothing about someone's safety, in the question or the answer."""
     return not (suggests_danger_to_a_person(question) or suggests_danger_to_a_person(answer) or SAFETY_FIGURES_ANSWER in answer)
 
 
@@ -85,20 +70,17 @@ def answer_script(question: str, answer: str, status: str) -> str:
 
 
 def _spelled(text: str) -> str:
-    """A reference said character by character, in its two halves: "K 7 Q M, 4 T X P"."""
+    """"K 7 Q M, 4 T X P"."""
     return _REFERENCE.sub(lambda m: f"{' '.join(m[1])}, {' '.join(m[2])}", text)
 
 
 def status_script(status: dict[str, Any], receipt: bool = False) -> str:
-    """A report's status as its page shows it; on the confirmation, with the reminder to keep the reference.
-    Never a personal-safety report's."""
     if status["private"]:
         raise NotReadAloud("A report about someone's safety isn't read aloud: audio can be overheard.")
     return _spelled(" ".join([headline(status), *spoken_details(status), *([KEEP_REFERENCE] if receipt else [])]))
 
 
 def _sentences(script: str) -> list[str]:
-    """The script's sentences, any too long for a part split between words."""
     return [piece for sentence in _SENTENCE_END.split(script.strip()) for piece in textwrap.wrap(sentence, PART_CHARS)]
 
 
@@ -107,8 +89,6 @@ def _figures(text: str) -> int:
 
 
 def parts(script: str) -> list[str]:
-    """The script in parts that end at sentences, each spoken on its own: the first short, so the words start soon,
-    and none holding more than PART_FIGURES figures, unless one sentence does."""
     made: list[str] = []
     part = ""
     for sentence in _sentences(script):
@@ -136,7 +116,6 @@ def _today_allows(now: datetime) -> bool:
 
 
 def audio(script: str, now: datetime) -> Encoded:
-    """The script spoken, as MP3: from the six-hour cache, or made now within the day's limit."""
     cached = get_redis().get(_cache_key(script))
     if cached:
         held = json.loads(cached)

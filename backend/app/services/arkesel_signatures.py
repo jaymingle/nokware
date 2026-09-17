@@ -1,16 +1,8 @@
-"""Arkesel's signed callbacks (SMS and Voice), verified exactly as Arkesel's signing guide specifies.
+"""Arkesel's signed callbacks (SMS and Voice), verified exactly as the signing guide from Arkesel support specifies.
 
-The guide comes from Arkesel support (https://arkesel.com/contact/). The signature is an
-HMAC-SHA256 hex digest of "{timestamp}.{canonical JSON of the query
-parameters}". Canonical JSON sorts keys at every depth, keeps list order,
-leaves slashes unescaped and escapes non-ASCII as PHP's json_encode does
-(ensure_ascii=True: never change it, or only non-ASCII payloads would fail).
-The signature header holds "v1=<hex>", or two comma-separated values during a
-secret rotation, and either may match. Comparison is constant-time, and a
-timestamp more than 5 minutes from now is refused.
-
-Arkesel does not sign USSD callbacks yet; see the USSD route for how those are
-protected until it does.
+Canonical JSON escapes non-ASCII as PHP's json_encode does: never change ensure_ascii=True, or only non-ASCII
+payloads would fail. The signature header holds two comma-separated values during a secret rotation, and either may
+match. Arkesel does not sign USSD callbacks yet.
 """
 
 import hashlib

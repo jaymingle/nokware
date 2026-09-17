@@ -77,7 +77,6 @@ def timeline(entries: list[dict[str, Any]]) -> list[TimelineEntry]:
 
 
 def linked_issue(public_id: str | None) -> LinkedIssue | None:
-    """The civic issue a petition links to, as the issue list shows it; "resolved" once it has closed."""
     if not public_id:
         return None
     try:

@@ -1,8 +1,6 @@
 """Per-number limits for the messaging channels, counted in Redis.
 
-The web's limits count per client address in the API process (rate_limit.py).
-A channel message arrives from the provider's servers, so here the count is per
-citizen number, under a keyed hash, in fixed windows that expire on their own.
+A channel message arrives from the provider's servers, so the count is per citizen number, not per client address.
 """
 
 from dataclasses import dataclass
@@ -17,7 +15,6 @@ class NumberLimit:
     window_seconds: int
 
     def allow(self, number: str, now: float) -> bool:
-        """Count one use by this number; False once it is over the limit for this window."""
         window = int(now // self.window_seconds)
         counter = key("limit", self.name, subject_key(number), str(window))
         pipe = get_redis().pipeline()

@@ -1,25 +1,4 @@
-"""Petitions: public pages, the creator's own petitions (by a confirmed phone), and the MCE's review.
-
-    GET  /api/petitions/options            topics, areas, thresholds, refusal reasons, ways to confirm a number
-    GET  /api/petitions                    published petitions (?group=open|closed, ?topic) and the MCE's moderation record
-    GET  /api/petitions/review             MCE: petitions waiting for a decision, closest to publishing automatically first
-    GET  /api/petitions/responses          MCE: petitions that reached their threshold, closest to their 30 days first
-    GET  /api/petitions/mine               the creator's own petitions (X-Phone-Proof)
-    POST /api/petitions/check              the draft's words, checked before it is sent
-    POST /api/petitions/ledger             what the Ledger holds on a draft's subject
-    POST /api/petitions                    submit a petition for review (X-Phone-Proof)
-    GET  /api/petitions/{code}             one published petition
-    GET  /api/petitions/{code}/ledger      what the Ledger holds on its subject
-    POST /api/petitions/{code}/resubmit    a refused petition, edited (X-Phone-Proof)
-    POST /api/petitions/{code}/withdraw    (X-Phone-Proof)
-    POST /api/petitions/{code}/anonymous   take the creator's name off it (X-Phone-Proof)
-    POST /api/petitions/{code}/decision    MCE: publish, or refuse for a fixed reason
-    POST /api/petitions/{code}/response    MCE: the public response to a petition that reached its threshold
-    POST /api/petitions/{code}/signatures  sign it, anonymous unless a name is shown (X-Phone-Proof)
-    GET  /api/petitions/{code}/signature   whether this number has signed (X-Phone-Proof)
-    POST /api/petitions/{code}/signature/anonymous   take the signer's name off (X-Phone-Proof)
-    GET  /api/petitions/{code}/names       the names signers chose to show, newest first
-"""
+"""Petitions: public pages, the creator's own petitions (by a confirmed phone), and the MCE's review."""
 
 from dataclasses import asdict
 from typing import Annotated, Literal
@@ -91,7 +70,7 @@ GROUPS = {"open": [PetitionStatus.OPEN], "awaiting": [PetitionStatus.AWAITING_RE
 
 
 def confirmed_phone(x_phone_proof: Annotated[str | None, Header()] = None) -> phone_proof.Proof:
-    """The number a page confirmed, from its sealed proof (401 if missing, altered or expired)."""
+    """401 if the proof is missing, altered or expired."""
     return phone_proof.open_proof(x_phone_proof, utc_now())
 
 
@@ -220,7 +199,7 @@ def respond(code: str, request: ResponseRequest, principal: Mce, tasks: Backgrou
 @router.post("/{code}/signatures", response_model=SignResult, dependencies=[Signing])
 def sign(code: str, request: SignRequest, proof: Phone, tasks: BackgroundTasks) -> SignResult:
     signed = petition_signatures.sign(code, proof.number, proof.channel, request.show_name, request.name, utc_now())
-    if signed.reached:  # this signature sent it to the MCE
+    if signed.reached:
         tasks.add_task(petition_updates.notify_quietly, signed.petition, Update.THRESHOLD_REACHED)
     return SignResult(added=signed.added, named=signed.named, signatures=signed.petition.get("signatureCount") or 0,
                       threshold=signed.petition.get("threshold"), status=signed.petition["status"])

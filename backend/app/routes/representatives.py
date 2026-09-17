@@ -1,8 +1,4 @@
-"""Who represents you: an electoral area's sub-metro, chairperson and office. No sign-in.
-
-    GET /api/representatives              every sub-metro and its electoral areas
-    GET /api/representatives?area=Bubuashie   the one sub-metro for an area, by any of its spellings
-"""
+"""Who represents you: an electoral area's sub-metro, chairperson and office. No sign-in."""
 
 from fastapi import APIRouter, HTTPException
 

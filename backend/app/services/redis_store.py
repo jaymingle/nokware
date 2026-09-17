@@ -1,9 +1,7 @@
-"""Redis: short-lived channel state, per-number limits and the day's SMS page count.
+"""Redis: short-lived channel state, per-number limits and the day's SMS page count. Everything stored here expires.
 
-Everything stored here expires. Keys start "nokware:" because production shares
-a Redis server with another product (on a database number of its own as well).
-A phone number never appears in a key or a value: subject_key() replaces it
-with a keyed hash, so Redis alone can't turn a key back into a number.
+Keys start "nokware:" because production shares a Redis server with another product. A phone number never appears
+in a key: it is a keyed hash, so Redis alone can't turn a key back into a number.
 """
 
 import hashlib
@@ -36,11 +34,9 @@ def key(*parts: str) -> str:
 
 @lru_cache
 def _subject_secret() -> bytes:
-    # Derived from the Appwrite API key, a server-only secret the API already
-    # holds: no new setting, and rotating that key only resets what expires anyway.
+    # Derived from the Appwrite API key: no new setting, and rotating that key only resets what expires anyway.
     return hmac.new(get_settings().appwrite_api_key.encode(), b"nokware-channel-subjects", hashlib.sha256).digest()
 
 
 def subject_key(subject: str) -> str:
-    """A phone number (or a USSD session ID) as a key part: a keyed hash, never the value itself."""
     return hmac.new(_subject_secret(), subject.encode(), hashlib.sha256).hexdigest()[:32]

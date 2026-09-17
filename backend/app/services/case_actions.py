@@ -1,9 +1,6 @@
-"""Staff changes to a citizen report: a recipient acknowledges and resolves its part; the MCE
-reassigns, reopens or confirms. Each re-reads the case under its lock, applies a rule from
-case_workflow, writes the change and adds it to the audit trail.
+"""Staff changes to a citizen report, each re-read under the case's lock.
 
-A personal-safety case's trail never carries what anyone wrote about it (the
-resolution note, the escalation): the MCE reads the trail but not the content.
+A personal-safety case's trail never carries what anyone wrote about it: the MCE reads the trail but not the content.
 The words stay on the case, for its recipients.
 """
 
@@ -24,9 +21,7 @@ from app.teams import RECIPIENT_NAMES
 @dataclass(frozen=True)
 class Outcome:
     case: dict[str, Any]
-    resolved: bool  # the change resolved the case: the citizen gets the resolution message
-
-
+    resolved: bool  # the citizen gets the resolution message
 
 
 def _load(case_id: str) -> tuple[dict[str, Any], list[dict[str, Any]]]:
@@ -41,7 +36,6 @@ def _named(recipient: str) -> str:
 
 
 def _settle(case: dict[str, Any], assignments: list[dict[str, Any]], now: datetime) -> Outcome:
-    """Write the case's status as its assignments now stand; keep the numbers' deletion date in step."""
     updated = report_store.update_case(case["$id"], case_workflow.after_assignments_change(case, assignments, now))
     resolved = updated["status"] == CaseStatus.RESOLVED and case["status"] != CaseStatus.RESOLVED
     if resolved:
@@ -95,7 +89,6 @@ def resolve(principal: Principal, case_id: str, note: str | None, now: datetime)
 
 
 def reassign(principal: Principal, case_id: str, move: Reassignment, reason: str | None, now: datetime) -> Outcome:
-    """The MCE moves one recipient's part of the case to another. Written to the trail with the reason."""
     with record_lock(case_id):
         case, assignments = _load(case_id)
         case_workflow.check_reassign(principal, case, move, reason)
@@ -130,7 +123,6 @@ def reassign(principal: Principal, case_id: str, move: Reassignment, reason: str
 
 
 def reopen(principal: Principal, case_id: str, note: str | None, now: datetime) -> Outcome:
-    """The MCE sends an escalated case back to the same recipients to finish the work."""
     with record_lock(case_id):
         case, assignments = _load(case_id)
         case_workflow.reopen(principal, case, note)
@@ -150,7 +142,6 @@ def reopen(principal: Principal, case_id: str, note: str | None, now: datetime) 
 
 
 def confirm_resolution(principal: Principal, case_id: str, note: str | None, now: datetime) -> Outcome:
-    """The MCE upholds the resolution of an escalated case; the case closes."""
     with record_lock(case_id):
         case, _ = _load(case_id)
         updated = report_store.update_case(case_id, case_workflow.confirm_resolution(principal, case, note, now))

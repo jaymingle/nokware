@@ -1,28 +1,12 @@
-"""The petition rules: what a petition must hold, what the MCE may decide, and when each clock runs out.
-
-Pure functions over a petition record, with no Appwrite calls, so every rule is
-unit-tested and the routes cannot drift from each other.
+"""The petition rules, as pure functions with no Appwrite calls, so every rule is unit-tested and the routes can't drift.
 
 Lifecycle:
-  a resident with a verified phone submits a petition -> in_review; the MCE has 72 hours
-    the MCE publishes it -> open
-    the MCE refuses it, for one of the fixed reasons only -> refused
-      the creator edits and resubmits it (at most twice) -> in_review, with a fresh 72 hours
-    the MCE decides nothing in 72 hours -> open: it publishes automatically
-  it reaches its threshold of signatures -> awaiting_response; the MCE has 30 days to respond publicly
-    (it keeps taking signatures until its 90 days are up, or the MCE responds)
-    the MCE responds: will act, referred to a department, or can't act and why -> responded
-    30 days pass with no response -> still awaiting_response, and the page says so plainly; a late response is
-    still taken, and says how late it was
-  open for 90 days without reaching it -> closed
-  the creator may withdraw it until it reaches its threshold or closes -> withdrawn
+  submitted -> in_review (72h) -> open, by the MCE or automatically; or refused (resubmittable twice)
+  open -> awaiting_response at its threshold (MCE has 30 days; a late response is still taken) -> responded
+  open for 90 days without reaching it -> closed; withdrawable until it reaches its threshold or closes
 
-One signature per confirmed Ghanaian number per petition. A signer is
-anonymous unless they choose to show their name, which is then public.
-
-The MCE is usually the petition's target, so moderation can't be a veto: a
-refusal must name a reason from REFUSALS, the public list counts refusals by
-reason, and silence publishes.
+The MCE is usually the petition's target, so moderation can't be a veto: a refusal must name a reason from REFUSALS,
+the public list counts refusals by reason, and silence publishes.
 """
 
 import re
@@ -154,7 +138,6 @@ def new_code() -> str:
 
 
 def normalise_code(typed: str) -> str | None:
-    """A petition number as typed ("482 913", "482-913"), or None if it isn't one."""
     code = typed.strip().replace(" ", "").replace("-", "")
     return code if re.fullmatch(f"[0-9]{{{CODE_DIGITS}}}", code) else None
 
@@ -180,7 +163,6 @@ def _text(value: str, name: str, low: int, high: int) -> str:
 
 
 def clean_draft(draft: Draft) -> Draft:
-    """The draft as it will be stored, or InvalidPetition saying what to fix."""
     if draft.topic not in {t.id for t in petition_topics()}:
         raise InvalidPetition("Choose a topic from the list.")
     ward = draft.ward if draft.scope == Scope.AREA else None
@@ -194,7 +176,6 @@ def clean_draft(draft: Draft) -> Draft:
 
 
 def clean_name(show_name: bool, name: str | None) -> str | None:
-    """A name to show publicly, only when the person chose to show one."""
     given = " ".join((name or "").split()) if show_name else ""
     if show_name and not given:
         raise InvalidPetition("Enter the name to show, or choose to stay anonymous.")
@@ -218,7 +199,7 @@ def threshold_for(scope: Scope, area_threshold: int, metro_threshold: int) -> in
 
 
 def publish_fields(petition: dict[str, Any], by: PublishedBy, now: datetime, threshold: int) -> dict[str, Any]:
-    """Opening for signatures. The threshold is fixed now, so a later change to the setting never moves the goal."""
+    """The threshold is fixed now, so a later change to the setting never moves the goal."""
     return {"status": PetitionStatus.OPEN.value, "publishedAt": now.isoformat(), "publishedBy": by.value,
             "closesAt": (now + OPEN_FOR).isoformat(), "threshold": threshold}
 
@@ -229,7 +210,6 @@ def review_expired(petition: dict[str, Any], now: datetime) -> bool:
 
 
 def check_review(petition: dict[str, Any], now: datetime) -> None:
-    """The MCE may decide only while the petition is in review and its clock is still running."""
     if petition.get("status") != PetitionStatus.IN_REVIEW:
         raise WrongState("This petition is no longer waiting for a decision.")
     if review_expired(petition, now):
@@ -273,7 +253,7 @@ def check_signable(petition: dict[str, Any], now: datetime) -> None:
 
 
 def clean_signer_name(show_name: bool, name: str | None) -> str | None:
-    """A signer's name to show publicly: letters only, so the name field can't carry a number or a message."""
+    """Letters only, so the name field can't carry a number or a message."""
     given = clean_name(show_name, name)
     if given and not _NAME.match(given):
         raise InvalidPetition("A name can have letters, spaces, hyphens and apostrophes only.")
@@ -281,7 +261,6 @@ def clean_signer_name(show_name: bool, name: str | None) -> str | None:
 
 
 def threshold_fields(petition: dict[str, Any], signatures: int, now: datetime) -> dict[str, Any]:
-    """The new count, and, the moment it reaches the threshold, the MCE's 30 days to respond."""
     changes: dict[str, Any] = {"signatureCount": signatures}
     threshold = petition.get("threshold")
     if petition.get("status") == PetitionStatus.OPEN and threshold and signatures >= threshold:
@@ -296,7 +275,7 @@ def closing_due(petition: dict[str, Any], now: datetime) -> bool:
 
 
 def was_published(petition: dict[str, Any]) -> bool:
-    """Whether the public may see it: it was published, even if it has since closed or been withdrawn."""
+    """Still public once published, even if it has since closed or been withdrawn."""
     return bool(petition.get("publishedAt"))
 
 
@@ -319,7 +298,6 @@ class Response:
 
 
 def response_fields(petition: dict[str, Any], response: Response, now: datetime) -> dict[str, Any]:
-    """The MCE's public response, checked. Only a petition that reached its threshold is owed one; a late one is taken."""
     if petition.get("status") != PetitionStatus.AWAITING_RESPONSE:
         raise WrongState("Only a petition that has reached its signatures, and not been answered, is waiting for a response.")
     if response.kind not in RESPONSE_KINDS:
@@ -336,21 +314,18 @@ def response_fields(petition: dict[str, Any], response: Response, now: datetime)
 
 
 def response_overdue(petition: dict[str, Any], now: datetime) -> bool:
-    """The 30 days have passed with no response, and that hasn't been recorded yet."""
     due = parse_datetime(petition.get("responseDue"))
     return (petition.get("status") == PetitionStatus.AWAITING_RESPONSE and due is not None and due <= now
             and not petition.get("noResponseAt"))
 
 
 def responded_late(petition: dict[str, Any]) -> bool:
-    """Whether the MCE responded after the 30-day deadline."""
     due, responded = parse_datetime(petition.get("responseDue")), parse_datetime(petition.get("respondedAt"))
     return due is not None and responded is not None and responded > due
 
 
 def days_late(petition: dict[str, Any]) -> int:
-    """Whole days after the 30-day deadline the MCE responded: never rounded up, so lateness is never overstated.
-    0 if in time, or late by less than a day (responded_late says which)."""
+    """Never rounded up, so lateness is never overstated."""
     if not responded_late(petition):
         return 0
     due, responded = parse_datetime(petition["responseDue"]), parse_datetime(petition["respondedAt"])

@@ -1,12 +1,8 @@
-"""Ask the model what a report is about: a category, a topic and (not for personal safety) a severity.
+"""Ask the model what a report is about.
 
-The model only reads the description. It chooses from the fixed topic list and
-never names a recipient; the routing table does that. Its verdict is advice:
-report_rules.classify() applies the privacy rules on top, and a failure here
-(timeout, outage, nonsense) returns None so those rules take over.
-
-Reports a citizen has already declared as personal safety never reach this
-module: they are never sent to the model at all.
+It chooses a topic, never a recipient. Its verdict is advice: report_rules.classify() applies the privacy rules on
+top, and a failure here returns None so those rules take over. Reports a citizen has already declared as personal
+safety are never sent to the model at all.
 """
 
 import logging
@@ -56,7 +52,6 @@ _PROMPT = ChatPromptTemplate.from_messages([("system", _SYSTEM), ("human", "Repo
 
 
 def model_verdict(description: str) -> ModelVerdict | None:
-    """The model's reading of the report, or None if it couldn't give one."""
     chain = _PROMPT | get_classifier_model().with_structured_output(Verdict)
     try:
         verdict = chain.invoke({"topics": _topic_lines(), "description": description})

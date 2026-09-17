@@ -1,32 +1,12 @@
 """The publishing record: what the Assembly is required to publish, against what the Ledger holds, year by year.
 
-Accountability rather than retrieval: it shows the gaps as well as the contents.
-The required documents, their groups, cadences and title patterns are in
-app/data/statutory_documents.json. Each period (a year, a quarter, or a 4-year
-plan period) is one of:
+A missing document is "not found in the Documents Centre and not in The Ledger", never "does not exist": it may
+exist and simply not be online. "not_due" rests on our conservative assumption of when a document is expected, not a
+statutory deadline.
 
-- held: the Ledger holds the document itself;
-- related: it holds documents about the same thing, but not the document itself
-  (a monitoring and evaluation report is not an Annual Progress Report);
-- missing: neither, once the document is expected;
-- not_due: not yet expected, by our conservative assumption of when it is due
-  ("expected" in the data file), which is not a statutory deadline.
-
-A missing document is "not found in ama.gov.gh's Documents Centre and not in
-The Ledger", never "does not exist": it may exist and simply not be online. The
-Ledger holds everything imported from the Documents Centre, so absent from the
-Ledger means absent from the Documents Centre when it was last checked. Beside a
-gap, the record lists what the Ledger does hold from the same departments or
-categories that year.
-
-Titles mislead: the file titled "2022 Composite Budget" is the budget's chart-of-
-account annex. Where the data file gives "cover" rules, a document's own first
-page decides what it is, and says why ("Its first page reads …"). Each document
-also says where its year came from (its first page, its title, the Ledger's
-record, or a person), so a year taken from the Ledger's record rather than the
-document can be marked as such. Documents issued by someone else (the Auditor-General,
-Parliament) say so; a Public Accounts Committee report has no fixed schedule, so
-no year of it is ever called missing.
+Titles mislead: the file titled "2022 Composite Budget" is the budget's chart-of-account annex, so where the data
+file gives "cover" rules, a document's own first page decides what it is. A Public Accounts Committee report has no
+fixed schedule, so no year of it is ever called missing.
 """
 
 import json
@@ -74,7 +54,6 @@ def _moment(year: int, month: int = 1) -> datetime:
 
 
 def periods(requirement: dict[str, Any], now: datetime) -> list[Period]:
-    """The periods the record covers: from the first year to now (a plan period reaching into this range counts)."""
     first, last = rules()["first_year"], now.year
     if requirement["cadence"] == "annual":
         return [Period(str(y), y, None, _moment(y), _moment(y + 1)) for y in range(first, last + 1)]
@@ -88,7 +67,6 @@ def periods(requirement: dict[str, Any], now: datetime) -> list[Period]:
 
 
 def expected_from(requirement: dict[str, Any], period: Period) -> datetime | None:
-    """When the document counts as expected: our conservative assumption, not a statutory deadline."""
     rule = requirement.get("expected")
     if not rule:
         return None
@@ -110,8 +88,7 @@ def expected_note(requirement: dict[str, Any]) -> str | None:
 
 
 def year_and_source(document: dict[str, Any]) -> tuple[int | None, str | None]:
-    """The year a document covers, and where that came from: a person, its first page, its title (a report filed
-    later still covers its own year), or the Ledger's record."""
+    """The title outranks the Ledger's record: a report filed later still covers its own year."""
     for source, year in (("confirmed", document.get("_confirmed_year")), ("cover", document.get("_cover_year")),
                          ("title", year_from_title(document.get("title") or "")), ("ledger", plausible_year(document.get("documentYear")))):
         if year:
@@ -146,8 +123,7 @@ def _pattern(requirement: dict[str, Any], key: str) -> re.Pattern[str] | None:
 
 
 def _by_cover(requirement: dict[str, Any], document: dict[str, Any], first_page: str | None) -> tuple[str, dict[str, Any]] | None:
-    """What the document's own first page says it is, where the requirement has cover rules: ("own" or "near",
-    the document with its year and why), or None to fall back on its title."""
+    """None to fall back on the title."""
     cover = requirement.get("cover")
     if not cover or not first_page:
         return None
@@ -162,8 +138,7 @@ def _by_cover(requirement: dict[str, Any], document: dict[str, Any], first_page:
 
 def classify(requirement: dict[str, Any], documents: list[dict[str, Any]],
              first_pages: dict[str, str] | None = None) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    """The requirement's own documents and its related ones: a person's confirmation first, then the document's own
-    first page, then its title."""
+    """A person's confirmation outranks the first page, which outranks the title."""
     confirmed = rules()["confirmed"]
     match, related = _pattern(requirement, "match"), _pattern(requirement, "related")
     own, near = [], []
@@ -184,7 +159,6 @@ def classify(requirement: dict[str, Any], documents: list[dict[str, Any]],
 
 
 def _nearby(requirement: dict[str, Any], year: int, documents: list[dict[str, Any]], shown: set[str]) -> list[dict[str, Any]]:
-    """What the Ledger does hold that year from the requirement's departments or categories."""
     return [d for d in documents if d["$id"] not in shown and document_year(d) == year
             and (d.get("department") in requirement["departments"] or d.get("category") in requirement["categories"])]
 
@@ -231,9 +205,8 @@ def _summary(groups: list[dict[str, Any]]) -> dict[str, int]:
 
 
 def published_documents() -> list[dict[str, Any]]:
-    """The Ledger's published documents, test documents left out."""
     records = every_record(ledger_documents.COLLECTION_ID, list(ledger_documents.PUBLIC_DOCUMENTS))
-    return [record for record in records if ledger_documents.is_public_document(record)]  # and again, by title
+    return [record for record in records if ledger_documents.is_public_document(record)]
 
 
 def build(documents: list[dict[str, Any]], now: datetime, first_pages: dict[str, str] | None = None) -> dict[str, Any]:
@@ -250,5 +223,4 @@ def build(documents: list[dict[str, Any]], now: datetime, first_pages: dict[str,
 
 
 def publishing_record(now: datetime) -> dict[str, Any]:
-    """The record, at most ten minutes old."""
     return CACHE.get(lambda: build(published_documents(), now, first_chunks()))

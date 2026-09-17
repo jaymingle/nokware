@@ -1,14 +1,6 @@
 """The petition clock: what happens to a petition when no one acts.
 
-Run by the API every DEADLINE_JOB_INTERVAL_SECONDS, in the same loop as the
-Ledger's deadline job:
-- a petition the MCE left undecided for 72 hours publishes automatically;
-- an open petition that reaches 90 days short of its threshold closes;
-- a petition that reached its threshold and has had no response for 30 days
-  gets that recorded, once: the page says "No response 30 days after the
-  petition reached its threshold." A late response is still taken.
-Each tells the petition's creator. Every change re-reads the petition under its
-lock first, in case someone acted a moment before.
+Every change re-reads the petition under its lock first, in case someone acted a moment before.
 """
 
 import logging
@@ -43,7 +35,6 @@ def _due(queries: list[str]) -> list[dict[str, Any]]:
 
 
 def _apply(candidate: dict[str, Any], now: datetime, step: Step) -> bool:
-    """One change the clock makes, if it is still due once the petition is re-read under its lock."""
     is_due, changes, action, update = step
     with record_lock(candidate["$id"]):
         petition = petitions.find(candidate["code"])
@@ -62,7 +53,6 @@ NO_RESPONSE: Step = (response_overdue, lambda p, now: {"noResponseAt": now.isofo
 
 
 def run_clock(now: datetime) -> dict[str, list[str]]:
-    """Every change due now, by kind: the petitions published automatically, closed, and recorded as unanswered."""
     at = now.isoformat()
     due = {
         "published": (_due([Query.equal("status", PetitionStatus.IN_REVIEW.value), Query.less_than_equal("reviewDeadline", at)]), AUTO_PUBLISH),

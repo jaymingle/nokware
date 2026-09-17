@@ -1,13 +1,8 @@
-"""Arkesel SMS: the provider behind citizen notifications.
+"""Arkesel SMS, behind citizen notifications.
 
-A message is a POST to Arkesel's v2 send endpoint with the api-key header. In
-sandbox mode (ARKESEL_SANDBOX, on by default) Arkesel accepts the request but
-delivers nothing and spends no credits. Outside it, a daily page limit
-(SMS_DAILY_LIMIT) guards the credits, counted in Redis when there is one (and
-if Redis can't be reached, nothing is sent rather than sent uncounted). Text is made plain GSM-7 first, so a page
-holds 160 characters, and an error never carries the key or a whole number.
-When the API has a public address and Arkesel's webhook secret, each message
-asks for signed delivery reports (routes/channels.py).
+In sandbox mode Arkesel accepts a request but delivers nothing and spends no credits. Outside it, a daily page limit
+guards the credits; if Redis can't be reached to count, nothing is sent rather than sent uncounted. Text is made
+plain GSM-7 first so a page holds 160 characters, and an error never carries the key or a whole number.
 """
 
 import logging
@@ -49,12 +44,11 @@ class SmsNotConfigured(RuntimeError):
 
 
 def _scrub(text: str) -> str:
-    """Arkesel's own words, without any phone number it may echo."""
     return _NUMBERS.sub("[number]", text)[:300]
 
 
 class _MemoryCount:
-    """The day's pages in this process: used only when there is no Redis, and reset by a restart."""
+    """Only when there is no Redis; a restart resets it."""
 
     def __init__(self) -> None:
         self._counts: dict[date, int] = {}
@@ -67,8 +61,6 @@ class _MemoryCount:
 
 
 class _RedisCount:
-    """The day's pages in Redis: shared by every worker and kept across restarts, for two days."""
-
     def __init__(self, name: str = "pages") -> None:
         self.name = name
 
@@ -79,14 +71,12 @@ class _RedisCount:
             pipe.incrby(counter, count)
             pipe.expire(counter, 2 * 86400)
             used, _ = pipe.execute()
-        except (redis.RedisError, RedisUnavailable) as error:  # can't count: don't spend
+        except (redis.RedisError, RedisUnavailable) as error:
             raise SmsError(f"The SMS limit can't be checked ({type(error).__name__}), so nothing was sent.") from None
         return int(used)
 
 
 class DailyBudget:
-    """SMS pages sent today (UTC) outside the sandbox, against SMS_DAILY_LIMIT."""
-
     def __init__(self, limit: int, counter: "_MemoryCount | _RedisCount | None" = None) -> None:
         self.limit = limit
         self._counter = counter or _MemoryCount()
@@ -109,7 +99,7 @@ def _body(response: httpx.Response) -> dict[str, Any]:
 
 
 def _message_id(data: Any) -> str:
-    """Arkesel's ID for the message: data is a list of {recipient, id} or a single {id}."""
+    """Arkesel returns a list of {recipient, id} or a single {id}."""
     first = data[0] if isinstance(data, list) and data else data
     return str(first.get("id", "")) if isinstance(first, dict) else ""
 
@@ -120,7 +110,7 @@ class ArkeselSms:
     sender: str
     sandbox: bool
     budget: DailyBudget
-    callback_url: str | None = None  # where Arkesel sends signed delivery reports
+    callback_url: str | None = None
     client: httpx.Client = field(default_factory=lambda: httpx.Client(timeout=TIMEOUT_SECONDS))
 
     @property
@@ -143,7 +133,6 @@ class ArkeselSms:
         return body
 
     def send(self, to: str, body: str) -> str:
-        """Send one SMS; return Arkesel's message ID. Raises SmsError, SmsLimitReached."""
         text = plain(body)
         count = pages(text)
         if not is_gsm7(text):
@@ -162,14 +151,14 @@ class ArkeselSms:
             raise
 
     def balance(self) -> dict[str, Any]:
-        """The account's SMS and main balances. Costs nothing."""
+        """Costs nothing."""
         data = self._request("GET", BALANCE_URL).get("data")
         return data if isinstance(data, dict) else {}
 
 
 @lru_cache
 def arkesel() -> ArkeselSms:
-    """The one Arkesel client for this process, so the daily budget is shared by every message."""
+    """One client per process, so the daily budget is shared by every message."""
     settings = get_settings()
     if not settings.arkesel_api_key or not settings.arkesel_sender_id:
         raise SmsNotConfigured("SMS_PROVIDER=arkesel needs ARKESEL_API_KEY and ARKESEL_SENDER_ID.")
@@ -186,8 +175,7 @@ def arkesel() -> ArkeselSms:
 
 @lru_cache
 def code_sms() -> ArkeselSms:
-    """The Arkesel client for verification codes: the same account, on a daily cap of its own
-    (SMS_CODE_DAILY_LIMIT), so codes never use up the pages report notifications need, nor the reverse."""
+    """A daily cap of its own, so verification codes never use up the pages report notifications need, nor the reverse."""
     settings = get_settings()
     report_sms = arkesel()
     return ArkeselSms(
@@ -199,7 +187,7 @@ def code_sms() -> ArkeselSms:
 
 
 def delivery_report_url() -> str | None:
-    """Delivery reports are asked for only when they can reach the API and be verified."""
+    """Only when reports can reach the API and be verified."""
     settings = get_settings()
     if not settings.public_api_url or not settings.arkesel_webhook_secret:
         return None

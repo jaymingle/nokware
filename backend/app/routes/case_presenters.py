@@ -72,7 +72,7 @@ def _contact(principal: Principal, case: dict[str, Any]) -> Contact | None:
 
 
 def _event(entry: dict[str, Any], full: bool) -> CaseEvent:
-    """An audit entry. In an outline, the classification says only "personal safety", not which kind."""
+    """In an outline, the classification says only "personal safety", not which kind."""
     note = entry.get("note")
     if not full and entry["action"] == CaseHistoryAction.CLASSIFIED:
         note = "Filed as personal safety."

@@ -1,11 +1,4 @@
-"""POST /api/jobs/publish-expired: the deadline job.
-
-Publishes held documents and escalated disputes whose 72-hour clock has run
-out, and re-queues ingestion for published documents that failed or stalled.
-The API already runs this job itself every DEADLINE_JOB_INTERVAL_SECONDS; the
-route runs it on demand. Safe to call at any frequency. Callable by an MCE
-session, or by a scheduler sending the X-Job-Token header (when JOB_TOKEN is set).
-"""
+"""The deadline job on demand; the API also runs it itself on an interval. Safe to call at any frequency."""
 
 from typing import Annotated
 

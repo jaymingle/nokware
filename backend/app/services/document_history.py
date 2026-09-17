@@ -1,9 +1,6 @@
-"""The audit trail: one document_history entry per upload and status change.
+"""The audit trail for Ledger documents, written by the server only and never edited.
 
-Entries are written by the server only and never edited. Each one records who
-acted (a snapshot of their name and role, so the trail reads correctly even if
-an account changes later), the status before and after, any note (a dispute
-reason, a contributor's response, a ruling), and the file in force at the time.
+Each entry snapshots the actor's name and role, so the trail reads correctly even if an account changes later.
 """
 
 from dataclasses import dataclass
@@ -51,7 +48,7 @@ def record(
     from_status: LedgerStatus | None,
     note: str | None = None,
 ) -> None:
-    """Append an entry for a document as it stands after the change."""
+    """The document as it stands after the change."""
     get_databases().create_document(
         DATABASE_ID,
         COLLECTION_ID,
@@ -73,7 +70,6 @@ def record(
 
 
 def entries_for(document_id: str) -> list[dict[str, Any]]:
-    """A document's trail, oldest first."""
     listing = get_databases().list_documents(
         DATABASE_ID,
         COLLECTION_ID,

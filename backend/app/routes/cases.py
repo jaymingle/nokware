@@ -1,16 +1,4 @@
-"""Citizen reports as staff work them. Signed in; each route checks the caller's role and view.
-
-    GET  /api/cases/queue                     a department's or agency's cases, most urgent first
-    GET  /api/cases/oversight                 every case, for the MCE (personal safety in outline)
-    GET  /api/cases/{id}                      one case, as the caller may see it
-    POST /api/cases/{id}/acknowledge          a recipient starts work
-    POST /api/cases/{id}/resolve              a recipient finishes its part (note required)
-    POST /api/cases/{id}/reassign             the MCE moves a recipient's part (reason required)
-    POST /api/cases/{id}/reopen               the MCE sends an escalated case back (note required)
-    POST /api/cases/{id}/confirm-resolution   the MCE upholds an escalated case's resolution (note required)
-    GET  /api/cases/{id}/location             a shared precise location: Police or Social Welfare on the case only;
-                                              each view is recorded, and the citizen sees it on their status page
-"""
+"""Citizen reports as staff work them. Signed in; each route checks the caller's role and view."""
 
 from typing import Annotated
 
@@ -54,7 +42,7 @@ def oversight(principal: Mce) -> CaseOversight:
 
 
 def _visible(principal: Principal, case_id: str) -> CaseDetail:
-    """The case as the caller may see it; 404 (not 403) for anyone with no view, so its existence isn't revealed."""
+    """404, not 403, for anyone with no view, so the case's existence isn't revealed."""
     found = case_queries.load(case_id)
     if found is None or case_view(principal, found[0]) == CaseView.NONE:
         raise CaseNotFound(case_id)

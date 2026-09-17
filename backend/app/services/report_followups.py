@@ -1,9 +1,7 @@
-"""What a citizen can do after filing, with only the case reference: follow it, escalate it once,
-and (straight after filing) answer the question about messages. Also the deletion of numbers
-whose retention has ended.
+"""What a citizen can do after filing with only the case reference, and the deletion of numbers past retention.
 
-Anyone holding a reference can open its status, so a personal-safety case's
-status says only how far along it is: no category, service, place or note.
+Anyone holding a reference can open its status, so a personal-safety case's status says only how far along it is:
+no category, service, place or note.
 """
 
 import hmac
@@ -34,7 +32,6 @@ from app.wards import sub_metros, wards
 
 logger = logging.getLogger(__name__)
 
-# The only progress words a personal-safety status shows.
 PRIVATE_STAGES = {
     CaseStatus.SUBMITTED: "received",
     CaseStatus.ASSIGNED: "received",
@@ -49,7 +46,6 @@ class CaseNotFound(Exception):
 
 
 def find(reference_or_id: str) -> dict[str, Any]:
-    """A case by its short reference, as typed, or by its case ID."""
     reference = normalise_reference(reference_or_id)
     case = report_store.find_by_reference(reference) if reference else None
     if case is None and _is_uuid(reference_or_id):
@@ -81,7 +77,6 @@ def _resolution_notes(assignments: list[dict[str, Any]]) -> list[dict[str, str]]
 
 
 def public_status(case: dict[str, Any], assignments: list[dict[str, Any]], now: datetime) -> dict[str, Any]:
-    """What the citizen (or anyone with the reference) sees."""
     common = {
         "reference": case["reference"],
         "case_id": case["$id"],
@@ -108,12 +103,11 @@ def public_status(case: dict[str, Any], assignments: list[dict[str, Any]], now: 
 
 
 def escalate_case(reference_or_id: str, note: str | None, now: datetime) -> dict[str, Any]:
-    """The citizen's one escalation to the MCE. The numbers are kept while the case is open again."""
+    """The numbers are kept while the case is open again."""
     case = find(reference_or_id)
     changes = escalate(case, (note or "").strip() or None, now)
     updated = report_store.update_case(case["$id"], changes)
-    # A personal-safety case's escalation note is the citizen's own words: kept on the
-    # case for its recipients, never copied into the trail the MCE reads.
+    # A personal-safety note is the citizen's own words: kept for its recipients, never copied into the MCE's trail.
     trail_note = "The citizen escalated the case." if case.get("isSensitive") else changes["escalationNote"]
     entry = CaseEntry(
         CaseHistoryAction.ESCALATED, CITIZEN, from_status=case["status"], to_status=changes["status"], note=trail_note
@@ -130,8 +124,7 @@ class Preferences:
 
 
 def set_preferences(reference_or_id: str, token: str, choice: Preferences, now: datetime) -> tuple[dict[str, Any], bool]:
-    """The citizen's answer about messages and calls, for a report the classifier filed as personal safety.
-    Once only, within the hour, with the token from the receipt. Returns the case and whether messages are now on."""
+    """Once only, within the hour, with the token from the receipt. Returns the case and whether messages are now on."""
     case = find(reference_or_id)
     contact = contact_for(case["$id"])
     expires = parse_datetime(contact.get("preferencesExpiresAt")) if contact else None
@@ -141,7 +134,7 @@ def set_preferences(reference_or_id: str, token: str, choice: Preferences, now: 
     changes = {
         "notify": choice.notify,
         "callbackConsent": choice.callback_consent,
-        "preferencesTokenHash": None,  # used once
+        "preferencesTokenHash": None,
         "preferencesExpiresAt": None,
     }
     update_contact(case["$id"], changes)
@@ -149,8 +142,7 @@ def set_preferences(reference_or_id: str, token: str, choice: Preferences, now: 
 
 
 def sync_contact_retention(case: dict[str, Any]) -> None:
-    """Keep the deletion date of the citizen's numbers, and of names given with voices, in step with the case:
-    none while open, 30 days after it closes."""
+    """Numbers and names given with voices: kept while open, deleted 30 days after the case closes."""
     purge_at = contact_purge_at(case)
     if contact_for(case["$id"]) is not None:
         update_contact(case["$id"], {"purgeAt": purge_at.isoformat() if purge_at else None})
@@ -159,7 +151,6 @@ def sync_contact_retention(case: dict[str, Any]) -> None:
 
 
 def purge_expired_contacts(now: datetime) -> int:
-    """Delete every citizen's numbers whose retention has ended; the trail records that it happened."""
     deleted = 0
     for contact in contacts_due_for_deletion(now):
         delete_contact(contact["$id"])
