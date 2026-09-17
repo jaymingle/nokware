@@ -65,10 +65,6 @@ class ContactChoice:
     notify: bool  # send the submitted / resolved / escalated messages
     callback_consent: bool  # recipients may call the citizen about this case
 
-    @property
-    def given(self) -> bool:
-        return bool(self.phone or self.whatsapp)
-
 
 def save_contact(case_id: str, choice: ContactChoice) -> None:
     """Stored under the case's own ID: one contact per case, found without a query."""

@@ -11,7 +11,6 @@ from minio.error import S3Error
 
 from app.config import get_settings
 
-MAX_PHOTOS = 10
 DEFAULT_URL_EXPIRY_SECONDS = 3600
 # Set explicitly so the client never auto-detects it: detection needs
 # s3:GetBucketLocation, which our access key's policy does not grant (every
