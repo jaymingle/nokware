@@ -1,24 +1,10 @@
-"""Proving a phone number: what a resident does before starting a petition (and, from P2, signing one).
+"""Proving a phone number before starting a petition.
 
-The web page asks for a challenge and gets a six-digit code plus a secret it
-keeps. The resident then proves the number one of three ways:
+WhatsApp and USSD prove the number because the provider says who sent or dialled the code. SMS codes are off by
+default (SMS_VERIFICATION_CODES) until the sender ID is registered: an unregistered sender's messages are held for
+about 15 minutes, and a code arriving that late is worse than no SMS option.
 
-- WhatsApp: the page opens a chat with "Nokware code 482173" already typed;
-  sending it proves the number, because Twilio says who sent it. One reply
-  confirms it.
-- USSD: dial the service, choose "Confirm a web code" and type the code; the
-  network says who dialled.
-- SMS: type the number on the page, then the code that arrives by SMS. OFF by
-  default (SMS_VERIFICATION_CODES), and it stays off until the Arkesel sender
-  ID is registered: an unregistered sender ID's messages are held for about 15
-  minutes, and a code arriving 15 minutes late is worse than no SMS option.
-  Codes have a daily cap of their own (sms.code_sms).
-
-Only Ghanaian mobile numbers qualify. Once proven, the page collects a proof: a
-sealed token (AES-GCM, under a key only the server holds) carrying the number,
-how it was proven and when it expires. The browser can't read it or change it.
-So no phone number is ever in Redis, which holds only the challenge's code,
-its state and, once proven, the sealed proof.
+The proof is a sealed AES-GCM token the browser can't read or change, so no phone number is ever held in Redis.
 """
 
 import base64
@@ -127,7 +113,6 @@ def issue_proof(number: str, channel: Channel, now: datetime) -> str:
 
 
 def open_proof(token: str | None, now: datetime) -> Proof:
-    """The number a proof carries, or ProofError if it's missing, altered or expired."""
     if not token:
         raise ProofError("Confirm your phone number first.")
     payload = _unseal(token)
@@ -145,7 +130,7 @@ def _phone_secret() -> bytes:
 
 
 def keyed_hash(text: str) -> str:
-    """A keyed hash under the phone secret: it can be matched, but not read back."""
+    """Can be matched, but not read back."""
     return hmac.new(_phone_secret(), text.encode(), hashlib.sha256).hexdigest()
 
 
@@ -162,11 +147,14 @@ def _code_key(code: str) -> str:
     return key("phone", "code", code)
 
 
+def _random_code() -> str:
+    return f"{secrets.randbelow(10 ** CODE_DIGITS):0{CODE_DIGITS}d}"
+
+
 def new_challenge() -> Challenge:
-    """A fresh code no other waiting challenge holds, and the secret the page keeps."""
     redis, secret = get_redis(), secrets.token_urlsafe(24)
     for _ in range(10):
-        code = f"{secrets.randbelow(10 ** CODE_DIGITS):0{CODE_DIGITS}d}"
+        code = _random_code()
         if redis.set(_code_key(code), _challenge_key(secret), nx=True, ex=CHALLENGE_SECONDS):
             redis.hset(_challenge_key(secret), mapping={"state": "waiting", "code": code})
             redis.expire(_challenge_key(secret), CHALLENGE_SECONDS)
@@ -191,7 +179,7 @@ def _prove(challenge_key: str, code: str, number: str, channel: Channel, now: da
 
 
 def claim(sent: str, raw_number: str, channel: Channel, now: datetime) -> Claim:
-    """A code sent by WhatsApp or typed in USSD, from the number the provider vouches for."""
+    """The provider vouches for raw_number, which is what makes this a proof."""
     code = "".join(ch for ch in sent if ch.isdigit())
     challenge_key = get_redis().get(_code_key(code)) if len(code) == CODE_DIGITS else None
     if not challenge_key or get_redis().hget(challenge_key, "state") != "waiting":
@@ -206,13 +194,11 @@ def claim(sent: str, raw_number: str, channel: Channel, now: datetime) -> Claim:
 
 
 def typed_code(text: str) -> str | None:
-    """The code in a WhatsApp message such as "Nokware code 482173", or None if it isn't one."""
     match = _TYPED_CODE.match(text or "")
     return match.group(1) + match.group(2) if match else None
 
 
 def state(secret: str) -> ChallengeState:
-    """What the page polls for: still waiting, or proven with the proof to keep."""
     try:
         held = _waiting(secret)
     except ProofError:
@@ -229,7 +215,6 @@ def sms_available() -> bool:
 
 
 def send_sms_code(secret: str, raw_number: str, now: datetime) -> str:
-    """Text a code to the number typed on the page. Returns the masked number it went to."""
     if not sms_available():
         raise SmsUnavailable("Confirming by SMS isn't available yet. Use WhatsApp or USSD.")
     held, number = _waiting(secret), normalise_phone(raw_number)  # InvalidNumber for anything not Ghanaian
@@ -237,7 +222,7 @@ def send_sms_code(secret: str, raw_number: str, now: datetime) -> str:
         raise ProofError("This number is already confirmed.")
     if not channel_limits.SMS_CODES.allow(number, now.timestamp()):
         raise SmsUnavailable("Too many codes for this number. Try again in an hour, or use WhatsApp or USSD.")
-    code = f"{secrets.randbelow(10 ** CODE_DIGITS):0{CODE_DIGITS}d}"
+    code = _random_code()
     sealed = _seal({"number": number, "code": _sms_code_hash(secret, code)})
     get_redis().hset(_challenge_key(secret), mapping={"sms": sealed, "attempts": 0})
     _text_code(number, code)
@@ -280,12 +265,10 @@ def whatsapp_available() -> bool:
 
 
 def whatsapp_link(code: str) -> str | None:
-    """A link that opens WhatsApp with the code message typed, to Nokware's number; None without one."""
     return f"https://wa.me/{_whatsapp_number()}?text={quote(f'Nokware code {code}')}" if whatsapp_available() else None
 
 
 def ussd_code() -> str | None:
-    """The code to dial, when USSD is on and the code is set."""
     settings = get_settings()
     return settings.ussd_service_code if settings.arkesel_ussd_token and settings.ussd_service_code else None
 

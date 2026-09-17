@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 def reply(number: str, text: str) -> None:
-    """Send a reply in the chat (the citizen just wrote, so the 24-hour window is open)."""
+    """The citizen just wrote, so the 24-hour window is open."""
     provider = provider_for(NotificationChannel.WHATSAPP)
     if provider is None:
         logger.info("WhatsApp reply to %s not sent (no provider is configured): %s", masked(number), text)
@@ -24,7 +24,7 @@ def reply(number: str, text: str) -> None:
 
 
 def reply_audio(number: str, media_url: str, about: str) -> str | None:
-    """Send a voice note Twilio fetches from media_url; its message SID, or None if it wasn't sent."""
+    """The message SID, or None if it wasn't sent."""
     provider = provider_for(NotificationChannel.WHATSAPP)
     if provider is None:
         logger.info("WhatsApp voice note to %s not sent (no provider is configured): %s, at %s", masked(number), about, media_url)

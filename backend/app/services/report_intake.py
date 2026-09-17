@@ -1,9 +1,6 @@
-"""Filing a citizen report, from any channel: the web form now, USSD and WhatsApp later.
+"""Filing a citizen report, from any channel.
 
-submit() checks everything first (description, photos, numbers) and writes only
-once all of it is valid: photos are cleaned, the report is classified and
-filed, one assignment is made per recipient, the numbers are stored apart, and
-every step goes to the case's audit trail. The citizen's "received" message is
+Nothing is written until the description, photos and numbers are all valid. The citizen's "received" message is
 sent afterwards, by the caller, so a slow provider never delays the receipt.
 """
 
@@ -76,7 +73,7 @@ def _description(raw: str) -> str:
 
 
 def _contact(submission: ReportSubmission) -> ContactChoice | None:
-    """The numbers, validated. Opt-ins are settled once the report's category is known."""
+    """Opt-ins are settled once the report's category is known."""
     phone = normalise_phone(submission.phone) if submission.phone else None
     whatsapp = normalise_whatsapp(submission.whatsapp) if submission.whatsapp else None
     if not (phone or whatsapp):
@@ -131,7 +128,7 @@ def _case_fields(
 
 
 def _drawn_ids(fields: dict[str, Any]) -> dict[str, Any]:
-    """A fresh reference, and for a civic report a public ID for the issue list (both random, so drawn together)."""
+    """Both random, so a collision redraws them together."""
     civic = fields["category"] == Category.CIVIC_SERVICE
     return {"reference": new_reference(), **({"publicId": new_public_id(), "voiceCount": 0} if civic else {})}
 
@@ -161,7 +158,7 @@ def _assign(case: dict[str, Any], now: datetime) -> None:
 
 
 def voice_note(language: str) -> str:
-    """The trail's word that a description is Nokware's transcription of a voice note, not the resident's own typing."""
+    """Says the description is Nokware's transcription, not the resident's own typing."""
     translated = "" if language.strip().lower() == "english" else f", translated from {language}"
     return (f"Reported by a resident in a WhatsApp voice note. The description is a machine transcription{translated}, "
             "which the resident confirmed before it was filed.")
@@ -189,7 +186,6 @@ def token_hash(token: str) -> str:
 
 
 def _save_contact(case_id: str, choice: ContactChoice, ask_again: bool, now: datetime) -> str | None:
-    """Store the numbers; when the citizen must be asked again about messages, return a one-time token."""
     save_contact(case_id, choice)
     if not ask_again:
         return None
@@ -200,14 +196,14 @@ def _save_contact(case_id: str, choice: ContactChoice, ask_again: bool, now: dat
 
 
 def read_report(description: str) -> Classification:
-    """How a report will be filed, before it is: a channel asks this first, so a personal-safety report gets
-    its emergency numbers at once and is never asked for its electoral area. Pass the result to submit()."""
+    """A channel asks this before filing, so a personal-safety report gets its emergency numbers at once and is
+    never asked for its electoral area."""
     return classify(description, None, model_verdict(description))
 
 
 def submit(submission: ReportSubmission, photos: list[bytes], now: datetime, filed: Classification | None = None) -> Receipt:
-    """File a report. Raises InvalidReport, InvalidNumber or PhotoRejected before anything is stored.
-    filed: the classification read_report() already gave for this description, if a channel asked first."""
+    """Raises InvalidReport, InvalidNumber or PhotoRejected before anything is stored.
+    filed: what read_report() already gave, if a channel asked first."""
     description = _description(submission.description)
     cleaned = clean_photos(photos)
     choice = _contact(submission)

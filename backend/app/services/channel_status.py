@@ -1,10 +1,6 @@
 """A case's status as a phone message, from the same public_status() the web's status page shows.
 
-A personal-safety case says only its stage: received, in progress or completed.
-Anyone holding a reference sees this, and a phone can be shared. An everyday
-case says what and where, who has it, what they said when they resolved it, how
-many residents added their voice, and until when it can be escalated. The
-compact form (a USSD screen) keeps to the first sentence.
+A personal-safety case says only its stage: anyone holding a reference sees this, and a phone can be shared.
 """
 
 from datetime import datetime
@@ -34,7 +30,7 @@ def headline(status: dict[str, Any]) -> str:
 
 
 def _details(status: dict[str, Any], site: str, where: str | None = None) -> list[str]:
-    """What else the status says. `where` is where to escalate: the status page's address in a message."""
+    """`where` is where to escalate: the status page's address in a message."""
     lines = []
     for note in status.get("resolution_notes") or []:
         text = note["note"] if len(note["note"]) <= NOTE_MAX else note["note"][: NOTE_MAX - 3].rstrip() + "..."
@@ -48,7 +44,6 @@ def _details(status: dict[str, Any], site: str, where: str | None = None) -> lis
 
 
 def status_text(status: dict[str, Any], site: str, compact: bool = False) -> str:
-    """The status as plain text: one sentence when compact, with the details otherwise."""
     if status["private"]:
         return f"Reference {status['reference']}: {PRIVATE_WORDS[status['stage']]}."
     first = headline(status)

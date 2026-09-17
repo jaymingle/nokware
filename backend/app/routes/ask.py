@@ -1,13 +1,7 @@
 """Ask: answer a question from the Ledger with cited sources. Public, no sign-in.
 
-POST /api/ask returns the whole answer at once. POST /api/ask/stream sends the
-same answer as newline-delimited JSON events (see AskStreamEvent), so the page
-can show progress during the 6-13 seconds an answer takes. Each answer comes with
-its export view, signed; POST /api/ask/export takes one back and returns it as a
-PDF, a Word document, a CSV or an Excel workbook (ask_export.py). POST /api/ask/voice turns a spoken
-question into words through the same pipeline as a WhatsApp voice note
-(voice_transcribe.listen), for the person to check before it is asked. The
-recording is held in memory only: never stored, and its words never logged.
+The stream exists so the page can show progress during the 6-13 seconds an answer takes. Exports render only a view
+the API signed. A spoken question's recording is held in memory only: never stored, and its words never logged.
 """
 
 import logging
@@ -38,9 +32,6 @@ BUSY_MESSAGE = "Ask is busy right now. Try again in a minute."
 FAILED_MESSAGE = "Something went wrong while answering. Try again."
 _BUSY_MARKERS = ("429", "RESOURCE_EXHAUSTED", "ResourceExhausted", "quota")
 
-
-# Plain defs (not async): the pipeline blocks on Postgres and Gemini, so FastAPI
-# runs it in its threadpool instead of stalling the event loop.
 FORMATS = {
     "pdf": (pdf, "application/pdf", "pdf"),
     "docx": (docx, "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "docx"),
@@ -57,6 +48,8 @@ VOICE_FAILED = "Your recording couldn't be read just now. Try again, or type you
 VOICE_NOT_AUDIO = "That recording couldn't be played. Try again, or type your question."
 
 
+# Plain defs (not async): the pipeline blocks on Postgres and Gemini, so FastAPI
+# runs it in its threadpool instead of stalling the event loop.
 @router.post("/ask", response_model=AskResponse)
 def ask(request: AskRequest) -> AskResponse:
     result = answer_question(request.question, languages=True)
@@ -68,7 +61,7 @@ def ask(request: AskRequest) -> AskResponse:
 
 
 def error_message(error: Exception) -> str:
-    """What to tell the reader: busy (rate limited) or a plain failure; never internals."""
+    """Never internals."""
     text = f"{type(error).__name__} {error}"
     return BUSY_MESSAGE if any(marker in text for marker in _BUSY_MARKERS) else FAILED_MESSAGE
 
@@ -78,7 +71,7 @@ def _line(event: dict[str, object]) -> str:
 
 
 def _signed(question: str, event: dict[str, Any], seen: dict[str, Any]) -> dict[str, Any]:
-    """The final event with the answer's export view: the sources and figures sent earlier, marked as cited."""
+    """The done event carries the export view, built from the sources and figures sent earlier."""
     if event["type"] == "sources":
         seen.update(sources=event["sources"], figures=event["figures"])
     if event["type"] != "done":
@@ -92,7 +85,7 @@ def _signed(question: str, event: dict[str, Any], seen: dict[str, Any]) -> dict[
 
 
 def ndjson_events(question: str) -> Iterator[str]:
-    """The stream's lines. A failure mid-answer ends it with an error event, not a broken stream."""
+    """A failure mid-answer ends the stream with an error event, not a broken stream."""
     seen: dict[str, Any] = {}
     try:
         for event in stream_answer(question, languages=True):

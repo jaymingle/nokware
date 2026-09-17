@@ -55,7 +55,6 @@ class Screening:
 
 
 def personal_data(text: str) -> str | None:
-    """What kind of personal data the text holds, if any."""
     return next((kind for kind, pattern in _PERSONAL_DATA if pattern.search(text)), None)
 
 
@@ -76,7 +75,7 @@ def _private_person(text: str) -> str | None:
 
 
 def hard_stop(title: str, body: str) -> str | None:
-    """Why the petition can't go as written, if it can't: checked on the draft and again when it is sent."""
+    """Checked on the draft and again when it is sent."""
     text = f"{title}\n\n{body}"
     if suggests_danger_to_a_person(text):
         return SAFETY_STOP

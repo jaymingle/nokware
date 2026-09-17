@@ -1,26 +1,11 @@
-"""Budget figures for Ask: the same kind of question as the live report counts, over rows read from the documents.
+"""Budget figures for Ask: the same shape of question as the live report counts, over rows read from the documents.
 
-The live figures answer "how many reports, broken down how". These answer "how
-much was approved, broken down how" — by year, department, programme,
-sub-programme, fund source or kind of spending, filtered on any of the same
-things. A comparison is two calls: approved for Waste Management in 2022 and in
-2026, or approved by department this year against last. Nothing here is special
-to budgets as a topic; it is the same shape of question over a different set of
-rows, which is what lets one answer compare the two.
+- A year that isn't in app/data/budget_lines.json is said to be missing, never approximated from the years that are.
+- Each figure says what share of its document's own stated total the rows cover, so any share is against a stated
+  base.
+- Totals never cross documents.
 
-What it will not do:
-
-- **Invent a year.** Only the years in app/data/budget_lines.json exist (the
-  Ledger holds no 2024 or 2025 budget), and a question about a year that isn't
-  there is told so, not approximated from the years that are.
-- **Hide what was left out.** Each figure says which document it comes from and
-  what share of that document's own stated total the rows cover, so a share
-  anyone takes is against a stated base.
-- **Add across documents.** Each row belongs to one document, and totals are
-  only ever within what that document details.
-
-These are approved amounts. Released and actual spending are not in these
-documents, and a question about them is answered as not available.
+These are approved amounts: released and actual spending aren't in the documents.
 """
 
 import json
@@ -80,8 +65,6 @@ class BudgetFigures(BaseModel):
 
 @dataclass(frozen=True)
 class BudgetFigure:
-    """One budget amount as a citable source: what it covers, the amount, and the document it is printed in."""
-
     label: str
     description: str
     value: str
@@ -127,7 +110,7 @@ def _breakdown(found: list[dict[str, Any]], group_by: Grouping) -> list[tuple[st
 
 
 def figure(call: BudgetFigures, label: str) -> BudgetFigure | None:
-    """One budget figure, or None where Nokware holds nothing that answers it: a gap is said, never estimated."""
+    """None where Nokware holds nothing that answers it: a gap is said, never estimated."""
     document = document_for(call.year)
     found = _matching(call)
     if not document or not found:
@@ -147,7 +130,6 @@ def figure(call: BudgetFigures, label: str) -> BudgetFigure | None:
 
 
 def context(found: BudgetFigure) -> str:
-    """How a budget figure is put to the model: a source in its own right, and plainly a document's figure."""
     lines = [f"[{found.label}] Approved budget figures, read from {found.document_title} ({found.year}).",
              f"{found.description}: {found.value}."]
     if found.rows:

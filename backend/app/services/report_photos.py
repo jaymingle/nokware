@@ -55,7 +55,6 @@ def _open(data: bytes, position: int) -> Image.Image:
 
 
 def clean_photo(data: bytes, position: int = 1) -> CleanPhoto:
-    """The photo as a fresh JPEG of its pixels only: upright, at most 2048px, with no metadata."""
     with _open(data, position) as image:
         try:
             upright = ImageOps.exif_transpose(image).convert("RGB")
@@ -76,7 +75,6 @@ def clean_photos(photos: list[bytes]) -> list[CleanPhoto]:
 
 
 def store_photos(case_id: str, photos: list[CleanPhoto]) -> list[str]:
-    """Upload cleaned photos under the case; returns their object names."""
     bucket = get_settings().minio_photos_bucket
     names = []
     for position, photo in enumerate(photos, start=1):
@@ -87,7 +85,6 @@ def store_photos(case_id: str, photos: list[CleanPhoto]) -> list[str]:
 
 
 def photo_link(object_name: str) -> str:
-    """A short-lived link to one photo, for a case's recipients only."""
     return get_minio().presigned_get_object(
         get_settings().minio_photos_bucket, object_name, expires=timedelta(seconds=PHOTO_LINK_SECONDS)
     )

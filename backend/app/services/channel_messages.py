@@ -15,7 +15,6 @@ logger = logging.getLogger(__name__)
 
 
 def send_sms(to: str, text: str) -> bool:
-    """Send one SMS; True if the provider took it."""
     provider = provider_for(NotificationChannel.SMS)
     if provider is None:
         logger.info("SMS to %s not sent: no provider is configured", masked(to))

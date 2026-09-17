@@ -1,24 +1,12 @@
 """Ask: answer a question from the Ledger with verifiable citations.
 
-Retrieval (hybrid, edition-aware, de-duplicated) supplies up to eight chunks.
-Each document is shown to gemini-2.5-flash under a short label ([S1], [S2], ...)
-with its title, year, department and source type; raw document ids never appear
-in the prompt. The model cites labels, and sanitize_citations() drops any label
-that does not map to a retrieved document. The answer and its labelled sources
-are returned together, so every citation resolves to a real document.
+Raw document ids never appear in the prompt: the model cites short labels ([S1]), and sanitize_citations() drops
+any label that doesn't map to a retrieved document, so every citation resolves to a real document.
 
-Years come from ``documentYear`` (the year of the document itself), never
-``publishedAt``, which is when the document was added to the Ledger.
+Years come from ``documentYear`` (the year of the document itself), never ``publishedAt``, which is when the
+document was added to the Ledger.
 
-A question about reports residents have filed also gets live figures
-(ask_figures.py), counted while retrieval runs. Each figure is a source under an
-R label ([R1]) beside the documents, and the model is told to say when a figure
-is live report data rather than a document. Personal-safety figures are never
-given: the answer says so in fixed words.
-
-answer_question() returns the whole answer at once; stream_answer() yields the
-same pipeline's progress as events (searching, the sources found, the answer
-text as it is written, then the checked answer), so a reader sees it working.
+Live report figures ([R1]) are kept apart from documents, and personal-safety figures are never given.
 """
 
 from collections.abc import Iterator
@@ -116,8 +104,6 @@ _PROMPT = ChatPromptTemplate.from_messages(
 
 
 class AnswerLength(StrEnum):
-    """How long an answer may be: in full on the web, shorter in a chat, a sentence or two by SMS."""
-
     WEB = "web"
     CHAT = "chat"
     SMS = "sms"
@@ -185,8 +171,6 @@ class RagAnswer(TypedDict):
 
 @dataclass(frozen=True)
 class Prepared:
-    """A question with its retrieved chunks, each document under its citation label."""
-
     question: str
     chunks: list[RetrievedChunk]
     labels: dict[str, str]  # {document_id: "S1", ...}
@@ -195,12 +179,10 @@ class Prepared:
 
     @property
     def has_sources(self) -> bool:
-        """Whether there is anything to answer from: passages, live counts, budget figures, or a gap to explain."""
         return bool(self.chunks or self.figures.figures or self.figures.budget or self.figures.budget_missing)
 
 
 def _assign_labels(chunks: list[RetrievedChunk]) -> dict[str, str]:
-    """One label per document, numbered in retrieval order: {document_id: "S1", ...}."""
     labels: dict[str, str] = {}
     for retrieved in chunks:
         labels.setdefault(retrieved.chunk.document_id, make_label(len(labels) + 1))
@@ -288,12 +270,10 @@ def _to_sources(chunks: list[RetrievedChunk], labels: dict[str, str], cited: set
 
 
 def answer_status(answer: str) -> AnswerStatus:
-    """Whether the Ledger answered, from the fixed no-information reply the model is told to give."""
     return "no_information" if answer.strip().startswith(NO_INFO_ANSWER) else "answered"
 
 
 def prepare(question: str) -> Prepared:
-    """Retrieve documents and, while that runs, count any live figures the question needs."""
     with ThreadPoolExecutor(max_workers=1) as pool:
         planned = pool.submit(plan_figures, question, utc_now())
         retrieval = retrieve(question)
@@ -317,7 +297,6 @@ def _prompt_input(prepared: Prepared, length: AnswerLength = AnswerLength.WEB) -
 
 
 def _budget_gap(prepared: Prepared) -> str:
-    """What the resident asked for that Nokware holds no budget figures for: said plainly, never filled in."""
     missing = prepared.figures.budget_missing
     if not missing:
         return ""
@@ -334,10 +313,10 @@ BODY = "\x00body"  # where the answer itself goes among the fixed sentences arou
 
 def _notices(body: str, prepared: Prepared, question: str, chart: ChartDict | None, note: str | None,
              figures: list[FigureSource]) -> list[list[str]]:
-    """The answer as paragraphs of catalogue keys around BODY, so each language writes its own fixed sentences.
+    """Paragraphs of catalogue keys around BODY, so each language writes its own fixed sentences.
 
-    Nokware's safety figures are refused whatever else is said: the refusal covers its own report counts, which
-    could identify a person, never AMA's documents, which are public and downloadable by anyone.
+    The safety refusal covers Nokware's own report counts, which could identify a person, never AMA's documents,
+    which are public.
     """
     answered = answer_status(body) == "answered"
     if prepared.figures.safety_asked and SAFETY_FIGURES_ANSWER not in body:
@@ -353,21 +332,18 @@ def _notices(body: str, prepared: Prepared, question: str, chart: ChartDict | No
 
 
 def _written(paragraphs: list[list[str]], body: str, language: Language) -> str:
-    """The answer in one language: the body as written, every fixed sentence from the catalogue."""
     return "\n\n".join(" ".join(body if part == BODY else phrase(part, language) for part in paragraph)
                         for paragraph in paragraphs)
 
 
 def _from_documents(prepared: Prepared, answer: str, sources: list[Source]) -> ChartDict | None:
-    """A chart of the figures in the cited passages, drawn only where each one is proved against them."""
+    """Drawn only where each figure is proved against the cited passages."""
     passages = [source["chunk_text"] for source in sources if source["cited"]]
     plotted = figures_to_chart(prepared.question, answer, passages) if passages else None
     return document_chart(prepared.question, plotted) if plotted else None
 
 
 def finish(prepared: Prepared, raw_answer: str, asked: Asked | None = None) -> RagAnswer:
-    """The checked answer: only real citations kept, sources and figures marked cited or not, any chart, and —
-    where the question wasn't in English — the answer in the language it was asked in, if every figure survives."""
     valid = (set(prepared.labels.values()) | {f.label for f in prepared.figures.figures}
              | {f.label for f in prepared.figures.budget})
     body, cited = sanitize_citations(raw_answer if prepared.has_sources else NO_INFO_ANSWER, valid)
@@ -395,7 +371,7 @@ def finish(prepared: Prepared, raw_answer: str, asked: Asked | None = None) -> R
 
 def _in_the_language_asked(paragraphs: list[list[str]], body: str, in_english: str,
                            asked: Asked | None) -> tuple[str, Language, bool]:
-    """The answer to show: the language asked for where every figure and citation survived, the English otherwise."""
+    """English unless every figure and citation survived translation."""
     if asked is None or not asked.translated:
         return in_english, Language.ENGLISH, False
     if answer_status(body) == "no_information":  # the body is a fixed sentence: the catalogue has it already
@@ -407,11 +383,8 @@ def _in_the_language_asked(paragraphs: list[list[str]], body: str, in_english: s
 
 
 def answer_question(question: str, length: AnswerLength = AnswerLength.WEB, languages: bool = False) -> RagAnswer:
-    """Answer from the Ledger, at the length the channel allows. Every [S#] left maps to a returned source.
-
-    With languages on (the web), a question in French or Twi is answered in that language: it is read into English
-    first, so every rule in the pipeline still applies, and the answer is translated back only if its figures and
-    citations survive. The channels answer in English, as they always have.
+    """A French or Twi question is read into English first, so every rule in the pipeline still applies, and
+    translated back only if its figures and citations survive. The channels answer in English.
     """
     asked = read_question(question) if languages else None
     prepared = prepare(asked.english if asked else question)
@@ -421,11 +394,8 @@ def answer_question(question: str, length: AnswerLength = AnswerLength.WEB, lang
 
 
 def stream_answer(question: str, languages: bool = False) -> Iterator[dict[str, Any]]:
-    """The answer as events: stage, sources, deltas of raw text, then the checked answer.
-
-    Deltas are the model's raw text, shown while it writes; the final "done"
-    event carries the sanitized answer that replaces them, so a citation the
-    checker removes never survives.
+    """Deltas are the model's raw text; the final "done" event carries the sanitized answer that replaces them,
+    so a citation the checker removes never survives.
     """
     asked = read_question(question) if languages else None
     english_question = asked.english if asked else question

@@ -1,4 +1,4 @@
-"""A citizen report's lifecycle, and who may see what: pure functions, unit-tested.
+"""A citizen report's lifecycle, and who may see what.
 
 A case has one assignment per recipient (two for some personal-safety cases).
 Each recipient acknowledges and resolves its own assignment; the case is
@@ -27,8 +27,7 @@ from app.teams import RECIPIENT_NAMES
 ESCALATION_WINDOW = timedelta(days=14)
 CONTACT_RETENTION = timedelta(days=30)  # after the case closes, the citizen's numbers are deleted
 SMALL_COUNT = 5  # personal-safety counts below this are never shown as numbers
-# Who a personal-safety case can be moved between: never a department that has no
-# business with it.
+# Never a department that has no business with a personal-safety case.
 SAFETY_RECIPIENTS = frozenset({POLICE, SOCIAL_WELFARE})
 
 
@@ -46,12 +45,7 @@ class AssignmentStatus(StrEnum):
     RESOLVED = "resolved"
 
 
-def _now(now: datetime) -> str:
-    return now.isoformat()
-
-
 def case_status(assignments: list[dict[str, Any]]) -> CaseStatus:
-    """The case's status from its active assignments: resolved only when all are."""
     statuses = {a["status"] for a in assignments if a.get("active", True)}
     if not statuses:
         return CaseStatus.SUBMITTED
@@ -71,7 +65,6 @@ class CaseAction(StrEnum):
 
 
 def assignment_for(principal: Principal, assignments: list[dict[str, Any]]) -> dict[str, Any] | None:
-    """The caller's own active assignment on a case, if any."""
     return next(
         (a for a in assignments if a.get("active", True) and principal.recipient and a["recipient"] == principal.recipient),
         None,
@@ -93,7 +86,7 @@ def allowed_case_actions(principal: Principal, case: dict[str, Any], assignments
 
 
 def reassign_targets(case: dict[str, Any]) -> list[str]:
-    """Where the MCE could move a part of the case: anyone it isn't with, only safety services for personal safety."""
+    """Only safety services for personal safety."""
     allowed = SAFETY_RECIPIENTS if case.get("category") == Category.PERSONAL_SAFETY else RECIPIENT_NAMES
     current = set(case.get("recipients") or [])
     return [recipient for recipient in allowed if recipient not in current]
@@ -107,29 +100,26 @@ def _own_assignment(principal: Principal, assignment: dict[str, Any]) -> None:
 
 
 def acknowledge(principal: Principal, assignment: dict[str, Any], now: datetime) -> dict[str, Any]:
-    """A recipient starts work: its assignment moves to in progress."""
     _own_assignment(principal, assignment)
     if assignment["status"] != AssignmentStatus.ASSIGNED:
         raise WrongState("Work on this case has already started.")
-    return {"status": AssignmentStatus.IN_PROGRESS.value, "acknowledgedAt": _now(now)}
+    return {"status": AssignmentStatus.IN_PROGRESS.value, "acknowledgedAt": now.isoformat()}
 
 
 def resolve(principal: Principal, assignment: dict[str, Any], note: str | None, now: datetime) -> dict[str, Any]:
-    """A recipient finishes its part, saying what was done."""
     _own_assignment(principal, assignment)
     if assignment["status"] == AssignmentStatus.RESOLVED:
         raise WrongState("This case is already resolved.")
     if not note:
         raise MissingInput("Say what was done, for the citizen and the record.")
-    return {"status": AssignmentStatus.RESOLVED.value, "resolvedAt": _now(now), "resolutionNote": note}
+    return {"status": AssignmentStatus.RESOLVED.value, "resolvedAt": now.isoformat(), "resolutionNote": note}
 
 
 def after_assignments_change(case: dict[str, Any], assignments: list[dict[str, Any]], now: datetime) -> dict[str, Any]:
-    """The case's own fields once its assignments have changed."""
     status = case_status(assignments)
     changes: dict[str, Any] = {"status": status.value}
     if status == CaseStatus.RESOLVED and case.get("status") != CaseStatus.RESOLVED:
-        changes["resolvedAt"] = _now(now)
+        changes["resolvedAt"] = now.isoformat()
     return changes
 
 
@@ -144,14 +134,13 @@ def escalation_open(case: dict[str, Any], now: datetime) -> bool:
 
 
 def escalate(case: dict[str, Any], note: str | None, now: datetime) -> dict[str, Any]:
-    """The citizen, unsatisfied with the resolution, sends the case to the MCE. Once only."""
     if case.get("escalatedAt"):
         raise WrongState("This case has already been escalated once.")
     if not escalation_open(case, now):
         raise WrongState("A case can be escalated only within 14 days of being resolved.")
     if not note:
         raise MissingInput("Say what is still wrong.")
-    return {"status": CaseStatus.ESCALATED.value, "escalatedAt": _now(now), "escalationNote": note}
+    return {"status": CaseStatus.ESCALATED.value, "escalatedAt": now.isoformat(), "escalationNote": note}
 
 
 def _mce(principal: Principal) -> None:
@@ -166,7 +155,6 @@ class Reassignment:
 
 
 def check_reassign(principal: Principal, case: dict[str, Any], move: Reassignment, reason: str | None) -> None:
-    """Whether the MCE may move one of the case's assignments to another recipient."""
     _mce(principal)
     if case.get("status") == CaseStatus.RESOLVED:
         raise WrongState("A resolved case can't be reassigned; the citizen can escalate it.")
@@ -182,17 +170,15 @@ def check_reassign(principal: Principal, case: dict[str, Any], move: Reassignmen
 
 
 def confirm_resolution(principal: Principal, case: dict[str, Any], note: str | None, now: datetime) -> dict[str, Any]:
-    """The MCE upholds the resolution of an escalated case. The case then closes."""
     _mce(principal)
     if case.get("status") != CaseStatus.ESCALATED:
         raise WrongState("Only an escalated case can be confirmed as resolved.")
     if not note:
         raise MissingInput("Say why the resolution stands, for the citizen and the record.")
-    return {"status": CaseStatus.RESOLVED.value, "resolvedAt": _now(now)}
+    return {"status": CaseStatus.RESOLVED.value, "resolvedAt": now.isoformat()}
 
 
 def reopen(principal: Principal, case: dict[str, Any], note: str | None) -> None:
-    """Whether the MCE may send an escalated case back to its recipients to finish the work."""
     _mce(principal)
     if case.get("status") != CaseStatus.ESCALATED:
         raise WrongState("Only an escalated case can be reopened.")
@@ -201,7 +187,7 @@ def reopen(principal: Principal, case: dict[str, Any], note: str | None) -> None
 
 
 def reopened_assignment() -> dict[str, Any]:
-    """An assignment sent back to work; its earlier resolution stays in the audit trail."""
+    """The earlier resolution stays in the audit trail."""
     return {"status": AssignmentStatus.ASSIGNED.value, "acknowledgedAt": None, "resolvedAt": None, "resolutionNote": None}
 
 
@@ -214,7 +200,6 @@ def closes_at(case: dict[str, Any]) -> datetime | None:
 
 
 def contact_purge_at(case: dict[str, Any]) -> datetime | None:
-    """When the citizen's phone numbers are deleted: 30 days after the case closes."""
     closed = closes_at(case)
     return closed + CONTACT_RETENTION if closed else None
 
@@ -226,7 +211,6 @@ class CaseView(StrEnum):
 
 
 def case_view(principal: Principal, case: dict[str, Any]) -> CaseView:
-    """What a signed-in user may see of a case: its recipients see it all; the MCE oversees."""
     if principal.recipient is not None and principal.recipient in (case.get("recipients") or []):
         return CaseView.FULL
     if principal.role == Role.MCE:
@@ -240,5 +224,4 @@ def may_see_contact(principal: Principal, case: dict[str, Any], contact: dict[st
 
 
 def shown_count(count: int) -> int | None:
-    """A personal-safety count as it may be shown: None ("fewer than 5") below the threshold."""
     return count if count >= SMALL_COUNT else None

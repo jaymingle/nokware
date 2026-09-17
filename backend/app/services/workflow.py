@@ -1,7 +1,6 @@
 """The portal's rules: who may do what to a Ledger document, and what changes.
 
-Pure functions over a document record and a Principal, with no Appwrite calls,
-so every rule is unit-tested and the routes cannot drift from each other.
+No Appwrite calls, so every rule is unit-tested and the routes can't drift from each other.
 
 Lifecycle:
   department upload  -> published
@@ -92,7 +91,6 @@ class Transition:
 
 
 def owns(principal: Principal, document: dict[str, Any]) -> bool:
-    """Whether the document is the principal's to act on in their role."""
     if principal.role == Role.DEPARTMENT:
         return document.get("department") == principal.department
     if principal.role == Role.CONTRIBUTOR:
@@ -110,7 +108,6 @@ def clock_expired(document: dict[str, Any], now: datetime) -> bool:
 
 
 def check(action: Action, document: dict[str, Any], principal: Principal, now: datetime) -> Rule:
-    """The action's rule if the principal may take it now; raises WorkflowError otherwise."""
     rule = RULES[action]
     if principal.role != rule.role or not owns(principal, document):
         raise NotAllowed("You can't take this action on this document.")
@@ -149,7 +146,6 @@ def transition(
     note: str | None = None,
     file_id: str | None = None,
 ) -> Transition:
-    """What taking the action changes. Raises WorkflowError if it isn't allowed."""
     rule = check(action, document, principal, now)
     if rule.needs_note and not note:
         raise MissingInput(f"Give {_NOTE_NAMES[action]}.")
@@ -184,8 +180,7 @@ def _changes(
         }
     if action == Action.ESCALATE:
         return {"escalatedToMce": True, "contributorResponse": note, "heldUntil": (now + MCE_WINDOW).isoformat()}
-    # Resubmit: the new file goes back to the department on a fresh clock. The
-    # earlier dispute stays on the record so the department can see it.
+    # Resubmit. The earlier dispute stays on the record so the department can see it.
     return {
         "status": LedgerStatus.HELD.value,
         "fileId": file_id,
@@ -196,7 +191,6 @@ def _changes(
 
 
 def expiry(document: dict[str, Any], now: datetime) -> Transition | None:
-    """The automatic publication due for a document whose clock ran out, if any."""
     status = document.get("status")
     on_clock = status == LedgerStatus.HELD or (status == LedgerStatus.DISPUTED and document.get("escalatedToMce"))
     if not on_clock or not clock_expired(document, now):
@@ -216,7 +210,6 @@ class Submission:
 
 
 def new_document(principal: Principal, submission: Submission, file_id: str, now: datetime) -> dict[str, Any]:
-    """The attributes of a new upload. Raises WorkflowError if the role can't upload it."""
     common = {
         "title": submission.title,
         "category": submission.category,

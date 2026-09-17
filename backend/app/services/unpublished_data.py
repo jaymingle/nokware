@@ -1,15 +1,8 @@
 """Things the public record would need to answer an ordinary question, that nobody publishes at all.
 
-The publishing record asks whether a document the Assembly should publish
-exists. "Figures that stop" asks whether a figure a document once gave is still
-being given. This asks a third question, and it is the one the map of Accra's
-electoral areas ran into: the thing was never published by anyone, so there is
-no document to look for and no figure to go stale.
-
-Each finding in app/data/unpublished_data.json names every source that was
-checked and what it holds instead, with the date, so a reader can repeat the
-search. A finding says what could not be found; it never says the Assembly broke
-a duty.
+Unlike the publishing record and "figures that stop", there is no document to look for and no figure to go stale.
+Each finding names every source checked, with the date, so a reader can repeat the search. A finding says what could
+not be found; it never says the Assembly broke a duty.
 """
 
 import json

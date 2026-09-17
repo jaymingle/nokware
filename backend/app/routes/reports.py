@@ -1,11 +1,4 @@
-"""Citizen reports: public routes, no sign-in. Rate-limited per client address.
-
-    GET  /api/reports/options                 wards, sub-metros and personal-safety types for the form
-    POST /api/reports                         file a report (multipart: fields plus up to 10 photos)
-    GET  /api/reports/{reference}             follow a case by its reference (or case ID)
-    POST /api/reports/{reference}/escalate    escalate a resolved case to the MCE, once, within 14 days
-    POST /api/reports/{reference}/preferences answer the messages question after a safety reclassification
-"""
+"""Citizen reports: public routes, no sign-in. Rate-limited per client address."""
 
 from typing import Annotated, Any
 

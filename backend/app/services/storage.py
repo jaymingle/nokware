@@ -1,9 +1,4 @@
-"""MinIO object storage client and typed helpers.
-
-Wraps a cached ``minio.Minio`` client. Ledger files and report photos live in
-separate buckets (configured via settings). Object names are prefixed with a
-random UUID to avoid collisions while preserving the original filename.
-"""
+"""MinIO object storage. Ledger files and report photos live in separate buckets."""
 
 import io
 import mimetypes
@@ -25,11 +20,7 @@ MINIO_REGION = "us-east-1"
 
 
 def _parse_endpoint(raw: str) -> tuple[str, bool]:
-    """Split an endpoint into (host[:port], secure) as minio.Minio expects.
-
-    Accepts a bare hostname ("s3.example.com", HTTPS on 443) or a URL with an
-    http:// or https:// scheme. Bare hostnames default to secure=True.
-    """
+    """A bare hostname ("s3.example.com") means HTTPS."""
     if raw.startswith("https://"):
         return raw[len("https://"):].rstrip("/"), True
     if raw.startswith("http://"):
@@ -71,13 +62,9 @@ def _upload(bucket: str, file_bytes: bytes, filename: str, object_name: str | No
 
 
 def upload_ledger_file(file_bytes: bytes, filename: str, object_name: str | None = None) -> str:
-    """Upload a ledger document; returns its object id (name in the bucket).
-
-    Pass object_name for a stable name (e.g. derived from a content hash) so
-    repeated uploads of the same file land on the same object.
-    """
-    settings = get_settings()
-    return _upload(settings.minio_ledger_bucket, file_bytes, filename, object_name)
+    """Returns the object name. Pass a stable object_name (e.g. a content hash) so repeated uploads of the same file
+    land on the same object."""
+    return _upload(get_settings().minio_ledger_bucket, file_bytes, filename, object_name)
 
 
 def download_ledger_file(file_id: str) -> bytes:
@@ -99,13 +86,9 @@ def ledger_file_exists(file_id: str) -> bool:
     return True
 
 
-def get_ledger_file_url(
-    file_id: str, expires: int = DEFAULT_URL_EXPIRY_SECONDS
-) -> str:
-    """Return a presigned GET URL for a ledger file, valid ``expires`` seconds."""
-    settings = get_settings()
+def get_ledger_file_url(file_id: str, expires: int = DEFAULT_URL_EXPIRY_SECONDS) -> str:
     return get_minio().presigned_get_object(
-        bucket_name=settings.minio_ledger_bucket,
+        bucket_name=get_settings().minio_ledger_bucket,
         object_name=file_id,
         expires=timedelta(seconds=expires),
     )

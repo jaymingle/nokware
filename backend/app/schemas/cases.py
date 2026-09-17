@@ -18,7 +18,7 @@ class CaseSummary(BaseModel):
     view: CaseViewName  # "oversight": no description, photos, place, topic or contact
     topic: str  # the topic's label; "Personal safety" in an outline
     severity: int
-    status: str  # the case's status
+    status: str
     my_status: str | None  # the caller's own assignment status, for a recipient
     place: str | None  # "Mudor, Ashiedu Keteke"; only a sub-metro, or none, for personal safety
     excerpt: str | None  # the description's opening words

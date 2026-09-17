@@ -17,9 +17,9 @@ SOURCE_URL_MAX = 2048  # size of the sourceUrl attribute
 
 def _blank_to_none(value: Any) -> Any:
     """Empty form fields arrive as ""; treat them as not given."""
-    if isinstance(value, str) and not value.strip():
-        return None
-    return value.strip() if isinstance(value, str) else value
+    if isinstance(value, str):
+        return value.strip() or None
+    return value
 
 
 OptionalText = Annotated[str | None, BeforeValidator(_blank_to_none)]

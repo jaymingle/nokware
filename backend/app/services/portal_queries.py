@@ -39,16 +39,12 @@ def load_visible(principal: Principal, document_id: str) -> dict[str, Any]:
 
 
 def file_link(principal: Principal, document_id: str) -> str:
-    """A short-lived link to the document's current PDF."""
     return get_ledger_file_url(load_visible(principal, document_id)["fileId"], expires=FILE_LINK_SECONDS)
 
 
 def public_file_link(document_id: str) -> str:
-    """A short-lived link to a published document's PDF, for anyone.
-
-    Anything unpublished is reported as not found, so the public can't learn
-    that a held, disputed or withdrawn document exists.
-    """
+    """Anything unpublished is reported as not found, so the public can't learn that a held, disputed or withdrawn
+    document exists."""
     document = load(document_id)
     if document.get("status") != LedgerStatus.PUBLISHED:
         raise DocumentNotFound(document_id)
@@ -56,7 +52,6 @@ def public_file_link(document_id: str) -> str:
 
 
 def review_queue(principal: Principal) -> list[dict[str, Any]]:
-    """The department's held documents, most urgent first, then its open disputes."""
     records, _ = ledger_documents.list_documents(
         [
             Query.equal("department", principal.department),
@@ -72,7 +67,6 @@ def _urgency(record: dict[str, Any]) -> tuple[bool, datetime]:
 
 
 def library(principal: Principal, limit: int, offset: int) -> tuple[list[dict[str, Any]], int]:
-    """The department's published documents, newest first."""
     return ledger_documents.list_documents(
         [
             Query.equal("department", principal.department),
@@ -85,7 +79,6 @@ def library(principal: Principal, limit: int, offset: int) -> tuple[list[dict[st
 
 
 def submissions(principal: Principal) -> list[dict[str, Any]]:
-    """Everything the contributor has submitted, newest first."""
     records, _ = ledger_documents.list_documents(
         [Query.equal("uploadedBy", principal.user_id), Query.order_desc("$createdAt"), Query.limit(QUEUE_LIMIT)]
     )
@@ -93,7 +86,6 @@ def submissions(principal: Principal) -> list[dict[str, Any]]:
 
 
 def escalations() -> list[dict[str, Any]]:
-    """Disputes escalated to the MCE, soonest deadline first."""
     records, _ = ledger_documents.list_documents(
         [
             Query.equal("status", LedgerStatus.DISPUTED.value),
@@ -106,7 +98,6 @@ def escalations() -> list[dict[str, Any]]:
 
 
 def display_names(user_ids: Iterable[str | None]) -> dict[str, str]:
-    """Display names for user IDs, fetched in one call and then remembered."""
     wanted = {user_id for user_id in user_ids if user_id}
     missing = sorted(wanted - _names.keys())
     if missing:

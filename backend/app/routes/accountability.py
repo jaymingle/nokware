@@ -1,10 +1,4 @@
-"""Accountability: what the Assembly publishes, and how its departments respond. Public, no sign-in.
-
-    GET /api/publishing-record   the documents it is required to publish, against what the Ledger holds, by year,
-                                 with the figures its documents once reported and haven't since, and the things
-                                 nobody publishes at all
-    GET /api/responsiveness      each department's handling of reports and contributors' documents, last 12 months
-"""
+"""Accountability: what the Assembly publishes, and how its departments respond. Public, no sign-in."""
 
 from dataclasses import asdict
 
