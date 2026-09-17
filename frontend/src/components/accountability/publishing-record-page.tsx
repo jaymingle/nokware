@@ -98,10 +98,9 @@ function Row({ requirement, years, selected, onSelect }: { requirement: RecordRe
 }
 
 /**
- * How a group stands, beside its name. Four tables of identical marks look
- * alike at a glance, so a group that is almost entirely "not found" read the
- * same as one that is almost entirely held — and that contrast is the argument
- * the page exists to make.
+ * Four tables of identical marks look alike at a glance, so a group almost
+ * entirely "not found" read the same as one almost entirely held, and that
+ * contrast is the argument the page exists to make.
  */
 function GroupTally({ group }: { group: PublishingRecord["groups"][number] }) {
   const periods = group.requirements.flatMap((requirement) => requirement.periods);
@@ -175,11 +174,9 @@ function HowToRead({ record }: { record: PublishingRecord }) {
 }
 
 /**
- * The finding of the whole page, at the size of a finding.
- *
- * It read as a sentence of body text, which is the wrong weight for the one
- * number a reader should leave with. Each count keeps its mark and its words,
- * so nothing here is carried by colour alone.
+ * Large, because as body text it was the wrong weight for the one number a
+ * reader should leave with. Each count keeps its mark and its words, so nothing
+ * is carried by colour alone.
  */
 function Summary({ record }: { record: PublishingRecord }) {
   const { due, held, related, missing } = record.summary;
@@ -209,7 +206,6 @@ function Summary({ record }: { record: PublishingRecord }) {
   );
 }
 
-/** What the Assembly is required to publish, against what The Ledger holds, by year. */
 export function PublishingRecordPage() {
   const record = usePublishingRecord();
   const [selected, setSelected] = useState<Selected>(null);

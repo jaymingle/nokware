@@ -88,7 +88,7 @@ function Figures({ figures }: { figures: Dashboard }) {
   );
 }
 
-/** The public dashboard: counts and trends only. Personal-safety reports are in none of them. */
+/** Personal-safety reports are in none of these counts. */
 export function DashboardPage() {
   const dashboard = useDashboard();
   return (

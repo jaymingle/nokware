@@ -11,7 +11,6 @@ type Search = Promise<{ [key: string]: string | string[] | undefined }>;
 
 const ISSUE_ID = /^[a-z0-9]{6,20}$/;
 
-/** An issue linked from the issue list, if the address carries one that could be an issue's public ID. */
 function issueFrom(value: string | string[] | undefined): string | null {
   const one = Array.isArray(value) ? value[0] : value;
   return one && ISSUE_ID.test(one) ? one : null;

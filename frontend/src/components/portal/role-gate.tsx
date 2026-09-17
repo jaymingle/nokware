@@ -8,7 +8,6 @@ import { ROLE_HOME } from "@/lib/portal/navigation";
 
 import type { Role } from "@/lib/api/types";
 
-/** Renders a role's pages only for that role; anyone else is sent to their own home. */
 export function RoleGate({ role, children }: { role: Role; children: ReactNode }) {
   const me = useMe();
   const router = useRouter();
@@ -19,7 +18,7 @@ export function RoleGate({ role, children }: { role: Role; children: ReactNode }
   return allowed ? children : null;
 }
 
-/** /portal itself: send the user to their role's home. */
+/** For /portal itself. */
 export function RoleRedirect() {
   const me = useMe();
   const router = useRouter();

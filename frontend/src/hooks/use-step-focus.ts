@@ -1,13 +1,9 @@
 import { useEffect, useRef, type RefObject } from "react";
 
 /**
- * Carries the focus into a step that has replaced another.
- *
- * Without it the control the person pressed is unmounted and the focus falls
- * to the top of the document: someone filing a report with a keyboard presses
- * "No, it's a problem in my area" and then has to tab through the whole header
- * again to reach the form they just asked for. The first render is left alone,
- * because arriving on the page is not a step.
+ * When a step replaces another, the control the person pressed is unmounted and
+ * focus falls to the top of the document, so a keyboard user has to tab through
+ * the header again. The first render is left alone: arriving is not a step.
  *
  * Give the returned ref to a wrapper with tabIndex={-1} around the step.
  */

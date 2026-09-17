@@ -31,7 +31,6 @@ function DisputeCard({ doc }: { doc: DocumentOut }) {
   );
 }
 
-/** Documents this department disputed that are still open, awaiting the contributor or the MCE. */
 export function OpenDisputes({ documents }: { documents: DocumentOut[] }) {
   return (
     <section aria-labelledby="open-disputes" className="flex flex-col gap-3">

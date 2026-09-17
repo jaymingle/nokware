@@ -24,7 +24,6 @@ type CaseNoteDialogProps = {
   tone?: "primary" | "secondary";
 };
 
-/** A case action that needs a note: resolving, reopening or confirming a resolution. */
 export function CaseNoteDialog({ caseId, action, tone = "primary", ...copy }: CaseNoteDialogProps) {
   const dialog = useCaseDialog(copy.success);
   const testId = `case-${action}-${caseId}`;

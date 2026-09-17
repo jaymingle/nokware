@@ -1,4 +1,4 @@
-/** What to do right now, after the numbers to call: the same steps as WhatsApp and USSD, from the API. */
+/** The steps come from the API, so they match WhatsApp and USSD. */
 export function SafetySteps({ steps, testId }: { steps: string[]; testId: string }) {
   if (steps.length === 0) return null;
   return (

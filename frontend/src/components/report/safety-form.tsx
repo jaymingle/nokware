@@ -27,7 +27,7 @@ function WhoReceives({ type }: { type: SafetyType }) {
   );
 }
 
-/** Someone's safety: the citizen names the danger, so the report goes straight to its services, privately. */
+/** The citizen names the danger, so the report goes straight to its services, privately. */
 export function SafetyForm({ options, onFiled, onBack }: ReportFormProps) {
   const { photos, setPhotos, contact, setContact, submit, filing } = useReportForm(onFiled);
   const [topic, setTopic] = useState("");

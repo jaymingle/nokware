@@ -17,7 +17,6 @@ const ALL = "all";
 
 type FilterProps = { value: string; onChange: (value: string) => void; documents: DocumentOut[] };
 
-/** Every department, with how many of its disputes are waiting on the MCE. */
 function DepartmentFilter({ value, onChange, documents }: FilterProps) {
   const { data: departments } = useDepartments();
   const waiting = (id: string) => documents.filter((doc) => doc.department === id).length;

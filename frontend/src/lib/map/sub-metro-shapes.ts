@@ -1,13 +1,10 @@
 import shapes from "@/lib/map/sub-metros.json";
 
 /**
- * The three AMA sub-metro outlines, projected for drawing.
- *
  * These are the only sub-metro polygons that exist publicly, and they are an
- * OpenStreetMap contributor's tracing, not a boundary the Assembly published —
- * see the source note in sub-metros.json, which every drawing of them repeats.
- * There are no polygons at all for the 20 electoral areas, which is why those
- * are drawn as tiles and never as shapes.
+ * OpenStreetMap contributor's tracing, not a boundary the Assembly published,
+ * so every drawing repeats the source note in sub-metros.json. The 20 electoral
+ * areas have no polygons at all, which is why they are drawn as tiles.
  */
 
 type SubMetroShape = { id: string; name: string; osm_relation: number; rings: number[][][] };
@@ -45,7 +42,6 @@ export function projection(width: number, height: number) {
   ];
 }
 
-/** One sub-metro's rings as an SVG path. */
 export function pathFor(shape: SubMetroShape, project: (point: number[]) => [number, number]): string {
   return shape.rings
     .map((ring) => ring.map((point, i) => `${i === 0 ? "M" : "L"}${project(point).map((n) => n.toFixed(1)).join(",")}`).join("") + "Z")
@@ -78,10 +74,9 @@ function toEdge([x, y]: [number, number], ring: [number, number][]): number {
 }
 
 /**
- * Where a label sits: the point furthest from any edge, found by sampling.
- * The average of a ring's points falls outside an L-shaped one — Ashiedu
- * Keteke's label landed on its neighbour — and a label on the wrong shape says
- * something false about where the reports are.
+ * The point furthest from any edge, not the average of the ring's points: that
+ * falls outside an L-shaped ring (Ashiedu Keteke's label landed on its
+ * neighbour), and a label on the wrong shape misplaces the reports.
  */
 export function labelFor(shape: SubMetroShape, project: (point: number[]) => [number, number]): [number, number] {
   const ring = shape.rings.reduce((widest, next) => (next.length > widest.length ? next : widest)).map(project);

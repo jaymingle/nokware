@@ -2,7 +2,6 @@ import type { ReactNode } from "react";
 
 export type Line = { label: string; value: ReactNode; testId: string };
 
-/** A titled list of figures, label left and value right, with an optional note under it. */
 export function Lines({ title, lines, children }: { title: string; lines: Line[]; children?: ReactNode }) {
   return (
     <div className="flex flex-col gap-1.5">

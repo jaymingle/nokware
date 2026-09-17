@@ -49,7 +49,6 @@ export function Services({ directory }: { directory: ContactDirectory }) {
   );
 }
 
-/** Every number, grouped by service, each with its source. */
 export function DirectoryPage() {
   const directory = useContacts();
   return (

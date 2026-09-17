@@ -5,10 +5,9 @@ export const PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
 export type PhotoLimits = { maxPhotos: number; maxBytes: number };
 
-/** An attached photo and its preview address (an object URL, revoked when the photo is removed). */
+/** url is an object URL, revoked when the photo is removed. */
 export type ReportPhoto = { file: File; url: string };
 
-/** A size limit as people say it: "10 MB". */
 export function limitLabel(bytes: number): string {
   return `${Math.round(bytes / (1024 * 1024))} MB`;
 }
@@ -22,7 +21,6 @@ function photoProblem(file: Pick<File, "name" | "type" | "size">, limits: PhotoL
   return null;
 }
 
-/** Adds the chosen photos to those already attached, keeping only those the API will take. */
 export function addPhotos(current: File[], chosen: File[], limits: PhotoLimits): PhotoPick {
   const problems: string[] = [];
   const photos = [...current];

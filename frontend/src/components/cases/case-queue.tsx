@@ -4,7 +4,6 @@ import { CaseWorkspace } from "@/components/cases/case-workspace";
 import { ErrorPanel, LoadingPanel } from "@/components/documents/panels";
 import { useCaseQueue } from "@/lib/api/queries";
 
-/** A department's or agency's cases: open work most severe and oldest first, then the last 30 days' resolved. */
 export function CaseQueue() {
   const { data, error, isPending, refetch } = useCaseQueue();
   if (isPending) return <LoadingPanel label="Loading your cases…" />;

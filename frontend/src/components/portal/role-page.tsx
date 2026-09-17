@@ -15,7 +15,6 @@ type RolePageProps = {
   children?: ReactNode;
 };
 
-/** A portal page headed by where the user sits (e.g. "Finance") and the page's title. */
 export function RolePage({ title, lead, eyebrow, children }: RolePageProps) {
   const me = useMe();
   return (

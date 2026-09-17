@@ -13,7 +13,6 @@ const PRINCIPLES = [
   },
 ];
 
-/** How the record stays trustworthy, in three lines. */
 export function Principles() {
   return (
     <section aria-labelledby="principles" className="flex flex-col gap-5">

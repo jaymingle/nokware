@@ -43,8 +43,8 @@ function useDraftCheck(draft: DraftState) {
   const ledger = useDraftLedger();
   const [checked, setChecked] = useState<Checked | null>(null);
   const [found, setFound] = useState<Found | null>(null);
+  const key = checkKey(draft);
   const run = async () => {
-    const key = checkKey(draft);
     const words = { title: draft.title, body: draft.body };
     ledger.reset();
     try {
@@ -55,7 +55,6 @@ function useDraftCheck(draft: DraftState) {
       // screen.error or ledger.error says what failed
     }
   };
-  const key = checkKey(draft);
   return {
     run, current: checked?.key === key ? checked : null, matches: found?.key === key ? found.matches : null,
     checking: screen.isPending, searching: ledger.isPending, error: screen.error, ledgerError: ledger.error,
@@ -186,7 +185,6 @@ function Form({ options, issue }: { options: PetitionOptions; issue: string | nu
   );
 }
 
-/** Starting a petition: write it, see what the Ledger holds, choose whether to show a name, confirm a phone, send it. */
 export function NewPetitionPage({ issue }: { issue: string | null }) {
   const mounted = useMounted();
   const options = usePetitionOptions();

@@ -12,7 +12,6 @@ export const FAILED_MESSAGE = "Something went wrong while answering. Try again."
 /** A failure the reader can act on; the message is safe to show. */
 export class AskError extends Error {}
 
-/** Complete lines from a growing buffer, and the unfinished remainder to keep. */
 export function takeLines(buffer: string): { lines: string[]; rest: string } {
   const parts = buffer.split("\n");
   const rest = parts.pop() ?? "";

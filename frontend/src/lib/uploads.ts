@@ -6,7 +6,6 @@ export function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-/** Why a chosen file can't be uploaded, or null if it can. */
 export function pdfProblem(file: Pick<File, "name" | "type" | "size">): string | null {
   const looksLikePdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
   if (!looksLikePdf) return "Choose a PDF file.";

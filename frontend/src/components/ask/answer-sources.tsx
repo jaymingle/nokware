@@ -39,7 +39,6 @@ type AnswerSourcesProps = {
   testIdPrefix: string;
 };
 
-/** The documents the answer cites, then (folded away) the ones it searched but didn't use. */
 export function AnswerSources({ cited, uncited, anchorFor, highlighted, testIdPrefix }: AnswerSourcesProps) {
   return (
     <section aria-label="Sources" className="flex flex-col gap-2.5">

@@ -36,7 +36,7 @@ function foundLabel(turn: Turn): string {
   return counted ? `${documents} and counted ${counted} live ${counted === 1 ? "figure" : "figures"}` : documents;
 }
 
-/** Real progress from the stream: the search (and any counting), what it found, then the writing. */
+/** Real progress, driven by the stream's stages. */
 export function AskProgress({ turn, testId }: { turn: Turn; testId: string }) {
   const searching = turn.stage === "searching" || turn.stage === "counting";
   const translating = turn.stage === "translating";

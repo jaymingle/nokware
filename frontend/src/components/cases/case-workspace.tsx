@@ -16,7 +16,6 @@ type CaseWorkspaceProps = {
   recipients?: Option[];  // given for the MCE: turns on reassignment and the "With" line
 };
 
-/** The design's two-part case screen: the queue, and the selected case beside it (below it on phones). */
 export function CaseWorkspace({ title, cases, empty, toolbar, recipients }: CaseWorkspaceProps) {
   const [selected, setSelected] = useState<string | null>(null);
   function select(caseId: string) {

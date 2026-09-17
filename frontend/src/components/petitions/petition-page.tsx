@@ -147,7 +147,6 @@ function Petition({ petition }: { petition: PetitionDetail }) {
   );
 }
 
-/** One published petition: the ask, its support, what it cites, what The Ledger holds on it, and what has happened. */
 export function PetitionPage({ code }: { code: string }) {
   const petition = usePetition(code);
   if (petition.isPending) return <LoadingPanel label="Loading the petition…" />;

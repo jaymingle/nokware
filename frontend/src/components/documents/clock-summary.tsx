@@ -24,10 +24,6 @@ function closedNote(closed: number): string {
   return ` ${closed} more ${one ? "has" : "have"} run out of time and ${one ? "is" : "are"} being published.`;
 }
 
-/**
- * A queue's headline: how many documents will publish on their own unless
- * the reader acts, and when the next one goes.
- */
 export function ClockSummary({ open, closed, now, unless, consequence, testId }: ClockSummaryProps) {
   const next = open[0]?.held_until;
   if (!next) return null;

@@ -9,10 +9,7 @@ import { EXPORT_FAILED, EXPORT_FORMATS, ExportError, NO_SPREADSHEET, downloadAns
 
 import type { ExportFormat, ExportView } from "@/lib/api/types";
 
-/**
- * Download the answer as a PDF, a Word document, a CSV or an Excel workbook. Each says it's Nokware's, not an
- * official AMA document. Excel is offered only where the answer has report counts or budget figures (see NO_SPREADSHEET).
- */
+/** Excel is offered only where the answer has report counts or budget figures (see NO_SPREADSHEET). */
 export function ExportMenu({ view, testId }: { view: ExportView; testId: string }) {
   const [busy, setBusy] = useState<ExportFormat | null>(null);
   const [error, setError] = useState<string | null>(null);

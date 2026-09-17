@@ -110,7 +110,6 @@ export function getPetitionReview(): Promise<ReviewQueue> {
   return apiRequest<ReviewQueue>("/api/petitions/review");
 }
 
-/** Publish a petition, or refuse it for one of the fixed reasons; the queue as it then stands. */
 export function decidePetition(code: string, decision: PetitionDecision): Promise<ReviewQueue> {
   return apiRequest<ReviewQueue>(`/api/petitions/${encodeURIComponent(code)}/decision`, {
     method: "POST",
@@ -124,7 +123,6 @@ export function getAwaitingResponses(): Promise<AwaitingResponse[]> {
   return apiRequest<AwaitingResponse[]>("/api/petitions/responses");
 }
 
-/** The MCE's public response to a petition; the petitions still waiting for one. */
 export function respondToPetition(code: string, response: PetitionResponseRequest): Promise<AwaitingResponse[]> {
   return apiRequest<AwaitingResponse[]>(`/api/petitions/${encodeURIComponent(code)}/response`, {
     method: "POST",

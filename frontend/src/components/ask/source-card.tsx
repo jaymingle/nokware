@@ -36,7 +36,6 @@ function Passages({ excerpts, testId }: { excerpts: string[]; testId: string }) 
 
 type SourceCardProps = { doc: SourceDocument; anchorId: string; highlighted: boolean; testIdPrefix: string };
 
-/** A cited document, numbered like the tags in the answer, with where it came from. */
 export function SourceCard({ doc, anchorId, highlighted, testIdPrefix }: SourceCardProps) {
   const testId = `${testIdPrefix}-source-${doc.label}`;
   return (

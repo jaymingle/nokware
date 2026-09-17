@@ -70,7 +70,6 @@ function Filters({ data, recipient, onRecipient, filter, onFilter }: {
   );
 }
 
-/** Every citizen case across the Assembly and its agencies, for the MCE. */
 export function CaseOversightScreen() {
   const { data, error, isPending, refetch } = useCaseOversight();
   const [recipient, setRecipient] = useState("");

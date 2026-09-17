@@ -26,7 +26,6 @@ function Thumb({ photo, index, onRemove }: { photo: ReportPhoto; index: number; 
   );
 }
 
-/** Frees every preview when the form goes away (after filing, or on leaving the page). */
 function useRevokeOnUnmount(photos: ReportPhoto[]) {
   const latest = useRef(photos);
   useEffect(() => {
@@ -37,7 +36,6 @@ function useRevokeOnUnmount(photos: ReportPhoto[]) {
 
 type PhotoFieldProps = { photos: ReportPhoto[]; onChange: (photos: ReportPhoto[]) => void; limits: PhotoLimits; hint: string };
 
-/** Up to the limit of photos, previewed here and checked before they're sent. */
 export function PhotoField({ photos, onChange, limits, hint }: PhotoFieldProps) {
   const input = useRef<HTMLInputElement>(null);
   const [problem, setProblem] = useState<string | null>(null);

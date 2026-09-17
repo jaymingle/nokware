@@ -28,7 +28,6 @@ function halt(session: Session, discard: boolean) {
   else session.recorder.stop();
 }
 
-/** Opens the microphone and records until stopped (at most a minute), handing the recording on unless discarded. */
 function useRecorder(onRecorded: (recording: Blob) => void, onTick: (seconds: number) => void) {
   const session = useRef<Session | null>(null);
   useEffect(() => () => void (session.current && halt(session.current, true)), []);
@@ -61,10 +60,7 @@ function useRecorder(onRecorded: (recording: Blob) => void, onTick: (seconds: nu
   return { record, stop };
 }
 
-/**
- * A question spoken instead of typed: record, send once to be heard, then show what was understood for the
- * person to check. Nothing is asked until they choose to.
- */
+/** What was heard is shown back for the person to check: nothing is asked until they choose to. */
 export function useVoiceQuestion() {
   const [state, setState] = useState<VoiceState>({ kind: "idle" });
   const attempt = useRef(0); // a recording cancelled while it is being heard must not come back

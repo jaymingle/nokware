@@ -17,7 +17,6 @@ const PAGES = [
   },
 ];
 
-/** The platform's evidence about the Assembly itself, not only its documents. */
 export function AccountabilityHub() {
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-7">

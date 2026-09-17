@@ -46,7 +46,6 @@ function Confirm({ phone }: { phone: PhoneProof }) {
   );
 }
 
-/** The petitions a confirmed number started: where each stands, and what its creator can still do. */
 export function MyPetitionsPage() {
   const phone = usePhoneProof();
   return (

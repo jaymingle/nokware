@@ -94,7 +94,6 @@ function Method({ figures }: { figures: Responsiveness }) {
   );
 }
 
-/** How each Assembly department responds to residents' reports and to contributors' documents. */
 export function ResponsivenessPage() {
   const figures = useResponsiveness();
   const data = figures.data;

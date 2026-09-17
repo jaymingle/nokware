@@ -1,6 +1,5 @@
 import type { HistoryAction, HistoryEntry } from "@/lib/api/types";
 
-/** What each audit-trail entry records, in the portal's words. */
 const LABELS: Record<HistoryAction, string> = {
   uploaded: "Published by the department",
   submitted: "Submitted for review",
@@ -24,7 +23,6 @@ export function historyLabel(action: HistoryAction): string {
   return LABELS[action];
 }
 
-/** Who acted, e.g. "Ama Mensah · Contributor"; automatic steps have no person. */
 export function historyActor(entry: HistoryEntry): string | null {
   if (entry.actor_role === "system") return null;
   const role = ROLES[entry.actor_role];

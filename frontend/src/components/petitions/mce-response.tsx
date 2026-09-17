@@ -3,7 +3,6 @@ import { respondedLine } from "@/lib/petitions";
 
 import type { PetitionDetail } from "@/lib/api/types";
 
-/** The MCE's public response, as given: what it is, the statement, anything cited, and when (and how late). */
 export function MceResponse({ petition }: { petition: PetitionDetail }) {
   const response = petition.response;
   if (!response) return null;

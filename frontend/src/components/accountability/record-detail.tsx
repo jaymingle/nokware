@@ -96,7 +96,6 @@ function Explanation({ requirement, period, checked, testId }: { requirement: Re
   );
 }
 
-/** One cell of the record, opened: what is held, what isn't, and what to do about it. */
 export function RecordDetail({ requirement, period, checked }: { requirement: RecordRequirement; period: RecordPeriod; checked: string }) {
   const testId = `record-${requirement.id}-${period.label.replace(/\W+/g, "-")}`;
   return (

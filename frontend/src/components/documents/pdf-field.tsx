@@ -58,7 +58,7 @@ function DropZone({ onFile, onChoose, testId }: { onFile: (file?: File) => void;
   );
 }
 
-/** Drop or choose one PDF. Rejected files never reach the form's state. */
+/** Rejected files never reach the form's state. */
 export function PdfField({ file, onChange, testId }: PdfFieldProps) {
   const input = useRef<HTMLInputElement>(null);
   const [problem, setProblem] = useState<string | null>(null);

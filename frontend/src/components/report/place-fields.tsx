@@ -3,7 +3,6 @@ import { NativeSelect, NativeSelectOptGroup, NativeSelectOption } from "@/compon
 
 import type { SubMetroOption } from "@/lib/api/types";
 
-/** An everyday report's place: the electoral area, grouped by sub-metro. */
 export function WardField({ subMetros }: { subMetros: SubMetroOption[] }) {
   return (
     <FormField id="ward" label="Where is it?" hint="The electoral area. Name the street or a landmark in your description.">

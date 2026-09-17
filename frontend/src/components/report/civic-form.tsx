@@ -13,7 +13,6 @@ import type { ReportOptions, ReportReceipt } from "@/lib/api/types";
 
 export type ReportFormProps = { options: ReportOptions; onFiled: (receipt: ReportReceipt) => void; onBack: () => void };
 
-/** An everyday problem: where it is, what it is, and a number for messages if the citizen wants them. */
 export function CivicForm({ options, onFiled, onBack }: ReportFormProps) {
   const { photos, setPhotos, contact, setContact, submit, filing } = useReportForm(onFiled);
   const limits = { maxPhotos: options.max_photos, maxBytes: options.max_photo_bytes };

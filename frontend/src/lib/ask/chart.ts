@@ -23,13 +23,10 @@ export function hasRange(chart: AskChart): boolean {
   return chart.series.some((series) => series.values.some(isRange));
 }
 
-/** A value-axis tick as a person writes it: 200, 7,875, or 12.50 where the figures carry pesewas. */
 /**
- * An axis mark. Written in full up to a thousand; above that shortened, because
- * a budget axis of tens of millions writes "25,000,000" at every tick and the
- * marks run into each other. The figures themselves are never shortened: only
- * the ruler is, and the amounts stand in full on the bars, in the figures card
- * and in every export.
+ * Large ticks are shortened because "25,000,000" at every tick of a budget axis
+ * runs together. Only the ruler is shortened: amounts stand in full on the bars,
+ * in the figures card and in every export.
  */
 export function tickLabel(tick: number): string {
   const size = Math.abs(tick);
@@ -42,7 +39,6 @@ function trim(value: number): string {
   return value.toLocaleString("en-GB", { maximumFractionDigits: 1 });
 }
 
-/** A count as a chart labels it: "12", or "<5". */
 export function short(value: ChartValue): string {
   return isRange(value) ? "<5" : value.shown;
 }
@@ -83,7 +79,7 @@ export function exactRuns(values: ChartValue[]): number[][] {
   return run.length ? [...runs, run] : runs;
 }
 
-/** A pie's slices, clockwise from twelve o'clock, in radians, with each one's share (a pie only ever has exact counts). */
+/** Clockwise from twelve o'clock, in radians. A pie only ever has exact counts. */
 export function slices(chart: AskChart): { start: number; end: number; share: number }[] {
   const values = chart.series[0]?.values.map((value) => value.high) ?? [];
   const total = values.reduce((sum, value) => sum + value, 0) || 1;
@@ -99,7 +95,6 @@ function point(cx: number, cy: number, r: number, angle: number): string {
   return `${(cx + r * Math.sin(angle)).toFixed(2)} ${(cy - r * Math.cos(angle)).toFixed(2)}`;
 }
 
-/** An SVG path for a slice; with an inner radius, a donut's ring segment. */
 export function arcPath(cx: number, cy: number, r: number, inner: number, start: number, end: number): string {
   const sweep = Math.min(end - start, 2 * Math.PI - 0.0001);
   const large = sweep > Math.PI ? 1 : 0;

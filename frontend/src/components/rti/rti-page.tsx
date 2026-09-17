@@ -34,7 +34,6 @@ function Wording({ text }: { text: string }) {
   );
 }
 
-/** How to request a document the Assembly hasn't published, with the wording ready when a gap sent the reader here. */
 export function RtiPage({ document, period, elsewhere }: { document?: string; period?: string; elsewhere?: boolean }) {
   const name = clean(document);
   const when = clean(period);

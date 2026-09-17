@@ -37,7 +37,6 @@ function targetsFor(detail: CaseDetail, recipients: Option[]): { current: Option
   return { current, targets };
 }
 
-/** The MCE moves one recipient's part of a case to another, with a reason for the audit trail. */
 export function ReassignDialog({ detail, recipients }: ReassignDialogProps) {
   const dialog = useCaseDialog("Reassigned. The move and your reason are in the audit trail.");
   const { current, targets } = targetsFor(detail, recipients);
