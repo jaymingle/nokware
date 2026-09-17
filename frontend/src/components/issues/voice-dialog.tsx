@@ -7,12 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useAddVoice } from "@/lib/api/public-queries";
+import { NAME_MAX } from "@/lib/limits";
 import { joinNames } from "@/lib/text";
 import { deviceToken, rememberVoiced } from "@/lib/voices";
 
 import type { Issue, VoiceResult } from "@/lib/api/types";
-
-const NAME_MAX = 80;
 
 function Choice({ checked, onChange, testId, label }: { checked: boolean; onChange: () => void; testId: string; label: string }) {
   return (

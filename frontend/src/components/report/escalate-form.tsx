@@ -7,9 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useEscalateReport } from "@/lib/api/public-queries";
+import { NOTE_MAX } from "@/lib/limits";
 import { formatDate } from "@/lib/time";
-
-const NOTE_MAX = 2000;
 
 type EscalateFormProps = { reference: string; until: string; intro: string; action: string };
 

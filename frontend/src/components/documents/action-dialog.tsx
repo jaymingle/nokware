@@ -18,10 +18,9 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useDocumentAction, useRefreshDocuments } from "@/lib/api/queries";
+import { NOTE_MAX } from "@/lib/limits";
 
 import type { DocumentOut, ReviewAction } from "@/lib/api/types";
-
-const NOTE_MAX = 2000;
 
 type Tone = "primary" | "destructive";
 
