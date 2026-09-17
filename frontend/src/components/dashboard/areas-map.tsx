@@ -66,7 +66,7 @@ function SubMetroMap({ subMetros }: { subMetros: SubMetroFigures[] }) {
         <Hatch id={hatch} />
         {SUB_METRO_SHAPES.map((shape) => {
           const figures = byId.get(shape.id);
-          const count = figures?.reports ?? 0;
+          const count = figures ? figures.reports : 0;
           const shade = step(count, largest);
           const [x, y] = labelFor(shape, project);
           return (
