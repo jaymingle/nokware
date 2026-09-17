@@ -19,7 +19,7 @@ COLUMNS = ["section", "number", "item", "category", "value", "shown_as", "detail
 _FORMULA = ("=", "+", "-", "@", "\t", "\r")
 
 
-def _safe(value: object) -> object:
+def safe_cell(value: object) -> object:
     return f"'{value}" if isinstance(value, str) and value.startswith(_FORMULA) else value
 
 
@@ -67,5 +67,5 @@ def csv_bytes(content: Content) -> bytes:
     writer = csv.DictWriter(out, fieldnames=COLUMNS, extrasaction="ignore", lineterminator="\r\n")
     writer.writeheader()
     for row in rows:
-        writer.writerow({key: _safe(value) for key, value in row.items() if value is not None})
+        writer.writerow({key: safe_cell(value) for key, value in row.items() if value is not None})
     return out.getvalue().encode("utf-8-sig")

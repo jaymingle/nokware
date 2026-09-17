@@ -22,7 +22,7 @@ from openpyxl.worksheet.worksheet import Worksheet
 
 from app.schemas.ask import AskChart, AskFigure
 from app.services.ask_export import HEADER_NOTICE, Content, chart_footnote, figure_footnote, figures_heading, figures_notes
-from app.services.export_csv import answer_text, figure_value
+from app.services.export_csv import answer_text, figure_value, safe_cell
 
 INK = "FF17242B"
 TEAL = "FF1F6F5C"
@@ -31,17 +31,12 @@ WHITE_HEADING = Font(bold=True, color="FFFFFFFF")
 SMALL = Font(size=9, color="FF4A5A5F")
 FILL = PatternFill("solid", fgColor=TEAL)
 WRAP = Alignment(wrap_text=True, vertical="top")
-_FORMULA = ("=", "+", "-", "@", "\t", "\r")
 MAX_ROWS_CHARTED = 24  # a chart of more categories than this is unreadable; the cells still hold every row
-
-
-def _safe(value: object) -> object:
-    return f"'{value}" if isinstance(value, str) and str(value).startswith(_FORMULA) else value
 
 
 def _write(sheet: Worksheet, row: int, values: list[object], font: Font | None = None) -> int:
     for column, value in enumerate(values, start=1):
-        cell = sheet.cell(row=row, column=column, value=_safe(value))
+        cell = sheet.cell(row=row, column=column, value=safe_cell(value))
         if font:
             cell.font = font
     return row + 1
@@ -60,7 +55,7 @@ def _answer_sheet(sheet: Worksheet, content: Content) -> None:
     row = _write(sheet, row, ["Answered", content.answered])
     row += 1
     sheet.cell(row=row, column=1, value="Answer").font = HEADING
-    answer = sheet.cell(row=row, column=2, value=_safe(answer_text(content)))
+    answer = sheet.cell(row=row, column=2, value=safe_cell(answer_text(content)))
     answer.alignment = WRAP
     sheet.row_dimensions[row].height = 220
     row += 2
