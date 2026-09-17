@@ -45,8 +45,15 @@ from app.services.petition_rules import InvalidPetition, WrongState, check_signa
 from app.services.rag import AnswerLength, answer_question
 from app.services.report_contacts import ContactChoice, InvalidNumber, masked, normalise_phone, save_contact, update_contact
 from app.services.report_intake import DESCRIPTION_MIN, Receipt, ReportSubmission
-from app.services.report_rules import Classification, ClassificationMethod, InvalidReport, classify, normalise_reference
-from app.services.report_taxonomy import Category
+from app.services.report_rules import (
+    Classification,
+    InvalidReport,
+    classify,
+    filed_privately,
+    normalise_reference,
+    restored_classification,
+    saved_classification,
+)
 from app.services.sms_text import plain
 from app.teams import short_name
 from app.wards import sub_metros, wards
@@ -180,21 +187,6 @@ def _read(description: str) -> Classification:
         return classify(description, None, None)
 
 
-def _saved(filed: Classification) -> dict[str, Any]:
-    return {"category": filed.category.value, "topic": filed.topic, "severity": filed.severity,
-            "recipients": list(filed.recipients), "method": filed.method.value}
-
-
-def _classification(state: State) -> Classification:
-    saved = state["filed"]
-    return Classification(Category(saved["category"]), saved["topic"], saved["severity"], tuple(saved["recipients"]),
-                          ClassificationMethod(saved["method"]))
-
-
-def _private(state: State) -> bool:
-    return state["filed"]["category"] == Category.PERSONAL_SAFETY
-
-
 def _pack(lines: list[str]) -> list[str]:
     pages: list[str] = []
     page: list[str] = []
@@ -221,13 +213,13 @@ def safety_sub_metro_screen() -> str:
 
 
 def _after_help(state: State) -> tuple[Reply, State]:
-    if _private(state):
+    if filed_privately(state):
         return con(safety_sub_metro_screen()), {**state, "step": "safety_sub_metro"}
     return con(sub_metro_screen()), {**state, "step": "sub_metro"}
 
 
 def _help_page(state: State, page: int) -> tuple[Reply, State]:
-    pages = help_pages(state["filed"]["topic"], _private(state))
+    pages = help_pages(state["filed"]["topic"], filed_privately(state))
     if page >= len(pages):
         return _after_help(state)
     key = CONTINUE if page == len(pages) - 1 else NEXT
@@ -239,7 +231,7 @@ def _describe(dial: Dial, state: State, later: Later) -> tuple[Reply, State | No
     if len(description) < DESCRIPTION_MIN:
         return con("Please describe it in a few more words, with where it is:"), state
     started, check = time.monotonic(), _filing.submit(channel_intent.is_medical, description)
-    state = {"description": description, "filed": _saved(_read(description))}
+    state = {"description": description, "filed": saved_classification(_read(description))}
     if _medical_now(check, started):
         return con(MEDICAL_REPORT), {**state, "step": "medical"}
     return _help_page(state, 0)  # help first, filing second
@@ -328,14 +320,14 @@ def _reference_later(filing: Future[Receipt], msisdn: str) -> None:
 
 
 def _file(dial: Dial, state: State, updates: bool, later: Later) -> tuple[Reply, State | None]:
-    private = _private(state)
+    private = filed_privately(state)
     submission = ReportSubmission(
         description=state["description"], ward=None if private else state["ward"],
         sub_metro=state.get("sub_metro") if private else None, safety_topic=None,
         phone=dial.msisdn if updates else None, whatsapp=None, notify=updates, callback_consent=False,
         channel=IntakeChannel.USSD,
     )
-    filing = _filing.submit(report_intake.submit, submission, [], utc_now(), _classification(state))
+    filing = _filing.submit(report_intake.submit, submission, [], utc_now(), restored_classification(state))
     try:
         return _receipt(filing.result(timeout=FILING_WAIT_SECONDS), later)
     except FilingTimeout:
@@ -354,7 +346,7 @@ def _confirm(dial: Dial, state: State, later: Later) -> tuple[Reply, State | Non
     if choice == "0":
         return end("Cancelled. Nothing was filed."), None
     # Personal safety is sent without the number, and never turned away by the hourly report limit.
-    if _private(state):
+    if filed_privately(state):
         return _file(dial, state, False, later) if choice == "1" else (con("Choose 1 or 0.\n" + SEND), state)
     if choice not in ("1", "2"):
         return con("Choose 1, 2 or 0.\n" + CONFIRM), state

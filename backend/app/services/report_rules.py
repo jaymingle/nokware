@@ -9,6 +9,7 @@ import re
 import secrets
 from dataclasses import dataclass
 from enum import StrEnum
+from typing import Any
 
 from app.services.report_taxonomy import (
     DEFAULT_SAFETY_TOPIC,
@@ -69,6 +70,22 @@ class Classification:
     @property
     def private(self) -> bool:
         return self.category == Category.PERSONAL_SAFETY
+
+
+def saved_classification(filed: Classification) -> dict[str, Any]:
+    """A classification as a channel conversation keeps it in its session state, under "filed"."""
+    return {"category": filed.category.value, "topic": filed.topic, "severity": filed.severity,
+            "recipients": list(filed.recipients), "method": filed.method.value}
+
+
+def restored_classification(state: dict[str, Any]) -> Classification:
+    saved = state["filed"]
+    return Classification(Category(saved["category"]), saved["topic"], saved["severity"], tuple(saved["recipients"]),
+                          ClassificationMethod(saved["method"]))
+
+
+def filed_privately(state: dict[str, Any]) -> bool:
+    return bool(state.get("filed")) and state["filed"]["category"] == Category.PERSONAL_SAFETY
 
 
 class InvalidReport(ValueError):

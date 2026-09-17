@@ -41,8 +41,12 @@ from app.services.redis_store import get_redis, key, subject_key
 from app.services.report_contacts import InvalidNumber, masked
 from app.services.report_intake import DESCRIPTION_MIN, Receipt, ReportSubmission
 from app.services.report_photos import PhotoRejected, clean_photo
-from app.services.report_rules import Classification, ClassificationMethod, InvalidReport
-from app.services.report_taxonomy import Category
+from app.services.report_rules import (
+    InvalidReport,
+    filed_privately,
+    restored_classification,
+    saved_classification,
+)
 from app.services.voice_transcribe import Heard, understood
 from app.services.whatsapp import WhatsAppError, WhatsAppNotConfigured, first_delivery, open_window, twilio
 from app.teams import short_name
@@ -123,21 +127,6 @@ def _keep_photo(number: str, media: Media) -> str | None:
     return None
 
 
-def _saved(filed: Classification) -> dict[str, Any]:
-    return {"category": filed.category.value, "topic": filed.topic, "severity": filed.severity,
-            "recipients": list(filed.recipients), "method": filed.method.value}
-
-
-def _classification(state: State) -> Classification:
-    saved = state["filed"]
-    return Classification(Category(saved["category"]), saved["topic"], saved["severity"], tuple(saved["recipients"]),
-                          ClassificationMethod(saved["method"]))
-
-
-def _private(state: State) -> bool:
-    return bool(state.get("filed")) and state["filed"]["category"] == Category.PERSONAL_SAFETY
-
-
 def _sub_metro_question() -> str:
     names = ", ".join(f"*{n}* {sub.name}" for n, sub in enumerate(sub_metros().values(), 1))
     return f"Which sub-metro are you in? It helps reach the nearest Social Welfare desk.\nReply {names}, or *0* to skip."
@@ -147,7 +136,7 @@ def _confirm_question(number: str, state: State) -> str:
     photos = get_redis().llen(_photos_key(number))
     with_photos = f" with {photos} photo{'s' if photos != 1 else ''}" if photos else ""
     spoken = state.get("spoken_language")
-    if _private(state):
+    if filed_privately(state):
         who = " and ".join(short_name(r) for r in state["filed"]["recipients"])
         if spoken:
             # Never the words back: they'd leave a readable copy of the disclosure on a phone the abuser may pick up.
@@ -163,9 +152,9 @@ def _confirm_question(number: str, state: State) -> str:
 def _next(number: str, state: State) -> tuple[State, str]:
     if not state.get("description"):
         return {**state, "step": "describe"}, "Describe the problem and where it is, in a sentence or two."
-    if _private(state) and "sub_metro" not in state:
+    if filed_privately(state) and "sub_metro" not in state:
         return {**state, "step": "sub_metro"}, _sub_metro_question()
-    if not _private(state) and not state.get("ward"):
+    if not filed_privately(state) and not state.get("ward"):
         return {**state, "step": "area"}, "Which electoral area is it in? Reply with its name, for example Kaneshie or Bubiashie."
     return {**state, "step": "confirm"}, _confirm_question(number, state)
 
@@ -175,7 +164,7 @@ def _prompt(number: str, state: State) -> None:
     numbers = ""
     if state.get("filed") and not state.get("numbers_sent"):
         numbers, state = numbers_text(state["filed"]["topic"], state.get("sub_metro")), {**state, "numbers_sent": True}
-        numbers = "\n\n".join(part for part in (numbers, steps_text() if _private(state) else "") if part)
+        numbers = "\n\n".join(part for part in (numbers, steps_text() if filed_privately(state) else "") if part)
     channel_sessions.save("whatsapp", number, state, DRAFT_SECONDS)
     get_redis().expire(_photos_key(number), DRAFT_SECONDS)
     whatsapp_reply.reply(number, "\n\n".join(part for part in (numbers, question) if part))
@@ -190,7 +179,7 @@ def _with_description(state: State, text: str, heard: Heard | None) -> State:
         place = {"ward": state.get("ward") or (ward.id if ward else None)}
     kept = {k: v for k, v in state.items() if k not in ("ward", "spoken_language")}
     spoken = {"spoken_language": heard.language} if heard else {}
-    return {**kept, "description": text, "filed": _saved(filed), **place, **spoken}
+    return {**kept, "description": text, "filed": saved_classification(filed), **place, **spoken}
 
 
 def start_report(inbound: Inbound) -> None:
@@ -211,7 +200,7 @@ def _receipt_text(receipt: Receipt) -> str:
 
 
 def _file(number: str, state: State) -> None:
-    private = _private(state)
+    private = filed_privately(state)
     # Someone in danger is never turned away by the hourly report limit (the message cap still holds).
     if not private and not channel_limits.REPORTS.allow(number, utc_now().timestamp()):
         _drop_draft(number)
@@ -224,7 +213,7 @@ def _file(number: str, state: State) -> None:
         spoken=state.get("spoken_language"),
     )
     try:
-        receipt = report_intake.submit(submission, draft_photos(number), utc_now(), _classification(state))
+        receipt = report_intake.submit(submission, draft_photos(number), utc_now(), restored_classification(state))
     except (InvalidReport, InvalidNumber, PhotoRejected) as error:
         whatsapp_reply.reply(number, f"{error} Reply *2* to cancel.")
         return
