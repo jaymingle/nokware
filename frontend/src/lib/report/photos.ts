@@ -1,4 +1,4 @@
-import { formatBytes } from "@/lib/uploads";
+import { formatBytes, limitLabel } from "@/lib/uploads";
 
 // The API re-encodes each photo from its pixels alone; these are the formats it reads.
 export const PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp"];
@@ -7,10 +7,6 @@ export type PhotoLimits = { maxPhotos: number; maxBytes: number };
 
 /** url is an object URL, revoked when the photo is removed. */
 export type ReportPhoto = { file: File; url: string };
-
-export function limitLabel(bytes: number): string {
-  return `${Math.round(bytes / (1024 * 1024))} MB`;
-}
 
 type PhotoPick = { photos: File[]; problem: string | null };
 

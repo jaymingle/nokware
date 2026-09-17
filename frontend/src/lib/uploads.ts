@@ -6,10 +6,15 @@ export function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+/** A limit in whole megabytes: "50 MB". */
+export function limitLabel(bytes: number): string {
+  return `${Math.round(bytes / (1024 * 1024))} MB`;
+}
+
 export function pdfProblem(file: Pick<File, "name" | "type" | "size">): string | null {
   const looksLikePdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
   if (!looksLikePdf) return "Choose a PDF file.";
   if (file.size === 0) return "That file is empty.";
-  if (file.size > MAX_PDF_BYTES) return `That PDF is ${formatBytes(file.size)}; the limit is 50 MB.`;
+  if (file.size > MAX_PDF_BYTES) return `That PDF is ${formatBytes(file.size)}; the limit is ${limitLabel(MAX_PDF_BYTES)}.`;
   return null;
 }

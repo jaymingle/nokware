@@ -4,7 +4,7 @@ import { FileTextIcon } from "lucide-react";
 import { useRef, useState, type DragEvent } from "react";
 
 import { Button } from "@/components/ui/button";
-import { formatBytes, pdfProblem } from "@/lib/uploads";
+import { MAX_PDF_BYTES, formatBytes, limitLabel, pdfProblem } from "@/lib/uploads";
 import { cn } from "@/lib/utils";
 
 type PdfFieldProps = {
@@ -50,7 +50,7 @@ function DropZone({ onFile, onChoose, testId }: { onFile: (file?: File) => void;
       className={cn("rounded-xl border border-dashed px-5 py-6 text-center", dragging && "border-teal bg-teal-tint")}
     >
       <p className="text-[15px]">Drop a PDF here</p>
-      <p className="mt-1 mb-3.5 text-[12.5px] text-ink-soft">or choose a file · up to 50 MB</p>
+      <p className="mt-1 mb-3.5 text-[12.5px] text-ink-soft">or choose a file · up to {limitLabel(MAX_PDF_BYTES)}</p>
       <Button type="button" onClick={onChoose} data-testid={`${testId}-choose`}>
         Choose file
       </Button>

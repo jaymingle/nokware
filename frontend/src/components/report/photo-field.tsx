@@ -7,7 +7,8 @@ import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { ErrorNote } from "@/components/documents/panels";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { PHOTO_TYPES, addPhotos, limitLabel, type PhotoLimits, type ReportPhoto } from "@/lib/report/photos";
+import { PHOTO_TYPES, addPhotos, type PhotoLimits, type ReportPhoto } from "@/lib/report/photos";
+import { limitLabel } from "@/lib/uploads";
 
 function Thumb({ photo, index, onRemove }: { photo: ReportPhoto; index: number; onRemove: () => void }) {
   return (
