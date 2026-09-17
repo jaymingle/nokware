@@ -8,7 +8,7 @@ import { AskTurn } from "@/components/ask/ask-turn";
 import { AskWelcome } from "@/components/ask/ask-welcome";
 import { cn } from "@/lib/utils";
 
-export type AskChatMode = "page" | "panel";
+type AskChatMode = "page" | "panel";
 
 // The newest exchange is at least a screen tall, so asking scrolls its question to the top and the answer grows
 // below it, rather than the page following every word. On the page, a screen less the docked question box.

@@ -26,7 +26,7 @@ import { getIssue } from "@/lib/api/public";
 
 import type { MySignature, OwnPetition, PetitionDraft, PetitionSubmission, SignResult } from "@/lib/api/types";
 
-export const petitionKeys = {
+const petitionKeys = {
   options: ["petition-options"] as const,
   list: (filters: PetitionFilters) => ["petitions", filters] as const,
   detail: (code: string) => ["petition", code] as const,

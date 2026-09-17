@@ -3,7 +3,7 @@ import type { Me, Role } from "@/lib/api/types";
 /** A live count shown on a nav item, e.g. documents awaiting review. */
 export type NavCountKind = "review" | "responses" | "escalations" | "cases" | "case-escalations" | "petitions";
 
-export type NavItem = { href: string; label: string; testId: string; count?: NavCountKind };
+type NavItem = { href: string; label: string; testId: string; count?: NavCountKind };
 
 export const ROLE_HOME: Record<Role, string> = {
   department: "/portal/department",

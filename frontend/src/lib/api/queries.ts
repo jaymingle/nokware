@@ -48,7 +48,7 @@ function queueRefresh(documents: DocumentOut[] | undefined): number {
   return anyPublishingNow(documents, Date.now()) ? PUBLISHING_REFRESH_MS : QUEUE_REFRESH_MS;
 }
 
-export const queryKeys = {
+const queryKeys = {
   reviewQueue: ["review-queue"] as const,
   library: (page: number) => ["library", page] as const,
   submissions: ["submissions"] as const,

@@ -45,7 +45,7 @@ export function markCited(documents: SourceDocument[], cited: string[]): SourceD
   return documents.map((doc) => ({ ...doc, cited: labels.has(doc.label) }));
 }
 
-export function hostOf(url: string): string {
+function hostOf(url: string): string {
   try {
     return new URL(url).host.replace(/^www\./, "");
   } catch {
@@ -54,7 +54,7 @@ export function hostOf(url: string): string {
 }
 
 /** A provenance statement with an optional link after it, e.g. "Published by Finance on" + "ama.gov.gh". */
-export type ProvenanceView = { text: string; link: { text: string; href: string } | null; joiner: string };
+type ProvenanceView = { text: string; link: { text: string; href: string } | null; joiner: string };
 
 /**
  * Where the document came from, stated precisely for each way into the Ledger:

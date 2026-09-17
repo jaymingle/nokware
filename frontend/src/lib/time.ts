@@ -6,9 +6,9 @@ const HOUR_MS = 60 * MINUTE_MS;
 /** A clock with this little left is shown as urgent. */
 export const URGENT_WITHIN_MS = 12 * HOUR_MS;
 
-export type Urgency = "normal" | "urgent" | "passed";
+type Urgency = "normal" | "urgent" | "passed";
 
-export type Deadline = { remainingMs: number; label: string; urgency: Urgency };
+type Deadline = { remainingMs: number; label: string; urgency: Urgency };
 
 /** Time left as "47h 12m", "42m" or "under a minute"; "0m" once it has passed. */
 export function formatRemaining(remainingMs: number): string {

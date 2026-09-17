@@ -12,7 +12,7 @@ import { spacedCode, type KeptChallenge, type KeptProof } from "@/lib/petitions"
 
 import type { PhoneChallengeStatus } from "@/lib/api/types";
 
-export const PHONE_PRIVACY =
+const PHONE_PRIVACY =
   "Ghanaian mobile numbers (+233) only. Nokware never shows your number. It keeps a scrambled form of it, so you can find your petition again, and the number itself only to send you updates about your petition, deleted 30 days after the petition closes.";
 
 function Way({ icon, title, children }: { icon: ReactNode; title: string; children: ReactNode }) {

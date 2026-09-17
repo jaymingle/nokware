@@ -22,7 +22,7 @@ import type { PreferencesResult, ReportPreferences, ReportReceipt, ReportStatus,
 
 const DASHBOARD_STALE_MS = 60_000; // the API recomputes the figures at most once a minute
 
-export const publicKeys = {
+const publicKeys = {
   reportOptions: ["report-options"] as const,
   reportStatus: (reference: string) => ["report-status", reference] as const,
   dashboard: ["dashboard"] as const,

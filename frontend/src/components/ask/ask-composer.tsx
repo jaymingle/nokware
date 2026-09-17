@@ -9,8 +9,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { useVoiceQuestion } from "@/hooks/use-voice-question";
 import { cn } from "@/lib/utils";
 
-export const MAX_QUESTION = 1000;
-export const QUESTION_INPUT_ID = "ask-question";
+const MAX_QUESTION = 1000;
+const QUESTION_INPUT_ID = "ask-question";
 const COUNT_FROM = 900; // show the character count only near the limit
 
 function ComposerHint({ busy, panel, length }: { busy: boolean; panel: boolean; length: number }) {

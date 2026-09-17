@@ -25,7 +25,7 @@ const NOTE_MAX = 2000;
 
 type Tone = "primary" | "destructive";
 
-export type ActionDialogProps = {
+type ActionDialogProps = {
   doc: DocumentOut;
   action: ReviewAction;
   triggerLabel: string;

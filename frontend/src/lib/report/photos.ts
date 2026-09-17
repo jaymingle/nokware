@@ -13,7 +13,7 @@ export function limitLabel(bytes: number): string {
   return `${Math.round(bytes / (1024 * 1024))} MB`;
 }
 
-export type PhotoPick = { photos: File[]; problem: string | null };
+type PhotoPick = { photos: File[]; problem: string | null };
 
 function photoProblem(file: Pick<File, "name" | "type" | "size">, limits: PhotoLimits): string | null {
   if (!PHOTO_TYPES.includes(file.type)) return `${file.name} isn't a JPEG, PNG or WebP photo.`;

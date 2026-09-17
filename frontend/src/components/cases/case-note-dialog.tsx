@@ -11,7 +11,7 @@ import type { FormEvent, ReactNode } from "react";
 
 const NOTE_MAX = 2000;
 
-export type CaseNoteDialogProps = {
+type CaseNoteDialogProps = {
   caseId: string;
   action: Extract<CaseAction, "resolve" | "reopen" | "confirm-resolution">;
   triggerLabel: string;

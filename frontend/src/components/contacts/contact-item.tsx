@@ -45,7 +45,7 @@ function EarlierNumbers({ contactId, numbers }: { contactId: string; numbers: Co
 }
 
 /** Where the number comes from, beside it: the emergency-line label, the cited page, or an unverified warning. */
-export function SourceLine({ contact }: { contact: PublicContact }) {
+function SourceLine({ contact }: { contact: PublicContact }) {
   if (contact.tier === 2 && contact.source) {
     return (
       <p className="text-[12px] text-ink-soft">

@@ -11,7 +11,7 @@ import type { Me } from "@/lib/api/types";
 
 const ME_QUERY_KEY = ["me"] as const;
 
-export type AuthStatus = "loading" | "signed-out" | "signed-in" | "no-role" | "unavailable";
+type AuthStatus = "loading" | "signed-out" | "signed-in" | "no-role" | "unavailable";
 
 type AuthContextValue = {
   status: AuthStatus;

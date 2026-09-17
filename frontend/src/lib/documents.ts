@@ -7,7 +7,7 @@ export function clockRunning(doc: DocumentOut, now: number): boolean {
   return !doc.held_until || deadlineFrom(doc.held_until, now).urgency !== "passed";
 }
 
-export type ClockSplit = { open: DocumentOut[]; closed: DocumentOut[] };
+type ClockSplit = { open: DocumentOut[]; closed: DocumentOut[] };
 
 /**
  * Documents split by whether their clock is still running. Closed ones are
@@ -31,7 +31,7 @@ export function splitHeld(documents: DocumentOut[], now: number): ClockSplit {
 export type Tone = "teal" | "gold" | "brick" | "neutral";
 
 /** Where a submission stands, from the contributor's side. */
-export type SubmissionView = {
+type SubmissionView = {
   tone: Tone;
   label: string;
   detail?: string;

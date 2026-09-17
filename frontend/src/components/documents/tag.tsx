@@ -13,7 +13,7 @@ const TONES: Record<Tone, string> = {
   neutral: "border text-ink-soft",
 };
 
-export type TagTone = Tone;
+type TagTone = Tone;
 
 type TagProps = { tone: TagTone; children: ReactNode; testId?: string; wrap?: boolean };
 

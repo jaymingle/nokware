@@ -1,7 +1,7 @@
 import type { ReportStatus } from "@/lib/api/types";
 import type { Tone } from "@/lib/documents";
 
-export type Stage = "received" | "in_progress" | "completed";
+type Stage = "received" | "in_progress" | "completed";
 
 export const STAGES: Stage[] = ["received", "in_progress", "completed"];
 

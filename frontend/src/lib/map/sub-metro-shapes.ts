@@ -10,7 +10,7 @@ import shapes from "@/lib/map/sub-metros.json";
  * are drawn as tiles and never as shapes.
  */
 
-export type SubMetroShape = { id: string; name: string; osm_relation: number; rings: number[][][] };
+type SubMetroShape = { id: string; name: string; osm_relation: number; rings: number[][][] };
 
 export const SUB_METRO_SOURCE = shapes.source;
 export const SUB_METRO_SHAPES = shapes.sub_metros as SubMetroShape[];

@@ -9,7 +9,7 @@ import type { PhoneChallengeStatus } from "@/lib/api/types";
 
 const POLL_MS = 3_000;
 
-export type PhoneChallengeState = {
+type PhoneChallengeState = {
   challenge: KeptChallenge | null;
   starting: boolean;
   error: string | null;
