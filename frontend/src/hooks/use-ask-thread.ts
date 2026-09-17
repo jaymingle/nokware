@@ -54,6 +54,6 @@ export function useAskThread() {
     [run],
   );
 
-  const busy = turns.some((turn) => turn.stage === "searching" || turn.stage === "writing");
+  const busy = turns.some((turn) => turn.stage !== "done" && turn.stage !== "error");
   return { turns, ask, retry, busy };
 }
