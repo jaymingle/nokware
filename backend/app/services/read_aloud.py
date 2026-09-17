@@ -24,7 +24,7 @@ from app.config import get_settings
 from app.services.channel_status import headline, spoken_details
 from app.services.rag import NO_INFO_ANSWER, SAFETY_FIGURES_ANSWER
 from app.services.redis_store import get_redis, key
-from app.services.report_rules import suggests_danger_to_a_person
+from app.services.report_rules import REFERENCE_ALPHABET, suggests_danger_to_a_person
 from app.services.voice_audio import Encoded
 from app.services.voice_speech import SpeechFailed, cut, speak, speakable
 
@@ -40,7 +40,7 @@ REST_ON_SCREEN = "The rest of the answer is on the screen."
 SOURCES_ON_SCREEN = "The documents it comes from are listed with the answer."
 NOTHING_FOUND = "The page says where else to look, and how to request a document."
 KEEP_REFERENCE = "Keep your reference: it is the only way to follow your report."
-_REFERENCE = re.compile(r"\b([A-Z0-9]{4})-([A-Z0-9]{4})\b")
+_REFERENCE = re.compile(rf"\b([{REFERENCE_ALPHABET}]{{4}})-([{REFERENCE_ALPHABET}]{{4}})\b")
 _SENTENCE_END = re.compile(r"(?<=[.!?])\s+")
 # Two digits or more (an amount, a count, a year), but not an ordinal: "31st December" is quick to say.
 _FIGURE = re.compile(r"(?<![A-Za-z\d])\d[\d,]*\d(?:\.\d+)?(?![\d,]|st\b|nd\b|rd\b|th\b)")
