@@ -111,6 +111,53 @@ def test_a_report_with_no_agreed_channel_says_so_in_the_log(monkeypatch: pytest.
     assert "No message about case case-1" in caplog.text
 
 
+@pytest.fixture
+def sends(monkeypatch: pytest.MonkeyPatch) -> list[tuple[str, str, str]]:
+    """What _send was asked to send: the channel the row will name, the number, and why."""
+    done: list[tuple[str, str, str]] = []
+    monkeypatch.setattr(
+        notifications, "_send",
+        lambda case_id, event, channel, number, message, why="": done.append((channel.value, number, why)),
+    )
+    return done
+
+
+def test_a_message_can_be_sent_on_one_channel_by_itself(monkeypatch: pytest.MonkeyPatch, sends: list[tuple[str, str, str]]) -> None:
+    """The sweep repairs the one channel a resident is still owed on, and notify is that same call per agreed channel."""
+    both = {"notify": True, "phone": "+233241234567", "whatsapp": "+233241234567"}
+    monkeypatch.setattr(notifications, "contact_for", lambda case_id: both)
+
+    notifications.notify_channel(CIVIC, NotificationEvent.SUBMITTED, NotificationChannel.WHATSAPP)
+    assert sends == [("whatsapp", "+233241234567", "")]
+
+    notifications.notify(CIVIC, NotificationEvent.SUBMITTED)
+    assert [channel for channel, _, _ in sends] == ["whatsapp", "sms", "whatsapp"]  # one code path, both ways in
+
+
+def test_a_channel_the_resident_never_agreed_to_is_not_sent_on(
+    monkeypatch: pytest.MonkeyPatch, sends: list[tuple[str, str, str]], caplog: pytest.LogCaptureFixture
+) -> None:
+    """Their contact details can change between the sweep reading them and the send."""
+    monkeypatch.setattr(notifications, "contact_for", lambda case_id: {"notify": True, "phone": "+233241234567"})
+    with caplog.at_level(logging.INFO):
+        notifications.notify_channel(CIVIC, NotificationEvent.SUBMITTED, NotificationChannel.WHATSAPP)
+
+    assert sends == [] and "No whatsapp about case c1" in caplog.text and "+233" not in caplog.text
+
+
+def test_repairing_the_whatsapp_channel_obeys_the_window_as_a_first_send_would(
+    monkeypatch: pytest.MonkeyPatch, sends: list[tuple[str, str, str]]
+) -> None:
+    """The window is read as the message goes, so a repair of the WhatsApp channel can itself go out by SMS."""
+    monkeypatch.setattr(notifications, "contact_for", lambda case_id: {"notify": True, "phone": None, "whatsapp": "+233241234567"})
+    monkeypatch.setattr(notifications, "_sms_can_stand_in", lambda number, contact: True)
+    monkeypatch.setattr(notifications, "window_open", lambda number: False)
+
+    notifications.notify_channel(CIVIC, NotificationEvent.SUBMITTED, NotificationChannel.WHATSAPP)
+
+    assert sends == [("sms", "+233241234567", notifications.WINDOW_CLOSED)]
+
+
 def test_a_send_our_own_side_never_attempted_is_told_apart_from_one_the_provider_refused() -> None:
     """The counter the daily budget needs couldn't be reached: nothing was handed to the provider, so it goes again."""
     stopped = SmsNothingSent("The SMS limit can't be checked (RedisUnavailable), so nothing was sent.")

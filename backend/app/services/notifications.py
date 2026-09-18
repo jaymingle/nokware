@@ -269,18 +269,35 @@ def _sms_can_stand_in(number: str, contact: dict[str, Any]) -> bool:
     return get_settings().whatsapp_provider == "twilio" and number.startswith(f"+{GHANA_CODE}") and not contact.get("phone")
 
 
-def notify(case: dict[str, Any], event: NotificationEvent) -> None:
+def notify_channel(case: dict[str, Any], event: NotificationEvent, channel: NotificationChannel) -> None:
+    """One message, on one channel the resident agreed to. Every send goes through here, whether it is the ordinary
+    one (notify, below, calls this once per agreed channel) or the sweep repairing the one channel still owed.
+
+    The WhatsApp-window rule lives here rather than in notify, so a repair obeys it exactly as a first send does: the
+    window is read at the moment of sending, so repairing the WhatsApp channel hours later may go out by SMS to the
+    same number even though the first attempt went (or tried to go) by WhatsApp, and the other way round. The row it
+    writes then names the SMS channel, which is why the sweep reads a stand-in row as settling the WhatsApp channel.
+    """
     contact = contact_for(case["$id"]) or {}
-    channels = channels_for(contact)
+    number = dict(channels_for(contact)).get(channel)
+    if number is None:
+        # The contact changed between a caller reading it and this send. Nothing is sent and nothing fails, so say so.
+        logger.info("No %s about case %s: the citizen hasn't agreed to it (%s)", channel.value, case["$id"], EVENT_NAMES[event])
+        return
+    message = compose(event, case)
+    if channel == NotificationChannel.WHATSAPP and _sms_can_stand_in(number, contact) and not window_open(number):
+        _send(case["$id"], event, NotificationChannel.SMS, number, message, WINDOW_CLOSED)
+    else:
+        _send(case["$id"], event, channel, number, message)
+
+
+def notify(case: dict[str, Any], event: NotificationEvent) -> None:
+    channels = channels_for(contact_for(case["$id"]) or {})
     if not channels:
         # Nothing is sent and nothing fails: without this line the quiet is indistinguishable from a lost message.
         logger.info("No message about case %s: the citizen agreed to none (%s)", case["$id"], EVENT_NAMES[event])
-    for channel, number in channels:
-        message = compose(event, case)
-        if channel == NotificationChannel.WHATSAPP and _sms_can_stand_in(number, contact) and not window_open(number):
-            _send(case["$id"], event, NotificationChannel.SMS, number, message, WINDOW_CLOSED)
-        else:
-            _send(case["$id"], event, channel, number, message)
+    for channel, _ in channels:
+        notify_channel(case, event, channel)
 
 
 def _outbox_row(provider_message_id: str) -> dict[str, Any] | None:
