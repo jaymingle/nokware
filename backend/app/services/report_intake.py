@@ -7,6 +7,7 @@ sent afterwards, by the caller, so a slow provider never delays the receipt.
 import hashlib
 import secrets
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
@@ -28,6 +29,7 @@ from app.services.report_rules import (
     Classification,
     ClassificationMethod,
     InvalidReport,
+    check_places,
     classify,
     locate,
     new_public_id,
@@ -167,18 +169,16 @@ def voice_note(language: str) -> str:
 def _record_filing(case: dict[str, Any], spoken: str | None) -> None:
     case_id = case["$id"]
     note = voice_note(spoken) if spoken else None
-    case_history.record(case_id, CaseEntry(CaseHistoryAction.SUBMITTED, CITIZEN, to_status=CaseStatus.SUBMITTED.value, note=note))
-    case_history.record(case_id, CaseEntry(CaseHistoryAction.CLASSIFIED, SYSTEM, note=case["classificationNote"]))
     names = " and ".join(RECIPIENT_NAMES[r] for r in case["recipients"])
-    entry = CaseEntry(
-        CaseHistoryAction.ASSIGNED,
-        SYSTEM,
-        from_status=CaseStatus.SUBMITTED.value,
-        to_status=CaseStatus.ASSIGNED.value,
-        to_recipient=",".join(case["recipients"]),
-        note=f"Routed to {names}.",
-    )
-    case_history.record(case_id, entry)
+    entries = [
+        CaseEntry(CaseHistoryAction.SUBMITTED, CITIZEN, to_status=CaseStatus.SUBMITTED.value, note=note),
+        CaseEntry(CaseHistoryAction.CLASSIFIED, SYSTEM, note=case["classificationNote"]),
+        CaseEntry(CaseHistoryAction.ASSIGNED, SYSTEM, from_status=CaseStatus.SUBMITTED.value,
+                  to_status=CaseStatus.ASSIGNED.value, to_recipient=",".join(case["recipients"]),
+                  note=f"Routed to {names}."),
+    ]
+    for entry in entries:
+        case_history.record(case_id, entry)
 
 
 def token_hash(token: str) -> str:
@@ -201,19 +201,32 @@ def read_report(description: str) -> Classification:
     return classify(description, None, model_verdict(description))
 
 
+def _read_description(description: str, submission: ReportSubmission, filed: Classification | None) -> Classification:
+    if filed is not None:
+        return filed
+    verdict = None if submission.safety_topic is not None else model_verdict(description)
+    return classify(description, submission.safety_topic, verdict)
+
+
 def submit(submission: ReportSubmission, photos: list[bytes], now: datetime, filed: Classification | None = None) -> Receipt:
     """Raises InvalidReport, InvalidNumber or PhotoRejected before anything is stored.
     filed: what read_report() already gave, if a channel asked first."""
     description = _description(submission.description)
-    cleaned = clean_photos(photos)
     choice = _contact(submission)
-    if filed is None:
-        verdict = None if submission.safety_topic is not None else model_verdict(description)
-        filed = classify(description, submission.safety_topic, verdict)
+    check_places(submission.ward, submission.sub_metro)  # a place that isn't on the list costs no model call
+    # The model reads the description while Pillow re-encodes the photos: about a second each, and nothing is
+    # stored until both have come back, so a rejected photo still stops the filing before anything is written.
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        reading = pool.submit(_read_description, description, submission, filed)
+        cleaning = pool.submit(clean_photos, photos)
+        filed, cleaned = reading.result(), cleaning.result()
     locate(filed.category, submission.ward, submission.sub_metro)  # check the place before writing anything
     case_id = str(uuid.uuid4())
     fields = _case_fields(filed, submission, description, store_photos(case_id, cleaned), now)
     case = _create(case_id, fields)
+    # Routing, the trail and the citizen's number are written one after another on purpose. Sent together they
+    # shared the keep-alive pool, and a connection Appwrite had closed took one of them down — a create is never
+    # retried, because a repeated POST is a second report. Half a second of waiting is the cheaper mistake.
     _assign(case, now)
     _record_filing(case, submission.spoken)
     if choice is None:

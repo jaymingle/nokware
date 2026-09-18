@@ -24,7 +24,9 @@ from app.config import get_settings
 DATABASE_ID = "nokware"
 _DEPRECATION_MARKER = "has been deprecated since"
 # Appwrite's side closes a kept-alive connection left idle for a few minutes (seen at about four); after this long
-# without a call, the kept connections are dropped rather than tried.
+# without a call, the kept connections are dropped rather than tried. Three minutes was tried, to save the ~0.9s a
+# quiet site pays opening a new connection for its first write; a filing then died on a connection Appwrite had
+# closed anyway, and a create can't be retried without risking a second report. A minute stays.
 IDLE_RESET_SECONDS = 60
 # The SDK sends no timeout of its own, so a stalled connection would hold a worker thread — and a resident's
 # "Filing…" button — for as long as the network let it. Seconds to connect, then to wait for a reply.

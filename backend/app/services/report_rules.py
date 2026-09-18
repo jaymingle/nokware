@@ -143,11 +143,18 @@ class Location:
     sub_metro: str | None
 
 
-def locate(category: Category, ward_id: str | None, sub_metro_id: str | None) -> Location:
+def check_places(ward_id: str | None, sub_metro_id: str | None) -> None:
+    """The half of locate() that doesn't need to know the category, so a place that isn't on the list can be
+    refused before the classifier is asked to read anything. Whether a missing ward matters depends on the
+    category, which only the classifier can give, so that check stays in locate()."""
     if ward_id is not None and ward_id not in wards():
         raise InvalidReport("Choose an electoral area from the list.")
     if sub_metro_id is not None and sub_metro_id not in sub_metros():
         raise InvalidReport("Choose a sub-metro from the list.")
+
+
+def locate(category: Category, ward_id: str | None, sub_metro_id: str | None) -> Location:
+    check_places(ward_id, sub_metro_id)
     if category == Category.PERSONAL_SAFETY:
         return Location(ward=None, sub_metro=sub_metro_id or (sub_metro_of(ward_id) if ward_id else None))
     if ward_id is None:
