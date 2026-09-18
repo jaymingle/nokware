@@ -106,6 +106,17 @@ def acknowledge(principal: Principal, assignment: dict[str, Any], now: datetime)
     return {"status": AssignmentStatus.IN_PROGRESS.value, "acknowledgedAt": now.isoformat()}
 
 
+def has_started(assignment: dict[str, Any]) -> bool:
+    """Whether a recipient has started work on its own part: it acknowledged the assignment.
+
+    The citizen hears about the first start only, so this answers for the whole case when asked of every assignment,
+    including the inactive ones — a recipient the case has since been moved away from had already started it. An
+    assignment resolved without ever being acknowledged never started, and a reopened one has its acknowledgement
+    cleared: work on it begins again, and so does the message.
+    """
+    return bool(assignment.get("acknowledgedAt")) or assignment.get("status") == AssignmentStatus.IN_PROGRESS
+
+
 def resolve(principal: Principal, assignment: dict[str, Any], note: str | None, now: datetime) -> dict[str, Any]:
     _own_assignment(principal, assignment)
     if assignment["status"] == AssignmentStatus.RESOLVED:

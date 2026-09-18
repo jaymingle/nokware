@@ -57,6 +57,8 @@ def case(principal: Staff, case_id: str) -> CaseDetail:
 def _after(principal: Principal, outcome: Outcome, tasks: BackgroundTasks) -> CaseDetail:
     if outcome.resolved:
         tasks.add_task(notify_quietly, outcome.case, NotificationEvent.RESOLVED)
+    if outcome.started:
+        tasks.add_task(notify_quietly, outcome.case, NotificationEvent.STARTED)
     return _visible(principal, outcome.case["$id"])
 
 

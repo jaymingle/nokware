@@ -1,9 +1,10 @@
 """Messages to citizens about their reports, by SMS and WhatsApp.
 
-Three moments only (received, resolved, escalation received): anything more would feel like spam, and each message
-costs money. Personal-safety messages say nothing but the reference, not even the word "report": a phone can be
-shared. Every other message fits one GSM-7 SMS page (one credit), except an emergency's "received" message, whose
-numbers to call are worth a second page.
+Four moments only (received, work started, resolved, escalation received): anything more would feel like spam, and
+each message costs money. "Work started" goes once, when the FIRST recipient starts: a citizen doesn't need to know
+that the Police and Social Welfare each opened their own part. Personal-safety messages say nothing but the
+reference, not even the word "report": a phone can be shared. Every other message fits one GSM-7 SMS page (one
+credit), except an emergency's "received" message, whose numbers to call are worth a second page.
 
 The outbox row never holds the number; it is read from report_contacts at the moment of sending.
 
@@ -62,6 +63,7 @@ REPAIRED = "repaired: "
 CHANNEL_NAMES = {NotificationChannel.SMS: "SMS", NotificationChannel.WHATSAPP: "WhatsApp message"}
 EVENT_NAMES = {
     NotificationEvent.SUBMITTED: "Submission",
+    NotificationEvent.STARTED: "Work started",
     NotificationEvent.RESOLVED: "Resolution",
     NotificationEvent.ESCALATED: "Escalation",
 }
@@ -98,6 +100,7 @@ def _one_page(render: Callable[[str], str], case: dict[str, Any], pages_allowed:
 def _neutral(event: NotificationEvent, reference: str) -> Message:
     bodies = {
         NotificationEvent.SUBMITTED: f"Nokware: reference {reference} received.",
+        NotificationEvent.STARTED: f"Nokware: reference {reference} is being worked on.",
         NotificationEvent.RESOLVED: f"Nokware: reference {reference} has been updated.",
         NotificationEvent.ESCALATED: f"Nokware: reference {reference}: your request has been received.",
     }
@@ -122,6 +125,9 @@ def compose(event: NotificationEvent, case: dict[str, Any]) -> Message:
     renders: dict[NotificationEvent, Callable[[str], str]] = {
         NotificationEvent.SUBMITTED: lambda who: f"Nokware: report {reference} is with {who}. "
         f"We'll message you when it's resolved. Track it: {status_page}",
+        # The receipt already promised a message at the end, so this one carries the news and the link and stops.
+        NotificationEvent.STARTED: lambda who: f"Nokware: {who} has started work on report {reference}. "
+        f"Track it: {status_page}",
         NotificationEvent.RESOLVED: lambda who: f"Nokware: {who} marked report {reference} resolved. "
         f"Not fixed? Escalate within 14 days: {status_page}",
     }

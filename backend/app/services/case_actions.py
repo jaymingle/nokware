@@ -4,7 +4,7 @@ A personal-safety case's trail never carries what anyone wrote about it: the MCE
 The words stay on the case, for its recipients.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from typing import Any
 
@@ -22,6 +22,7 @@ from app.teams import RECIPIENT_NAMES
 class Outcome:
     case: dict[str, Any]
     resolved: bool  # the citizen gets the resolution message
+    started: bool = False  # ...and the "work started" message, once, when the first recipient starts
 
 
 def _load(case_id: str) -> tuple[dict[str, Any], list[dict[str, Any]]]:
@@ -60,8 +61,10 @@ def acknowledge(principal: Principal, case_id: str, now: datetime) -> Outcome:
     with record_lock(case_id):
         case, assignments = _load(case_id)
         mine = _mine(principal, case, assignments)
+        # Read under the same lock as the change itself, so two recipients starting at once can't both be the first.
+        first = not any(case_workflow.has_started(a) for a in assignments if a["$id"] != mine["$id"])
         updated = report_store.update_assignment(mine["$id"], case_workflow.acknowledge(principal, mine, now))
-        outcome = _settle(case, _replace(assignments, updated), now)
+        outcome = replace(_settle(case, _replace(assignments, updated), now), started=first)
         entry = CaseEntry(
             CaseHistoryAction.ACKNOWLEDGED,
             actor(principal),

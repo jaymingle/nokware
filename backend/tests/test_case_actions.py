@@ -74,6 +74,35 @@ def test_a_department_starts_and_finishes_a_case_and_the_citizen_is_told(fake: F
     assert fake.trail[1].note == "Resolved by Works Department. Drain desilted on 12 September." and fake.trail[1].actor.name == "Kofi (Works)"
 
 
+def test_the_citizen_hears_that_work_started_when_the_first_recipient_starts_and_not_the_second(fake: Fake) -> None:
+    """A safety case sits with two recipients. "The Police have opened it" and then "Social Welfare have opened it"
+    is one piece of news told twice, at two credits."""
+    fake.add_case("c5", ["agency-police", "dept-social-welfare"], category="personal_safety", isSensitive=True)
+
+    assert case_actions.acknowledge(POLICE, "c5", NOW).started
+    assert not case_actions.acknowledge(WELFARE, "c5", NOW).started
+    assert [e.action for e in fake.trail] == ["acknowledged", "acknowledged"]
+
+
+def test_a_recipient_the_case_has_moved_away_from_had_already_started_it(fake: Fake) -> None:
+    """The message went when Works started; the case moving to Waste Management is not a second start for the citizen."""
+    fake.add_case("c6", ["dept-works"])
+    assert case_actions.acknowledge(WORKS, "c6", NOW).started
+    case_actions.reassign(MCE, "c6", Reassignment("dept-works", "dept-waste-management"), "Refuse, not drains.", NOW)
+
+    waste = Principal("u-wm", "Ama (Waste)", "wm@x.org", Role.DEPARTMENT, "dept-waste-management")
+    assert not case_actions.acknowledge(waste, "c6", NOW).started
+
+
+def test_work_starting_again_after_the_mce_reopens_a_case_is_told_again(fake: Fake) -> None:
+    """Reopening clears the acknowledgement: work really does begin again, and the citizen last heard "resolved"."""
+    fake.add_case("c7", ["dept-works"], status="escalated", escalatedAt=NOW.isoformat())
+    fake.assignments["a1"].update({"status": "in_progress", "acknowledgedAt": NOW.isoformat()})
+    case_actions.reopen(MCE, "c7", "The drain is choked again.", NOW)
+
+    assert case_actions.acknowledge(WORKS, "c7", NOW).started
+
+
 def test_a_two_recipient_case_waits_for_both_and_its_trail_never_quotes_them(fake: Fake) -> None:
     fake.add_case("c2", ["agency-police", "dept-social-welfare"], category="personal_safety", isSensitive=True)
     first = case_actions.resolve(POLICE, "c2", "Arrested the suspect; statement taken.", NOW)

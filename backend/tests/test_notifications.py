@@ -31,6 +31,27 @@ def test_personal_safety_messages_say_nothing_but_the_reference(event: Notificat
         assert giveaway not in lowered
 
 
+def test_the_start_of_work_names_the_office_that_picked_the_report_up() -> None:
+    """Between filing and resolution a resident hears nothing, however fast someone picks it up. This is that word."""
+    message = compose(NotificationEvent.STARTED, CIVIC)
+    assert message.template == "started" and "has started work on report K7QM-4TXP" in message.body
+    assert "Works Department" in message.body and message.body.endswith("/report/status")
+
+
+def test_the_start_of_work_is_sent_only_where_the_resident_agreed_to_hear(
+    monkeypatch: pytest.MonkeyPatch, sends: list[tuple[str, str, str]], caplog: pytest.LogCaptureFixture
+) -> None:
+    """The same consent rule as every other moment: it goes through notify, and notify reads the agreement."""
+    monkeypatch.setattr(notifications, "contact_for", lambda case_id: {"notify": False, "phone": "+233241234567"})
+    with caplog.at_level(logging.INFO):
+        notifications.notify(CIVIC, NotificationEvent.STARTED)
+    assert sends == [] and "No message about case c1" in caplog.text
+
+    monkeypatch.setattr(notifications, "contact_for", lambda case_id: {"notify": True, "phone": "+233241234567"})
+    notifications.notify(CIVIC, NotificationEvent.STARTED)
+    assert sends == [("sms", "+233241234567", "")]
+
+
 def test_every_channel_given_is_used_and_none_without_agreement() -> None:
     both = {"notify": True, "phone": "+233241234567", "whatsapp": "+447700900123"}
     assert [c for c, _ in channels_for(both)] == [NotificationChannel.SMS, NotificationChannel.WHATSAPP]

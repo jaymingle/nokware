@@ -1,12 +1,15 @@
 """The staff case routes: role gates, and no hint that a case exists to someone with no view of it."""
 
 import pytest
+from fastapi import BackgroundTasks
 from fastapi.testclient import TestClient
 
 from app import dependencies
 from app.main import app
 from app.routes import cases as routes
 from app.services.auth import Principal, Role
+from app.services.case_actions import Outcome
+from app.services.citizen_reports import NotificationEvent
 
 FINANCE = Principal("u-f", "Finance", "f@x.org", Role.DEPARTMENT, "dept-finance")
 CONTRIBUTOR = Principal("u-c", "Contributor", "c@x.org", Role.CONTRIBUTOR)
@@ -23,6 +26,27 @@ def test_a_department_with_no_part_in_a_case_gets_not_found(monkeypatch: pytest.
     monkeypatch.setattr(routes.case_queries, "load", lambda case_id: (SAFETY_CASE, []))
     response = as_user(FINANCE, monkeypatch).get("/api/cases/c1", headers=BEARER)
     assert response.status_code == 404
+
+
+@pytest.mark.parametrize(
+    ("outcome", "expected"),
+    [
+        (Outcome({"$id": "c1"}, resolved=False, started=True), [NotificationEvent.STARTED]),
+        (Outcome({"$id": "c1"}, resolved=False), []),
+        (Outcome({"$id": "c1"}, resolved=True), [NotificationEvent.RESOLVED]),
+    ],
+)
+def test_the_citizen_is_told_after_the_response_and_never_inside_the_request(
+    monkeypatch: pytest.MonkeyPatch, outcome: Outcome, expected: list[NotificationEvent]
+) -> None:
+    """A department's "Start work" must not wait on a provider, and a provider failing must not fail the action."""
+    monkeypatch.setattr(routes, "_visible", lambda principal, case_id: case_id)
+    tasks = BackgroundTasks()
+
+    routes._after(FINANCE, outcome, tasks)
+
+    assert [task.args for task in tasks.tasks] == [(outcome.case, event) for event in expected]
+    assert all(task.func is routes.notify_quietly for task in tasks.tasks)
 
 
 def test_only_the_mce_oversees_and_contributors_have_no_cases(monkeypatch: pytest.MonkeyPatch) -> None:

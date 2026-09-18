@@ -28,6 +28,7 @@ class IntakeChannel(StrEnum):
 
 class NotificationEvent(StrEnum):
     SUBMITTED = "submitted"
+    STARTED = "started"  # the first recipient started work; the others starting is not news to the citizen
     RESOLVED = "resolved"
     ESCALATED = "escalated"
 

@@ -62,7 +62,7 @@ def test_names_give_way_to_a_count_only_when_they_would_not_fit(monkeypatch: pyt
     assert "is with Works Department." in works.body
     # A report goes to one office: with the deployed address, every office's full name fits one page beside the link.
     for team in RECIPIENT_NAMES:
-        for event in (NotificationEvent.SUBMITTED, NotificationEvent.RESOLVED):
+        for event in (NotificationEvent.SUBMITTED, NotificationEvent.STARTED, NotificationEvent.RESOLVED):
             body = notifications.compose(event, {"reference": "K7QM-4TXP", "recipients": [team]}).body
             assert short_name(team) in body and pages(body) == 1 and "nokware.tstitagency.com/report/status" in body, body
             assert "https://" not in body and "K7QM-4TXP/" not in body  # no scheme, and the reference never in the address
