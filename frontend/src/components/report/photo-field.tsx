@@ -8,6 +8,7 @@ import { ErrorNote } from "@/components/documents/panels";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { PHOTO_TYPES, addPhotos, type PhotoLimits, type ReportPhoto } from "@/lib/report/photos";
+import { shrink } from "@/lib/report/shrink";
 import { limitLabel } from "@/lib/uploads";
 
 function Thumb({ photo, index, onRemove }: { photo: ReportPhoto; index: number; onRemove: () => void }) {
@@ -41,12 +42,19 @@ export function PhotoField({ photos, onChange, limits, hint }: PhotoFieldProps) 
   const input = useRef<HTMLInputElement>(null);
   const [problem, setProblem] = useState<string | null>(null);
   useRevokeOnUnmount(photos);
-  const choose = (event: ChangeEvent<HTMLInputElement>) => {
-    const picked = addPhotos(photos.map((photo) => photo.file), Array.from(event.target.files ?? []), limits);
+  const [preparing, setPreparing] = useState(false);
+  const choose = async (event: ChangeEvent<HTMLInputElement>) => {
+    const chosen = Array.from(event.target.files ?? []);
+    event.target.value = ""; // choosing the same photo again still fires a change
+    setPreparing(true);
+    // Shrunk before it is checked: a 9 MB photo from a phone is well under the limit once it is the size the
+    // Assembly will actually store, and refusing it first would be refusing it for a reason that no longer holds.
+    const ready = await Promise.all(chosen.map(shrink));
+    setPreparing(false);
+    const picked = addPhotos(photos.map((photo) => photo.file), ready, limits);
     const added = picked.photos.slice(photos.length).map((file) => ({ file, url: URL.createObjectURL(file) }));
     onChange([...photos, ...added]);
     setProblem(picked.problem);
-    event.target.value = ""; // choosing the same photo again still fires a change
   };
   const remove = (index: number) => {
     URL.revokeObjectURL(photos[index].url);
@@ -66,20 +74,21 @@ export function PhotoField({ photos, onChange, limits, hint }: PhotoFieldProps) 
           ))}
         </ul>
       ) : null}
-      <input ref={input} id="report-photos" type="file" accept={PHOTO_TYPES.join(",")} multiple onChange={choose} className="sr-only" data-testid="report-photos-input" />
-      <PhotoButtons count={photos.length} limits={limits} onAdd={() => input.current?.click()} />
+      <input ref={input} id="report-photos" type="file" accept={PHOTO_TYPES.join(",")} multiple onChange={(event) => void choose(event)} className="sr-only" data-testid="report-photos-input" />
+      <PhotoButtons count={photos.length} limits={limits} preparing={preparing} onAdd={() => input.current?.click()} />
       {problem ? <ErrorNote testId="report-photos-problem">{problem}</ErrorNote> : null}
     </div>
   );
 }
 
-function PhotoButtons({ count, limits, onAdd }: { count: number; limits: PhotoLimits; onAdd: () => void }) {
+function PhotoButtons({ count, limits, preparing, onAdd }: { count: number; limits: PhotoLimits; preparing: boolean; onAdd: () => void }) {
   return (
     <div className="flex flex-wrap items-center gap-3">
-      <Button type="button" variant="secondary" onClick={onAdd} disabled={count >= limits.maxPhotos} data-testid="report-photos-add">
+      <Button type="button" variant="secondary" onClick={onAdd} disabled={preparing || count >= limits.maxPhotos} data-testid="report-photos-add">
         <ImagePlusIcon data-icon="inline-start" />
         {count ? "Add more photos" : "Add photos"}
       </Button>
+      {preparing ? <span className="text-[12.5px] text-ink-soft" role="status">Preparing the photos…</span> : null}
       {count ? <span className="text-[12.5px] text-ink-soft">{count} of {limits.maxPhotos}</span> : null}
     </div>
   );
