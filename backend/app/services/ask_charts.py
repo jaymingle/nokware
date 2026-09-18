@@ -22,9 +22,12 @@ from app.services.stats import FEWER_THAN_SMALL, SMALL
 DOCUMENT_CHART_REFUSAL = phrase("ask.document_chart_refusal")
 SPREADSHEET_REFUSAL = phrase("ask.spreadsheet_refusal")
 ASKS_FOR_SPREADSHEET = re.compile(r"\b(spread ?sheets?|excel|xlsx?|workbook|csv|\.xls)\b", re.IGNORECASE)
+# Anyone who plainly means "I want to see this" is asking for a chart. A request that can't be drawn is answered
+# with the reason, so a matcher that reaches too far costs a sentence; one that reaches too short says nothing at all.
 ASKS_FOR_CHART = re.compile(
-    r"\b(charts?|graphs?|plot(ted)?|visuali[sz](e|ation)|diagram|pie|donut|doughnut|histogram|infographic|stacked|"
-    r"(bar|line|column)s? (chart|graph|diagram))\b", re.IGNORECASE)
+    r"\b(charts?|graphs?|graphical(ly)?|graphics?|plot(s|ted|ting)?|visuali[sz](e|ed|ing|ation|ations)|visually|"
+    r"visual|diagrams?|pie|donut|doughnut|histograms?|infographics?|stacked|pictorial|pictures?|"
+    r"illustrat(e|ed|ion|ions)|draw(n|ing)?|show me|(bar|line|column)s? (chart|graph|diagram))\b", re.IGNORECASE)
 # The kinds a question can name, most specific first. Anything else charted is drawn as the nearest of these.
 NAMED = (
     ("stacked_bar", re.compile(r"\bstack(ed)?\b", re.IGNORECASE)),
@@ -44,6 +47,7 @@ MANY_CATEGORIES = "Only the {shown} largest of {total} are drawn; they are all i
 ONE_COUNT = phrase("ask.one_count")
 ONE_MONTH = phrase("ask.one_month")
 ALL_ZERO = phrase("ask.all_zero")
+TOTAL_AND_PARTS = phrase("ask.total_and_parts_only")
 ChartDict = dict[str, Any]
 
 
@@ -214,6 +218,8 @@ def chart_for(question: str, figures: list[dict[str, Any]]) -> tuple[ChartDict |
         parts, totals = _without_totals(figures)
         data = _separate(parts)
     if data is None or sum(len(values) for _, values in data.series) < 2:  # one count, or one month so far
+        if totals:  # a total was set aside and too little of its breakdown was left: say that, not "one count"
+            return None, TOTAL_AND_PARTS
         return None, ONE_MONTH if data is not None and data.over_time else ONE_COUNT
     if all(high == 0 for _, values in data.series for _, _, high in values):
         return None, ALL_ZERO

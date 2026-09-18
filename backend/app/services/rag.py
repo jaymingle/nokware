@@ -20,6 +20,10 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import Runnable
 
 from app.services.ask_charts import (
+    ALL_ZERO,
+    ONE_COUNT,
+    ONE_MONTH,
+    TOTAL_AND_PARTS,
     ChartDict,
     asks_for_chart,
     asks_for_spreadsheet,
@@ -311,6 +315,33 @@ def _budget_gap(prepared: Prepared) -> str:
 BODY = "\x00body"  # where the answer itself goes among the fixed sentences around it
 
 
+NO_ANSWER_TO_CHART = phrase("ask.no_answer_to_chart")
+NO_FIGURES_TO_CHART = phrase("ask.no_figures_to_chart")
+# A note is written in English and shown in the language asked; the composed ones (a chart kind, a cap) stay English.
+_NOTE_KEYS = {ONE_COUNT: "ask.one_count", ONE_MONTH: "ask.one_month", ALL_ZERO: "ask.all_zero",
+              TOTAL_AND_PARTS: "ask.total_and_parts_only", NO_ANSWER_TO_CHART: "ask.no_answer_to_chart",
+              NO_FIGURES_TO_CHART: "ask.no_figures_to_chart"}
+
+
+def _why_no_chart(prepared: Prepared, body: str, chart: ChartDict | None, figures: list[FigureSource],
+                  sources: list[Source]) -> str | None:
+    """A chart that can't be drawn is always accounted for: a request answered with nothing tells the reader
+    neither that it failed nor that it was never tried. The safety refusal is a paragraph already, and so is the
+    one for a document whose table couldn't be proved — which is what a cited source without figures means."""
+    if chart is not None or not asks_for_chart(prepared.question) or prepared.figures.safety_asked:
+        return None
+    if answer_status(body) != "answered":
+        return NO_ANSWER_TO_CHART
+    if any(figure["cited"] for figure in figures) or any(source["cited"] for source in sources):
+        return None
+    return NO_FIGURES_TO_CHART
+
+
+def _note_in(note: str | None, language: Language) -> str | None:
+    key = _NOTE_KEYS.get(note or "")
+    return phrase(key, language) if key else note
+
+
 def _notices(body: str, prepared: Prepared, question: str, chart: ChartDict | None, note: str | None,
              figures: list[FigureSource]) -> list[list[str]]:
     """Paragraphs of catalogue keys around BODY, so each language writes its own fixed sentences.
@@ -320,9 +351,10 @@ def _notices(body: str, prepared: Prepared, question: str, chart: ChartDict | No
     """
     answered = answer_status(body) == "answered"
     if prepared.figures.safety_asked and SAFETY_FIGURES_ANSWER not in body:
+        no_chart = ["ask.no_safety_chart"] if asks_for_chart(question) else []
         if not answered:  # no document answers it either, and saying so beats leaving figures looking withheld
-            return [["ask.safety_figures", "ask.no_safety_documents"]]
-        return [["ask.safety_figures"], ["ask.safety_in_documents"], [BODY]]
+            return [["ask.safety_figures", "ask.no_safety_documents", *no_chart]]
+        return [["ask.safety_figures", *no_chart], ["ask.safety_in_documents"], [BODY]]
     paragraphs = []
     if answered and asks_for_chart(question) and chart is None and note is None:
         paragraphs.append(["ask.document_chart_refusal"])
@@ -352,6 +384,7 @@ def finish(prepared: Prepared, raw_answer: str, asked: Asked | None = None) -> R
     chart, chart_note = chart_for(prepared.question, [dict(f) for f in figures if f["cited"]])
     if chart is None and chart_note is None and asks_for_chart(prepared.question):
         chart = _from_documents(prepared, body, sources)
+    chart_note = chart_note or _why_no_chart(prepared, body, chart, figures, sources)
     paragraphs = _notices(body, prepared, prepared.question, chart, chart_note, figures)
     in_english = _written(paragraphs, body, Language.ENGLISH)
     answer, language, translated = _in_the_language_asked(paragraphs, body, in_english, asked)
@@ -365,7 +398,7 @@ def finish(prepared: Prepared, raw_answer: str, asked: Asked | None = None) -> R
         figures=figures,
         search_queries=prepared.queries,
         chart=chart,
-        chart_note=chart_note,
+        chart_note=_note_in(chart_note, language),
     )
 
 

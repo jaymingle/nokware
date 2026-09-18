@@ -237,7 +237,8 @@ def _budget_figures(calls: list[dict[str, Any]]) -> tuple[list[BudgetFigure], li
     for index, call in enumerate(calls, 1):
         try:
             wanted = BudgetFigures.model_validate(call["args"])
-        except ValidationError:
+        except ValidationError as error:  # dropped without this line, and seen only as a figure that never arrives
+            logger.warning("A budget figure the model asked for made no sense and was dropped: %s", error)
             continue
         figure = budget_figures.figure(wanted, f"{budget_figures.LABEL_PREFIX}{index}")
         if figure:

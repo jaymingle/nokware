@@ -96,6 +96,26 @@
       "critical": true,
       "text": "Nokware can't file this: it isn't an Assembly matter. Ambulance: 193, 0501 614 877, 0505 982 870. Or call 112.",
       "note": "The numbers are digits from the contacts data and are never translated; only the words around them are."
+    },
+    "ask.no_figures_to_chart": {
+      "critical": false,
+      "text": "There are no figures in this answer to chart.",
+      "note": "A chart was asked for, but the answer holds no figures at all — said instead of leaving the request unanswered."
+    },
+    "ask.no_answer_to_chart": {
+      "critical": false,
+      "text": "There's nothing to chart: the Ledger doesn't hold an answer to this yet.",
+      "note": "A chart was asked for on a question the Ledger can't answer."
+    },
+    "ask.no_safety_chart": {
+      "critical": false,
+      "text": "No chart either: these figures aren't published at all.",
+      "note": "A chart was asked for alongside figures about someone's safety, which Nokware never publishes."
+    },
+    "ask.total_and_parts_only": {
+      "critical": false,
+      "text": "The only figures here are a total and one part of it. A total drawn beside its parts reads as one of them, so there's nothing to chart.",
+      "note": "Replaces the old, wrong 'only one count here' when a total was left out and one part remained."
     }
   }
 }

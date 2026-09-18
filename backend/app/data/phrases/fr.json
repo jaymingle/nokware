@@ -67,6 +67,22 @@
     },
     "safety.medical": {
       "text": "Nokware ne peut pas enregistrer ceci : cela ne relève pas de l'Assemblée. Ambulance : 193, 0501 614 877, 0505 982 870. Ou appelez le 112."
+    },
+    "ask.no_figures_to_chart": {
+      "critical": false,
+      "text": "Cette réponse ne contient aucun chiffre à représenter."
+    },
+    "ask.no_answer_to_chart": {
+      "critical": false,
+      "text": "Il n'y a rien à représenter : le Registre ne contient pas encore de réponse à cette question."
+    },
+    "ask.no_safety_chart": {
+      "critical": false,
+      "text": "Pas de graphique non plus : ces chiffres ne sont pas publiés du tout."
+    },
+    "ask.total_and_parts_only": {
+      "critical": false,
+      "text": "Les seuls chiffres ici sont un total et l'une de ses composantes. Un total placé à côté de ses composantes se lit comme l'une d'elles : il n'y a donc rien à représenter."
     }
   }
 }

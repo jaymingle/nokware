@@ -119,6 +119,16 @@ function ReplyBody({ turn, jump, onRetry, testId }: { turn: Turn; jump: Jump; on
   );
 }
 
+/** Why there is no chart. Shown under an answer, and on its own where there was no answer to attach it to:
+    a request that produces silence tells the reader neither that it failed nor that it was never tried. */
+function ChartNote({ note, testId }: { note: string; testId: string }) {
+  return (
+    <p className="border-t bg-paper-subtle px-4 py-3 text-[13px] text-ink-soft italic sm:px-5" data-testid={`${testId}-chart-note`}>
+      {note}
+    </p>
+  );
+}
+
 function Attachments({ turn, jump, testId }: { turn: Turn; jump: Jump; testId: string }) {
   const figures = turn.figures.filter((figure) => figure.cited);
   const cited = citedDocuments(turn);
@@ -128,7 +138,7 @@ function Attachments({ turn, jump, testId }: { turn: Turn; jump: Jump; testId: s
   return (
     <div className="flex flex-col gap-4 border-t bg-paper-subtle px-4 py-4 sm:px-5" data-testid={`${testId}-attachments`}>
       {turn.chart ? <AnswerChart chart={turn.chart} testId={testId} /> : null}
-      {note ? <p className="text-[13px] text-ink-soft italic" data-testid={`${testId}-chart-note`}>{turn.chartNote}</p> : null}
+      {note ? <p className="text-[13px] text-ink-soft italic" data-testid={`${testId}-chart-note`}>{note}</p> : null}
       {figures.length ? (
         <section aria-label="Figures" className="flex flex-col gap-2.5">
           <h3 className="font-sans text-[12px] font-medium tracking-wide text-ink-soft uppercase">Figures</h3>
@@ -173,6 +183,7 @@ function ReplyMessage({ turn, anchorPrefix, onRetry, testId }: { turn: Turn; anc
           <ReplyBody turn={turn} jump={jump} onRetry={onRetry} testId={testId} />
         </div>
         {answered ? <Attachments turn={turn} jump={jump} testId={testId} /> : null}
+        {!answered && done && turn.chartNote ? <ChartNote note={turn.chartNote} testId={testId} /> : null}
       </div>
     </div>
   );
