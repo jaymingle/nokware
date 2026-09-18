@@ -31,7 +31,7 @@ from app.services.citizen_reports import IntakeChannel, NotificationChannel, Not
 from app.services.report_intake import Receipt, ReportSubmission
 from app.services.report_rules import Classification, ClassificationMethod
 from app.services.report_taxonomy import TOPICS_BY_ID, Category
-from app.services.whatsapp import TwilioWhatsApp, WhatsAppError, split
+from app.services.whatsapp import TwilioWhatsApp, WhatsAppError, WhatsAppNothingSent, WhatsAppUnreachable, split
 from app.services.whatsapp_conversation import ASK_KIND, CANCELLED, Inbound, Media
 
 NUMBER = "+233507387216"
@@ -82,6 +82,40 @@ def test_a_message_is_posted_to_twilio_with_the_status_callback() -> None:
         lambda r: httpx.Response(401, json={"code": 20003, "message": "Authenticate"}))))
     with pytest.raises(WhatsAppError, match="20003"):
         refusing.send(NUMBER, "Hello")
+
+
+def _twilio_raising(error: Exception) -> TwilioWhatsApp:
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise error
+
+    return TwilioWhatsApp("AC1", TOKEN, "whatsapp:+1", client=httpx.Client(transport=httpx.MockTransport(handler)))
+
+
+@pytest.mark.parametrize("error", [httpx.ConnectError("no route"), httpx.ConnectTimeout("too slow")])
+def test_a_whatsapp_message_that_never_reached_twilio_says_nothing_was_sent(error: Exception) -> None:
+    """No connection was ever made, so nobody got anything: sending it again is the same message arriving late."""
+    with pytest.raises(WhatsAppNothingSent) as raised:
+        _twilio_raising(error).send(NUMBER, "Hello")
+    assert type(error).__name__ in str(raised.value) and NUMBER not in str(raised.value)
+
+
+@pytest.mark.parametrize("error", [httpx.ReadTimeout("no answer"), httpx.RemoteProtocolError("dropped")])
+def test_a_whatsapp_message_twilio_never_answered_may_have_gone_out_and_is_told_apart(error: Exception) -> None:
+    """The request may have arrived; no SID came back, so no status callback can ever settle it."""
+    with pytest.raises(WhatsAppUnreachable) as raised:
+        _twilio_raising(error).send(NUMBER, "Hello")
+    assert not isinstance(raised.value, WhatsAppNothingSent) and NUMBER not in str(raised.value)
+
+
+def test_a_whatsapp_refusal_twilio_answered_is_neither_and_is_never_sent_again() -> None:
+    """Twilio answered, so the message may have been delivered anyway — and 63016 is the SMS stand-in's to handle."""
+    refusing = TwilioWhatsApp("AC1", TOKEN, "whatsapp:+1", client=httpx.Client(transport=httpx.MockTransport(
+        lambda r: httpx.Response(400, json={"code": 63016, "message": "Outside the window"}))))
+    with pytest.raises(WhatsAppError) as raised:
+        refusing.send(NUMBER, "Hello")
+    assert "63016" in str(raised.value)
+    assert not isinstance(raised.value, (WhatsAppNothingSent, WhatsAppUnreachable))
+    assert notifications._why_failed(raised.value) == ""  # no prefix: the sweep leaves it alone
 
 
 def test_only_twilios_signature_for_our_public_url_is_accepted(monkeypatch: pytest.MonkeyPatch) -> None:

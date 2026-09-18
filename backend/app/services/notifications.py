@@ -39,7 +39,7 @@ from app.services.report_taxonomy import Category
 from app.services.sms import SmsLimitReached, SmsNothingSent, SmsUnreachable, arkesel
 from app.services.sms_bms import bms
 from app.services.sms_text import bare_address, pages
-from app.services.whatsapp import first_delivery, twilio, window_open
+from app.services.whatsapp import WhatsAppNothingSent, WhatsAppUnreachable, first_delivery, twilio, window_open
 from app.teams import short_name
 
 logger = logging.getLogger(__name__)
@@ -173,14 +173,22 @@ def _outbox(case_id: str, event: NotificationEvent, channel: NotificationChannel
     return document.id
 
 
+NOTHING_LEFT_US = (SmsNothingSent, WhatsAppNothingSent)
+NO_ANSWER = (SmsUnreachable, WhatsAppUnreachable)
+
+
 def _why_failed(error: Exception) -> str:
     """Which kind of failure this was, as the prefix the sweep reads back. An unknown one carries none: it means the
-    provider answered, so the message may have gone out, and only the three named kinds are ever sent again."""
+    provider answered, so the message may have gone out, and only the three named kinds are ever sent again.
+
+    Both channels are read the same way. A WhatsApp send that never reached Twilio is the same thing to a resident as
+    an SMS that never reached Arkesel, and a Twilio timeout is the same thing as an Arkesel one.
+    """
     if isinstance(error, SmsLimitReached):
         return BUDGET_REFUSED
-    if isinstance(error, SmsNothingSent):
+    if isinstance(error, NOTHING_LEFT_US):
         return NOTHING_SENT
-    return UNREACHABLE if isinstance(error, SmsUnreachable) else ""
+    return UNREACHABLE if isinstance(error, NO_ANSWER) else ""
 
 
 def _deliver(provider: Provider | None, number: str, message: Message) -> dict[str, Any]:

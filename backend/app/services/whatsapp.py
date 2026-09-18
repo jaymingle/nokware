@@ -5,6 +5,10 @@ behind ngrok or a proxy the API's own URL differs.
 
 WhatsApp allows free-form messages only within 24 hours of the citizen's last message; outside that window
 notifications go by SMS instead (see notifications.py).
+
+A send that fails says which kind of failure it was, as the SMS side does: a request that never left this process,
+a Twilio that never answered, or a Twilio that answered and refused. Only the first two are ever sent again, and the
+outbox row records which, so the missed-message sweep can tell a lost message from a delivered one.
 """
 
 import logging
@@ -34,8 +38,29 @@ class WhatsAppError(RuntimeError):
     """Twilio refused the message or couldn't be reached. The text is safe to store."""
 
 
+class WhatsAppNothingSent(WhatsAppError):
+    """The request never left this process: no connection to Twilio was ever made. Nothing reached anyone, so sending
+    it again is this message arriving late, not a second one."""
+
+
+class WhatsAppUnreachable(WhatsAppError):
+    """Twilio never answered. The request may have arrived and the message may have been delivered, but no message
+    SID came back, so no status callback can ever settle it. The resident gets the message rather than the silence."""
+
+
 class WhatsAppNotConfigured(RuntimeError):
     """WHATSAPP_PROVIDER=twilio without the settings it needs."""
+
+
+# Only a connection that was never made is certain to have sent nothing. Anything after that — the request written,
+# then a timeout or a dropped connection — may have reached Twilio, so it is judged by the rule the SMS side uses.
+NEVER_LEFT = (httpx.ConnectError, httpx.ConnectTimeout)
+
+
+def _no_answer(error: httpx.HTTPError) -> WhatsAppError:
+    """Which kind of no-answer this was. The text carries the failure's type name and nothing else: never a number."""
+    said = f"Twilio couldn't be reached ({type(error).__name__})."
+    return WhatsAppNothingSent(said) if isinstance(error, NEVER_LEFT) else WhatsAppUnreachable(said)
 
 
 def split(text: str, limit: int = BODY_MAX) -> list[str]:
@@ -70,9 +95,11 @@ class TwilioWhatsApp:
         try:
             response = self.client.post(f"{API}/Accounts/{self.account_sid}/Messages.json", data=form, auth=(self.account_sid, self.auth_token))
         except httpx.HTTPError as error:
-            raise WhatsAppError(f"Twilio couldn't be reached ({type(error).__name__}).") from None
+            raise _no_answer(error) from None
         payload = response.json() if response.headers.get("content-type", "").startswith("application/json") else {}
         if response.is_error:
+            # Twilio answered: this message may have been delivered anyway, and error 63016 — free-form outside the
+            # 24-hour window — is answered by the SMS stand-in. Neither is ever sent again by the sweep.
             raise WhatsAppError(f"Twilio refused the message ({response.status_code}, code {payload.get('code')}): {payload.get('message', '')[:200]}")
         return str(payload.get("sid", ""))
 

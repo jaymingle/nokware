@@ -9,6 +9,7 @@ from app.services import notifications
 from app.services.citizen_reports import NotificationChannel, NotificationEvent, NotificationStatus
 from app.services.notifications import channels_for, compose
 from app.services.sms import SmsError, SmsLimitReached, SmsNothingSent, SmsUnreachable
+from app.services.whatsapp import WhatsAppNothingSent, WhatsAppUnreachable
 
 CIVIC = {"$id": "c1", "reference": "K7QM-4TXP", "category": "civic_service", "recipients": ["dept-works"]}
 SAFETY = {"$id": "c2", "reference": "M3RD-8WQA", "category": "personal_safety", "recipients": ["agency-police", "dept-social-welfare"]}
@@ -184,6 +185,28 @@ def test_a_provider_that_refused_with_an_answer_is_none_of_the_three_and_is_neve
     outcome = notifications._deliver(Broken(SmsError("Arkesel refused the request (400): invalid")), "+233", compose(NotificationEvent.SUBMITTED, CIVIC))
     assert not notifications.nothing_was_sent(outcome) and not notifications.provider_unreachable(outcome)
     assert not notifications.repaired(outcome)
+
+
+def test_a_whatsapp_send_that_never_left_is_marked_the_way_the_sms_side_is() -> None:
+    """The outbox row is read by the sweep, which knows only the prefixes — so both channels have to write them."""
+    never_left = WhatsAppNothingSent("Twilio couldn't be reached (ConnectError).")
+    outcome = notifications._deliver(Broken(never_left), "+233241234567", compose(NotificationEvent.SUBMITTED, CIVIC))
+
+    assert notifications.nothing_was_sent(outcome) and not notifications.provider_unreachable(outcome)
+    assert "ConnectError" in outcome["error"] and "+233" not in outcome["error"]
+    note = notifications._history_note(NotificationEvent.SUBMITTED, NotificationChannel.WHATSAPP, outcome, None)
+    assert note == "Submission WhatsApp message not sent: it never reached the provider. It will be sent again."
+
+
+def test_a_whatsapp_send_twilio_never_answered_is_sent_again_rather_than_left_as_silence() -> None:
+    """It may have been delivered; nothing can ever settle it. A duplicate reference beats a resident hearing nothing."""
+    unanswered = WhatsAppUnreachable("Twilio couldn't be reached (ReadTimeout).")
+    outcome = notifications._deliver(Broken(unanswered), "+233241234567", compose(NotificationEvent.SUBMITTED, CIVIC))
+
+    assert notifications.provider_unreachable(outcome) and not notifications.nothing_was_sent(outcome)
+    assert "ReadTimeout" in outcome["error"] and "+233" not in outcome["error"]
+    note = notifications._history_note(NotificationEvent.SUBMITTED, NotificationChannel.WHATSAPP, outcome, None)
+    assert note == "Submission WhatsApp message may not have gone out: the provider didn't answer. It will be sent again."
 
 
 def test_a_repaired_row_keeps_its_own_status_and_says_what_it_was(monkeypatch: pytest.MonkeyPatch) -> None:
