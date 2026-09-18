@@ -8,7 +8,7 @@ import pytest
 from app.services import notifications
 from app.services.citizen_reports import NotificationChannel, NotificationEvent, NotificationStatus
 from app.services.notifications import channels_for, compose
-from app.services.sms import SmsLimitReached
+from app.services.sms import SmsError, SmsLimitReached, SmsNothingSent, SmsUnreachable
 
 CIVIC = {"$id": "c1", "reference": "K7QM-4TXP", "category": "civic_service", "recipients": ["dept-works"]}
 SAFETY = {"$id": "c2", "reference": "M3RD-8WQA", "category": "personal_safety", "recipients": ["agency-police", "dept-social-welfare"]}
@@ -48,7 +48,7 @@ def test_until_a_provider_is_wired_in_messages_are_recorded_as_not_sent(monkeypa
     notifications.notify(CIVIC, NotificationEvent.SUBMITTED)
 
     assert written == [{"status": NotificationStatus.NOT_SENT.value, "provider": "log"}]
-    assert history[0].note == "Submission SMS recorded, not sent: no provider is configured yet."
+    assert history[0].note == "Submission SMS recorded, not sent: no provider is configured yet. It will be sent once one is."
     assert "+233" not in history[0].note
 
 
@@ -109,3 +109,41 @@ def test_a_report_with_no_agreed_channel_says_so_in_the_log(monkeypatch: pytest.
     with caplog.at_level(logging.INFO):
         notifications.notify({"$id": "case-1"}, NotificationEvent.SUBMITTED)
     assert "No message about case case-1" in caplog.text
+
+
+def test_a_send_our_own_side_never_attempted_is_told_apart_from_one_the_provider_refused() -> None:
+    """The counter the daily budget needs couldn't be reached: nothing was handed to the provider, so it goes again."""
+    stopped = SmsNothingSent("The SMS limit can't be checked (RedisUnavailable), so nothing was sent.")
+    outcome = notifications._deliver(Broken(stopped), "+233241234567", compose(NotificationEvent.SUBMITTED, CIVIC))
+
+    assert notifications.nothing_was_sent(outcome) and not notifications.budget_refused(outcome)
+    assert not notifications.provider_unreachable(outcome) and "+233" not in outcome["error"]
+    note = notifications._history_note(NotificationEvent.SUBMITTED, NotificationChannel.SMS, outcome, None)
+    assert note == "Submission SMS not sent: it never reached the provider. It will be sent again."
+
+
+def test_a_send_the_provider_never_answered_is_told_apart_so_it_can_be_sent_again() -> None:
+    """No message ID came back, so no delivery report and no poll can ever say whether the resident got it."""
+    unanswered = SmsUnreachable("Arkesel couldn't be reached (ReadTimeout).")
+    outcome = notifications._deliver(Broken(unanswered), "+233241234567", compose(NotificationEvent.SUBMITTED, CIVIC))
+
+    assert notifications.provider_unreachable(outcome) and not notifications.nothing_was_sent(outcome)
+    assert "ReadTimeout" in outcome["error"] and "+233" not in outcome["error"]
+    note = notifications._history_note(NotificationEvent.SUBMITTED, NotificationChannel.SMS, outcome, None)
+    assert note == "Submission SMS may not have gone out: the provider didn't answer. It will be sent again."
+
+
+def test_a_provider_that_refused_with_an_answer_is_none_of_the_three_and_is_never_sent_again() -> None:
+    outcome = notifications._deliver(Broken(SmsError("Arkesel refused the request (400): invalid")), "+233", compose(NotificationEvent.SUBMITTED, CIVIC))
+    assert not notifications.nothing_was_sent(outcome) and not notifications.provider_unreachable(outcome)
+    assert not notifications.repaired(outcome)
+
+
+def test_a_repaired_row_keeps_its_own_status_and_says_what_it_was(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`not_sent` is what really happened to that row; the prefix alone is what stops a second send."""
+    written: list[Any] = []
+    monkeypatch.setattr(notifications.get_databases(), "update_document", lambda *args: written.append(args[3]))
+
+    notifications.mark_repaired("n1", "the sweep sent this message again", was="provider-unreachable: ReadTimeout")
+
+    assert "status" not in written[0] and notifications.repaired(written[0]) and "ReadTimeout" in written[0]["error"]
