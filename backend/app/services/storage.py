@@ -6,6 +6,7 @@ from datetime import timedelta
 from functools import lru_cache
 from uuid import uuid4
 
+import urllib3
 from minio import Minio
 from minio.error import S3Error
 
@@ -27,6 +28,10 @@ def _parse_endpoint(raw: str) -> tuple[str, bool]:
     return raw.rstrip("/"), True
 
 
+# A photo upload with no timeout would hold the resident's request until the SDK's own five-minute default.
+TIMEOUT = urllib3.Timeout(connect=5, read=30)
+
+
 @lru_cache
 def get_minio() -> Minio:
     settings = get_settings()
@@ -37,6 +42,7 @@ def get_minio() -> Minio:
         secret_key=settings.minio_secret_key,
         secure=secure,
         region=MINIO_REGION,
+        http_client=urllib3.PoolManager(timeout=TIMEOUT, retries=urllib3.Retry(total=1, connect=1, read=0, redirect=0)),
     )
 
 

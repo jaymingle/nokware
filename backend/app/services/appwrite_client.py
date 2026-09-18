@@ -26,6 +26,9 @@ _DEPRECATION_MARKER = "has been deprecated since"
 # Appwrite's side closes a kept-alive connection left idle for a few minutes (seen at about four); after this long
 # without a call, the kept connections are dropped rather than tried.
 IDLE_RESET_SECONDS = 60
+# The SDK sends no timeout of its own, so a stalled connection would hold a worker thread — and a resident's
+# "Filing…" button — for as long as the network let it. Seconds to connect, then to wait for a reply.
+TIMEOUT = (5, 25)
 
 
 class _DropSdkDeprecations(logging.Filter):
@@ -62,6 +65,7 @@ class _PooledRequests:
         self._lock = threading.Lock()
 
     def request(self, *args: Any, **kwargs: Any) -> requests.Response:
+        kwargs.setdefault("timeout", TIMEOUT)
         with self._lock:
             now = time.monotonic()
             if now - self._last_call > IDLE_RESET_SECONDS:
