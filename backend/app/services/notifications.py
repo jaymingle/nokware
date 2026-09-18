@@ -309,6 +309,12 @@ def notify(case: dict[str, Any], event: NotificationEvent) -> None:
 
 
 def _outbox_row(provider_message_id: str) -> dict[str, Any] | None:
+    if not provider_message_id:
+        # A provider that answers without an ID leaves a row with an empty one, so an empty ID here would match some
+        # other resident's message — and a delivery report about nothing would be written onto it, or the SMS
+        # stand-in sent to whoever it belongs to.
+        logger.warning("A delivery report arrived with no message ID, so no outbox row can answer for it")
+        return None
     rows = get_databases().list_documents(
         DATABASE_ID, NOTIFICATIONS_COLLECTION, queries=[Query.equal("providerMessageId", provider_message_id), Query.limit(1)]
     ).documents

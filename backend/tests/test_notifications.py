@@ -1,6 +1,7 @@
 """Messages to citizens: when, to which channels, and what they say."""
 
 import logging
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
@@ -207,6 +208,20 @@ def test_a_whatsapp_send_twilio_never_answered_is_sent_again_rather_than_left_as
     assert "ReadTimeout" in outcome["error"] and "+233" not in outcome["error"]
     note = notifications._history_note(NotificationEvent.SUBMITTED, NotificationChannel.WHATSAPP, outcome, None)
     assert note == "Submission WhatsApp message may not have gone out: the provider didn't answer. It will be sent again."
+
+
+class NoLookups:
+    def list_documents(self, *args: Any, **kwargs: Any) -> Any:
+        raise AssertionError("the outbox was searched for an empty provider message ID")
+
+
+def test_a_callback_with_no_message_id_answers_for_no_row_at_all(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A provider that answers without an ID leaves a row holding an empty one, and an empty ID would match it:
+    some other resident's message marked delivered, or sent again by SMS on the strength of a callback about nothing."""
+    monkeypatch.setattr(notifications, "get_databases", NoLookups)
+
+    assert notifications.record_delivery("", "delivered", datetime(2026, 9, 18, tzinfo=UTC)) is False
+    assert notifications.whatsapp_undelivered("", notifications.OUTSIDE_WINDOW_ERROR) is False
 
 
 def test_a_repaired_row_keeps_its_own_status_and_says_what_it_was(monkeypatch: pytest.MonkeyPatch) -> None:
