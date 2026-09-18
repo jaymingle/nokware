@@ -178,6 +178,11 @@ INDEXES: dict[str, dict[str, tuple[DatabasesIndexType, list[str]]]] = {
         "uniq_reference": (UNIQUE, ["reference"]),
         "idx_category_created": (KEY, ["category", "createdAt"]),
         "idx_subMetro": (KEY, ["subMetro"]),
+        # The missed-message sweep looks for cases by when each moment happened: filed, resolved, escalated.
+        # idx_category_created can't serve those — its first column is the category, not the date.
+        "idx_createdAt": (KEY, ["createdAt"]),
+        "idx_resolvedAt": (KEY, ["resolvedAt"]),
+        "idx_escalatedAt": (KEY, ["escalatedAt"]),
     },
     HISTORY: {"idx_case_timestamp": (KEY, ["caseId", "timestamp"])},
     ASSIGNMENTS: {

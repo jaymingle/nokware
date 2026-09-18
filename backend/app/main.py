@@ -108,7 +108,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     # BMS sends no delivery reports, so they are asked for.
     polling = settings.bms_delivery_poll_seconds if settings.sms_provider == "bms" else 0
     deliveries = scheduler.start(polling, run_bms_delivery_poll, "BMS delivery check")
-    # A "received" message lost with the process before it reached the outbox is sent late rather than never.
+    # A message a resident is owed — received, resolved, escalation received — is sent late rather than never.
     missed = scheduler.start(settings.missed_message_sweep_interval_seconds, run_missed_message_sweep, "Missed-message sweep")
     # The MCP server at /mcp answers only while its session manager runs, and its own app's lifespan never does here.
     async with stats_mcp.SERVER.session_manager.run():
