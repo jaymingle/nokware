@@ -6,6 +6,7 @@ import { useFileReport } from "@/lib/api/public-queries";
 import { NO_CONTACT, reportFormData, type Contact } from "@/lib/report/form";
 
 import type { ReportReceipt } from "@/lib/api/types";
+import type { Sending } from "@/lib/api/upload";
 import type { ReportPhoto } from "@/lib/report/photos";
 
 function text(fields: FormData, name: string): string | undefined {
@@ -15,7 +16,8 @@ function text(fields: FormData, name: string): string | undefined {
 
 /** Photos and numbers are held here; the text fields are read from the form when it is sent. */
 export function useReportForm(onFiled: (receipt: ReportReceipt) => void) {
-  const filing = useFileReport();
+  const [sending, setSending] = useState<Sending | null>(null);
+  const filing = useFileReport(setSending);
   const [photos, setPhotos] = useState<ReportPhoto[]>([]);
   const [contact, setContact] = useState<Contact>(NO_CONTACT);
   const submit = (event: FormEvent<HTMLFormElement>, safetyTopic?: string) => {
@@ -29,7 +31,8 @@ export function useReportForm(onFiled: (receipt: ReportReceipt) => void) {
       safetyTopic,
       photos: photos.map((photo) => photo.file),
     });
-    filing.mutate(form, { onSuccess: onFiled });
+    setSending({ sent: 0, total: 1 });
+    filing.mutate(form, { onSuccess: onFiled, onError: () => setSending(null) });
   };
-  return { photos, setPhotos, contact, setContact, submit, filing };
+  return { photos, setPhotos, contact, setContact, submit, filing, sending };
 }

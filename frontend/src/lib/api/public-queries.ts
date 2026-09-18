@@ -19,6 +19,7 @@ import {
 } from "@/lib/api/public";
 
 import type { PreferencesResult, ReportPreferences, ReportReceipt, ReportStatus, VoiceResult } from "@/lib/api/types";
+import type { Sending } from "@/lib/api/upload";
 
 const DASHBOARD_STALE_MS = 60_000; // the API recomputes the figures at most once a minute
 
@@ -37,8 +38,8 @@ export function useReportOptions() {
   return useQuery({ queryKey: publicKeys.reportOptions, queryFn: getReportOptions, staleTime: Infinity });
 }
 
-export function useFileReport() {
-  return useMutation<ReportReceipt, Error, FormData>({ mutationFn: fileReport });
+export function useFileReport(onProgress?: (sending: Sending) => void) {
+  return useMutation<ReportReceipt, Error, FormData>({ mutationFn: (form) => fileReport(form, onProgress) });
 }
 
 export function useReportStatus(reference: string | null) {

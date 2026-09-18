@@ -1,6 +1,7 @@
 import { ErrorNote } from "@/components/documents/panels";
 import { Button } from "@/components/ui/button";
 
+import type { Sending } from "@/lib/api/upload";
 import type { ReactNode } from "react";
 
 export function FormSection({ title, hint, children }: { title: string; hint: string; children: ReactNode }) {
@@ -15,10 +16,17 @@ export function FormSection({ title, hint, children }: { title: string; hint: st
   );
 }
 
-type FormActionsProps = { busy: boolean; error: Error | null; onBack: () => void };
+type FormActionsProps = { busy: boolean; error: Error | null; sending: Sending | null; onBack: () => void };
 
-/** Filing waits on the classifier, so the wait is explained. */
-export function FormActions({ busy, error, onBack }: FormActionsProps) {
+/** What is actually happening, and nothing more: the photos go first, and the API then reads and routes the report.
+    Naming stages the browser can't see ("classifying", "routing") would be a guess dressed as progress. */
+function sendingLabel(sending: Sending | null): string {
+  if (sending === null || sending === "filing") return "Filing your report…";
+  const percent = Math.round((sending.sent / Math.max(sending.total, 1)) * 100);
+  return `Sending your photos… ${percent}%`;
+}
+
+export function FormActions({ busy, error, sending, onBack }: FormActionsProps) {
   return (
     <div className="flex flex-col gap-3">
       {error ? <ErrorNote testId="report-error">{error.message}</ErrorNote> : null}
@@ -30,8 +38,8 @@ export function FormActions({ busy, error, onBack }: FormActionsProps) {
           Back
         </Button>
         {busy ? (
-          <span className="text-[12.5px] text-ink-soft" aria-live="polite">
-            This can take a few seconds.
+          <span className="text-[12.5px] text-ink-soft" aria-live="polite" data-testid="report-progress">
+            {sendingLabel(sending)}
           </span>
         ) : null}
       </div>

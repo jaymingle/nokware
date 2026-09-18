@@ -14,7 +14,7 @@ import type { ReportOptions, ReportReceipt } from "@/lib/api/types";
 export type ReportFormProps = { options: ReportOptions; onFiled: (receipt: ReportReceipt) => void; onBack: () => void };
 
 export function CivicForm({ options, onFiled, onBack }: ReportFormProps) {
-  const { photos, setPhotos, contact, setContact, submit, filing } = useReportForm(onFiled);
+  const { photos, setPhotos, contact, setContact, submit, filing, sending } = useReportForm(onFiled);
   const limits = { maxPhotos: options.max_photos, maxBytes: options.max_photo_bytes };
   return (
     <Card>
@@ -40,7 +40,7 @@ export function CivicForm({ options, onFiled, onBack }: ReportFormProps) {
             department sees what you write and your photos, never your number. Other residents will see that a report
             about this topic in this area exists and can add their voice; your words, photos and number are never shown.
           </Note>
-          <FormActions busy={filing.isPending} error={filing.error} onBack={onBack} />
+          <FormActions busy={filing.isPending} error={filing.error} sending={sending} onBack={onBack} />
         </form>
       </CardContent>
     </Card>

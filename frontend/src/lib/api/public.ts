@@ -1,6 +1,7 @@
 // The API's public routes: no sign-in, so this never loads the auth client.
 import { ApiError, UNREACHABLE, errorMessage } from "@/lib/api/errors";
 import { timedOut, timedOutMessage, withTimeout } from "@/lib/api/timeout";
+import { postWithProgress, type Sending } from "@/lib/api/upload";
 import { env } from "@/lib/env";
 
 import type {
@@ -80,8 +81,9 @@ export function getReportOptions(): Promise<ReportOptions> {
 }
 
 /** A multipart report: the fields plus up to 10 "photos". */
-export function fileReport(form: FormData): Promise<ReportReceipt> {
-  return publicRequest<ReportReceipt>("/api/reports", { method: "POST", body: form });
+export function fileReport(form: FormData, onProgress?: (sending: Sending) => void): Promise<ReportReceipt> {
+  if (!onProgress) return publicRequest<ReportReceipt>("/api/reports", { method: "POST", body: form });
+  return postWithProgress<ReportReceipt>("/api/reports", form, onProgress);
 }
 
 export function getReportStatus(reference: string): Promise<ReportStatus> {

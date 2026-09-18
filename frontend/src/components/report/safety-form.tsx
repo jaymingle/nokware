@@ -29,7 +29,7 @@ function WhoReceives({ type }: { type: SafetyType }) {
 
 /** The citizen names the danger, so the report goes straight to its services, privately. */
 export function SafetyForm({ options, onFiled, onBack }: ReportFormProps) {
-  const { photos, setPhotos, contact, setContact, submit, filing } = useReportForm(onFiled);
+  const { photos, setPhotos, contact, setContact, submit, filing, sending } = useReportForm(onFiled);
   const [topic, setTopic] = useState("");
   const chosen = options.safety_types.find((type) => type.id === topic);
   const limits = { maxPhotos: options.max_photos, maxBytes: options.max_photo_bytes };
@@ -65,7 +65,7 @@ export function SafetyForm({ options, onFiled, onBack }: ReportFormProps) {
             <NumberFields contact={contact} onChange={setContact} sensitive />
             <SafetyConsents contact={contact} onChange={setContact} />
           </FormSection>
-          <FormActions busy={filing.isPending} error={filing.error} onBack={onBack} />
+          <FormActions busy={filing.isPending} error={filing.error} sending={sending} onBack={onBack} />
         </form>
       </CardContent>
     </Card>
