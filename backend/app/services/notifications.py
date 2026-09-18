@@ -36,13 +36,22 @@ from app.services.citizen_reports import (
 from app.services.ledger_documents import now_iso
 from app.services.report_contacts import GHANA_CODE, contact_for, masked
 from app.services.report_taxonomy import Category
-from app.services.sms import arkesel
+from app.services.sms import SmsLimitReached, arkesel
 from app.services.sms_bms import bms
 from app.services.sms_text import bare_address, pages
 from app.services.whatsapp import first_delivery, twilio, window_open
 from app.teams import short_name
 
 logger = logging.getLogger(__name__)
+
+# Two things that look alike in the outbox and are not: a message our own daily budget refused, where nothing at all
+# left this process and sending it tomorrow is simply the message arriving late; and a message the provider was asked
+# for and refused, which may have gone out anyway. Both end as `failed` — the outbox has no column for the
+# difference and adding one would be a schema change — so the free-form `error` string carries it, under a prefix
+# written here and read back by budget_refused(). A stale row the sweep gave up on is closed the same way: `failed`
+# is the only status that means "settled, never retried", and the prefix says which kind of settled it is.
+BUDGET_REFUSED = "our-daily-budget: "
+STALE_QUEUED = "stale-queued: "
 
 CHANNEL_NAMES = {NotificationChannel.SMS: "SMS", NotificationChannel.WHATSAPP: "WhatsApp message"}
 EVENT_NAMES = {
@@ -166,8 +175,21 @@ def _deliver(provider: Provider | None, number: str, message: Message) -> dict[s
         message_id = provider.send(number, message.body)
     except Exception as error:  # a provider failure must never break the case itself
         logger.exception("Message to %s failed", masked(number))
-        return {"status": NotificationStatus.FAILED.value, "provider": provider.name, "error": str(error)[:500]}
+        prefix = BUDGET_REFUSED if isinstance(error, SmsLimitReached) else ""
+        return {"status": NotificationStatus.FAILED.value, "provider": provider.name, "error": f"{prefix}{error}"[:500]}
     return {"status": NotificationStatus.SENT.value, "provider": provider.name, "providerMessageId": message_id, "sentAt": now_iso()}
+
+
+def budget_refused(row: dict[str, Any]) -> bool:
+    """True when our own daily budget refused this message: nothing reached anyone, so sending it again is safe."""
+    return row.get("status") == NotificationStatus.FAILED and (row.get("error") or "").startswith(BUDGET_REFUSED)
+
+
+def mark_stale_queued(outbox_id: str, note: str) -> None:
+    """Closes a row left `queued` by a process that died mid-send. We can never learn whether that message went, so
+    the row is settled rather than left open, and the prefix keeps it from being retried a second time."""
+    changes = {"status": NotificationStatus.FAILED.value, "error": f"{STALE_QUEUED}{note}"[:500]}
+    get_databases().update_document(DATABASE_ID, NOTIFICATIONS_COLLECTION, outbox_id, changes)
 
 
 def _history_note(event: NotificationEvent, channel: NotificationChannel, outcome: dict[str, Any], provider: Provider | None) -> str:
@@ -176,6 +198,8 @@ def _history_note(event: NotificationEvent, channel: NotificationChannel, outcom
         return f"{what} sent." if provider is None or provider.delivers else f"{what} accepted by the provider's sandbox, not delivered."
     if outcome["status"] == NotificationStatus.NOT_SENT:
         return f"{what} recorded, not sent: no provider is configured yet."
+    if budget_refused(outcome):  # nothing left this process, and a later sweep sends it: don't call that a failure
+        return f"{what} not sent: today's message limit was reached. It will be sent again."
     return f"{what} failed to send."
 
 

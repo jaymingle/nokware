@@ -8,6 +8,7 @@ import pytest
 from app.services import notifications
 from app.services.citizen_reports import NotificationChannel, NotificationEvent, NotificationStatus
 from app.services.notifications import channels_for, compose
+from app.services.sms import SmsLimitReached
 
 CIVIC = {"$id": "c1", "reference": "K7QM-4TXP", "category": "civic_service", "recipients": ["dept-works"]}
 SAFETY = {"$id": "c2", "reference": "M3RD-8WQA", "category": "personal_safety", "recipients": ["agency-police", "dept-social-welfare"]}
@@ -51,15 +52,50 @@ def test_until_a_provider_is_wired_in_messages_are_recorded_as_not_sent(monkeypa
     assert "+233" not in history[0].note
 
 
+class Broken:
+    """A provider that refuses whatever it is handed."""
+
+    name = "arkesel"
+
+    def __init__(self, error: Exception) -> None:
+        self.error = error
+
+    def send(self, to: str, body: str) -> str:
+        raise self.error
+
+
 def test_a_provider_failure_is_recorded_and_never_raised() -> None:
-    class Broken:
-        name = "arkesel"
-
-        def send(self, to: str, body: str) -> str:
-            raise RuntimeError("gateway down")
-
-    outcome = notifications._deliver(Broken(), "+233241234567", compose(NotificationEvent.SUBMITTED, CIVIC))
+    outcome = notifications._deliver(Broken(RuntimeError("gateway down")), "+233241234567", compose(NotificationEvent.SUBMITTED, CIVIC))
     assert outcome["status"] == NotificationStatus.FAILED.value and outcome["provider"] == "arkesel"
+    assert not notifications.budget_refused(outcome)  # the provider was asked and may have delivered: never retried
+
+
+def test_our_own_budget_refusing_a_message_is_told_apart_from_the_provider_refusing_it() -> None:
+    """Both end as `failed`; only one means nothing reached anyone, and only that one may be sent again."""
+    refusal = SmsLimitReached("Today's limit of 200 SMS pages is reached.")
+    outcome = notifications._deliver(Broken(refusal), "+233241234567", compose(NotificationEvent.SUBMITTED, CIVIC))
+
+    assert outcome["status"] == NotificationStatus.FAILED.value and notifications.budget_refused(outcome)
+    assert str(refusal) in outcome["error"] and "+233" not in outcome["error"]
+
+
+def test_a_budget_refusal_is_not_written_into_the_case_history_as_a_failure() -> None:
+    refused = {"status": NotificationStatus.FAILED.value, "error": f"{notifications.BUDGET_REFUSED}spent"}
+    note = notifications._history_note(NotificationEvent.SUBMITTED, NotificationChannel.SMS, refused, None)
+    assert note == "Submission SMS not sent: today's message limit was reached. It will be sent again."
+
+    failed = {"status": NotificationStatus.FAILED.value, "error": "Arkesel refused the request (400)"}
+    assert notifications._history_note(NotificationEvent.SUBMITTED, NotificationChannel.SMS, failed, None) == "Submission SMS failed to send."
+
+
+def test_a_row_left_queued_mid_send_is_closed_so_it_is_never_retried_twice(monkeypatch: pytest.MonkeyPatch) -> None:
+    written: list[Any] = []
+    monkeypatch.setattr(notifications.get_databases(), "update_document", lambda *args: written.append(args[3]))
+
+    notifications.mark_stale_queued("n1", "the send never finished")
+
+    assert written[0]["status"] == NotificationStatus.FAILED.value  # `failed` is the one status the sweep never retries
+    assert written[0]["error"].startswith(notifications.STALE_QUEUED) and not notifications.budget_refused(written[0])
 
 
 def test_a_resolution_after_the_escalation_is_final_and_offers_no_second_escalation() -> None:
