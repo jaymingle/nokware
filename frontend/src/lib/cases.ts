@@ -58,3 +58,30 @@ const EVENT_LABELS: Record<string, string> = {
 export function caseEventText(event: { action: string; note?: string | null }): string {
   return event.note ?? EVENT_LABELS[event.action] ?? event.action;
 }
+
+/** What a department sees its own part of a case as: the MCE's view of the whole case is filtered separately. */
+export const MY_FILTERS = {
+  all: { label: "All", matches: () => true },
+  new: { label: "New", matches: (c: CaseSummary) => c.my_status === "assigned" && c.status !== "escalated" },
+  in_progress: { label: "In progress", matches: (c: CaseSummary) => c.my_status === "in_progress" && c.status !== "escalated" },
+  resolved: { label: "Resolved", matches: (c: CaseSummary) => c.my_status === "resolved" || c.status === "resolved" },
+} as const;
+
+export type MyFilterKey = keyof typeof MY_FILTERS;
+
+/**
+ * The queue arrives unfinished first, then most severe, then longest waiting — so nobody's report is left while
+ * newer ones are picked off. Newest first is offered beside it, not instead of it.
+ */
+export const ORDERS = {
+  urgent: { label: "Most urgent", sort: null },
+  newest: { label: "Newest first", sort: (a: CaseSummary, b: CaseSummary) => Date.parse(b.submitted_at) - Date.parse(a.submitted_at) },
+} as const;
+
+export type OrderKey = keyof typeof ORDERS;
+
+export function arrange(cases: CaseSummary[], filter: MyFilterKey, order: OrderKey): CaseSummary[] {
+  const shown = cases.filter(MY_FILTERS[filter].matches);
+  const sort = ORDERS[order].sort;
+  return sort ? [...shown].sort(sort) : shown;
+}
