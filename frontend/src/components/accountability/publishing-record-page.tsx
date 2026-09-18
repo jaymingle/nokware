@@ -3,6 +3,7 @@
 import { CircleCheckIcon, CircleDashedIcon, CircleXIcon, MinusIcon, type LucideIcon } from "lucide-react";
 import { Fragment, useState } from "react";
 
+import { OtherView } from "@/components/accountability/other-view";
 import { RecordDetail } from "@/components/accountability/record-detail";
 import { ReportingGaps } from "@/components/accountability/reporting-gaps";
 import { UnpublishedRecord } from "@/components/accountability/unpublished-data";
@@ -216,6 +217,9 @@ export function PublishingRecordPage() {
       <PageIntro eyebrow="Accountability" title="What the Assembly publishes">
         The documents the Accra Metropolitan Assembly is required to publish, against what The Ledger holds, year by year. It shows the gaps, not just the contents.
       </PageIntro>
+      <OtherView href="/accountability/departments" title="How departments respond" testId="record-to-responsiveness">
+        The same Assembly measured by what it does with what residents report.
+      </OtherView>
       {record.isPending ? <LoadingPanel label="Checking the record…" /> : null}
       {record.error ? <ErrorPanel message={record.error.message} onRetry={() => record.refetch()} /> : null}
       {record.data ? (

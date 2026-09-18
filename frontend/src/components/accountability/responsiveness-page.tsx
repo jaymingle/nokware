@@ -1,6 +1,7 @@
 "use client";
 
 import { Lines, type Line } from "@/components/accountability/figure-lines";
+import { OtherView } from "@/components/accountability/other-view";
 import { PetitionFigures } from "@/components/accountability/petition-figures";
 import { CountValue } from "@/components/dashboard/count";
 import { ErrorPanel, LoadingPanel } from "@/components/documents/panels";
@@ -105,6 +106,9 @@ export function ResponsivenessPage() {
         Evidence about the Assembly&apos;s own behaviour: how quickly each department starts and resolves what residents report, and how it
         handles the documents contributors send it.
       </PageIntro>
+      <OtherView href="/accountability/documents" title="What the Assembly publishes" testId="responsiveness-to-record">
+        The same Assembly measured by the documents it is required to publish.
+      </OtherView>
       {figures.isPending ? <LoadingPanel label="Counting…" /> : null}
       {figures.error ? <ErrorPanel message={figures.error.message} onRetry={() => figures.refetch()} /> : null}
       {data ? (
