@@ -194,6 +194,7 @@ from development:
 | `PHONE_KEY_SECRET` | unset | **the new secret from step 3** |
 | `JOB_TOKEN` | unset | unset (optional; see step 3) |
 | `DEADLINE_JOB_INTERVAL_SECONDS`, `CONTACT_PURGE_INTERVAL_SECONDS` | `120`, `3600` | unchanged |
+| `MISSED_MESSAGE_SWEEP_INTERVAL_SECONDS` | `900` | unchanged: how often the API sends a "received" message that never reached the outbox (at most 20 a run, nothing older than 7 days) |
 
 `PUBLIC_API_URL` must be exactly the address Twilio and Arkesel call: the API
 checks Twilio's signature against it, and asks for delivery reports at it.

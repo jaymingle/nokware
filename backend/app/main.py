@@ -35,7 +35,16 @@ from app.routes import (
 from app.routes import (
     petitions as petition_routes,
 )
-from app.services import bms_deliveries, notifications, petition_clock, petitions, scheduler, search_index, whatsapp_voice
+from app.services import (
+    bms_deliveries,
+    notification_sweep,
+    notifications,
+    petition_clock,
+    petitions,
+    scheduler,
+    search_index,
+    whatsapp_voice,
+)
 from app.services.appwrite_client import quiet_sdk_deprecation_warnings
 from app.services.issue_voices import InvalidVoice, IssueNotFound, purge_expired_voice_names
 from app.services.ledger_documents import utc_now
@@ -99,6 +108,8 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     # BMS sends no delivery reports, so they are asked for.
     polling = settings.bms_delivery_poll_seconds if settings.sms_provider == "bms" else 0
     deliveries = scheduler.start(polling, run_bms_delivery_poll, "BMS delivery check")
+    # A "received" message lost with the process before it reached the outbox is sent late rather than never.
+    missed = scheduler.start(settings.missed_message_sweep_interval_seconds, run_missed_message_sweep, "Missed-message sweep")
     # The MCP server at /mcp answers only while its session manager runs, and its own app's lifespan never does here.
     async with stats_mcp.SERVER.session_manager.run():
         yield
@@ -106,10 +117,15 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     await scheduler.stop(clock)
     await scheduler.stop(purge)
     await scheduler.stop(deliveries)
+    await scheduler.stop(missed)
 
 
 def run_petition_clock() -> None:
     petition_clock.run_clock(utc_now())
+
+
+def run_missed_message_sweep() -> None:
+    notification_sweep.run_sweep(utc_now())
 
 
 def run_bms_delivery_poll() -> None:

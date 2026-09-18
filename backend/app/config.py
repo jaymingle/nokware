@@ -90,6 +90,11 @@ class Settings(BaseSettings):
     # 0 turns it off.
     contact_purge_interval_seconds: int = 3600
 
+    # The sweep for a "received" message that never reached the outbox at all (a restart between the 201 and the
+    # background task). The gap is rare and the scan is not free, so it is not worth the deadline job's two minutes;
+    # a quarter of an hour still reaches the resident while they are plausibly still waiting. 0 turns it off.
+    missed_message_sweep_interval_seconds: int = 900
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
