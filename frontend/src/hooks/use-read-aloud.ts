@@ -33,6 +33,10 @@ export function useReadAloud(load: (part: number) => Promise<SpokenPart>) {
     pending.current.set(part, request);
     return request;
   };
+  /** The first part, made before it is asked for: the model takes seconds, and the cache then answers in one. */
+  const prefetch = () => {
+    if (state === "idle" && !resumeAt) void fetchPart(0).catch(() => undefined);
+  };
   const start = async (audio: HTMLAudioElement) => {
     if (current && current !== audio) current.pause();
     current = audio;
@@ -73,5 +77,5 @@ export function useReadAloud(load: (part: number) => Promise<SpokenPart>) {
     else if (state === "paused") start(audio).catch(() => setState("paused"));
     else void play(resumeAt, audio);
   };
-  return { state, error, resuming: state === "idle" && resumeAt > 0, toggle };
+  return { state, error, resuming: state === "idle" && resumeAt > 0, toggle, prefetch };
 }

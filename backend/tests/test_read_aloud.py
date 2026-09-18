@@ -45,8 +45,8 @@ def test_an_answer_is_read_as_words_with_where_its_sources_are() -> None:
 def test_a_reading_is_made_in_parts_that_end_at_sentences_the_first_short() -> None:
     script = read_aloud.answer_script("Tell me everything", "The Assembly plans many things for the markets. " * 40, "answered")
     made = read_aloud.parts(script)
-    assert len(made[0]) <= read_aloud.FIRST_PART_CHARS and all(len(part) <= read_aloud.PART_CHARS for part in made)
-    assert " ".join(made) == script and all(part.endswith(".") for part in made) and len(made) <= 7
+    assert len(made[0]) <= read_aloud.FIRST_PART_MAX and all(len(part) <= read_aloud.PART_CHARS for part in made)
+    assert " ".join(made) == script and all(part.endswith(".") for part in made[1:]) and len(made) <= 8
     assert read_aloud.parts("Hello, Accra.") == ["Hello, Accra."]
     run_on = "word " * 200  # no full stop anywhere: split between words
     assert all(0 < len(part) <= read_aloud.PART_CHARS for part in read_aloud.parts(run_on))
@@ -107,7 +107,8 @@ def test_only_an_answer_the_api_gave_is_read_aloud(spoken: list[str]) -> None:
     view = _view("What does a market stall cost?", ANSWER)
     response = client.post("/api/speech/answer", json={"view": view})
     assert response.status_code == 200 and response.headers["content-type"] == "audio/mpeg" and response.content == b"ID3-mp3"
-    assert response.headers["x-speech-parts"] == "1" and client.post("/api/speech/answer", json={"view": view, "part": 1}).status_code == 404
+    made = int(response.headers["x-speech-parts"])
+    assert client.post("/api/speech/answer", json={"view": view, "part": made}).status_code == 404  # no part beyond the last
     forged = {**view, "answer": "Anything at all, read aloud for free."}
     assert client.post("/api/speech/answer", json={"view": forged}).status_code == 403
     unsafe = _view("Someone is beating my neighbour", "Call the Police on 191.")
@@ -131,3 +132,34 @@ def test_the_answer_says_whether_it_can_be_read_aloud() -> None:
     done = {"type": "done", "answer": ANSWER, "status": "answered", "cited": [], "chart": None, "chart_note": None}
     assert ask_routes._signed("What does a market stall cost?", done, {})["speakable"] is True
     assert ask_routes._signed("My uncle beats me", done, {})["speakable"] is False
+
+
+def test_the_first_words_are_reached_sooner_by_splitting_where_a_speaker_would_pause() -> None:
+    """The listener waits through the first part alone, and Gemini takes about 0.7 seconds a second of audio."""
+    budget = ("AMA approved GH¢ 20,270,110 for Head Office and GH¢ 20,232,848 for Public Works in its 2026 budget, "
+              "which together make up about half of the approved total. Education was approved GH¢ 7,786,630.")
+    made = read_aloud.parts(budget)
+    assert made[0] == "AMA approved GH¢ 20,270,110 for Head Office"  # the pause before the second amount
+    assert read_aloud._figures(made[0]) <= read_aloud.FIRST_PART_FIGURES and " ".join(made) == budget
+
+
+def test_a_sentence_with_nowhere_to_pause_is_left_whole() -> None:
+    """A seam mid-phrase is worse to listen to than the seconds it saves."""
+    unbroken = ("The Assembly has not published a quarterly financial report for the third quarter of 2025 anywhere "
+                "that Nokware can find. The publishing record shows every period it was due and what was asked for "
+                "under the Right to Information Act, with the date each request was sent to the Assembly.")
+    made = read_aloud.parts(unbroken)
+    assert made[0].endswith("can find.") and " ".join(made) == unbroken
+
+
+def test_a_short_answer_is_still_made_in_one_go() -> None:
+    short = "Residents filed 12 reports last month. Most were about waste collection and drains."
+    assert read_aloud.parts(short) == [short]
+
+
+def test_figures_count_towards_the_opening_because_they_are_slow_to_say() -> None:
+    """Three amounts in under 200 characters run to half a minute of audio: length alone would read that as short."""
+    amounts = "Head Office got GH¢ 20,270,110, Public Works GH¢ 20,232,848 and Education GH¢ 7,786,630 in 2026."
+    prose = "Head Office, Public Works and Education were each given a share of the approved budget for the coming year."
+    assert read_aloud._speaking_cost(amounts) > read_aloud._speaking_cost(prose) + 60 >= len(prose)
+    assert len(read_aloud.parts(amounts)) > 1
