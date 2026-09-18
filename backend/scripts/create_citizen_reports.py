@@ -115,12 +115,16 @@ def adjust_history() -> None:
 
 
 def adjust_notifications() -> None:
-    """The outbox's status gains "not_sent" (recorded while no provider is wired in)."""
+    """The outbox's enums, re-derived from the Python ones: status gained "not_sent" (recorded while no provider is
+    wired in) and event gained "started" (a recipient began work). Re-running writes the same set again."""
     db = get_databases()
     existing = {a.key for a in db.list_attributes(DATABASE_ID, NOTIFICATIONS, queries=LISTING).attributes}
     if "status" in existing:
         db.update_enum_attribute(DATABASE_ID, NOTIFICATIONS, "status", values(NotificationStatus), True, None)
         print("updated   notifications.status (the full set of outcomes)")
+    if "event" in existing:
+        db.update_enum_attribute(DATABASE_ID, NOTIFICATIONS, "event", values(NotificationEvent), True, None)
+        print("updated   notifications.event (the full set of moments a citizen hears about)")
 
 
 def assignment_attributes() -> dict[str, Creator]:
@@ -188,6 +192,8 @@ INDEXES: dict[str, dict[str, tuple[DatabasesIndexType, list[str]]]] = {
     ASSIGNMENTS: {
         "idx_recipient_active_status": (KEY, ["recipient", "active", "status"]),
         "idx_caseId": (KEY, ["caseId"]),
+        # The missed-message sweep looks for work started lately, and only the assignment records when that was.
+        "idx_acknowledgedAt": (KEY, ["acknowledgedAt"]),
     },
     CONTACTS: {"uniq_caseId": (UNIQUE, ["caseId"]), "idx_purgeAt": (KEY, ["purgeAt"])},
     NOTIFICATIONS: {"idx_caseId": (KEY, ["caseId"]), "idx_status": (KEY, ["status"])},
