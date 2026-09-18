@@ -1,12 +1,12 @@
 """The messages a resident agreed to and never got, on the channel they never got them on.
 
-A case reaches three moments a resident is told about: it was received, it was resolved, and — if they escalated it —
-the escalation was received. Each one answers 201 or 200 and hands the message to a background task. If the process
-restarts or dies in that moment the task goes with it: nothing is sent, and — because the outbox row is written by
-the send itself — nothing anywhere records that a message was owed. This sweep looks for that gap and sends the
-message the ordinary way, so the outbox row, the case-history line and the daily SMS budget all behave as they do on
-the ordinary path. The resolution and the escalation are the moments a resident has been waiting for, so they are
-repaired exactly as the receipt is.
+A case reaches four moments a resident is told about: it was received, a recipient started work on it, it was
+resolved, and — if they escalated it — the escalation was received. Each one answers 201 or 200 and hands the
+message to a background task. If the process restarts or dies in that moment the task goes with it: nothing is sent,
+and — because the outbox row is written by the send itself — nothing anywhere records that a message was owed. This
+sweep looks for that gap and sends the message the ordinary way, so the outbox row, the case-history line and the
+daily SMS budget all behave as they do on the ordinary path. The start of work, the resolution and the escalation
+are the moments a resident has been waiting for, so they are repaired exactly as the receipt is.
 
 What is repaired is one message on one channel, never the case as a whole. A resident who agreed to both SMS and
 WhatsApp and got only the SMS is owed the WhatsApp message and nothing else: repairing the case would either send
@@ -40,8 +40,9 @@ from appwrite.query import Query
 from app.services import case_history
 from app.services.appwrite_client import DATABASE_ID, as_record, every_record, get_databases
 from app.services.case_history import CaseHistoryAction
-from app.services.case_workflow import CaseStatus
+from app.services.case_workflow import CaseStatus, has_started
 from app.services.citizen_reports import (
+    ASSIGNMENTS_COLLECTION,
     CONTACTS_COLLECTION,
     NOTIFICATIONS_COLLECTION,
     REPORTS_COLLECTION,
@@ -70,7 +71,7 @@ logger = logging.getLogger(__name__)
 WINDOW = timedelta(days=7)
 # These are real messages and real credits, so one run repairs a little at a time, oldest first. A case counts once
 # however many of its moments and channels are repaired: the cap is there to keep a run small, and a case has at
-# most three moments on at most two channels.
+# most four moments on at most two channels.
 PER_RUN = 20
 # How many recent cases each of the three scans looks at. The gap is rare, so this bounds the work, not the repair:
 # a case further back than this is picked up by a later run, for as long as it stays inside the window.
@@ -92,8 +93,10 @@ EARLIER_GRACE = timedelta(minutes=5)
 RESOLUTION_ACTIONS = (CaseHistoryAction.RESOLVED, CaseHistoryAction.ESCALATION_CONFIRMED)
 ESCALATION_ACTIONS = (CaseHistoryAction.ESCALATED,)
 HISTORY_ACTIONS = [action.value for action in (*RESOLUTION_ACTIONS, *ESCALATION_ACTIONS)]
-# The fields a case's own moments are read from, and so the scans that find a case with a recent one.
+# The fields a case's own moments are read from, and so the scans that find a case with a recent one. The start of
+# work isn't among them: it is stamped on the assignment, not the case, and is scanned for there.
 DATED_BY = ("createdAt", "resolvedAt", "escalatedAt")
+STARTED_BY = "acknowledgedAt"  # on the assignment: when that recipient started work
 
 NOTHING_RECORDED = "nothing was ever written to the outbox"
 BUDGET = "our own daily SMS budget refused it, so nothing was sent to anyone"
@@ -108,10 +111,10 @@ CLOSED_REPAIRED = "the sweep sent this message again"
 CHANNELS = {channel.value: channel for channel in NotificationChannel}
 
 
-def _scan(field: str, since: str) -> list[dict[str, Any]]:
+def _scan(collection: str, field: str, since: str) -> list[dict[str, Any]]:
     listing = get_databases().list_documents(
         DATABASE_ID,
-        REPORTS_COLLECTION,
+        collection,
         queries=[
             Query.greater_than_equal(field, since),
             Query.order_asc(field),
@@ -121,17 +124,35 @@ def _scan(field: str, since: str) -> list[dict[str, Any]]:
     return [as_record(document) for document in listing.documents]
 
 
-def _recent_cases(now: datetime) -> list[dict[str, Any]]:
-    """Every case that reached one of its moments lately: filed, resolved, or escalated.
+def _started_lately(since: str, already: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
+    """The cases a recipient started work on lately, apart from the ones the scans above have already found.
 
-    Three scans rather than one, because a case filed months ago and resolved yesterday owes yesterday's message and
+    A fourth scan, and over the assignments rather than the cases, for the same reason there are three: a case filed
+    in March and picked up yesterday owes yesterday's message, and no scan by when it was filed would reach it.
+    """
+    started = {record["caseId"] for record in _scan(ASSIGNMENTS_COLLECTION, STARTED_BY, since)}
+    case_ids = sorted(started - set(already))
+    if not case_ids:
+        return []
+    listing = get_databases().list_documents(
+        DATABASE_ID, REPORTS_COLLECTION, queries=[Query.equal("$id", case_ids), Query.limit(len(case_ids))]
+    )
+    return [as_record(document) for document in listing.documents]
+
+
+def _recent_cases(now: datetime) -> list[dict[str, Any]]:
+    """Every case that reached one of its moments lately: filed, started, resolved, or escalated.
+
+    Four scans rather than one, because a case filed months ago and resolved yesterday owes yesterday's message and
     would never be found by when it was filed. A case found by two of them is looked at once.
     """
     since = (now - WINDOW).isoformat()
     found: dict[str, dict[str, Any]] = {}
     for field in DATED_BY:
-        for case in _scan(field, since):
+        for case in _scan(REPORTS_COLLECTION, field, since):
             found.setdefault(case["$id"], case)
+    for case in _started_lately(since, found):
+        found.setdefault(case["$id"], case)
     return sorted(found.values(), key=lambda case: str(case.get("createdAt") or ""))
 
 
@@ -176,11 +197,23 @@ class Moment:
     at: datetime
 
 
-def _reached(case: dict[str, Any], history: list[dict[str, Any]]) -> dict[NotificationEvent, datetime | None]:
+def _first_start(assignments: list[dict[str, Any]]) -> tuple[bool, datetime | None]:
+    """Whether work has started on this case, and when it first did — the earliest recipient's, because the citizen
+    is written to when the first one starts and not when the second does. None means it started and nothing stored
+    says when: an assignment that is in progress with no readable `acknowledgedAt`."""
+    started = [assignment for assignment in assignments if has_started(assignment)]
+    stamps = [at for assignment in started if (at := _at(assignment.get(STARTED_BY)))]
+    return bool(started), min(stamps, default=None)
+
+
+def _reached(case: dict[str, Any], history: list[dict[str, Any]],
+             assignments: list[dict[str, Any]]) -> dict[NotificationEvent, datetime | None]:
     """Which messages this case has reached, and when each became owed. A value of None means the case reached that
     moment and nothing stored says when.
 
     Received: every case has one, when it was filed.
+    Work started: once any recipient has acknowledged its own assignment, dated from the earliest of them. A case
+      reopened by the MCE has its acknowledgements cleared, so work starting on it again is a moment of its own.
     Resolved: while the case IS resolved, which is the one state that message describes. A case resolved and then
       escalated is not owed it any more: after an escalation that message reads "reviewed and resolved", which is
       not what happened, and telling a resident something untrue is a worse harm than a message they never got. A
@@ -189,6 +222,9 @@ def _reached(case: dict[str, Any], history: list[dict[str, Any]]) -> dict[Notifi
       your escalation" stays true. Late is not wrong; it can only be overtaken.
     """
     reached: dict[NotificationEvent, datetime | None] = {NotificationEvent.SUBMITTED: _at(case.get("createdAt"))}
+    started, started_at = _first_start(assignments)
+    if started:
+        reached[NotificationEvent.STARTED] = started_at
     if case.get("status") == CaseStatus.RESOLVED:
         reached[NotificationEvent.RESOLVED] = _at(case.get("resolvedAt")) or _last_entry(history, RESOLUTION_ACTIONS)
     escalated = _at(case.get("escalatedAt")) or _last_entry(history, ESCALATION_ACTIONS)
@@ -197,12 +233,13 @@ def _reached(case: dict[str, Any], history: list[dict[str, Any]]) -> dict[Notifi
     return reached
 
 
-def _moments(case: dict[str, Any], history: list[dict[str, Any]], now: datetime) -> list[Moment]:
+def _moments(case: dict[str, Any], history: list[dict[str, Any]], assignments: list[dict[str, Any]],
+             now: datetime) -> list[Moment]:
     """The moments this case could still be owed a message about, oldest first, so a repair sends them in the order
     they happened. A moment nothing can date is said aloud and left alone: a guessed date would either resend for
     ever or bury a message the resident is owed somewhere in the past."""
     moments = []
-    for event, at in _reached(case, history).items():
+    for event, at in _reached(case, history, assignments).items():
         if at is None:
             logger.warning(
                 "Missed-message sweep can't date the %s message for case %s: nothing stored says when it happened, "
@@ -307,11 +344,11 @@ class Owed:
         return "; ".join(f"{repair.event.value} by {repair.channel.value}: {repair.why}" for repair in self.repairs)
 
 
-def _repairs(case: dict[str, Any], history: list[dict[str, Any]], rows: list[dict[str, Any]],
-             channels: list[NotificationChannel], now: datetime) -> list[Repair]:
+def _repairs(case: dict[str, Any], history: list[dict[str, Any]], assignments: list[dict[str, Any]],
+             rows: list[dict[str, Any]], channels: list[NotificationChannel], now: datetime) -> list[Repair]:
     """Every message this case still owes, oldest moment first."""
     repairs: list[Repair] = []
-    for moment in _moments(case, history, now):
+    for moment in _moments(case, history, assignments, now):
         answering = [row for row in rows if _answers(row, moment)]
         for channel, these in _rows_by_channel(channels, answering).items():
             if why := _reason(these, now):
@@ -325,13 +362,14 @@ def _owed(cases: list[dict[str, Any]], now: datetime) -> list[Owed]:
     case_ids = list(agreed)
     rows = _records_by_case(NOTIFICATIONS_COLLECTION, case_ids)
     history = _records_by_case(case_history.COLLECTION_ID, case_ids, Query.equal("action", HISTORY_ACTIONS))
+    assignments = _records_by_case(ASSIGNMENTS_COLLECTION, case_ids)
     owed: list[Owed] = []
     for case in cases:
         channels = agreed.get(case["$id"])
         if not channels:
             continue
         found = rows.get(case["$id"], [])
-        if repairs := _repairs(case, history.get(case["$id"], []), found, channels, now):
+        if repairs := _repairs(case, history.get(case["$id"], []), assignments.get(case["$id"], []), found, channels, now):
             owed.append(Owed(case, repairs, found))
     return owed
 

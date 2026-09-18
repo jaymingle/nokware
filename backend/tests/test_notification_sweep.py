@@ -1,5 +1,5 @@
-"""The sweep for a message a resident never got on a channel they agreed to: the receipt, the resolution, and the
-acknowledged escalation alike.
+"""The sweep for a message a resident never got on a channel they agreed to: the receipt, the start of work, the
+resolution, and the acknowledged escalation alike.
 
 Storage is an in-memory fake that reads the real Appwrite queries, so the window and the "no row in any status" rule
 are the ones the sweep actually sends with. Sending is faked too: no test ever reaches a provider.
@@ -17,6 +17,7 @@ from app.services.appwrite_client import DATABASE_ID
 from app.services.case_history import CaseHistoryAction
 from app.services.case_workflow import CaseStatus
 from app.services.citizen_reports import (
+    ASSIGNMENTS_COLLECTION,
     CONTACTS_COLLECTION,
     NOTIFICATIONS_COLLECTION,
     REPORTS_COLLECTION,
@@ -31,6 +32,7 @@ BOTH = {"notify": True, "phone": "+233241234567", "whatsapp": "+233241234567"}
 WHATSAPP_ONLY = {"notify": True, "phone": None, "whatsapp": "+233241234567"}
 SMS, WHATSAPP = NotificationChannel.SMS, NotificationChannel.WHATSAPP
 SUBMITTED, RESOLVED, ESCALATED = NotificationEvent.SUBMITTED, NotificationEvent.RESOLVED, NotificationEvent.ESCALATED
+STARTED = NotificationEvent.STARTED
 
 
 def case(case_id: str, filed: datetime, **reached: str) -> dict[str, Any]:
@@ -47,6 +49,13 @@ def escalated_case(case_id: str, filed: datetime, at: datetime) -> dict[str, Any
     """As the lifecycle has it: resolved first, then escalated by the citizen within the fourteen days."""
     return case(case_id, filed, status=CaseStatus.ESCALATED.value,
                 resolvedAt=(at - timedelta(days=1)).isoformat(), escalatedAt=at.isoformat())
+
+
+def assignment(case_id: str, started: datetime | None, recipient: str = "dept-works",
+               status: str = "in_progress") -> dict[str, Any]:
+    """One recipient's part of a case. `started` is its acknowledgedAt: when that recipient began work."""
+    return {"$id": f"a-{case_id}-{recipient}", "caseId": case_id, "recipient": recipient, "active": True,
+            "status": status, "assignedAt": None, "acknowledgedAt": started.isoformat() if started else None}
 
 
 def entry(case_id: str, action: CaseHistoryAction, when: datetime) -> dict[str, Any]:
@@ -114,7 +123,8 @@ class FakeDatabases:
 @pytest.fixture
 def storage(monkeypatch: pytest.MonkeyPatch) -> dict[str, list[dict[str, Any]]]:
     collections: dict[str, list[dict[str, Any]]] = {
-        REPORTS_COLLECTION: [], CONTACTS_COLLECTION: [], NOTIFICATIONS_COLLECTION: [], case_history.COLLECTION_ID: []
+        REPORTS_COLLECTION: [], CONTACTS_COLLECTION: [], NOTIFICATIONS_COLLECTION: [],
+        ASSIGNMENTS_COLLECTION: [], case_history.COLLECTION_ID: []
     }
     fake = FakeDatabases(collections)
     monkeypatch.setattr(notification_sweep, "get_databases", lambda: fake)
@@ -414,6 +424,94 @@ def test_a_resolution_the_resident_never_heard_about_is_sent_once(
 
     assert notification_sweep.run_sweep(NOW) == ["c1"] and sent == ["c1/resolved/sms"]
     assert notification_sweep.run_sweep(NOW) == [] and sent == ["c1/resolved/sms"]
+
+
+def test_a_start_of_work_the_resident_never_heard_about_is_sent_once(
+    storage: dict[str, list[dict[str, Any]]], sent: list[str]
+) -> None:
+    """Someone picked the report up the same day and the resident heard nothing: the silence this message is for."""
+    filed = NOW - timedelta(days=1)
+    storage[REPORTS_COLLECTION].append(case("c1", filed))
+    storage[CONTACTS_COLLECTION].append({"$id": "c1", "caseId": "c1", **CONSENTED})
+    storage[ASSIGNMENTS_COLLECTION].append(assignment("c1", NOW - timedelta(hours=2)))
+    storage[NOTIFICATIONS_COLLECTION].append(outbox("c1", NotificationStatus.SENT, SUBMITTED, written=filed))
+
+    assert notification_sweep.run_sweep(NOW) == ["c1"] and sent == ["c1/started/sms"]
+    assert notification_sweep.run_sweep(NOW) == [] and sent == ["c1/started/sms"]  # the row it wrote settles it
+
+
+def test_the_second_recipient_starting_owes_nothing_because_the_first_one_already_did(
+    storage: dict[str, list[dict[str, Any]]], sent: list[str]
+) -> None:
+    """One message for the case, not one per office: the Police and Social Welfare each opening their own part is
+    one piece of news. The row written when the first started answers for the case."""
+    filed = NOW - timedelta(days=1)
+    storage[REPORTS_COLLECTION].append(case("c1", filed))
+    storage[CONTACTS_COLLECTION].append({"$id": "c1", "caseId": "c1", **CONSENTED})
+    first = NOW - timedelta(hours=4)
+    storage[ASSIGNMENTS_COLLECTION].append(assignment("c1", first, "agency-police"))
+    storage[ASSIGNMENTS_COLLECTION].append(assignment("c1", NOW - timedelta(hours=1), "dept-social-welfare"))
+    storage[NOTIFICATIONS_COLLECTION].append(outbox("c1", NotificationStatus.SENT, SUBMITTED, written=filed))
+    storage[NOTIFICATIONS_COLLECTION].append(outbox("c1", NotificationStatus.SENT, STARTED, written=first))
+
+    assert notification_sweep.run_sweep(NOW) == [] and sent == []
+
+
+def test_the_start_is_dated_from_the_first_recipient_so_a_late_second_one_revives_nothing(
+    storage: dict[str, list[dict[str, Any]]], sent: list[str]
+) -> None:
+    """The message goes on the first start, so that is the moment it is owed from. A "work has started" a week and a
+    half late is worse than none, and the second office starting doesn't make it new again."""
+    filed = NOW - timedelta(days=30)
+    storage[REPORTS_COLLECTION].append(case("c1", filed))
+    storage[CONTACTS_COLLECTION].append({"$id": "c1", "caseId": "c1", **CONSENTED})
+    storage[ASSIGNMENTS_COLLECTION].append(
+        assignment("c1", NOW - notification_sweep.WINDOW - timedelta(hours=1), "agency-police")
+    )
+    storage[ASSIGNMENTS_COLLECTION].append(assignment("c1", NOW - timedelta(hours=1), "dept-social-welfare"))
+
+    assert notification_sweep.run_sweep(NOW) == [] and sent == []
+
+
+def test_a_case_picked_up_long_after_it_was_filed_is_found_by_when_the_work_started(
+    storage: dict[str, list[dict[str, Any]]], sent: list[str]
+) -> None:
+    """Only the assignment records when work started, so the case itself is found through it. Filed a month ago, it
+    would never be reached by a scan over the case's own dates. The month-old receipt stays unsent."""
+    storage[REPORTS_COLLECTION].append(case("c1", NOW - timedelta(days=30)))
+    storage[CONTACTS_COLLECTION].append({"$id": "c1", "caseId": "c1", **CONSENTED})
+    storage[ASSIGNMENTS_COLLECTION].append(assignment("c1", NOW - timedelta(hours=2)))
+
+    assert notification_sweep.run_sweep(NOW) == ["c1"] and sent == ["c1/started/sms"]
+    assert notification_sweep.run_sweep(NOW) == [] and sent == ["c1/started/sms"]
+
+
+def test_a_start_nothing_can_date_is_said_aloud_rather_than_guessed_at(
+    storage: dict[str, list[dict[str, Any]]], sent: list[str], caplog: pytest.LogCaptureFixture
+) -> None:
+    """Work is in progress and no stamp says when it began: a guessed date would send it run after run."""
+    filed = NOW - timedelta(hours=2)
+    storage[REPORTS_COLLECTION].append(case("c1", filed))
+    storage[CONTACTS_COLLECTION].append({"$id": "c1", "caseId": "c1", **CONSENTED})
+    storage[ASSIGNMENTS_COLLECTION].append(assignment("c1", None))
+    storage[NOTIFICATIONS_COLLECTION].append(outbox("c1", NotificationStatus.SENT, SUBMITTED, written=filed))
+
+    assert notification_sweep.run_sweep(NOW) == [] and sent == []
+    assert "can't date the started message for case c1" in caplog.text and "+233" not in caplog.text
+
+
+def test_an_assignment_resolved_without_ever_being_started_owes_no_start(
+    storage: dict[str, list[dict[str, Any]]], sent: list[str]
+) -> None:
+    """A recipient may resolve a case outright, never acknowledging it. Nothing started, so nothing was owed: the
+    resolution is the message, and it is the only one."""
+    filed = NOW - timedelta(days=1)
+    storage[REPORTS_COLLECTION].append(resolved_case("c1", filed, NOW - timedelta(hours=2)))
+    storage[CONTACTS_COLLECTION].append({"$id": "c1", "caseId": "c1", **CONSENTED})
+    storage[ASSIGNMENTS_COLLECTION].append(assignment("c1", None, status="resolved"))
+    storage[NOTIFICATIONS_COLLECTION].append(outbox("c1", NotificationStatus.SENT, SUBMITTED, written=filed))
+
+    assert notification_sweep.run_sweep(NOW) == ["c1"] and sent == ["c1/resolved/sms"]
 
 
 def test_an_escalation_is_sent_and_the_resolution_the_case_has_moved_past_is_not(
