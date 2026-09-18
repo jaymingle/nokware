@@ -1,9 +1,9 @@
 "use client";
 
 import { PhoneIcon, UsersIcon } from "lucide-react";
-import Image from "next/image";
 
 import { CaseActions } from "@/components/cases/case-actions";
+import { PhotoGallery } from "@/components/cases/photo-gallery";
 import { SharedLocation } from "@/components/cases/shared-location";
 import { ErrorNote } from "@/components/documents/panels";
 import { Tag } from "@/components/documents/tag";
@@ -30,21 +30,6 @@ function Facts({ detail }: { detail: CaseDetail }) {
         </div>
       ))}
     </dl>
-  );
-}
-
-function Photos({ photos }: { photos: string[] }) {
-  if (photos.length === 0) return null;
-  return (
-    <ul className="grid grid-cols-3 gap-2" aria-label="Photos">
-      {photos.map((url, index) => (
-        <li key={url}>
-          <a href={url} target="_blank" rel="noopener noreferrer" data-testid={`case-photo-${index}`}>
-            <Image src={url} alt={`Photo ${index + 1} from the citizen`} width={160} height={120} unoptimized className="aspect-4/3 w-full rounded-md border object-cover" />
-          </a>
-        </li>
-      ))}
-    </ul>
   );
 }
 
@@ -94,7 +79,7 @@ function Body({ detail }: { detail: CaseDetail }) {
   return (
     <>
       <p className="text-[14.5px] whitespace-pre-line break-words">{detail.description}</p>
-      <Photos photos={detail.photos} />
+      <PhotoGallery photos={detail.photos} />
       {detail.escalation_note ? (
         <p className="rounded-lg bg-brick-tint px-3.5 py-3 text-[13px]"><span className="font-medium text-brick">The citizen escalated it: </span>{detail.escalation_note}</p>
       ) : null}
