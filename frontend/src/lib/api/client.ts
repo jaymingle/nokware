@@ -1,6 +1,7 @@
 import { AppwriteException } from "appwrite";
 
 import { ApiError, UNREACHABLE, errorMessage } from "@/lib/api/errors";
+import { timedOut, timedOutMessage, withTimeout } from "@/lib/api/timeout";
 import { clearJwt, getJwt } from "@/lib/auth/jwt";
 import { env } from "@/lib/env";
 
@@ -19,9 +20,9 @@ async function send(path: string, init: RequestInit): Promise<Response> {
   const headers = new Headers(init.headers);
   headers.set("Authorization", await bearer());
   try {
-    return await fetch(`${env.apiUrl}${path}`, { ...init, headers });
-  } catch {
-    throw new ApiError(0, UNREACHABLE);
+    return await fetch(`${env.apiUrl}${path}`, withTimeout({ ...init, headers }));
+  } catch (error) {
+    throw new ApiError(0, timedOut(error) ? timedOutMessage(init) : UNREACHABLE);
   }
 }
 

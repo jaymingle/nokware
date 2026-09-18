@@ -1,5 +1,6 @@
 // The API's public routes: no sign-in, so this never loads the auth client.
 import { ApiError, UNREACHABLE, errorMessage } from "@/lib/api/errors";
+import { timedOut, timedOutMessage, withTimeout } from "@/lib/api/timeout";
 import { env } from "@/lib/env";
 
 import type {
@@ -23,9 +24,9 @@ import type {
 async function publicFetch(path: string, init: RequestInit): Promise<Response> {
   let response: Response;
   try {
-    response = await fetch(`${env.apiUrl}${path}`, init);
-  } catch {
-    throw new ApiError(0, UNREACHABLE);
+    response = await fetch(`${env.apiUrl}${path}`, withTimeout(init));
+  } catch (error) {
+    throw new ApiError(0, timedOut(error) ? timedOutMessage(init) : UNREACHABLE);
   }
   if (!response.ok) throw new ApiError(response.status, await errorMessage(response));
   return response;
