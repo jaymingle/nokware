@@ -43,6 +43,9 @@ function HeldForConsent({ receipt }: { receipt: ReportReceipt }) {
         From what you wrote, Nokware has filed this as a report about someone&apos;s safety, so it is handled privately
         and never appears on the public dashboard.
       </p>
+      <p className="text-[14px]">
+        Nothing has been sent to your number, and nothing will be unless you ask for it here.
+      </p>
       {receipt.preferences_token ? <PreferencesForm reference={receipt.reference} token={receipt.preferences_token} /> : null}
     </section>
   );

@@ -1,5 +1,6 @@
 """Messages to citizens: when, to which channels, and what they say."""
 
+import logging
 from typing import Any
 
 import pytest
@@ -64,3 +65,11 @@ def test_a_provider_failure_is_recorded_and_never_raised() -> None:
 def test_a_resolution_after_the_escalation_is_final_and_offers_no_second_escalation() -> None:
     message = compose(NotificationEvent.RESOLVED, {**CIVIC, "escalatedAt": "2026-09-13T10:00:00+00:00"})
     assert message.template == "resolved_after_escalation" and "escalate" not in message.body
+
+
+def test_a_report_with_no_agreed_channel_says_so_in_the_log(monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture) -> None:
+    """A safety reclassification holds consent: nothing is sent and nothing fails, so the quiet has to be findable."""
+    monkeypatch.setattr(notifications, "contact_for", lambda case_id: {"phone": "", "whatsapp": "", "notify": False})
+    with caplog.at_level(logging.INFO):
+        notifications.notify({"$id": "case-1"}, NotificationEvent.SUBMITTED)
+    assert "No message about case case-1" in caplog.text

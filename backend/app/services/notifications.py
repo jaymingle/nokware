@@ -198,7 +198,11 @@ def _sms_can_stand_in(number: str, contact: dict[str, Any]) -> bool:
 
 def notify(case: dict[str, Any], event: NotificationEvent) -> None:
     contact = contact_for(case["$id"]) or {}
-    for channel, number in channels_for(contact):
+    channels = channels_for(contact)
+    if not channels:
+        # Nothing is sent and nothing fails: without this line the quiet is indistinguishable from a lost message.
+        logger.info("No message about case %s: the citizen agreed to none (%s)", case["$id"], EVENT_NAMES[event])
+    for channel, number in channels:
         message = compose(event, case)
         if channel == NotificationChannel.WHATSAPP and _sms_can_stand_in(number, contact) and not window_open(number):
             _send(case["$id"], event, NotificationChannel.SMS, number, message, WINDOW_CLOSED)
