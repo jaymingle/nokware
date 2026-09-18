@@ -10,7 +10,7 @@ from typing import Any
 
 import pytest
 
-from app.services import appwrite_client, notification_sweep
+from app.services import appwrite_client, notification_sweep, notifications
 from app.services.appwrite_client import DATABASE_ID
 from app.services.citizen_reports import (
     CONTACTS_COLLECTION,
@@ -30,9 +30,16 @@ def case(case_id: str, filed: datetime) -> dict[str, Any]:
             "topic": "drainage", "recipients": ["dept-works"], "createdAt": filed.isoformat()}
 
 
-def outbox(case_id: str, status: NotificationStatus, event: NotificationEvent = NotificationEvent.SUBMITTED) -> dict[str, Any]:
-    return {"$id": f"n-{case_id}-{event.value}", "caseId": case_id, "event": event.value,
-            "channel": NotificationChannel.SMS.value, "status": status.value}
+def outbox(case_id: str, status: NotificationStatus, event: NotificationEvent = NotificationEvent.SUBMITTED,
+           written: datetime = NOW, error: str | None = None, oid: str = "") -> dict[str, Any]:
+    row = {"$id": oid or f"n-{case_id}-{event.value}-{status.value}", "caseId": case_id, "event": event.value,
+           "channel": NotificationChannel.SMS.value, "status": status.value, "createdAt": written.isoformat()}
+    return {**row, "error": error} if error is not None else row
+
+
+def budget_refused(case_id: str) -> dict[str, Any]:
+    """What notifications._deliver writes when our own daily budget, not the provider, refused the message."""
+    return outbox(case_id, NotificationStatus.FAILED, error=f"{notifications.BUDGET_REFUSED}Today's limit of 200 SMS pages is reached.")
 
 
 class Listing:
@@ -72,6 +79,11 @@ class FakeDatabases:
                 raise AssertionError(f"the sweep sent a query the fake doesn't know: {query}")
         return Listing([Document(row) for row in rows[:limit]])
 
+    def update_document(self, database: str, collection: str, document_id: str, data: dict[str, Any]) -> None:
+        assert database == DATABASE_ID
+        row = next(row for row in self.collections[collection] if row["$id"] == document_id)
+        row.update(data)
+
 
 @pytest.fixture
 def storage(monkeypatch: pytest.MonkeyPatch) -> dict[str, list[dict[str, Any]]]:
@@ -79,6 +91,7 @@ def storage(monkeypatch: pytest.MonkeyPatch) -> dict[str, list[dict[str, Any]]]:
     fake = FakeDatabases(collections)
     monkeypatch.setattr(notification_sweep, "get_databases", lambda: fake)
     monkeypatch.setattr(appwrite_client, "get_databases", lambda: fake)  # every_record reads its own client
+    monkeypatch.setattr(notifications, "get_databases", lambda: fake)  # marking a stale row writes through this one
     return collections
 
 
@@ -109,12 +122,84 @@ def test_a_resident_who_agreed_and_got_nothing_is_sent_exactly_one_message(
 def test_a_case_whose_message_is_already_recorded_is_left_alone(
     storage: dict[str, list[dict[str, Any]]], sent: list[str], status: NotificationStatus
 ) -> None:
-    """A failed row means the provider was asked and may have delivered: a second message would be the duplicate."""
+    """A failed row means the provider was asked and may have delivered: a second message would be the duplicate.
+
+    The queued row here was written a moment ago, so a send is still plausibly in flight and nothing is resent.
+    """
     storage[REPORTS_COLLECTION].append(case("c1", NOW - timedelta(hours=2)))
     storage[CONTACTS_COLLECTION].append({"$id": "c1", "caseId": "c1", **CONSENTED})
     storage[NOTIFICATIONS_COLLECTION].append(outbox("c1", status))
 
     assert notification_sweep.run_sweep(NOW) == [] and sent == []
+
+
+def test_a_message_our_own_budget_refused_is_sent_again_and_then_only_once(
+    storage: dict[str, list[dict[str, Any]]], sent: list[str], caplog: pytest.LogCaptureFixture
+) -> None:
+    """Our daily limit means nothing reached anyone, so tomorrow's send is the same message late, not a second one."""
+    storage[REPORTS_COLLECTION].append(case("c1", NOW - timedelta(hours=2)))
+    storage[CONTACTS_COLLECTION].append({"$id": "c1", "caseId": "c1", **CONSENTED})
+    storage[NOTIFICATIONS_COLLECTION].append(budget_refused("c1"))
+
+    assert notification_sweep.run_sweep(NOW) == ["c1"] and sent == ["c1"]
+    assert notification_sweep.run_sweep(NOW) == [] and sent == ["c1"]  # the sent row it wrote settles the case
+    assert "+233" not in caplog.text
+
+
+def test_a_message_the_provider_refused_is_never_sent_again(storage: dict[str, list[dict[str, Any]]], sent: list[str]) -> None:
+    """The provider was asked and may have delivered anyway; only our own budget is safe to retry."""
+    storage[REPORTS_COLLECTION].append(case("c1", NOW - timedelta(hours=2)))
+    storage[CONTACTS_COLLECTION].append({"$id": "c1", "caseId": "c1", **CONSENTED})
+    storage[NOTIFICATIONS_COLLECTION].append(outbox("c1", NotificationStatus.FAILED, error="Arkesel refused the request (400): invalid"))
+
+    assert notification_sweep.run_sweep(NOW) == [] and sent == []
+
+
+def test_a_budget_refusal_beside_a_settled_row_leaves_the_case_alone(
+    storage: dict[str, list[dict[str, Any]]], sent: list[str]
+) -> None:
+    """A resend goes out on every agreed channel, so one unretriable row holds the whole case back."""
+    storage[REPORTS_COLLECTION].append(case("c1", NOW - timedelta(hours=2)))
+    storage[CONTACTS_COLLECTION].append({"$id": "c1", "caseId": "c1", **CONSENTED})
+    storage[NOTIFICATIONS_COLLECTION].append(budget_refused("c1"))
+    storage[NOTIFICATIONS_COLLECTION].append(outbox("c1", NotificationStatus.SENT))
+
+    assert notification_sweep.run_sweep(NOW) == [] and sent == []
+
+
+def test_a_row_left_queued_past_the_grace_is_sent_once_and_the_row_is_closed(
+    storage: dict[str, list[dict[str, Any]]], sent: list[str], caplog: pytest.LogCaptureFixture
+) -> None:
+    """The process died between writing the row and updating it: nobody would ever learn whether it went."""
+    storage[REPORTS_COLLECTION].append(case("c1", NOW - timedelta(hours=2)))
+    storage[CONTACTS_COLLECTION].append({"$id": "c1", "caseId": "c1", **CONSENTED})
+    stuck = outbox("c1", NotificationStatus.QUEUED, written=NOW - notification_sweep.QUEUED_GRACE - timedelta(minutes=1))
+    storage[NOTIFICATIONS_COLLECTION].append(stuck)
+
+    assert notification_sweep.run_sweep(NOW) == ["c1"] and sent == ["c1"]
+    assert stuck["status"] == NotificationStatus.FAILED.value and stuck["error"].startswith(notifications.STALE_QUEUED)
+    assert "+233" not in stuck["error"] and "+233" not in caplog.text
+    assert notification_sweep.run_sweep(NOW) == [] and sent == ["c1"]
+
+
+def test_a_stale_row_is_retried_once_even_when_the_resend_sticks_too(
+    storage: dict[str, list[dict[str, Any]]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Otherwise every run would resend: one duplicate is the price, an endless stream of them is not."""
+    tried: list[str] = []
+
+    def sticking_notify(case: dict[str, Any], event: NotificationEvent) -> None:
+        tried.append(case["$id"])
+        storage[NOTIFICATIONS_COLLECTION].append(outbox(case["$id"], NotificationStatus.QUEUED, event, oid="n-resend"))
+
+    monkeypatch.setattr(notification_sweep, "notify", sticking_notify)
+    storage[REPORTS_COLLECTION].append(case("c1", NOW - timedelta(hours=2)))
+    storage[CONTACTS_COLLECTION].append({"$id": "c1", "caseId": "c1", **CONSENTED})
+    storage[NOTIFICATIONS_COLLECTION].append(outbox("c1", NotificationStatus.QUEUED, written=NOW - timedelta(hours=1)))
+
+    assert notification_sweep.run_sweep(NOW) == ["c1"] and tried == ["c1"]
+    later = NOW + notification_sweep.QUEUED_GRACE + timedelta(minutes=1)  # the resend's own row is stale by now
+    assert notification_sweep.run_sweep(later) == [] and tried == ["c1"]
 
 
 def test_a_message_about_another_moment_is_not_the_one_that_is_owed(storage: dict[str, list[dict[str, Any]]], sent: list[str]) -> None:
