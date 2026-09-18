@@ -294,3 +294,11 @@ def test_a_passage_from_the_ledger_reads_as_words_and_the_same_text_shows_once(m
     docs = {d: {"$id": d, "title": d.title(), "status": "published", "department": "dept-disaster-management"} for d in ("plan", "copy", "budget")}
     monkeypatch.setattr(petition_ledger.ledger_documents, "get_documents", lambda ids: docs)
     assert [m.id for m in petition_ledger.search("drainage")] == ["plan", "budget"]
+
+
+def test_the_tabs_are_told_how_many_petitions_stand_in_each_group(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A tab that only says "Open" leaves the reader counting cards to learn whether anything is happening."""
+    stored = [{"status": "open"}, {"status": "open"}, {"status": "awaiting_response"}, {"status": "responded"},
+              {"status": "closed"}, {"status": "withdrawn"}, {"status": "in_review"}]
+    monkeypatch.setattr(petitions, "every_record", lambda collection, queries: stored)
+    assert petitions.public_counts() == {"open": 2, "awaiting": 1, "responded": 1, "closed": 2}

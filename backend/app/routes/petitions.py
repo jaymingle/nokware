@@ -50,7 +50,6 @@ from app.services.petition_rules import (
     REVIEW_WINDOW,
     Draft,
     InvalidPetition,
-    PetitionStatus,
     Response,
     Scope,
     petition_topics,
@@ -65,8 +64,7 @@ Changes = Depends(rate_limited(rate_limit.PETITION_CHANGES))
 Signing = Depends(rate_limited(rate_limit.SIGNING))
 Mce = Annotated[Principal, Depends(require_roles(Role.MCE))]
 PAGE_MAX = 50
-GROUPS = {"open": [PetitionStatus.OPEN], "awaiting": [PetitionStatus.AWAITING_RESPONSE], "responded": [PetitionStatus.RESPONDED],
-          "closed": [PetitionStatus.CLOSED, PetitionStatus.WITHDRAWN]}
+GROUPS = petitions.PUBLIC_GROUPS
 
 
 def confirmed_phone(x_phone_proof: Annotated[str | None, Header()] = None) -> phone_proof.Proof:
@@ -104,7 +102,7 @@ def published(
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> PetitionPage:
     found, total = petitions.list_public(GROUPS[group], topic, limit, offset)
-    return PetitionPage(petitions=[present.card(p) for p in found], total=total,
+    return PetitionPage(petitions=[present.card(p) for p in found], total=total, counts=petitions.public_counts(),
                         moderation=present.moderation(petitions.moderation_counts()),
                         topics=[Option(id=t.id, name=t.label) for t in petition_topics()])
 

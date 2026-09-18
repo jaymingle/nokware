@@ -135,6 +135,7 @@ class Moderation(BaseModel):
 class PetitionPage(BaseModel):
     petitions: list[PetitionCard]
     total: int
+    counts: dict[str, int]  # how many stand in each group, so a tab says what it holds
     moderation: Moderation
     topics: list[Option]
 

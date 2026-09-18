@@ -302,6 +302,24 @@ def awaiting_response() -> list[dict[str, Any]]:
                                                Query.order_asc("responseDue")])
 
 
+# The four groups a published petition can be in, and the statuses each one gathers. The route names them in its
+# URL; the counts below use the same map, so a tab can never say a number the list underneath won't show.
+PUBLIC_GROUPS: dict[str, list[PetitionStatus]] = {
+    "open": [PetitionStatus.OPEN],
+    "awaiting": [PetitionStatus.AWAITING_RESPONSE],
+    "responded": [PetitionStatus.RESPONDED],
+    "closed": [PetitionStatus.CLOSED, PetitionStatus.WITHDRAWN],
+}
+
+
+def public_counts() -> dict[str, int]:
+    """How many petitions stand in each group. One read of their statuses rather than a count each, which on a
+    public page would be four round trips for four small numbers."""
+    rows = every_record(PETITIONS_COLLECTION, [Query.is_not_null("publishedAt"), NOT_TEST, Query.select(["status"])])
+    standing = Counter(str(row.get("status")) for row in rows)
+    return {group: sum(standing[status.value] for status in statuses) for group, statuses in PUBLIC_GROUPS.items()}
+
+
 def _count(queries: list[str]) -> int:
     _, total = list_petitions([*queries, NOT_TEST, Query.limit(1)])
     return total

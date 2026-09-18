@@ -2629,6 +2629,10 @@ export interface components {
             petitions: components["schemas"]["PetitionCard"][];
             /** Total */
             total: number;
+            /** Counts */
+            counts: {
+                [key: string]: number;
+            };
             moderation: components["schemas"]["Moderation"];
             /** Topics */
             topics: components["schemas"]["Option"][];

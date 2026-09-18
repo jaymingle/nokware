@@ -28,16 +28,26 @@ const EMPTY: Record<PetitionGroup, string> = {
   closed: "No petitions have closed yet.",
 };
 
-function Tabs({ group, onGroup }: { group: PetitionGroup; onGroup: (group: PetitionGroup) => void }) {
+function Tabs({ group, counts, onGroup }: { group: PetitionGroup; counts?: Record<string, number>; onGroup: (group: PetitionGroup) => void }) {
   return (
     <div role="tablist" aria-label="Petitions" className="flex gap-1 rounded-lg bg-paper-subtle p-1">
-      {GROUPS.map((g) => (
-        <button key={g.id} type="button" role="tab" aria-selected={group === g.id} onClick={() => onGroup(g.id)}
-          className={cn("rounded-md px-3 py-1.5 text-[13.5px]", group === g.id ? "bg-card font-medium shadow-sm" : "text-ink-soft")}
-          data-testid={`petitions-tab-${g.id}`}>
-          {g.label}
-        </button>
-      ))}
+      {GROUPS.map((g) => {
+        const count = counts?.[g.id];
+        return (
+          <button key={g.id} type="button" role="tab" aria-selected={group === g.id} onClick={() => onGroup(g.id)}
+            // The number is part of the label a screen reader reads, not a decoration beside it.
+            aria-label={count === undefined ? g.label : `${g.label}, ${count} ${count === 1 ? "petition" : "petitions"}`}
+            className={cn("flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[13.5px]", group === g.id ? "bg-card font-medium shadow-sm" : "text-ink-soft")}
+            data-testid={`petitions-tab-${g.id}`}>
+            {g.label}
+            {count === undefined ? null : (
+              <span aria-hidden className={cn("tabular-nums", group === g.id ? "text-ink-soft" : "text-ink-soft/70")} data-testid={`petitions-count-${g.id}`}>
+                {count}
+              </span>
+            )}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -81,7 +91,7 @@ export function PetitionListPage() {
       {petitions.data ? <ModerationRecord moderation={petitions.data.moderation} /> : null}
       <section className="flex flex-col gap-3 rounded-xl border bg-card p-5" aria-label="Petitions">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <Tabs group={group} onGroup={choose} />
+          <Tabs group={group} counts={petitions.data?.counts} onGroup={choose} />
           <NativeSelect value={topic} onChange={(e) => { setTopic(e.target.value); setOffset(0); }} aria-label="Topic" size="sm" data-testid="petitions-topic">
             <NativeSelectOption value="">All topics</NativeSelectOption>
             {petitions.data?.topics.map((t) => <NativeSelectOption key={t.id} value={t.id}>{t.name}</NativeSelectOption>)}
