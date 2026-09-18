@@ -10,7 +10,8 @@ import type { ReactNode } from "react";
 
 function NavLink({ href, testId, children }: { href: string; testId: string; children: ReactNode }) {
   const pathname = usePathname();
-  const active = pathname === href || pathname.startsWith(`${href}/`);
+  // Home is only itself: every path starts with "/", so the prefix test would mark it current everywhere.
+  const active = pathname === href || (href !== "/" && pathname.startsWith(`${href}/`));
   return (
     <Link
       href={href}
@@ -35,6 +36,9 @@ export function PublicHeader() {
           <Brand />
         </Link>
         <nav aria-label="Main" className="-mx-3 flex w-[calc(100%+1.5rem)] items-center overflow-x-auto md:mx-0 md:w-auto md:shrink-0">
+          <NavLink href="/" testId="public-home-link">
+            Home
+          </NavLink>
           <NavLink href="/ask" testId="public-ask-link">
             Ask
           </NavLink>
@@ -45,11 +49,11 @@ export function PublicHeader() {
           <NavLink href="/dashboard" testId="public-dashboard-link">
             Dashboard
           </NavLink>
-          <NavLink href="/petitions" testId="public-petitions-link">
-            Petitions
-          </NavLink>
           <NavLink href="/accountability" testId="public-accountability-link">
             Accountability
+          </NavLink>
+          <NavLink href="/petitions" testId="public-petitions-link">
+            Petitions
           </NavLink>
           <NavLink href="/contacts" testId="public-contacts-link">
             Contacts

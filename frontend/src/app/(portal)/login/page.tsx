@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Suspense } from "react";
 
 import { LoginForm } from "@/components/auth/login-form";
@@ -11,7 +12,9 @@ export const metadata: Metadata = { title: "Sign in" };
 export default function LoginPage() {
   return (
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center gap-8 px-6 py-16">
-      <Brand />
+      <Link href="/" aria-label="Nokware home" data-touch-target className="inline-flex w-fit items-center" data-testid="login-home">
+        <Brand />
+      </Link>
       <div className="flex flex-col gap-2">
         <h1 className="text-[34px] leading-tight">Institution portal</h1>
         <p className="text-sm text-ink-soft">

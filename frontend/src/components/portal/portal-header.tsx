@@ -49,6 +49,9 @@ function UserChip() {
       <span data-testid="portal-user">
         {me.name} · {roleLabel(me)}
       </span>
+      <Link href="/" data-touch-target className="inline-flex items-center underline underline-offset-2 hover:text-ink" data-testid="portal-public-site">
+        Public site
+      </Link>
       <Button variant="ghost" size="sm" onClick={() => void signOut()} data-testid="portal-sign-out">
         Sign out
       </Button>
@@ -60,9 +63,9 @@ export function PortalHeader() {
   return (
     <header className="border-b bg-card">
       <div className="mx-auto flex max-w-[1360px] flex-wrap items-center gap-6 px-7 py-4">
-        <div className="mr-auto">
+        <Link href="/" aria-label="Nokware home" data-touch-target className="mr-auto inline-flex min-w-0 items-center" data-testid="portal-home">
           <Brand />
-        </div>
+        </Link>
         <PortalNav />
         <UserChip />
       </div>
