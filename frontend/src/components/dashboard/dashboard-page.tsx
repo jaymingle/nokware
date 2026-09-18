@@ -58,6 +58,14 @@ function Figures({ figures }: { figures: Dashboard }) {
   return (
     <div className="flex flex-col gap-5">
       <StatCards figures={figures} />
+      {/* On the totals rather than in the page's opening paragraph: a reader who takes in the four numbers and
+          nothing else would otherwise never learn what is missing from them, and a total that quietly excludes
+          a category is the kind of figure this project exists to argue against. */}
+      <p className="max-w-[80ch] text-[13px] text-ink-soft" data-testid="dashboard-safety-excluded">
+        Reports about someone&apos;s safety are in none of these figures, including the totals. Counting them
+        anywhere — even inside a total — would let the number be worked out by subtraction, and a person&apos;s
+        safety is not a statistic to be reverse-engineered. They go privately to the services that protect people.
+      </p>
       <div className="flex flex-wrap items-start gap-5">
         <Panel title="Reports received and resolved" lead={`Monthly, ${periodLabel(figures.months)}. Bars: received. Line: resolved in the month. Dashed: fewer than 5.`} className="flex-[1_1_520px]">
           <TrendChart months={figures.months} />
@@ -101,7 +109,7 @@ export function DashboardPage() {
         <p className="text-base text-ink-soft">
           What Accra&apos;s residents reported over the last twelve months, and what the Assembly resolved. Counts and
           trends only: no individual case, address or reporter appears here, and a count from 1 to 4 reads
-          &ldquo;fewer than 5&rdquo;. Reports about a person&apos;s safety are handled privately and are not counted here at all.
+          &ldquo;fewer than 5&rdquo;.
         </p>
       </div>
       {dashboard.isPending ? <LoadingPanel label="Loading the figures…" /> : null}
