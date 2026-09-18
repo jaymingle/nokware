@@ -1,5 +1,7 @@
 "use client";
 
+import { ArrowRightIcon } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 
 import { ErrorPanel, LoadingPanel } from "@/components/documents/panels";
@@ -27,6 +29,25 @@ function StepView({ step, options, go }: { step: Step; options: ReportOptions; g
   return <CivicForm options={options} onFiled={filed} onBack={back} />;
 }
 
+/** Reached from the receipt once a report is filed, and from here: someone coming back has only their reference. */
+function CheckExisting() {
+  return (
+    <section aria-labelledby="check-existing" className="mt-4 flex flex-col gap-1.5 rounded-xl border bg-paper-subtle p-5">
+      <h2 id="check-existing" className="text-[18px] leading-snug">Already reported something?</h2>
+      <p className="text-[14px] text-ink-soft">
+        Check how far along it is with the reference you were given. Nokware never asks your name, so the reference
+        is the only way to follow a report.
+      </p>
+      <Link href="/report/status" data-touch-target
+        className="inline-flex w-fit items-center gap-1.5 text-[14px] font-medium text-teal underline underline-offset-2"
+        data-testid="report-check-status">
+        Check a case
+        <ArrowRightIcon aria-hidden className="size-4" />
+      </Link>
+    </section>
+  );
+}
+
 function isPrivate(step: Step): boolean {
   return (step.kind === "form" && step.safety) || (step.kind === "filed" && step.receipt.private);
 }
@@ -51,6 +72,7 @@ export function ReportPage() {
       <div ref={here} tabIndex={-1} className="flex flex-col outline-none" data-testid="report-step">
         {options.data ? <StepView step={step} options={options.data} go={go} /> : null}
       </div>
+      {step.kind === "choose" ? <CheckExisting /> : null}
     </div>
   );
 }
