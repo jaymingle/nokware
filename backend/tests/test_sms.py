@@ -6,12 +6,22 @@ from typing import Any
 
 import httpx
 import pytest
+import redis
 
 from app.config import get_settings
 from app.services import notifications, sms
 from app.services.citizen_reports import NotificationChannel, NotificationEvent, NotificationStatus
 from app.services.report_taxonomy import TOPICS, Category
-from app.services.sms import ArkeselSms, DailyBudget, SmsError, SmsLimitReached, SmsNotConfigured
+from app.services.sms import (
+    ArkeselSms,
+    DailyBudget,
+    SmsError,
+    SmsLimitReached,
+    SmsNotConfigured,
+    SmsNothingSent,
+    SmsUnreachable,
+    _RedisCount,
+)
 from app.services.sms_text import is_gsm7, pages, plain
 from app.teams import RECIPIENT_NAMES, short_name
 
@@ -100,11 +110,22 @@ def test_a_refusal_raises_without_the_number_or_the_key(response: httpx.Response
 
 
 def test_an_unreachable_gateway_raises_a_readable_error() -> None:
+    """Its own type: the gateway may have taken the message, so the outbox row is one the sweep sends again."""
     def handler(request: httpx.Request) -> httpx.Response:
         raise httpx.ConnectTimeout("timed out", request=request)
 
-    with pytest.raises(SmsError, match="couldn't be reached"):
+    with pytest.raises(SmsUnreachable, match="couldn't be reached"):
         _provider(handler).send("+233241234567", "Hello there")
+
+
+def test_a_count_that_cannot_be_reached_says_nothing_was_sent(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Nothing is handed to Arkesel, so it is the daily limit's own kind of refusal: the same message, later."""
+    def down() -> Any:
+        raise redis.ConnectionError("refused")
+
+    monkeypatch.setattr(sms, "get_redis", down)
+    with pytest.raises(SmsNothingSent, match="can't be checked"):
+        DailyBudget(3, _RedisCount()).take(1, TODAY)
 
 
 def test_the_daily_limit_counts_pages_and_only_outside_the_sandbox(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -28,6 +28,7 @@ from app.services.sms import (
     DailyBudget,
     SmsError,
     SmsNotConfigured,
+    SmsUnreachable,
     _body,
     _MemoryCount,
     _RedisCount,
@@ -81,7 +82,8 @@ class BmsSms:
         try:
             response = self.client.request(method, url, params={"key": self.api_key}, **kwargs)
         except httpx.HTTPError as error:  # the type only: httpx's message can carry the address, and so the key
-            raise SmsError(f"BMS couldn't be reached ({type(error).__name__}).") from None
+            # No answer at all: the campaign may have been created. Told apart from a refusal so the sweep can send again.
+            raise SmsUnreachable(f"BMS couldn't be reached ({type(error).__name__}).") from None
         body = _body(response)
         if response.is_error or body.get("status") != "success":
             detail = self._safe(str(body.get("message") or body or response.reason_phrase))

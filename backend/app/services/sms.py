@@ -35,8 +35,17 @@ class SmsError(RuntimeError):
     """Arkesel refused the message or couldn't be reached. The text is safe to store."""
 
 
-class SmsLimitReached(SmsError):
+class SmsNothingSent(SmsError):
+    """Our own side stopped before Arkesel was asked, so nothing reached anyone and sending it again is safe."""
+
+
+class SmsLimitReached(SmsNothingSent):
     """Today's SMS pages are used up."""
+
+
+class SmsUnreachable(SmsError):
+    """The provider never answered. Whether the message went out can never be learned: no message ID came back, so
+    no delivery report and no poll can ever settle it. The resident gets the message rather than the silence."""
 
 
 class SmsNotConfigured(RuntimeError):
@@ -72,7 +81,8 @@ class _RedisCount:
             pipe.expire(counter, 2 * 86400)
             used, _ = pipe.execute()
         except (redis.RedisError, RedisUnavailable) as error:
-            raise SmsError(f"The SMS limit can't be checked ({type(error).__name__}), so nothing was sent.") from None
+            # Nothing was handed to the provider, so this is the daily limit's own kind of refusal: send it again.
+            raise SmsNothingSent(f"The SMS limit can't be checked ({type(error).__name__}), so nothing was sent.") from None
         return int(used)
 
 
@@ -125,7 +135,8 @@ class ArkeselSms:
         try:
             response = self.client.request(method, url, headers={"api-key": self.api_key}, **kwargs)
         except httpx.HTTPError as error:
-            raise SmsError(f"Arkesel couldn't be reached ({type(error).__name__}).") from None
+            # No answer at all: the request may have arrived. Told apart from a refusal so the sweep can send again.
+            raise SmsUnreachable(f"Arkesel couldn't be reached ({type(error).__name__}).") from None
         body = _body(response)
         if response.is_error or body.get("status") != "success":
             detail = _scrub(str(body.get("message") or body or response.reason_phrase))

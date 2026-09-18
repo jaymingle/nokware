@@ -13,7 +13,7 @@ import pytest
 from app.config import get_settings
 from app.services import bms_deliveries, notifications, phone_proof, sms_bms
 from app.services.citizen_reports import NotificationChannel
-from app.services.sms import DailyBudget, SmsError, SmsLimitReached, SmsNotConfigured
+from app.services.sms import DailyBudget, SmsError, SmsLimitReached, SmsNotConfigured, SmsUnreachable
 from app.services.sms_bms import BmsSms
 
 KEY = "bms-key-8f3a"
@@ -61,7 +61,7 @@ def test_an_unreachable_gateway_names_the_error_type_only() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         raise httpx.ConnectTimeout(f"timed out reaching {request.url}", request=request)
 
-    with pytest.raises(SmsError, match=r"^BMS couldn't be reached \(ConnectTimeout\)\.$") as failed:
+    with pytest.raises(SmsUnreachable, match=r"^BMS couldn't be reached \(ConnectTimeout\)\.$") as failed:
         _provider(handler).send("+233241234567", "Hello there")
     assert KEY not in str(failed.value)
 
