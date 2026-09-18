@@ -1,17 +1,21 @@
-"""The sweep for a "received" message a resident never got on a channel they agreed to.
+"""The sweep for a message a resident never got on a channel they agreed to: the receipt, the resolution, and the
+acknowledged escalation alike.
 
 Storage is an in-memory fake that reads the real Appwrite queries, so the window and the "no row in any status" rule
 are the ones the sweep actually sends with. Sending is faked too: no test ever reaches a provider.
 """
 
 import json
+import logging
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
 
-from app.services import appwrite_client, notification_sweep, notifications
+from app.services import appwrite_client, case_history, notification_sweep, notifications
 from app.services.appwrite_client import DATABASE_ID
+from app.services.case_history import CaseHistoryAction
+from app.services.case_workflow import CaseStatus
 from app.services.citizen_reports import (
     CONTACTS_COLLECTION,
     NOTIFICATIONS_COLLECTION,
@@ -26,11 +30,27 @@ CONSENTED = {"notify": True, "phone": "+233241234567", "whatsapp": None}
 BOTH = {"notify": True, "phone": "+233241234567", "whatsapp": "+233241234567"}
 WHATSAPP_ONLY = {"notify": True, "phone": None, "whatsapp": "+233241234567"}
 SMS, WHATSAPP = NotificationChannel.SMS, NotificationChannel.WHATSAPP
+SUBMITTED, RESOLVED, ESCALATED = NotificationEvent.SUBMITTED, NotificationEvent.RESOLVED, NotificationEvent.ESCALATED
 
 
-def case(case_id: str, filed: datetime) -> dict[str, Any]:
+def case(case_id: str, filed: datetime, **reached: str) -> dict[str, Any]:
+    """`reached` carries the case's own record of what has happened to it since: status, resolvedAt, escalatedAt."""
     return {"$id": case_id, "caseId": case_id, "reference": f"K7QM-{case_id.upper()}", "category": "civic_service",
-            "topic": "drainage", "recipients": ["dept-works"], "createdAt": filed.isoformat()}
+            "topic": "drainage", "recipients": ["dept-works"], "createdAt": filed.isoformat(), **reached}
+
+
+def resolved_case(case_id: str, filed: datetime, at: datetime) -> dict[str, Any]:
+    return case(case_id, filed, status=CaseStatus.RESOLVED.value, resolvedAt=at.isoformat())
+
+
+def escalated_case(case_id: str, filed: datetime, at: datetime) -> dict[str, Any]:
+    """As the lifecycle has it: resolved first, then escalated by the citizen within the fourteen days."""
+    return case(case_id, filed, status=CaseStatus.ESCALATED.value,
+                resolvedAt=(at - timedelta(days=1)).isoformat(), escalatedAt=at.isoformat())
+
+
+def entry(case_id: str, action: CaseHistoryAction, when: datetime) -> dict[str, Any]:
+    return {"$id": f"h-{case_id}-{action.value}", "caseId": case_id, "action": action.value, "timestamp": when.isoformat()}
 
 
 def outbox(case_id: str, status: NotificationStatus, event: NotificationEvent = NotificationEvent.SUBMITTED,
@@ -75,10 +95,10 @@ class FakeDatabases:
             method, attribute, values = parsed["method"], parsed.get("attribute"), parsed.get("values", [])
             if method == "equal":
                 rows = [row for row in rows if row.get(attribute) in values]
-            elif method == "greaterThanEqual":
-                rows = [row for row in rows if row.get(attribute) >= values[0]]
+            elif method == "greaterThanEqual":  # a row with nothing in that field is outside any range, as in Appwrite
+                rows = [row for row in rows if row.get(attribute) is not None and row[attribute] >= values[0]]
             elif method == "orderAsc":
-                rows = sorted(rows, key=lambda row: row[attribute])
+                rows = sorted(rows, key=lambda row: row.get(attribute) or "")
             elif method == "limit":
                 limit = values[0]
             else:
@@ -93,7 +113,9 @@ class FakeDatabases:
 
 @pytest.fixture
 def storage(monkeypatch: pytest.MonkeyPatch) -> dict[str, list[dict[str, Any]]]:
-    collections: dict[str, list[dict[str, Any]]] = {REPORTS_COLLECTION: [], CONTACTS_COLLECTION: [], NOTIFICATIONS_COLLECTION: []}
+    collections: dict[str, list[dict[str, Any]]] = {
+        REPORTS_COLLECTION: [], CONTACTS_COLLECTION: [], NOTIFICATIONS_COLLECTION: [], case_history.COLLECTION_ID: []
+    }
     fake = FakeDatabases(collections)
     monkeypatch.setattr(notification_sweep, "get_databases", lambda: fake)
     monkeypatch.setattr(appwrite_client, "get_databases", lambda: fake)  # every_record reads its own client
@@ -103,14 +125,15 @@ def storage(monkeypatch: pytest.MonkeyPatch) -> dict[str, list[dict[str, Any]]]:
 
 @pytest.fixture
 def sent(storage: dict[str, list[dict[str, Any]]], monkeypatch: pytest.MonkeyPatch) -> list[str]:
-    """Sending the ordinary way writes the outbox row, so the fake does the same. Each entry is "case/channel": the
-    channel is the point, because the sweep repairs the channels a resident is owed on and no others."""
+    """Sending the ordinary way writes the outbox row, so the fake does the same. Each entry is "case/event/channel":
+    both are the point, because the sweep repairs the moments and channels a resident is owed on and no others."""
     done: list[str] = []
 
     def fake_notify_channel(case: dict[str, Any], event: NotificationEvent, channel: NotificationChannel) -> None:
-        done.append(f"{case['$id']}/{channel.value}")
+        done.append(f"{case['$id']}/{event.value}/{channel.value}")
         storage[NOTIFICATIONS_COLLECTION].append(
-            outbox(case["$id"], NotificationStatus.SENT, event, channel=channel, oid=f"resend-{case['$id']}-{channel.value}")
+            outbox(case["$id"], NotificationStatus.SENT, event, channel=channel,
+                   oid=f"resend-{case['$id']}-{event.value}-{channel.value}")
         )
 
     monkeypatch.setattr(notification_sweep, "notify_channel", fake_notify_channel)
@@ -129,8 +152,8 @@ def test_a_resident_who_agreed_and_got_nothing_is_sent_exactly_one_message(
     storage[REPORTS_COLLECTION].append(case("c1", NOW - timedelta(hours=2)))
     storage[CONTACTS_COLLECTION].append({"$id": "c1", "caseId": "c1", **CONSENTED})
 
-    assert notification_sweep.run_sweep(NOW) == ["c1"] and sent == ["c1/sms"]
-    assert notification_sweep.run_sweep(NOW) == [] and sent == ["c1/sms"]  # the row it wrote stops the next run
+    assert notification_sweep.run_sweep(NOW) == ["c1"] and sent == ["c1/submitted/sms"]
+    assert notification_sweep.run_sweep(NOW) == [] and sent == ["c1/submitted/sms"]  # the row it wrote stops the next run
 
 
 @pytest.mark.parametrize("status", list(NotificationStatus))
@@ -157,8 +180,8 @@ def test_a_message_our_own_budget_refused_is_sent_again_and_then_only_once(
     storage[CONTACTS_COLLECTION].append({"$id": "c1", "caseId": "c1", **CONSENTED})
     storage[NOTIFICATIONS_COLLECTION].append(budget_refused("c1"))
 
-    assert notification_sweep.run_sweep(NOW) == ["c1"] and sent == ["c1/sms"]
-    assert notification_sweep.run_sweep(NOW) == [] and sent == ["c1/sms"]  # the sent row it wrote settles the channel
+    assert notification_sweep.run_sweep(NOW) == ["c1"] and sent == ["c1/submitted/sms"]
+    assert notification_sweep.run_sweep(NOW) == [] and sent == ["c1/submitted/sms"]  # the sent row it wrote settles the channel
     assert "+233" not in caplog.text
 
 
@@ -192,10 +215,10 @@ def test_a_row_left_queued_past_the_grace_is_sent_once_and_the_row_is_closed(
     stuck = outbox("c1", NotificationStatus.QUEUED, written=NOW - notification_sweep.QUEUED_GRACE - timedelta(minutes=1))
     storage[NOTIFICATIONS_COLLECTION].append(stuck)
 
-    assert notification_sweep.run_sweep(NOW) == ["c1"] and sent == ["c1/sms"]
+    assert notification_sweep.run_sweep(NOW) == ["c1"] and sent == ["c1/submitted/sms"]
     assert stuck["status"] == NotificationStatus.FAILED.value and stuck["error"].startswith(notifications.STALE_QUEUED)
     assert "+233" not in stuck["error"] and "+233" not in caplog.text
-    assert notification_sweep.run_sweep(NOW) == [] and sent == ["c1/sms"]
+    assert notification_sweep.run_sweep(NOW) == [] and sent == ["c1/submitted/sms"]
 
 
 def test_a_stale_row_is_retried_once_even_when_the_resend_sticks_too(
@@ -244,7 +267,7 @@ def test_a_report_older_than_the_window_is_left_unsent(storage: dict[str, list[d
     for case_id in ("old", "new"):
         storage[CONTACTS_COLLECTION].append({"$id": case_id, "caseId": case_id, **CONSENTED})
 
-    assert notification_sweep.run_sweep(NOW) == ["new"] and sent == ["new/sms"]
+    assert notification_sweep.run_sweep(NOW) == ["new"] and sent == ["new/submitted/sms"]
 
 
 def test_one_run_sends_at_most_its_cap_oldest_first(storage: dict[str, list[dict[str, Any]]], sent: list[str]) -> None:
@@ -288,16 +311,16 @@ def test_only_the_channel_the_resident_is_still_owed_on_is_sent_on(
     storage[NOTIFICATIONS_COLLECTION].append(outbox("c1", NotificationStatus.SENT, channel=SMS))
     storage[NOTIFICATIONS_COLLECTION].append(budget_refused("c1", channel=WHATSAPP))
 
-    assert notification_sweep.run_sweep(NOW) == ["c1"] and sent == ["c1/whatsapp"]
-    assert notification_sweep.run_sweep(NOW) == [] and sent == ["c1/whatsapp"]
+    assert notification_sweep.run_sweep(NOW) == ["c1"] and sent == ["c1/submitted/whatsapp"]
+    assert notification_sweep.run_sweep(NOW) == [] and sent == ["c1/submitted/whatsapp"]
 
 
 def test_each_channel_is_repaired_when_both_are_owed(storage: dict[str, list[dict[str, Any]]], sent: list[str]) -> None:
     storage[REPORTS_COLLECTION].append(case("c1", NOW - timedelta(hours=2)))
     storage[CONTACTS_COLLECTION].append({"$id": "c1", "caseId": "c1", **BOTH})
 
-    assert notification_sweep.run_sweep(NOW) == ["c1"] and sent == ["c1/sms", "c1/whatsapp"]
-    assert notification_sweep.run_sweep(NOW) == [] and sent == ["c1/sms", "c1/whatsapp"]
+    assert notification_sweep.run_sweep(NOW) == ["c1"] and sent == ["c1/submitted/sms", "c1/submitted/whatsapp"]
+    assert notification_sweep.run_sweep(NOW) == [] and sent == ["c1/submitted/sms", "c1/submitted/whatsapp"]
 
 
 def test_a_whatsapp_message_that_went_by_sms_settles_the_whatsapp_channel(
@@ -321,10 +344,10 @@ def test_a_row_recorded_with_no_provider_is_sent_once_one_exists_and_never_twice
     recorded = outbox("c1", NotificationStatus.NOT_SENT)
     storage[NOTIFICATIONS_COLLECTION].append(recorded)
 
-    assert notification_sweep.run_sweep(NOW) == ["c1"] and sent == ["c1/sms"]
+    assert notification_sweep.run_sweep(NOW) == ["c1"] and sent == ["c1/submitted/sms"]
     assert recorded["status"] == NotificationStatus.NOT_SENT.value  # what happened to this row is still what it says
     assert notifications.repaired(recorded) and "+233" not in recorded["error"] and "+233" not in caplog.text
-    assert notification_sweep.run_sweep(NOW) == [] and sent == ["c1/sms"]
+    assert notification_sweep.run_sweep(NOW) == [] and sent == ["c1/submitted/sms"]
 
 
 def test_a_row_recorded_with_no_provider_waits_while_its_own_channel_still_has_none(
@@ -348,9 +371,9 @@ def test_a_queued_row_whose_time_cannot_be_read_is_repaired_rather_than_left_for
     stuck = outbox("c1", NotificationStatus.QUEUED, written=stamp)
     storage[NOTIFICATIONS_COLLECTION].append(stuck)
 
-    assert notification_sweep.run_sweep(NOW) == ["c1"] and sent == ["c1/sms"]
+    assert notification_sweep.run_sweep(NOW) == ["c1"] and sent == ["c1/submitted/sms"]
     assert stuck["error"].startswith(notifications.STALE_QUEUED)
-    assert notification_sweep.run_sweep(NOW) == [] and sent == ["c1/sms"]
+    assert notification_sweep.run_sweep(NOW) == [] and sent == ["c1/submitted/sms"]
 
 
 def test_a_send_the_provider_never_answered_is_made_once_more_and_only_once(
@@ -362,10 +385,10 @@ def test_a_send_the_provider_never_answered_is_made_once_more_and_only_once(
     unanswered = outbox("c1", NotificationStatus.FAILED, error=f"{notifications.UNREACHABLE}Arkesel couldn't be reached (ReadTimeout).")
     storage[NOTIFICATIONS_COLLECTION].append(unanswered)
 
-    assert notification_sweep.run_sweep(NOW) == ["c1"] and sent == ["c1/sms"]
+    assert notification_sweep.run_sweep(NOW) == ["c1"] and sent == ["c1/submitted/sms"]
     assert notifications.repaired(unanswered) and "ReadTimeout" in unanswered["error"]  # why it was repaired is kept
     assert "+233" not in unanswered["error"] and "+233" not in caplog.text
-    assert notification_sweep.run_sweep(NOW) == [] and sent == ["c1/sms"]
+    assert notification_sweep.run_sweep(NOW) == [] and sent == ["c1/submitted/sms"]
 
 
 def test_a_send_our_own_side_never_attempted_is_sent_again(storage: dict[str, list[dict[str, Any]]], sent: list[str]) -> None:
@@ -376,22 +399,202 @@ def test_a_send_our_own_side_never_attempted_is_sent_again(storage: dict[str, li
         outbox("c1", NotificationStatus.FAILED, error=f"{notifications.NOTHING_SENT}The SMS limit can't be checked (RedisUnavailable).")
     )
 
-    assert notification_sweep.run_sweep(NOW) == ["c1"] and sent == ["c1/sms"]
-    assert notification_sweep.run_sweep(NOW) == [] and sent == ["c1/sms"]
+    assert notification_sweep.run_sweep(NOW) == ["c1"] and sent == ["c1/submitted/sms"]
+    assert notification_sweep.run_sweep(NOW) == [] and sent == ["c1/submitted/sms"]
+
+
+def test_a_resolution_the_resident_never_heard_about_is_sent_once(
+    storage: dict[str, list[dict[str, Any]]], sent: list[str]
+) -> None:
+    """The moment they have been waiting for. The receipt arrived; the resolution never reached the outbox at all."""
+    filed = NOW - timedelta(days=2)
+    storage[REPORTS_COLLECTION].append(resolved_case("c1", filed, NOW - timedelta(hours=2)))
+    storage[CONTACTS_COLLECTION].append({"$id": "c1", "caseId": "c1", **CONSENTED})
+    storage[NOTIFICATIONS_COLLECTION].append(outbox("c1", NotificationStatus.SENT, SUBMITTED, written=filed))
+
+    assert notification_sweep.run_sweep(NOW) == ["c1"] and sent == ["c1/resolved/sms"]
+    assert notification_sweep.run_sweep(NOW) == [] and sent == ["c1/resolved/sms"]
+
+
+def test_an_escalation_is_sent_and_the_resolution_the_case_has_moved_past_is_not(
+    storage: dict[str, list[dict[str, Any]]], sent: list[str]
+) -> None:
+    """The escalation acknowledgement is owed the same as any other message. The resolution message is not: after an
+    escalation it reads "reviewed and resolved", which is not what happened, and an untruth is its own harm."""
+    filed = NOW - timedelta(days=3)
+    storage[REPORTS_COLLECTION].append(escalated_case("c1", filed, NOW - timedelta(hours=2)))
+    storage[CONTACTS_COLLECTION].append({"$id": "c1", "caseId": "c1", **CONSENTED})
+    storage[NOTIFICATIONS_COLLECTION].append(outbox("c1", NotificationStatus.SENT, SUBMITTED, written=filed))
+
+    assert notification_sweep.run_sweep(NOW) == ["c1"] and sent == ["c1/escalated/sms"]
+    assert notification_sweep.run_sweep(NOW) == [] and sent == ["c1/escalated/sms"]
+
+
+def test_a_case_whose_resolution_message_was_sent_is_left_alone(
+    storage: dict[str, list[dict[str, Any]]], sent: list[str]
+) -> None:
+    filed, resolved = NOW - timedelta(days=2), NOW - timedelta(hours=2)
+    storage[REPORTS_COLLECTION].append(resolved_case("c1", filed, resolved))
+    storage[CONTACTS_COLLECTION].append({"$id": "c1", "caseId": "c1", **CONSENTED})
+    storage[NOTIFICATIONS_COLLECTION].append(outbox("c1", NotificationStatus.SENT, SUBMITTED, written=filed))
+    storage[NOTIFICATIONS_COLLECTION].append(outbox("c1", NotificationStatus.SENT, RESOLVED, written=resolved))
+
+    assert notification_sweep.run_sweep(NOW) == [] and sent == []
+
+
+def test_a_case_resolved_long_after_it_was_filed_is_found_by_when_it_was_resolved(
+    storage: dict[str, list[dict[str, Any]]], sent: list[str]
+) -> None:
+    """A case filed a month ago and resolved this morning owes this morning's message, and no scan by when it was
+    filed would ever reach it. The receipt, a month old, stays unsent: that one nobody wants now."""
+    storage[REPORTS_COLLECTION].append(resolved_case("c1", NOW - timedelta(days=30), NOW - timedelta(hours=2)))
+    storage[CONTACTS_COLLECTION].append({"$id": "c1", "caseId": "c1", **CONSENTED})
+
+    assert notification_sweep.run_sweep(NOW) == ["c1"] and sent == ["c1/resolved/sms"]
+    assert notification_sweep.run_sweep(NOW) == [] and sent == ["c1/resolved/sms"]
+
+
+def test_a_resolution_older_than_the_window_is_left_unsent(
+    storage: dict[str, list[dict[str, Any]]], sent: list[str]
+) -> None:
+    """A "your report was resolved" a week and a half late is worse than none, exactly as a late receipt is."""
+    filed = NOW - timedelta(days=40)
+    storage[REPORTS_COLLECTION].append(resolved_case("old", filed, NOW - notification_sweep.WINDOW - timedelta(hours=1)))
+    storage[REPORTS_COLLECTION].append(resolved_case("new", filed, NOW - notification_sweep.WINDOW + timedelta(hours=1)))
+    for case_id in ("old", "new"):
+        storage[CONTACTS_COLLECTION].append({"$id": case_id, "caseId": case_id, **CONSENTED})
+
+    assert notification_sweep.run_sweep(NOW) == ["new"] and sent == ["new/resolved/sms"]
+
+
+def test_the_window_is_measured_from_each_moment_and_not_from_the_case(
+    storage: dict[str, list[dict[str, Any]]], sent: list[str]
+) -> None:
+    """One case, three moments, one of them recent: the old receipt stays unsent and this morning's escalation goes."""
+    storage[REPORTS_COLLECTION].append(escalated_case("c1", NOW - timedelta(days=30), NOW - timedelta(hours=2)))
+    storage[CONTACTS_COLLECTION].append({"$id": "c1", "caseId": "c1", **CONSENTED})
+
+    assert notification_sweep.run_sweep(NOW) == ["c1"] and sent == ["c1/escalated/sms"]
+
+
+def test_the_mce_s_ruling_is_owed_though_the_first_resolution_was_sent(
+    storage: dict[str, list[dict[str, Any]]], sent: list[str]
+) -> None:
+    """Resolved, escalated, then resolved again by the MCE: two resolution messages, and the first one's outbox row
+    was written days before the second moment, so it answers for the first and settles nothing here."""
+    filed, first, escalation, ruling = (NOW - timedelta(days=5), NOW - timedelta(days=4),
+                                        NOW - timedelta(days=3), NOW - timedelta(hours=2))
+    storage[REPORTS_COLLECTION].append(
+        case("c1", filed, status=CaseStatus.RESOLVED.value, resolvedAt=ruling.isoformat(), escalatedAt=escalation.isoformat())
+    )
+    storage[CONTACTS_COLLECTION].append({"$id": "c1", "caseId": "c1", **CONSENTED})
+    storage[NOTIFICATIONS_COLLECTION].append(outbox("c1", NotificationStatus.SENT, SUBMITTED, written=filed))
+    storage[NOTIFICATIONS_COLLECTION].append(outbox("c1", NotificationStatus.SENT, RESOLVED, written=first, oid="n-first"))
+    storage[NOTIFICATIONS_COLLECTION].append(outbox("c1", NotificationStatus.SENT, ESCALATED, written=escalation))
+
+    assert notification_sweep.run_sweep(NOW) == ["c1"] and sent == ["c1/resolved/sms"]
+    assert notification_sweep.run_sweep(NOW) == [] and sent == ["c1/resolved/sms"]
+
+
+def test_every_moment_a_case_has_reached_is_repaired_in_the_order_it_happened(
+    storage: dict[str, list[dict[str, Any]]], sent: list[str]
+) -> None:
+    """Nothing at all was ever written for this case: the resident hears the three things in the order they happened."""
+    escalation, ruling = NOW - timedelta(days=2), NOW - timedelta(hours=1)
+    storage[REPORTS_COLLECTION].append(
+        case("c1", NOW - timedelta(days=3), status=CaseStatus.RESOLVED.value,
+             resolvedAt=ruling.isoformat(), escalatedAt=escalation.isoformat())
+    )
+    storage[CONTACTS_COLLECTION].append({"$id": "c1", "caseId": "c1", **CONSENTED})
+
+    assert notification_sweep.run_sweep(NOW) == ["c1"]
+    assert sent == ["c1/submitted/sms", "c1/escalated/sms", "c1/resolved/sms"]
+    assert notification_sweep.run_sweep(NOW) == [] and len(sent) == 3
+
+
+def test_a_resolution_is_dated_by_the_case_s_own_history_when_the_case_itself_does_not_say(
+    storage: dict[str, list[dict[str, Any]]], sent: list[str]
+) -> None:
+    """Nothing on this case says when it was resolved, so the trail it keeps of itself does — the latest of the
+    entries that resolve a case, because an earlier one is a single recipient finishing its own part."""
+    filed, first, ruling = NOW - timedelta(days=3), NOW - timedelta(days=2), NOW - timedelta(hours=2)
+    storage[REPORTS_COLLECTION].append(case("c1", filed, status=CaseStatus.RESOLVED.value))
+    storage[CONTACTS_COLLECTION].append({"$id": "c1", "caseId": "c1", **CONSENTED})
+    storage[NOTIFICATIONS_COLLECTION].append(outbox("c1", NotificationStatus.SENT, SUBMITTED, written=filed))
+    storage[NOTIFICATIONS_COLLECTION].append(outbox("c1", NotificationStatus.SENT, RESOLVED, written=first))
+    storage[case_history.COLLECTION_ID].append(entry("c1", CaseHistoryAction.RESOLVED, first))
+    storage[case_history.COLLECTION_ID].append(entry("c1", CaseHistoryAction.ESCALATION_CONFIRMED, ruling))
+
+    assert notification_sweep.run_sweep(NOW) == ["c1"] and sent == ["c1/resolved/sms"]
+    assert notification_sweep.run_sweep(NOW) == [] and sent == ["c1/resolved/sms"]
+
+
+def test_a_moment_nothing_can_date_is_said_aloud_rather_than_guessed_at(
+    storage: dict[str, list[dict[str, Any]]], sent: list[str], caplog: pytest.LogCaptureFixture
+) -> None:
+    """A guessed date would either send the message run after run or bury it somewhere outside the window."""
+    filed = NOW - timedelta(days=2)
+    storage[REPORTS_COLLECTION].append(case("c1", filed, status=CaseStatus.RESOLVED.value))
+    storage[CONTACTS_COLLECTION].append({"$id": "c1", "caseId": "c1", **CONSENTED})
+    storage[NOTIFICATIONS_COLLECTION].append(outbox("c1", NotificationStatus.SENT, SUBMITTED, written=filed))
+
+    assert notification_sweep.run_sweep(NOW) == [] and sent == []
+    assert "can't date the resolved message for case c1" in caplog.text and "+233" not in caplog.text
+
+
+def test_a_whatsapp_message_that_never_left_is_repaired_and_one_twilio_answered_is_not(
+    storage: dict[str, list[dict[str, Any]]], sent: list[str]
+) -> None:
+    """Twilio's failures are told apart now as Arkesel's already were: the send that never made a connection reached
+    nobody, and the one Twilio answered — 63016 among them — may have been delivered, so it is left alone."""
+    for case_id in ("c1", "c2"):
+        storage[REPORTS_COLLECTION].append(case(case_id, NOW - timedelta(hours=2)))
+        storage[CONTACTS_COLLECTION].append({"$id": case_id, "caseId": case_id, **WHATSAPP_ONLY})
+    storage[NOTIFICATIONS_COLLECTION].append(outbox(
+        "c1", NotificationStatus.FAILED, channel=WHATSAPP,
+        error=f"{notifications.NOTHING_SENT}Twilio couldn't be reached (ConnectError).",
+    ))
+    storage[NOTIFICATIONS_COLLECTION].append(outbox(
+        "c2", NotificationStatus.FAILED, channel=WHATSAPP,
+        error="Twilio refused the message (400, code 63016): outside the 24-hour window",
+    ))
+
+    assert notification_sweep.run_sweep(NOW) == ["c1"] and sent == ["c1/submitted/whatsapp"]
+
+
+def test_a_whatsapp_message_twilio_never_answered_is_sent_once_more_and_only_once(
+    storage: dict[str, list[dict[str, Any]]], sent: list[str], caplog: pytest.LogCaptureFixture
+) -> None:
+    """It may have been delivered: no SID came back, so no status callback can ever settle it. One duplicate, paid once."""
+    storage[REPORTS_COLLECTION].append(case("c1", NOW - timedelta(hours=2)))
+    storage[CONTACTS_COLLECTION].append({"$id": "c1", "caseId": "c1", **WHATSAPP_ONLY})
+    unanswered = outbox("c1", NotificationStatus.FAILED, channel=WHATSAPP,
+                        error=f"{notifications.UNREACHABLE}Twilio couldn't be reached (ReadTimeout).")
+    storage[NOTIFICATIONS_COLLECTION].append(unanswered)
+
+    assert notification_sweep.run_sweep(NOW) == ["c1"] and sent == ["c1/submitted/whatsapp"]
+    assert notifications.repaired(unanswered) and "ReadTimeout" in unanswered["error"]  # why it was repaired is kept
+    assert "+233" not in unanswered["error"] and "+233" not in caplog.text
+    assert notification_sweep.run_sweep(NOW) == [] and sent == ["c1/submitted/whatsapp"]
 
 
 def test_no_stored_field_and_no_log_line_ever_holds_a_number(
     storage: dict[str, list[dict[str, Any]]], sent: list[str], sms_configured: None, caplog: pytest.LogCaptureFixture
 ) -> None:
-    """Every repair the sweep can make, in one run, against the numbers the contacts hold."""
-    for case_id, contact in (("c1", CONSENTED), ("c2", BOTH), ("c3", WHATSAPP_ONLY)):
-        storage[REPORTS_COLLECTION].append(case(case_id, NOW - timedelta(hours=2)))
-        storage[CONTACTS_COLLECTION].append({"$id": case_id, "caseId": case_id, **contact})
-    storage[NOTIFICATIONS_COLLECTION].append(outbox("c1", NotificationStatus.NOT_SENT))
+    """Every repair the sweep can make — every moment, every channel — in one run, against the contacts' own numbers."""
+    filed = NOW - timedelta(days=2)
+    records = (resolved_case("c1", filed, NOW - timedelta(hours=2)), escalated_case("c2", filed, NOW - timedelta(hours=3)),
+               case("c3", NOW - timedelta(hours=2), status=CaseStatus.RESOLVED.value))
+    for record, contact in zip(records, (CONSENTED, BOTH, WHATSAPP_ONLY)):
+        storage[REPORTS_COLLECTION].append(record)
+        storage[CONTACTS_COLLECTION].append({"$id": record["$id"], "caseId": record["$id"], **contact})
+    storage[NOTIFICATIONS_COLLECTION].append(outbox("c1", NotificationStatus.NOT_SENT, RESOLVED))
     storage[NOTIFICATIONS_COLLECTION].append(budget_refused("c2", channel=WHATSAPP))
     storage[NOTIFICATIONS_COLLECTION].append(outbox("c3", NotificationStatus.QUEUED, written=NOW - timedelta(hours=1), channel=WHATSAPP))
 
-    assert notification_sweep.run_sweep(NOW) == ["c1", "c2", "c3"]
+    with caplog.at_level(logging.INFO):
+        assert notification_sweep.run_sweep(NOW) == ["c1", "c2", "c3"]
     written = " ".join(str(value) for row in storage[NOTIFICATIONS_COLLECTION] for value in row.values())
     assert "+233" not in written and "241234567" not in written
     assert "+233" not in caplog.text and "241234567" not in caplog.text
+    assert "can't date the resolved message for case c3" in caplog.text  # and no number in that line either

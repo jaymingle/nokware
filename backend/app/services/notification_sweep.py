@@ -1,15 +1,20 @@
-"""The "received" message a resident agreed to and never got, on the channel they never got it on.
+"""The messages a resident agreed to and never got, on the channel they never got them on.
 
-Filing a report answers 201 and hands the message to a background task. If the process restarts or dies in that
-moment the task goes with it: nothing is sent, and — because the outbox row is written by the send itself — nothing
-anywhere records that a message was owed. This sweep looks for that gap and sends the message the ordinary way, so
-the outbox row, the case-history line and the daily SMS budget all behave as they do on the ordinary path.
+A case reaches three moments a resident is told about: it was received, it was resolved, and — if they escalated it —
+the escalation was received. Each one answers 201 or 200 and hands the message to a background task. If the process
+restarts or dies in that moment the task goes with it: nothing is sent, and — because the outbox row is written by
+the send itself — nothing anywhere records that a message was owed. This sweep looks for that gap and sends the
+message the ordinary way, so the outbox row, the case-history line and the daily SMS budget all behave as they do on
+the ordinary path. The resolution and the escalation are the moments a resident has been waiting for, so they are
+repaired exactly as the receipt is.
 
-What is repaired is one channel of one case, never the case as a whole. A resident who agreed to both SMS and
+What is repaired is one message on one channel, never the case as a whole. A resident who agreed to both SMS and
 WhatsApp and got only the SMS is owed the WhatsApp message and nothing else: repairing the case would either send
-the SMS a second time or — as this sweep first did — leave the WhatsApp message unsent for ever.
+the SMS a second time or — as this sweep first did — leave the WhatsApp message unsent for ever. The same holds
+between moments: a resident who got the receipt and not the resolution is owed the resolution alone.
 
-A channel is owed its message when every outbox row it has says so, and a row says so in these ways only:
+A channel is owed a moment's message when every outbox row that answers for it says so, and a row says so in these
+ways only:
   * there is no row at all — the task died before it wrote one;
   * our own side refused it before the provider was asked: the daily SMS budget, or the counter that budget needs.
     Nothing was sent to anyone, so a later send is the same message arriving late, not a second one;
@@ -32,7 +37,10 @@ from typing import Any
 
 from appwrite.query import Query
 
+from app.services import case_history
 from app.services.appwrite_client import DATABASE_ID, as_record, every_record, get_databases
+from app.services.case_history import CaseHistoryAction
+from app.services.case_workflow import CaseStatus
 from app.services.citizen_reports import (
     CONTACTS_COLLECTION,
     NOTIFICATIONS_COLLECTION,
@@ -55,22 +63,37 @@ from app.services.notifications import (
 
 logger = logging.getLogger(__name__)
 
-# An old "we received your report" is worse than none: by then the resident has drawn their own conclusion, and a
-# message out of nowhere reads as a system talking to itself. Anything filed longer ago than this is left unsent.
+# An old message is worse than none: by then the resident has drawn their own conclusion, and a message out of
+# nowhere reads as a system talking to itself. The window is measured from the moment the message became owed — when
+# the report was filed, resolved or escalated — not from when the case was filed: a case filed in March and resolved
+# yesterday owes yesterday's message.
 WINDOW = timedelta(days=7)
 # These are real messages and real credits, so one run repairs a little at a time, oldest first. A case counts once
-# however many of its channels are repaired: the cap is there to keep a run small, and a case has at most two.
+# however many of its moments and channels are repaired: the cap is there to keep a run small, and a case has at
+# most three moments on at most two channels.
 PER_RUN = 20
-# How many recent cases a run looks at. The gap is rare, so this bounds the work, not the repair: a case further
-# back than this is picked up by a later run, for as long as it stays inside the window.
+# How many recent cases each of the three scans looks at. The gap is rare, so this bounds the work, not the repair:
+# a case further back than this is picked up by a later run, for as long as it stays inside the window.
 SCAN_LIMIT = 200
-BATCH = 25  # case IDs per lookup of contacts and of outbox rows
+BATCH = 25  # case IDs per lookup of contacts, of history and of outbox rows
 # How long a row may sit at `queued` before the sweep stops believing a send is still in flight. On the ordinary
 # path the row is written, the provider is called and the row is updated within seconds: the provider call is capped
 # at sms.TIMEOUT_SECONDS (10s) and the Appwrite update at appwrite_client.TIMEOUT (5s + 25s). Fifteen minutes is far
 # past any of that, so a slow provider, a retry or a few minutes of clock skew between this process and Appwrite is
 # never mistaken for a death — and a resident whose message really is stuck still hears within the hour.
 QUEUED_GRACE = timedelta(minutes=15)
+# How far before a moment an outbox row may be written and still be that moment's own. The row is written by the
+# send, moments after the case changed and by this same process, so this only covers the clocks of two machines.
+EARLIER_GRACE = timedelta(minutes=5)
+
+# When each moment happened, in the case's own history, for a case whose stored timestamp is missing. The latest
+# `resolved` or `escalation_confirmed` entry is when the case itself became resolved: earlier ones are single
+# recipients finishing their own part, which is not a moment the resident is written to about.
+RESOLUTION_ACTIONS = (CaseHistoryAction.RESOLVED, CaseHistoryAction.ESCALATION_CONFIRMED)
+ESCALATION_ACTIONS = (CaseHistoryAction.ESCALATED,)
+HISTORY_ACTIONS = [action.value for action in (*RESOLUTION_ACTIONS, *ESCALATION_ACTIONS)]
+# The fields a case's own moments are read from, and so the scans that find a case with a recent one.
+DATED_BY = ("createdAt", "resolvedAt", "escalatedAt")
 
 NOTHING_RECORDED = "nothing was ever written to the outbox"
 BUDGET = "our own daily SMS budget refused it, so nothing was sent to anyone"
@@ -85,22 +108,37 @@ CLOSED_REPAIRED = "the sweep sent this message again"
 CHANNELS = {channel.value: channel for channel in NotificationChannel}
 
 
-def _recent_cases(now: datetime) -> list[dict[str, Any]]:
+def _scan(field: str, since: str) -> list[dict[str, Any]]:
     listing = get_databases().list_documents(
         DATABASE_ID,
         REPORTS_COLLECTION,
         queries=[
-            Query.greater_than_equal("createdAt", (now - WINDOW).isoformat()),
-            Query.order_asc("createdAt"),
+            Query.greater_than_equal(field, since),
+            Query.order_asc(field),
             Query.limit(SCAN_LIMIT),
         ],
     )
     return [as_record(document) for document in listing.documents]
 
 
-def _records_by_case(collection: str, case_ids: list[str]) -> dict[str, list[dict[str, Any]]]:
+def _recent_cases(now: datetime) -> list[dict[str, Any]]:
+    """Every case that reached one of its moments lately: filed, resolved, or escalated.
+
+    Three scans rather than one, because a case filed months ago and resolved yesterday owes yesterday's message and
+    would never be found by when it was filed. A case found by two of them is looked at once.
+    """
+    since = (now - WINDOW).isoformat()
+    found: dict[str, dict[str, Any]] = {}
+    for field in DATED_BY:
+        for case in _scan(field, since):
+            found.setdefault(case["$id"], case)
+    return sorted(found.values(), key=lambda case: str(case.get("createdAt") or ""))
+
+
+def _records_by_case(collection: str, case_ids: list[str], *narrower: str) -> dict[str, list[dict[str, Any]]]:
     found: dict[str, list[dict[str, Any]]] = {}
-    for record in every_record(collection, [Query.equal("caseId", case_ids)]) if case_ids else []:
+    queries = [Query.equal("caseId", case_ids), *narrower]
+    for record in every_record(collection, queries) if case_ids else []:
         found.setdefault(record["caseId"], []).append(record)
     return found
 
@@ -113,19 +151,78 @@ def _agreed(cases: list[dict[str, Any]]) -> dict[str, list[NotificationChannel]]
     return {case_id: channels for case_id, channels in agreed.items() if channels}
 
 
-def _submitted_rows(case_ids: list[str]) -> dict[str, list[dict[str, Any]]]:
-    """The outbox rows for the submitted message, by case, whatever status they ended in."""
-    rows = _records_by_case(NOTIFICATIONS_COLLECTION, case_ids)
-    return {case_id: [row for row in found if row["event"] == NotificationEvent.SUBMITTED] for case_id, found in rows.items()}
+def _at(stamp: Any) -> datetime | None:
+    try:
+        moment = datetime.fromisoformat(stamp) if isinstance(stamp, str) and stamp else None
+    except ValueError:
+        return None
+    return moment.replace(tzinfo=UTC) if moment is not None and moment.tzinfo is None else moment
 
 
 def _written_at(row: dict[str, Any]) -> datetime | None:
-    stamp = row.get("createdAt") or row.get("$createdAt")
-    try:
-        written = datetime.fromisoformat(stamp) if stamp else None
-    except ValueError:
-        return None
-    return written.replace(tzinfo=UTC) if written and written.tzinfo is None else written
+    return _at(row.get("createdAt") or row.get("$createdAt"))
+
+
+def _last_entry(history: list[dict[str, Any]], actions: tuple[CaseHistoryAction, ...]) -> datetime | None:
+    stamps = [when for entry in history if entry.get("action") in actions and (when := _at(entry.get("timestamp")))]
+    return max(stamps, default=None)
+
+
+@dataclass(frozen=True)
+class Moment:
+    """One message a case has reached, and when it became owed."""
+
+    event: NotificationEvent
+    at: datetime
+
+
+def _reached(case: dict[str, Any], history: list[dict[str, Any]]) -> dict[NotificationEvent, datetime | None]:
+    """Which messages this case has reached, and when each became owed. A value of None means the case reached that
+    moment and nothing stored says when.
+
+    Received: every case has one, when it was filed.
+    Resolved: while the case IS resolved, which is the one state that message describes. A case resolved and then
+      escalated is not owed it any more: after an escalation that message reads "reviewed and resolved", which is
+      not what happened, and telling a resident something untrue is a worse harm than a message they never got. A
+      case resolved twice — resolved, escalated, then the MCE's ruling — is owed it again, at the second resolution.
+    Escalation received: once the citizen has escalated, and still owed after the MCE has ruled, because "we have
+      your escalation" stays true. Late is not wrong; it can only be overtaken.
+    """
+    reached: dict[NotificationEvent, datetime | None] = {NotificationEvent.SUBMITTED: _at(case.get("createdAt"))}
+    if case.get("status") == CaseStatus.RESOLVED:
+        reached[NotificationEvent.RESOLVED] = _at(case.get("resolvedAt")) or _last_entry(history, RESOLUTION_ACTIONS)
+    escalated = _at(case.get("escalatedAt")) or _last_entry(history, ESCALATION_ACTIONS)
+    if case.get("escalatedAt") or escalated:
+        reached[NotificationEvent.ESCALATED] = escalated
+    return reached
+
+
+def _moments(case: dict[str, Any], history: list[dict[str, Any]], now: datetime) -> list[Moment]:
+    """The moments this case could still be owed a message about, oldest first, so a repair sends them in the order
+    they happened. A moment nothing can date is said aloud and left alone: a guessed date would either resend for
+    ever or bury a message the resident is owed somewhere in the past."""
+    moments = []
+    for event, at in _reached(case, history).items():
+        if at is None:
+            logger.warning(
+                "Missed-message sweep can't date the %s message for case %s: nothing stored says when it happened, "
+                "so it is left unsent", event.value, case["$id"]
+            )
+        elif now - at <= WINDOW:
+            moments.append(Moment(event, at))
+    return sorted(moments, key=lambda moment: moment.at)
+
+
+def _answers(row: dict[str, Any], moment: Moment) -> bool:
+    """Whether this outbox row is about this moment's message.
+
+    A row for the same event written clearly before the moment is about an earlier one of the same kind: a case
+    resolved, escalated and then resolved again by the MCE owes a second resolution message, and the first
+    resolution's row must not settle it. A row whose time can't be read is taken as this moment's rather than an
+    earlier one — the other way round, a `sent` row nothing can close would be sent again run after run.
+    """
+    written = _written_at(row)
+    return row.get("event") == moment.event and (written is None or written >= moment.at - EARLIER_GRACE)
 
 
 def _stale_queued(row: dict[str, Any], now: datetime) -> bool:
@@ -193,47 +290,60 @@ def _rows_by_channel(agreed: list[NotificationChannel], rows: list[dict[str, Any
 
 @dataclass(frozen=True)
 class Repair:
+    event: NotificationEvent
     channel: NotificationChannel
     why: str
-    rows: list[dict[str, Any]]  # this channel's rows, closed before the resend
+    rows: list[dict[str, Any]]  # this moment's rows on this channel, closed before the resend
 
 
 @dataclass(frozen=True)
 class Owed:
     case: dict[str, Any]
     repairs: list[Repair]
-    rows: list[dict[str, Any]]  # every submitted row the case had before the repair
+    rows: list[dict[str, Any]]  # every outbox row the case had before the repair
 
     @property
     def why(self) -> str:
-        return "; ".join(f"{repair.channel.value}: {repair.why}" for repair in self.repairs)
+        return "; ".join(f"{repair.event.value} by {repair.channel.value}: {repair.why}" for repair in self.repairs)
+
+
+def _repairs(case: dict[str, Any], history: list[dict[str, Any]], rows: list[dict[str, Any]],
+             channels: list[NotificationChannel], now: datetime) -> list[Repair]:
+    """Every message this case still owes, oldest moment first."""
+    repairs: list[Repair] = []
+    for moment in _moments(case, history, now):
+        answering = [row for row in rows if _answers(row, moment)]
+        for channel, these in _rows_by_channel(channels, answering).items():
+            if why := _reason(these, now):
+                repairs.append(Repair(moment.event, channel, why, these))
+    return repairs
 
 
 def _owed(cases: list[dict[str, Any]], now: datetime) -> list[Owed]:
-    """Of these cases, the ones with a channel whose resident agreed to it and never got the message on it."""
+    """Of these cases, the ones with a moment and a channel whose resident agreed to it and got no message on it."""
     agreed = _agreed(cases)
-    rows = _submitted_rows(list(agreed))
+    case_ids = list(agreed)
+    rows = _records_by_case(NOTIFICATIONS_COLLECTION, case_ids)
+    history = _records_by_case(case_history.COLLECTION_ID, case_ids, Query.equal("action", HISTORY_ACTIONS))
     owed: list[Owed] = []
     for case in cases:
         channels = agreed.get(case["$id"])
         if not channels:
             continue
         found = rows.get(case["$id"], [])
-        by_channel = _rows_by_channel(channels, found)
-        repairs = [Repair(channel, why, these) for channel, these in by_channel.items() if (why := _reason(these, now))]
-        if repairs:
+        if repairs := _repairs(case, history.get(case["$id"], []), found, channels, now):
             owed.append(Owed(case, repairs, found))
     return owed
 
 
 def _close(repair: Repair, now: datetime) -> None:
-    """Closes the rows this repair answers, so this channel is never swept a second time.
+    """Closes the rows this repair answers, so this message is never swept a second time.
 
     The judgement call, stated plainly: the provider may in fact have received one of these, so the resend risks a
-    second "we received your report". A duplicate that carries nothing but a reference is a smaller harm than a
-    resident who filed a report and heard nothing at all — but it is a real cost, so it is paid exactly once. The
-    rows are closed BEFORE the send: if this process dies in between, the resident is left with the same silence
-    they already had, whereas closing them afterwards would let that same death resend a third and fourth time.
+    second message. A duplicate that carries nothing but a reference is a smaller harm than a resident who filed a
+    report and heard nothing at all — but it is a real cost, so it is paid exactly once. The rows are closed BEFORE
+    the send: if this process dies in between, the resident is left with the same silence they already had, whereas
+    closing them afterwards would let that same death resend a third and fourth time.
 
     Rows our own side never attempted — the daily budget, or the counter behind it — are left open on purpose:
     nothing reached anyone, so tomorrow's send is this message arriving late and has no duplicate to pay for.
@@ -246,24 +356,24 @@ def _close(repair: Repair, now: datetime) -> None:
 
 
 def _send(owed: Owed, now: datetime) -> bool:
-    """Sends one case's missed messages, on the unresolved channels only. False means the run should stop."""
+    """Sends one case's missed messages, on the unresolved moments and channels only. False means the run should stop."""
     case_id = owed.case["$id"]
     before = {row["$id"] for row in owed.rows}
     for repair in owed.repairs:
         _close(repair, now)
-        notify_channel(owed.case, NotificationEvent.SUBMITTED, repair.channel)
-    fresh = [row for row in _submitted_rows([case_id]).get(case_id, []) if row["$id"] not in before]
+        notify_channel(owed.case, repair.event, repair.channel)
+    fresh = [row for row in _records_by_case(NOTIFICATIONS_COLLECTION, [case_id]).get(case_id, []) if row["$id"] not in before]
     if fresh and all(row["status"] == NotificationStatus.FAILED for row in fresh):
         # Nothing this case could be sent on worked, and a row the provider refused is never retried, so every
         # further case risks being written off the same way. The run stops here and leaves the rest to a later one.
         logger.warning("Missed-message sweep stopped at case %s: the message failed to send", case_id)
         return False
-    logger.info("Missed-message sweep sent the received message for case %s (%s)", case_id, owed.why)
+    logger.info("Missed-message sweep sent the messages case %s was owed (%s)", case_id, owed.why)
     return True
 
 
 def run_sweep(now: datetime) -> list[str]:
-    """Sends the received message to residents who were owed one and got nothing. Returns the case IDs it handled."""
+    """Sends the messages residents were owed and never got. Returns the case IDs it handled."""
     cases = _recent_cases(now)
     sent: list[str] = []
     for start in range(0, len(cases), BATCH):
