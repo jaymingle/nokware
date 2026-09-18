@@ -96,7 +96,8 @@ def _answer(monkeypatch: pytest.MonkeyPatch, question: str, figures: FigurePlan,
             return text
 
     chunk = RetrievedChunk(chunk=Chunk(1, "d1", 0, passage), score=1.0, document={"title": "2026 Budget", "department": "dept-finance"})
-    monkeypatch.setattr(rag, "figures_to_chart", lambda q, a, passages: plotted)  # the reading is tested on its own
+    # The reading is tested on its own; here a Plotted means figures were found, None means none were.
+    monkeypatch.setattr(rag, "read_for_chart", lambda q, a, passages: (plotted, True))
     monkeypatch.setattr(rag, "retrieve", lambda q: Retrieval(queries=[q], chunks=[chunk]))
     monkeypatch.setattr(rag, "plan_figures", lambda q, now: figures)
     monkeypatch.setattr(rag, "_answer_chain", lambda: Model())

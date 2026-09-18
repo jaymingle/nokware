@@ -30,7 +30,7 @@ from app.services.ask_charts import (
     chart_for,
     document_chart,
 )
-from app.services.ask_document_charts import figures_to_chart
+from app.services.ask_document_charts import read_for_chart
 from app.services.ask_figures import (
     NO_FIGURES,
     SAFETY_FIGURES_ANSWER,
@@ -323,18 +323,13 @@ _NOTE_KEYS = {ONE_COUNT: "ask.one_count", ONE_MONTH: "ask.one_month", ALL_ZERO: 
               NO_FIGURES_TO_CHART: "ask.no_figures_to_chart"}
 
 
-def _why_no_chart(prepared: Prepared, body: str, chart: ChartDict | None, figures: list[FigureSource],
-                  sources: list[Source]) -> str | None:
+def _why_no_chart(prepared: Prepared, body: str, chart: ChartDict | None, table_refused: bool) -> str | None:
     """A chart that can't be drawn is always accounted for: a request answered with nothing tells the reader
-    neither that it failed nor that it was never tried. The safety refusal is a paragraph already, and so is the
-    one for a document whose table couldn't be proved — which is what a cited source without figures means."""
-    if chart is not None or not asks_for_chart(prepared.question) or prepared.figures.safety_asked:
+    neither that it failed nor that it was never tried. The safety refusal and the unprovable table are paragraphs
+    of their own."""
+    if chart is not None or not asks_for_chart(prepared.question) or prepared.figures.safety_asked or table_refused:
         return None
-    if answer_status(body) != "answered":
-        return NO_ANSWER_TO_CHART
-    if any(figure["cited"] for figure in figures) or any(source["cited"] for source in sources):
-        return None
-    return NO_FIGURES_TO_CHART
+    return NO_ANSWER_TO_CHART if answer_status(body) != "answered" else NO_FIGURES_TO_CHART
 
 
 def _note_in(note: str | None, language: Language) -> str | None:
@@ -342,7 +337,7 @@ def _note_in(note: str | None, language: Language) -> str | None:
     return phrase(key, language) if key else note
 
 
-def _notices(body: str, prepared: Prepared, question: str, chart: ChartDict | None, note: str | None,
+def _notices(body: str, prepared: Prepared, question: str, table_refused: bool,
              figures: list[FigureSource]) -> list[list[str]]:
     """Paragraphs of catalogue keys around BODY, so each language writes its own fixed sentences.
 
@@ -356,7 +351,7 @@ def _notices(body: str, prepared: Prepared, question: str, chart: ChartDict | No
             return [["ask.safety_figures", "ask.no_safety_documents", *no_chart]]
         return [["ask.safety_figures", *no_chart], ["ask.safety_in_documents"], [BODY]]
     paragraphs = []
-    if answered and asks_for_chart(question) and chart is None and note is None:
+    if answered and table_refused:
         paragraphs.append(["ask.document_chart_refusal"])
     if answered and asks_for_spreadsheet(question) and not any(figure["cited"] for figure in figures):
         paragraphs.append(["ask.spreadsheet_refusal"])
@@ -368,11 +363,16 @@ def _written(paragraphs: list[list[str]], body: str, language: Language) -> str:
                         for paragraph in paragraphs)
 
 
-def _from_documents(prepared: Prepared, answer: str, sources: list[Source]) -> ChartDict | None:
-    """Drawn only where each figure is proved against the cited passages."""
+def _from_documents(prepared: Prepared, answer: str, sources: list[Source]) -> tuple[ChartDict | None, bool]:
+    """(chart, whether a table was found and couldn't be proved). Drawn only where each figure is proved against the
+    cited passages. Finding nothing chartable is not the same as failing to prove a table, and saying the second
+    when the first happened tells a reader their question hit a limit that wasn't there."""
     passages = [source["chunk_text"] for source in sources if source["cited"]]
-    plotted = figures_to_chart(prepared.question, answer, passages) if passages else None
-    return document_chart(prepared.question, plotted) if plotted else None
+    if not passages:
+        return None, False
+    plotted, found = read_for_chart(prepared.question, answer, passages)
+    chart = document_chart(prepared.question, plotted) if plotted else None
+    return chart, found and chart is None
 
 
 def finish(prepared: Prepared, raw_answer: str, asked: Asked | None = None) -> RagAnswer:
@@ -382,10 +382,11 @@ def finish(prepared: Prepared, raw_answer: str, asked: Asked | None = None) -> R
     figures = _to_figures(prepared, cited)
     sources = _to_sources(prepared.chunks, prepared.labels, cited)
     chart, chart_note = chart_for(prepared.question, [dict(f) for f in figures if f["cited"]])
+    table_refused = False
     if chart is None and chart_note is None and asks_for_chart(prepared.question):
-        chart = _from_documents(prepared, body, sources)
-    chart_note = chart_note or _why_no_chart(prepared, body, chart, figures, sources)
-    paragraphs = _notices(body, prepared, prepared.question, chart, chart_note, figures)
+        chart, table_refused = _from_documents(prepared, body, sources)
+    chart_note = chart_note or _why_no_chart(prepared, body, chart, table_refused)
+    paragraphs = _notices(body, prepared, prepared.question, table_refused, figures)
     in_english = _written(paragraphs, body, Language.ENGLISH)
     answer, language, translated = _in_the_language_asked(paragraphs, body, in_english, asked)
     return RagAnswer(

@@ -48,14 +48,14 @@ def test_a_total_beside_its_parts_says_what_actually_happened() -> None:
 
 
 def _answered(monkeypatch: pytest.MonkeyPatch, question: str, text: str, plan: FigurePlan = NOTHING,
-              cited: bool = True) -> dict[str, Any]:
+              cited: bool = True, found: bool = False) -> dict[str, Any]:
     class Model:
         def invoke(self, prompt_input: dict[str, str]) -> str:
             return text
 
     chunk = RetrievedChunk(chunk=Chunk(1, "d1", 0, "Budget text"), score=1.0,
                            document={"title": "2026 Budget", "department": "dept-finance"})
-    monkeypatch.setattr(rag, "figures_to_chart", lambda q, a, passages: None)
+    monkeypatch.setattr(rag, "read_for_chart", lambda q, a, passages: (None, found))
     monkeypatch.setattr(rag, "retrieve", lambda q: Retrieval(queries=[q], chunks=[chunk] if cited else []))
     monkeypatch.setattr(rag, "plan_figures", lambda q, now: plan)
     monkeypatch.setattr(rag, "_answer_chain", lambda: Model())
@@ -89,3 +89,16 @@ def test_the_reason_is_given_in_the_language_the_question_was_asked_in() -> None
     assert rag._note_in(rag.NO_ANSWER_TO_CHART, Language.FRENCH) == phrase("ask.no_answer_to_chart", Language.FRENCH)
     assert rag._note_in(TOTAL_AND_PARTS, Language.FRENCH).startswith("Les seuls chiffres")
     assert rag._note_in("Only the 20 largest of 24 are drawn", Language.FRENCH) == "Only the 20 largest of 24 are drawn"
+
+
+def test_an_answer_with_no_figures_is_not_blamed_on_how_tables_are_read(monkeypatch: pytest.MonkeyPatch) -> None:
+    """"Show me which department handles drains" met the document-table refusal, which describes a limit that
+    had nothing to do with the question. Nothing chartable found is not a table that couldn't be proved."""
+    result = _answered(monkeypatch, "Show me which department handles drains", "The Works Department does [S1].")
+    assert result["chart_note"] == rag.NO_FIGURES_TO_CHART
+    assert phrase("ask.document_chart_refusal") not in result["answer"]
+
+
+def test_figures_that_cannot_be_proved_against_the_passage_still_say_so(monkeypatch: pytest.MonkeyPatch) -> None:
+    result = _answered(monkeypatch, "Chart the stall fees", "Stores A cost 800.00 [S1].", found=True)
+    assert phrase("ask.document_chart_refusal") in result["answer"] and result["chart_note"] is None

@@ -263,6 +263,17 @@ def _extract(question: str, answer: str, passages: list[str]) -> _Extracted | No
     return result
 
 
-def figures_to_chart(question: str, answer: str, passages: list[str]) -> Plotted | None:
+def read_for_chart(question: str, answer: str, passages: list[str]) -> tuple[Plotted | None, bool]:
+    """(what can be plotted, whether any figures were read out of the passages at all).
+
+    The second tells apart "this answer holds no figures" from "figures were found and couldn't be proved against
+    the passages" — the first isn't a limit of how tables are read, and shouldn't be explained as one.
+    """
     extracted = _extract(question, answer, passages)
-    return verified(extracted, passages) if extracted else None
+    if extracted is None:
+        return None, False
+    return verified(extracted, passages), True
+
+
+def figures_to_chart(question: str, answer: str, passages: list[str]) -> Plotted | None:
+    return read_for_chart(question, answer, passages)[0]
