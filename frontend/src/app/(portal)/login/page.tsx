@@ -1,3 +1,4 @@
+import { ArrowLeftIcon } from "lucide-react";
 import Link from "next/link";
 import { Suspense } from "react";
 
@@ -30,6 +31,14 @@ export default function LoginPage() {
           </Suspense>
         </CardContent>
       </Card>
+      {/* The logo above is a link, but nothing about a logo says so. Someone who lands here by mistake — most
+          people who land here — needs a way out that reads as one. */}
+      <Link href="/" data-touch-target
+        className="inline-flex w-fit items-center gap-1.5 text-[14px] text-teal underline underline-offset-2"
+        data-testid="login-public-site">
+        <ArrowLeftIcon aria-hidden className="size-4" />
+        Back to the public site
+      </Link>
     </main>
   );
 }
