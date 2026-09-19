@@ -181,7 +181,8 @@ def answer_screens(question: str) -> list[str]:
 def send_answer_by_sms(msisdn: str, question: str) -> None:
     """The parts go one after another: each is a whole thought, numbered, and the last carries the citation."""
     try:
-        parts = for_sms(answer_question(question, AnswerLength.SMS), _site())
+        parts = for_sms(answer_question(question, AnswerLength.SMS), _site(),
+                        shorter=lambda: answer_question(question, AnswerLength.SMS_SHORTER))
     except Exception:
         logger.exception("Answering a USSD question for %s failed", masked(msisdn))
         parts = [f"Nokware: {ANSWER_FAILED}"]

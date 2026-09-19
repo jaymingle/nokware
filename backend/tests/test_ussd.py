@@ -115,7 +115,7 @@ def test_the_cap_falls_on_sending_the_answer_not_on_reading_it(
 def test_the_answer_goes_by_sms_in_parts_and_a_failure_still_gets_a_reply(monkeypatch: pytest.MonkeyPatch) -> None:
     sent: list[tuple[str, str]] = []
     monkeypatch.setattr(ussd, "send_sms", lambda to, text: sent.append((to, text)) or True)
-    monkeypatch.setattr(ussd, "for_sms", lambda answer, site: ["Nokware: first. (1/2)", "second. (2/2)"])
+    monkeypatch.setattr(ussd, "for_sms", lambda answer, site, shorter=None: ["Nokware: first. (1/2)", "second. (2/2)"])
     monkeypatch.setattr(ussd, "answer_question", lambda q, length: {"status": "answered", "answer": "x"})
     ussd.send_answer_by_sms(PHONE, "What is the budget?")
     assert [text for _, text in sent] == ["Nokware: first. (1/2)", "second. (2/2)"]

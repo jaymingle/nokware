@@ -106,10 +106,13 @@ def test_the_model_reads_the_rest_and_a_failure_means_ask(monkeypatch: pytest.Mo
 
 def test_only_the_length_rule_changes_between_channels() -> None:
     prepared = Prepared("What are the fees?", [], {}, [])
-    web, chat, text = (rag._prompt_input(prepared, length) for length in AnswerLength)
+    web, chat, text, shorter = (rag._prompt_input(prepared, length) for length in AnswerLength)
     assert web["length"] == "" and "1,000 characters" in chat["length"] and "300 characters" in text["length"]
-    assert "complete answer" in text["length"] and "only part" in text["length"]
-    assert {k: v for k, v in web.items() if k != "length"} == {k: v for k, v in text.items() if k != "length"}
+    assert "complete short answer" in text["length"] and "never a first instalment" in text["length"]
+    # The re-ask is shorter still, and just as firm that shorter means fewer things said, not a sentence stopped.
+    assert "160 characters" in shorter["length"] and "never by stopping early" in shorter["length"]
+    for other in (text, shorter):
+        assert {k: v for k, v in web.items() if k != "length"} == {k: v for k, v in other.items() if k != "length"}
 
 
 def _source(label: str, title: str, year: int | None = 2026) -> dict[str, Any]:
@@ -177,6 +180,7 @@ def test_an_sms_answer_is_never_cut_and_never_calls_itself_the_first_part() -> N
         for parts in (for_sms(answer, SITE), for_sms(answer, SITE, lambda: _long())):  # type: ignore[arg-type]
             text = " ".join(parts)
             assert "..." not in text and "First part" not in text
+            assert all(pages(part) == 1 for part in parts)  # a part is a page: none of them costs two credits
             assert sum(pages(part) for part in parts) <= channel_answers.SMS_PARTS
     assert "don't have information" in for_sms(nothing, SITE)[0] and len(for_sms(nothing, SITE)) == 1
     refused = for_sms({**ANSWER, "answer": "Nokware doesn't publish figures on reports about someone's safety.",

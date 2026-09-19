@@ -111,6 +111,7 @@ class AnswerLength(StrEnum):
     WEB = "web"
     CHAT = "chat"
     SMS = "sms"
+    SMS_SHORTER = "sms_shorter"  # asked for once, when what SMS produced still needed a fourth page
 
 
 # Only the length changes between channels: the same sources, figures, citation and safety rules apply.
@@ -123,9 +124,14 @@ _LENGTH_RULES = {
     # The composer pages this into three SMS parts and spends the rest of them on the citation and the web address,
     # so what is asked for here is what is left. An answer written past it is asked for again, never cut.
     AnswerLength.SMS: (
-        "\n\nThis answer goes by SMS: at most 300 characters of plain text. Write a complete answer in two or "
-        "three short sentences — the figures first, then what they are cited from. Never stop mid-thought, and "
-        "never say this is only part of the answer. No lists and no formatting."
+        "\n\nThis answer is read as a text message on a phone. Hard limit: 300 characters in total, about two "
+        "sentences. Give the figures that answer the question, cited, and stop there: a complete short answer, "
+        "never a first instalment and never a sentence left unfinished. No lists, no bullets, no formatting."
+    ),
+    AnswerLength.SMS_SHORTER: (
+        "\n\nThis answer is read as a text message and the last one written was too long to send. Hard limit: 160 "
+        "characters in total, one sentence. Give the single figure or fact that answers the question, cited, and "
+        "nothing else. It must be a complete sentence: shorten by leaving things out, never by stopping early."
     ),
 }
 

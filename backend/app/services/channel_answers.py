@@ -189,14 +189,22 @@ def _sms_body(answer: RagAnswer) -> str:
     return flat if flat.startswith("Nokware") else f"Nokware: {flat}"  # the sender ID may not say Nokware
 
 
-def _sms_parts(answer: RagAnswer, site: str) -> list[str] | None:
+def _sms_parts(answer: RagAnswer, site: str, more: str = "Also at",
+               limit: int | None = SMS_PARTS) -> list[str] | None:
     if answer["status"] == "no_information":
         return [plain(f"Nokware: {NO_INFO_ANSWER} More at {bare_address(site)}/ask")]
-    body, ending = _sms_body(answer), plain(f" Also at {bare_address(site)}/ask")
-    room = part_room(body + ending) - NUMBERING
-    tail = _sources_line(answer, room - cost(ending)) + ending
-    room = min(room, part_room(body + tail) - NUMBERING)  # one character outside GSM-7 halves every page
-    parts = _pack(_split(body, room), room, tail, SMS_PARTS)
+    body, ending = _sms_body(answer), plain(f" {more} {bare_address(site)}/ask")
+    # A title outside GSM-7 would halve every page, so the names are weighed in the alphabet before the pages are cut.
+    room = part_room(body + ending + "".join(_named(answer, detail=True))) - NUMBERING
+    pieces = _split(body, room)
+    packed = _pack(pieces, room, ending, limit)
+    if packed is None:
+        return None
+    spare = room if limit is None or len(packed) < limit else room - cost(packed[-1])
+    line = _sources_line(answer, spare - cost(ending))  # the address goes with it, on that same page
+    if not line and _named(answer, detail=False):
+        return None  # an answer with no room left for its citation is too long, and is asked for again shorter
+    parts = _pack(pieces, room, line + ending, limit)
     return _numbered(parts) if parts else None
 
 
@@ -211,25 +219,22 @@ def for_sms(answer: RagAnswer, site: str, shorter: Reask | None = None) -> list[
         parts = _sms_parts(answer, site)
     if parts is not None:
         return parts
-    logger.warning("An SMS answer still needed more than %d pages after a shorter one was asked for", SMS_PARTS)
+    asked = "after a shorter one was asked for" if shorter is not None else "and no shorter one could be asked for"
+    logger.warning("An SMS answer still needed more than %d pages %s", SMS_PARTS, asked)
     return _as_much_as_fits(answer, site)
 
 
 def _as_much_as_fits(answer: RagAnswer, site: str) -> list[str]:
-    """Whole sentences as far as they go, and the last part says where the rest is: a sentence is dropped entire
-    or kept entire, never half-sent."""
-    ending = plain(f" More at {bare_address(site)}/ask")
-    body = _sms_body(answer)
-    room = part_room(body + ending) - NUMBERING
-    sentences = _SENTENCE.split(body)
-    for keep in range(len(sentences), 0, -1):
-        kept = _split(" ".join(sentences[:keep]), room - cost(ending))
-        parts = _pack(kept, room, ending, SMS_PARTS)
+    """Whole sentences as far as they go, and the last part says where the rest is. A sentence is kept entire or
+    dropped entire, and the citation then names what was kept rather than what was dropped."""
+    sentences = _SENTENCE.split(answer["answer"].strip())
+    for keep in range(len(sentences) - 1, 0, -1):
+        parts = _sms_parts({**answer, "answer": " ".join(sentences[:keep])}, site, "More at")
         if parts is not None:
-            return _numbered(parts)
-    # One sentence wider than the whole ceiling: it goes out complete over a page more, which is cheaper than
-    # a resident acting on half of it. Already logged as rare.
-    return _numbered(_pack(_split(sentences[0], room - cost(ending)), room, ending) or [body])
+            return parts
+    # One sentence wider than the whole ceiling: it goes out complete over a page more, which is cheaper than a
+    # resident acting on half of it. Already logged as rare.
+    return _sms_parts({**answer, "answer": sentences[0]}, site, "More at", None) or [_sms_body(answer)]
 
 
 def screens(text: str, menu_cost: int, limit: int = SCREEN_MAX) -> list[str]:
