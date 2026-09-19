@@ -3,23 +3,28 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
+  addPetitionComment,
   checkDraft,
   draftLedger,
   editPetition,
   getMyPetitions,
   getMySignature,
+  getPetitionComments,
   getSignerNames,
   getPetition,
   getPetitionLedger,
   getPetitionOptions,
   getPetitions,
   petitionCreatorAction,
+  replyToResponse,
   reportPetition,
+  reportPetitionComment,
   signPetition,
   submitPetition,
   takeNameOffSignature,
   type CreatorAction,
   type DraftWords,
+  type NewComment,
   type NewPetition,
   type PetitionEditSend,
   type PetitionFilters,
@@ -27,7 +32,16 @@ import {
 } from "@/lib/api/petitions";
 import { getIssue } from "@/lib/api/public";
 
-import type { MySignature, OwnPetition, PetitionReportFiled, PetitionReportRequest, SignResult } from "@/lib/api/types";
+import type {
+  MySignature,
+  OwnPetition,
+  PetitionComment,
+  PetitionCommentReportRequest,
+  PetitionDetail,
+  PetitionReportFiled,
+  PetitionReportRequest,
+  SignResult,
+} from "@/lib/api/types";
 import type { Sending } from "@/lib/api/upload";
 
 const petitionKeys = {
@@ -38,9 +52,11 @@ const petitionKeys = {
   mine: (proof: string) => ["my-petitions", proof] as const,
   signature: (code: string, proof: string) => ["my-signature", code, proof] as const,
   names: (code: string) => ["signer-names", code] as const,
+  comments: (code: string) => ["petition-comments", code] as const,
 };
 
 const NAMES_PAGE = 50;
+const COMMENTS_PAGE = 20;
 
 export function usePetitionOptions() {
   return useQuery({ queryKey: petitionKeys.options, queryFn: getPetitionOptions, staleTime: Infinity });
@@ -145,4 +161,44 @@ export function useSignPetition(code: string) {
 export function useTakeNameOff(code: string) {
   const refresh = useAfterSigning(code);
   return useMutation<MySignature, Error, string>({ mutationFn: (proof) => takeNameOffSignature(code, proof), onSuccess: () => refresh() });
+}
+
+export function usePetitionComments(code: string) {
+  return useInfiniteQuery({
+    queryKey: petitionKeys.comments(code),
+    queryFn: ({ pageParam }) => getPetitionComments(code, COMMENTS_PAGE, pageParam),
+    initialPageParam: 0,
+    getNextPageParam: (last, pages) => {
+      const shown = pages.reduce((sum, page) => sum + page.comments.length, 0);
+      return shown < last.total ? shown : undefined;
+    },
+  });
+}
+
+/** The petition's own count is on its page too, so both are read again once a comment is published. */
+export function useAddComment(code: string) {
+  const queryClient = useQueryClient();
+  return useMutation<PetitionComment, Error, { comment: NewComment; proof: string }>({
+    mutationFn: ({ comment, proof }) => addPetitionComment(code, comment, proof),
+    onSuccess: () => Promise.all([
+      queryClient.invalidateQueries({ queryKey: petitionKeys.comments(code) }),
+      queryClient.invalidateQueries({ queryKey: petitionKeys.detail(code) }),
+    ]),
+  });
+}
+
+/** No sign-in, and nothing on the page changes: the comment stays up while a contributor reads the report. */
+export function useReportComment(code: string, commentId: string) {
+  return useMutation<PetitionReportFiled, Error, PetitionCommentReportRequest>({
+    mutationFn: (report) => reportPetitionComment(code, commentId, report),
+  });
+}
+
+/** The API answers with the petition as it now reads, so the reply stands on the page without another request. */
+export function useReplyToResponse(code: string) {
+  const queryClient = useQueryClient();
+  return useMutation<PetitionDetail, Error, { text: string; proof: string }>({
+    mutationFn: ({ text, proof }) => replyToResponse(code, text, proof),
+    onSuccess: (petition) => queryClient.setQueryData(petitionKeys.detail(code), petition),
+  });
 }

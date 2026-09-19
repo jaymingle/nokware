@@ -9,6 +9,10 @@ import type {
   MySignature,
   NamedSignatures,
   OwnPetition,
+  PetitionComment,
+  PetitionCommentPage,
+  PetitionCommentReportRequest,
+  PetitionDetail,
   PetitionOptions,
   PetitionOrTombstone,
   PetitionPage,
@@ -152,4 +156,28 @@ export function takeNameOffSignature(code: string, proof: string): Promise<MySig
 /** Newest first. */
 export function getSignerNames(code: string, limit: number, offset: number): Promise<NamedSignatures> {
   return publicRequest<NamedSignatures>(`${petitionPath(code)}/names?limit=${limit}&offset=${offset}`);
+}
+
+/** Newest first. A removed petition has none to give: they went down with it, and are back when it is. */
+export function getPetitionComments(code: string, limit: number, offset: number): Promise<PetitionCommentPage> {
+  return publicRequest<PetitionCommentPage>(`${petitionPath(code)}/comments?limit=${limit}&offset=${offset}`);
+}
+
+/** `name` empty leaves the comment standing as "Resident". */
+export type NewComment = { text: string; name: string | null };
+
+/** The same confirmed number a signature is given with, and nothing more stored with it than with one. */
+export function addPetitionComment(code: string, comment: NewComment, proof: string): Promise<PetitionComment> {
+  return postJson<PetitionComment>(`${petitionPath(code)}/comments`, comment, proofHeader(proof));
+}
+
+/** Anyone, without signing in: the comment stays up while a contributor reads what you send. */
+export function reportPetitionComment(code: string, commentId: string,
+                                      report: PetitionCommentReportRequest): Promise<PetitionReportFiled> {
+  return postJson<PetitionReportFiled>(`${petitionPath(code)}/comments/${encodeURIComponent(commentId)}/report`, report);
+}
+
+/** The creator answers the MCE, once, on the number they started the petition with. The page comes back with it on. */
+export function replyToResponse(code: string, text: string, proof: string): Promise<PetitionDetail> {
+  return postJson<PetitionDetail>(`${petitionPath(code)}/reply`, { text }, proofHeader(proof));
 }

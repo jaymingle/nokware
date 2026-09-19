@@ -98,6 +98,12 @@ export type PetitionDismissalOption = Schemas["DismissalOption"];
 export type PetitionDismissal = Schemas["DismissRequest"]["reason"];
 export type PetitionRemovalNotice = Schemas["RemovalNotice"];
 export type PetitionResponseOut = Schemas["PetitionResponse"];
+/** The creator's one answer to the response, under it. Null until they give it. */
+export type PetitionReplyOut = Schemas["PetitionReply"];
+/** One comment as a reader meets it: somebody's words, or the notice standing where a removed one's were. */
+export type PetitionComment = Schemas["Comment"];
+export type PetitionCommentPage = Schemas["CommentPage"];
+export type PetitionCommentReportRequest = Schemas["CommentReportRequest"];
 /** One department the MCE asked to answer a petition, under the department's name, and the note it wrote back. */
 export type PetitionDepartmentShare = Schemas["DepartmentShare"];
 /** A petition as the department it was shared with meets it, with its own note if it has written one. */

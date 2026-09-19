@@ -10,6 +10,7 @@ import { PageShell } from "@/components/page-shell";
 import { DocumentLine, LedgerMatches } from "@/components/petitions/ledger-matches";
 import { MceResponse } from "@/components/petitions/mce-response";
 import { Progress } from "@/components/petitions/petition-card";
+import { PetitionComments } from "@/components/petitions/petition-comments";
 import { PetitionTombstoneView } from "@/components/petitions/petition-tombstone";
 import { PetitionVersions } from "@/components/petitions/petition-versions";
 import { ReportPetition } from "@/components/petitions/report-petition";
@@ -180,6 +181,7 @@ function Petition({ petition }: { petition: PetitionDetail }) {
       <LedgerContext code={petition.code} />
       <History petition={petition} />
       <Timeline petition={petition} />
+      <PetitionComments code={petition.code} />
       <div className="flex"><ReportPetition code={petition.code} /></div>
     </PageShell>
   );
