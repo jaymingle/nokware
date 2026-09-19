@@ -24,7 +24,7 @@ export const ROLE_NAV: Record<Role, NavItem[]> = {
     { href: "/portal/contributor/submit", label: "Submit a document", testId: "portal-nav-submit" },
   ],
   mce: [
-    { href: "/portal/mce", label: "Disputes", testId: "portal-nav-escalations", count: "escalations" },
+    { href: "/portal/mce", label: "Document disputes", testId: "portal-nav-escalations", count: "escalations" },
     { href: "/portal/mce/cases", label: "Cases", testId: "portal-nav-cases", count: "case-escalations" },
     { href: "/portal/mce/petitions", label: "Petitions", testId: "portal-nav-petitions", count: "petitions" },
   ],
