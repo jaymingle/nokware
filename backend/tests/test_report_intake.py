@@ -1,11 +1,16 @@
 """Filing a report end to end, with storage, photos and the model replaced by fakes."""
 
-from datetime import UTC, datetime
+import logging
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
+from fastapi import BackgroundTasks
 
+from app.routes import reports
 from app.services import report_intake
+from app.services.citizen_reports import NotificationEvent
+from app.services.notifications import compose, notify_quietly
 from app.services.report_contacts import ContactChoice, InvalidNumber
 from app.services.report_intake import ReportSubmission, submit
 from app.services.report_rules import InvalidReport, ModelVerdict
@@ -86,14 +91,56 @@ def test_the_safety_opt_in_is_respected(store: Store) -> None:
     assert receipt.messages_on
 
 
-def test_a_report_the_model_files_as_personal_safety_holds_messages_and_asks_again(store: Store) -> None:
+def test_a_report_the_model_files_as_personal_safety_is_still_sent_the_neutral_message(
+    store: Store, caplog: pytest.LogCaptureFixture
+) -> None:
+    """The resident gave a number on the ordinary form, which promised messages, so the messages go: the neutral
+    one, which names the reference and nothing else. Only the call waits for the answer they haven't given yet."""
+    store.next_verdict = ModelVerdict("personal_safety", "child_at_risk", 2)
+    with caplog.at_level(logging.INFO):
+        receipt = submit(form(description="The children next door are beaten daily.", phone="0241234567"), [], NOW)
+    contact = store.contacts[receipt.case["$id"]]
+
+    assert receipt.case["isSensitive"] and receipt.case["wardLocation"] is None
+    assert receipt.messages_on and contact["notify"] is True
+    assert contact["callbackConsent"] is False and receipt.held_for_consent and receipt.preferences_token
+    assert contact["preferencesTokenHash"] == report_intake.token_hash(receipt.preferences_token)
+    decisions = [line for line in caplog.messages if "personal safety by the classifier" in line]
+    assert len(decisions) == 1 and "neutral message" in decisions[0] and "0241234567" not in decisions[0]
+
+
+def test_the_neutral_message_that_reaches_such_a_resident_says_nothing_about_their_report(store: Store) -> None:
+    """The reason the message can be sent at all: whoever is holding that phone learns nothing from it."""
+    store.next_verdict = ModelVerdict("personal_safety", "child_at_risk", 2)
+    receipt = submit(form(description="The children next door are beaten daily.", phone="0241234567"), [], NOW)
+    body = compose(NotificationEvent.SUBMITTED, receipt.case).body
+
+    assert body == f"Nokware: reference {receipt.case['reference']} received."
+    for giveaway in ("child", "safety", "police", "welfare", "report", "http"):
+        assert giveaway not in body.lower()
+
+
+def test_the_web_form_hands_that_message_to_the_ordinary_path_rather_than_filing_in_silence(store: Store) -> None:
+    """The route is what sends the receipt, so the wiring is the whole of it: while the form held the consent back,
+    no task was queued, no outbox row was ever written, and the resident heard nothing from anyone, ever."""
+    store.next_verdict = ModelVerdict("personal_safety", "child_at_risk", 2)
+    tasks = BackgroundTasks()
+
+    receipt = reports.file_report(tasks, form(description="The children next door are beaten daily.", phone="0241234567"))
+
+    assert receipt.private and receipt.messages_on and receipt.held_for_consent
+    assert [(task.func, task.args[1]) for task in tasks.tasks] == [(notify_quietly, NotificationEvent.SUBMITTED)]
+
+
+def test_the_link_that_asks_about_a_call_lasts_a_week_and_still_answers_on_the_sixth_day(store: Store) -> None:
+    """An hour was gone before a resident in danger had a quiet moment to weigh a phone call from the Police."""
     store.next_verdict = ModelVerdict("personal_safety", "child_at_risk", 2)
     receipt = submit(form(description="The children next door are beaten daily.", phone="0241234567"), [], NOW)
     contact = store.contacts[receipt.case["$id"]]
-    assert receipt.case["isSensitive"] and receipt.case["wardLocation"] is None
-    assert not receipt.messages_on and receipt.held_for_consent and receipt.preferences_token
-    assert contact["notify"] is False and contact["callbackConsent"] is False
-    assert contact["preferencesTokenHash"] == report_intake.token_hash(receipt.preferences_token)
+    expires = datetime.fromisoformat(contact["preferencesExpiresAt"])
+
+    assert timedelta(days=7) <= report_intake.PREFERENCES_WINDOW and NOW + timedelta(days=7) <= expires
+    assert NOW + timedelta(days=6) < expires  # the day the resident comes back to it
 
 
 def test_without_a_number_there_is_nothing_to_store_or_send(store: Store) -> None:

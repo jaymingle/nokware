@@ -5,6 +5,7 @@ sent afterwards, by the caller, so a slow provider never delays the receipt.
 """
 
 import hashlib
+import logging
 import secrets
 import uuid
 from concurrent.futures import ThreadPoolExecutor
@@ -38,9 +39,15 @@ from app.services.report_rules import (
 from app.services.report_taxonomy import TOPICS_BY_ID, Category
 from app.teams import RECIPIENT_NAMES
 
+logger = logging.getLogger(__name__)
+
 DESCRIPTION_MIN = 10
 REFERENCE_ATTEMPTS = 5
-PREFERENCES_WINDOW = timedelta(hours=1)
+# How long the confirmation page's link can still answer the callback question. An hour was too short to be an offer
+# at all: the question is about a phone call from the Police or Social Welfare, which someone in danger weighs in
+# their own time and rarely at the moment of filing, and a link that has quietly expired asks them nothing. A week
+# is long enough to come back to and short enough that the token dies well inside the case's own life.
+PREFERENCES_WINDOW = timedelta(days=7)
 
 
 @dataclass(frozen=True)
@@ -61,8 +68,8 @@ class ReportSubmission:
 class Receipt:
     case: dict[str, Any]
     messages_on: bool  # the citizen will get the received / resolved / escalated messages
-    held_for_consent: bool  # filed as personal safety by the classifier: messages wait for the citizen's say
-    preferences_token: str | None  # lets the confirmation page ask, once, within the hour
+    held_for_consent: bool  # filed as personal safety by the classifier: a call waits for the citizen's say
+    preferences_token: str | None  # lets the confirmation page ask, once, within PREFERENCES_WINDOW
 
 
 def _description(raw: str) -> str:
@@ -83,13 +90,22 @@ def _contact(submission: ReportSubmission) -> ContactChoice | None:
     return ContactChoice(phone, whatsapp, notify=submission.notify, callback_consent=submission.callback_consent)
 
 
-def _consented(choice: ContactChoice, submission: ReportSubmission, filed: Classification) -> ContactChoice:
-    """Messages and calls as agreed. Safety form: only what was ticked. Normal form: messages yes, calls never.
-    Filed as personal safety by the classifier: nothing until the citizen says (they never saw the safety wording)."""
+def _consented(choice: ContactChoice, submission: ReportSubmission) -> ContactChoice:
+    """Messages and calls as agreed. Safety form: only what was ticked. Every other form: messages yes, calls never.
+
+    That holds when the classifier, not the resident, reads the report as personal safety. What the resident agreed
+    to is what they were asked: they gave a number on a form that promised messages about their report, and that
+    consent is not made void by a reading they never saw. What such a case is sent is the neutral message — the
+    reference alone, no category, no service, not even the word "report" — which is exactly why it exists: it tells
+    whoever is holding the phone nothing. Weighed against it, holding messages back meant a resident who gave a
+    number and heard nothing at all, ever.
+
+    A call is the opposite trade. Someone from the Police or Social Welfare ringing can be overheard, or answered by
+    the person the report is about, and no wording of ours controls what is said. So the callback waits for the
+    resident's own answer, on the confirmation page, and is never assumed.
+    """
     if submission.safety_topic is not None:
         return choice
-    if filed.private:
-        return ContactChoice(choice.phone, choice.whatsapp, notify=False, callback_consent=False)
     return ContactChoice(choice.phone, choice.whatsapp, notify=True, callback_consent=False)
 
 
@@ -231,7 +247,14 @@ def submit(submission: ReportSubmission, photos: list[bytes], now: datetime, fil
     _record_filing(case, submission.spoken)
     if choice is None:
         return Receipt(case=case, messages_on=False, held_for_consent=False, preferences_token=None)
-    agreed = _consented(choice, submission, filed)
-    held = filed.private and submission.safety_topic is None
-    token = _save_contact(case_id, agreed, held, now)
-    return Receipt(case=case, messages_on=agreed.notify, held_for_consent=held, preferences_token=token)
+    agreed = _consented(choice, submission)
+    ask_about_calls = filed.private and submission.safety_topic is None
+    if ask_about_calls:
+        # Once, at info: a decision made for the resident rather than by them belongs on the record, so the quiet
+        # about the category is a choice someone can find and read back, not a message that went missing.
+        logger.info("Case %s was read as personal safety by the classifier, not declared by the resident: messages "
+                    "are on, because they gave a number on a form that promised them, and what such a case is ever "
+                    "sent is the neutral message, which names only the reference; only a call from a service waits "
+                    "for their answer", case_id)
+    token = _save_contact(case_id, agreed, ask_about_calls, now)
+    return Receipt(case=case, messages_on=agreed.notify, held_for_consent=ask_about_calls, preferences_token=token)

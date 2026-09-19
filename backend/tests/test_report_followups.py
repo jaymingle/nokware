@@ -7,7 +7,7 @@ import pytest
 
 from app.services import report_followups
 from app.services.report_followups import Preferences, public_status, set_preferences
-from app.services.report_intake import token_hash
+from app.services.report_intake import PREFERENCES_WINDOW, token_hash
 from app.services.workflow import NotAllowed
 
 NOW = datetime(2026, 9, 13, 12, 0, tzinfo=UTC)
@@ -54,6 +54,24 @@ def test_the_messages_question_is_answered_once_with_the_receipt_token(contact: 
     assert on and contact["notify"] and contact["callbackConsent"] and contact["preferencesTokenHash"] is None
     with pytest.raises(NotAllowed):
         set_preferences("M3RD-8WQA", "tok", Preferences(notify=False, callback_consent=False), NOW)
+
+
+def test_the_callback_question_can_still_be_answered_on_the_sixth_day(contact: dict[str, Any]) -> None:
+    """The link lives a week, not an hour: a resident in danger weighs a phone call from the Police in their own
+    time, and a link that expired while they thought about it asks them nothing."""
+    contact["preferencesExpiresAt"] = (NOW + PREFERENCES_WINDOW).isoformat()
+    _, receipt_owed = set_preferences(
+        "M3RD-8WQA", "tok", Preferences(notify=True, callback_consent=True), NOW + timedelta(days=6)
+    )
+    assert contact["callbackConsent"] is True and receipt_owed  # their messages were off, so the receipt is owed
+
+
+def test_a_resident_whose_messages_were_already_on_is_not_sent_the_receipt_a_second_time(contact: dict[str, Any]) -> None:
+    """A case the classifier read as personal safety had its neutral receipt when it was filed. Answering the
+    callback question is not a second filing, and a duplicate reference is a message they have to make sense of."""
+    contact["notify"] = True
+    _, receipt_owed = set_preferences("M3RD-8WQA", "tok", Preferences(notify=True, callback_consent=True), NOW)
+    assert contact["callbackConsent"] is True and not receipt_owed
 
 
 def test_a_wrong_or_late_token_changes_nothing(contact: dict[str, Any]) -> None:

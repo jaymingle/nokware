@@ -150,7 +150,7 @@ def preferences(
     receipt_token: Annotated[str, Header(alias="X-Receipt-Token")],
 ) -> PreferencesResult:
     choice = report_followups.Preferences(notify=request.notify, callback_consent=request.callback_consent)
-    case, messages_on = report_followups.set_preferences(reference, receipt_token, choice, utc_now())
-    if messages_on:  # the "received" message they would otherwise have had
+    case, receipt_owed = report_followups.set_preferences(reference, receipt_token, choice, utc_now())
+    if receipt_owed:  # messages were off and are now on, so this is the "received" message they never had
         tasks.add_task(notify_quietly, case, NotificationEvent.SUBMITTED)
-    return PreferencesResult(messages_on=messages_on)
+    return PreferencesResult(messages_on=choice.notify)

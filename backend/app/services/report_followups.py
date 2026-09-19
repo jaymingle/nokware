@@ -28,7 +28,7 @@ from app.services.citizen_reports import MAX_ESCALATION_PHOTOS
 from app.services.issue_voices import sync_voice_retention
 from app.services.ledger_documents import parse_datetime
 from app.services.report_contacts import contact_for, contacts_due_for_deletion, delete_contact, update_contact
-from app.services.report_intake import token_hash
+from app.services.report_intake import PREFERENCES_WINDOW, token_hash
 from app.services.report_photos import clean_photos, photo_link, store_photos
 from app.services.report_rules import normalise_reference
 from app.services.report_taxonomy import TOPICS_BY_ID, Category
@@ -161,13 +161,17 @@ class Preferences:
 
 
 def set_preferences(reference_or_id: str, token: str, choice: Preferences, now: datetime) -> tuple[dict[str, Any], bool]:
-    """Once only, within the hour, with the token from the receipt. Returns the case and whether messages are now on."""
+    """Once only, with the token from the receipt, for as long as the token lives. Returns the case and whether the
+    "received" message is now owed: a resident whose messages were already on had that message when they filed, so
+    sending it here would be a second copy of one they have."""
     case = find(reference_or_id)
     contact = contact_for(case["$id"])
     expires = parse_datetime(contact.get("preferencesExpiresAt")) if contact else None
     stored = (contact or {}).get("preferencesTokenHash") or ""
     if not contact or not expires or now > expires or not hmac.compare_digest(stored, token_hash(token)):
-        raise NotAllowed("This choice can only be made on the confirmation page, within an hour of reporting.")
+        days = PREFERENCES_WINDOW.days
+        raise NotAllowed(f"This choice can only be made on the confirmation page, within {days} days of reporting.")
+    was_on = bool(contact.get("notify"))
     changes = {
         "notify": choice.notify,
         "callbackConsent": choice.callback_consent,
@@ -175,7 +179,7 @@ def set_preferences(reference_or_id: str, token: str, choice: Preferences, now: 
         "preferencesExpiresAt": None,
     }
     update_contact(case["$id"], changes)
-    return case, choice.notify
+    return case, choice.notify and not was_on
 
 
 def sync_contact_retention(case: dict[str, Any]) -> None:
