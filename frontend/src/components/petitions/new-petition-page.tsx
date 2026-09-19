@@ -151,8 +151,23 @@ function Send({ ready, submit, proof }: { ready: boolean; submit: ReturnType<typ
   );
 }
 
+/** A petition takes a while to write, so what was typed is kept in this browser. Unannounced, coming back to a
+    half-filled form reads as a fault rather than a kindness. */
+function KeptDraft({ onDiscard }: { onDiscard: () => void }) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-dashed bg-paper-subtle px-4 py-3" data-testid="petition-draft-kept">
+      <p className="text-[13.5px] text-ink-soft">
+        This is the petition you started on this device. Nothing has been sent to the Assembly.
+      </p>
+      <Button variant="secondary" size="sm" onClick={onDiscard} data-testid="petition-draft-discard">
+        Start again
+      </Button>
+    </div>
+  );
+}
+
 function Form({ options, issue }: { options: PetitionOptions; issue: string | null }) {
-  const [draft, change, clear] = usePetitionDraft(issue);
+  const { draft, change, clear, restored } = usePetitionDraft(issue);
   const [named, setNamed] = useState(false);
   const [name, setName] = useState("");
   const [done, setDone] = useState<OwnPetition | null>(null);
@@ -163,6 +178,7 @@ function Form({ options, issue }: { options: PetitionOptions; issue: string | nu
   const ready = check.current !== null && !check.current.screen.stop && phone.proof !== null;
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-5">
+      {restored ? <KeptDraft onDiscard={clear} /> : null}
       <Step number={1} title="Your petition" testId="petition-step-words">
         <DraftFields draft={draft} change={change} options={options} testId="petition-draft" />
         <Button variant="secondary" className="w-fit" onClick={() => void check.run()} disabled={check.checking || check.searching} data-testid="petition-check">
