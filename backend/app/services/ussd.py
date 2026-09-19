@@ -35,7 +35,7 @@ from app.services import (
     report_store,
 )
 from app.services.channel_answers import for_sms
-from app.services.channel_contacts import ambulance_calls, call_lines, desk_line, emergency_call, numbers_sms
+from app.services.channel_contacts import ambulance_calls, call_lines, desk_line, emergency_call, first_calls, numbers_sms
 from app.services.channel_messages import send_sms
 from app.services.channel_status import status_text
 from app.services.citizen_reports import IntakeChannel, NotificationEvent
@@ -67,8 +67,15 @@ CONTINUE = "\n1 Continue"
 SCREEN_MAX = 160
 QUESTION_MIN = 5
 WHO_MAX = 40  # longer office names give way to a count, so the receipt keeps its last words
-MENU = "Nokware - Accra Assembly\n1 Ask a question\n2 Report an issue\n3 Check a case\n4 Medical emergency\n5 Confirm a web code\n6 Sign a petition"
+# Emergency numbers lead the menu. Nothing is filed by that option and the screen says so first — but someone in
+# an emergency should not be reading past "Ask a question" to find a number, and two taps to an ambulance is a
+# service even though Nokware does nothing with it.
+MENU = ("Nokware - Accra Assembly\n1 Emergency numbers\n2 Ask a question\n3 Report an issue\n4 Check a case\n"
+        "5 Confirm a web code\n6 Sign a petition")
 AMBULANCE, EMERGENCY = ", ".join(ambulance_calls()), emergency_call()  # from contacts.json, as WhatsApp gives them
+POLICE, FIRE = first_calls("police-191", "fire-192")
+EMERGENCY_NUMBERS = (f"Numbers to call now. Nokware gives them; it can't send help.\nAny emergency: {EMERGENCY}\n"
+                     f"Ambulance: {AMBULANCE}\nPolice: {POLICE}\nFire: {FIRE}")
 MEDICAL = f"Nokware can't file this: it isn't an Assembly matter. Ambulance: {AMBULANCE}. Or call {EMERGENCY}."
 CONFIRM = "File this report?\n1 File, and SMS me updates\n2 File, no SMS\n0 Cancel"
 # Personal safety asks about updates once, after filing: offering them here too asked twice and never turned them on.
@@ -154,14 +161,14 @@ def answer_by_sms(msisdn: str, question: str) -> None:
 
 def _menu(dial: Dial, state: State, later: Later) -> tuple[Reply, State | None]:
     choice = dial.text.strip()
-    if choice == "1":
-        return con("Type your question. The answer comes by SMS."), {"step": "ask"}
+    if choice == "1":  # nothing is filed here, and the screen says so before the numbers
+        return end(EMERGENCY_NUMBERS), None
     if choice == "2":
-        return con("Describe the problem and where it is (a street or a landmark):"), {"step": "describe"}
+        return con("Type your question. The answer comes by SMS."), {"step": "ask"}
     if choice == "3":
+        return con("Describe the problem and where it is (a street or a landmark):"), {"step": "describe"}
+    if choice == "4":
         return con("Enter your case reference, e.g. K7QM-4TXP:"), {"step": "check"}
-    if choice == "4":  # not the Assembly's to act on, but the numbers cost nothing to give
-        return end(MEDICAL), None
     if choice == "5":
         return con("Enter the 6-digit code shown on the Nokware page:"), {"step": "code"}
     if choice == "6":

@@ -80,6 +80,12 @@ def emergency_call() -> str:
     return _calls(contacts()[PUBLIC_EMERGENCY])[0]
 
 
+def first_calls(*contact_ids: str) -> list[str]:
+    """The first number of each named contact, for a screen with room for one apiece."""
+    held = contacts()
+    return [_calls(held[contact_id])[0] for contact_id in contact_ids if contact_id in held and _calls(held[contact_id])]
+
+
 def _welfare_calls(sub_metro: str | None) -> list[str]:
     desk, head = welfare_desk(sub_metro), _calls(contacts()[SAFETY_DESK_FALLBACK])
     return [*_calls(desk), *(f"head office {number}" for number in head)] if desk else head
