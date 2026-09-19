@@ -108,7 +108,7 @@ def test_the_cap_falls_on_sending_the_answer_not_on_reading_it(
     monkeypatch.setattr(channel_limits, "SMS_ANSWERS", channel_limits.NumberLimit("sms-answers", 1, 86400))
     assert keys(session, "2", "What are the market fees?", "1", session_id="a").message.startswith("Thank you")
     refused = keys(session, "2", "And the toll fees?", "1", session_id="b")
-    assert "still on this screen, free to read" in refused.message and refused.more
+    assert ussd.REFUSED_SMS in refused.message and refused.message.endswith("\n0 Menu") and refused.more
     assert len(session) == 1
 
 

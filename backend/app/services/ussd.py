@@ -252,9 +252,14 @@ def _send_answer(dial: Dial, state: State, later: Later) -> tuple[Reply, State |
     return end("Thank you. Your answer is on its way by SMS."), None
 
 
+REFUSED_SMS = "You've had today's answers by SMS. The answer is still here, free to read."
+
+
 def _refused_sms(state: State) -> tuple[Reply, State]:
-    return con("You've had today's answers by SMS. The answer is still on this screen, free to read."
-               + MORE_MENU.replace("1 More", "1 Read it again")), {**state, "step": "answer", "page": 0}
+    """Back to the top of the answer, with the keys that screen really offers: pressing 1 there reads on, and a
+    one-screen answer has nothing to read on to."""
+    menu = "\n1 More  0 Menu" if len(state["pages"]) > 1 else "\n0 Menu"
+    return con(REFUSED_SMS + menu), {**state, "step": "answer", "page": 0}
 
 
 def _read(description: str) -> Classification:
