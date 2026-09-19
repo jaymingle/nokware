@@ -84,10 +84,11 @@ describe("a petition that was edited, or taken down", () => {
 
   it("says plainly how many times it came down, on the petition and on the tombstone", () => {
     expect(removedBeforeLine(0)).toBeNull();
-    expect(removedBeforeLine(1)).toBe("This petition has been removed 1 time and published again.");
+    expect(removedBeforeLine(1)).toBe("This petition has been removed once and published again.");
     expect(removedBeforeLine(3)).toBe("This petition has been removed 3 times and published again.");
     expect(previousRemovalsLine(0)).toBeNull();
-    expect(previousRemovalsLine(2)).toBe("It had been removed 2 times before this.");
+    expect(previousRemovalsLine(2)).toBe("It had been removed twice before this.");
+    expect(previousRemovalsLine(3)).toBe("It had been removed 3 times before this.");
     expect(removedLine({ ground_words: "Contains personal data", removed_at: "2026-09-12T09:00:00Z" })).toBe(
       "Removed on 12 Sept 2026: contains personal data.");
   });

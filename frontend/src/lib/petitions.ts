@@ -1,4 +1,4 @@
-import { joinNames, lowerFirst, plural } from "@/lib/text";
+import { joinNames, lowerFirst, plural, times } from "@/lib/text";
 import { formatDate } from "@/lib/time";
 
 import type { PetitionCard, PetitionStatus, PetitionTimelineEntry, PetitionTombstone, PhoneChallenge } from "@/lib/api/types";
@@ -157,7 +157,7 @@ export function earlierVersionsLine(count: number): string | null {
 /** A petition that came down and was mended. Said on the petition itself, so the record isn't only the tombstone's. */
 export function removedBeforeLine(removals: number): string | null {
   if (removals < 1) return null;
-  return `This petition has been removed ${plural(removals, "time", "times")} and published again.`;
+  return `This petition has been removed ${times(removals)} and published again.`;
 }
 
 export function removedLine(stone: Pick<PetitionTombstone, "ground_words" | "removed_at">): string {
@@ -167,7 +167,7 @@ export function removedLine(stone: Pick<PetitionTombstone, "ground_words" | "rem
 /** What a tombstone says about the removals before this one. */
 export function previousRemovalsLine(previous: number): string | null {
   if (previous < 1) return null;
-  return `It had been removed ${plural(previous, "time", "times")} before this.`;
+  return `It had been removed ${times(previous)} before this.`;
 }
 
 /**

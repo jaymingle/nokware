@@ -8,6 +8,11 @@ export function plural(count: number, one: string, many: string): string {
   return `${count} ${count === 1 ? one : many}`;
 }
 
+/** "once, twice, 3 times" — how many times something happened, which "1 time" says badly. */
+export function times(count: number): string {
+  return count === 1 ? "once" : count === 2 ? "twice" : `${count} times`;
+}
+
 /** Only the first letter: the rest may be a proper noun. */
 export function lowerFirst(text: string): string {
   return text ? text[0].toLowerCase() + text.slice(1) : text;
