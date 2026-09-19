@@ -87,10 +87,7 @@ export function petitionStatus(status: PetitionStatus): StatusMeaning {
   return tone ? { tone, label: STATUS_LABELS[status] } : unknownStatus(status);
 }
 
-/**
- * The five tabs the public petitions list is filed under, in the same language as the petitions themselves. Four
- * are groups the API lists petitions for; "removed" lists nothing, and holds the removal record instead.
- */
+/** The five tabs the public petitions list is filed under, in the same language as the petitions themselves. */
 export const PETITION_GROUPS: Record<string, StatusTone> = {
   open: "active", awaiting: "waiting", responded: "done", removed: "ended", closed: "ended",
 };
@@ -210,6 +207,7 @@ export function historyTone(action: HistoryAction): StatusTone {
 
 const PETITION_EVENT: Record<PetitionTimelineEntry["action"], StatusTone> = {
   edited: "active", threshold_reached: "active", shared: "active", creator_replied: "active",
+  image_removed: "attention",
   moved_to_new_process: "waiting",
   published: "done", republished: "done", responded: "done", department_note: "done",
   no_response: "attention", removed: "ended", withdrawn: "ended", closed: "ended",

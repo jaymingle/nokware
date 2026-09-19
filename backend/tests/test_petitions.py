@@ -666,3 +666,16 @@ def test_a_creator_reads_their_own_petition_whole_and_nobody_elses(stored: Fake,
     assert [v["version"] for v in body["versions"]] == [1] and body["shared_with"] == []
     stranger = phone_proof.issue_proof("+233209999999", Channel.WHATSAPP, datetime.now(UTC))
     assert client.get("/api/petitions/482913/mine", headers={"X-Phone-Proof": stranger}).status_code == 404
+
+
+def test_a_contributor_takes_one_photo_off_and_the_petition_and_the_rest_stand(stored: Fake, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A petition's signatures shouldn't be lost over one photograph its creator could have taken off themselves."""
+    monkeypatch.setattr(petitions, "public", lambda code: dict(stored.petition))
+    _publish(stored)
+    petitions.update_petition("p1", {"imageIds": ["a.jpg", "b.jpg", "c.jpg"], "signatureCount": 31})
+    left = petition_images.remove_image(KOFI, "482913", "b.jpg", Ground.PERSONAL_DATA, NOW)
+    assert left["imageIds"] == ["a.jpg", "c.jpg"] and left["status"] == PetitionStatus.OPEN
+    assert left["signatureCount"] == 31
+    assert stored.trail[-1][:2] == (PetitionAction.IMAGE_REMOVED, "contributor")
+    with pytest.raises(petitions.PetitionNotFound):
+        petition_images.remove_image(KOFI, "482913", "b.jpg", Ground.PERSONAL_DATA, NOW)

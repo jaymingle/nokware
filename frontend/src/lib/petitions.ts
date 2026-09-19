@@ -112,6 +112,7 @@ export const TIMELINE_WORDS: Record<PetitionTimelineEntry["action"], string> = {
   shared: "Sent to a department for its answer",
   department_note: "A department answered",
   creator_replied: "The person who started it replied",
+  image_removed: "A photo was taken down by a verified contributor",
   moved_to_new_process: "Moved to the new petition process",
 };
 

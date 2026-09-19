@@ -86,6 +86,7 @@ class PetitionAction(StrEnum):
     SHARED = "shared"  # the MCE sent the petition to a department for its answer
     DEPARTMENT_NOTE = "department_note"  # that department wrote its one note
     CREATOR_REPLIED = "creator_replied"  # the petitioner answered the MCE's response
+    IMAGE_REMOVED = "image_removed"  # a contributor took one photo off; the petition and the rest stand
     CREATOR_NOTIFIED = "creator_notified"  # a message to the creator: never public
 
 

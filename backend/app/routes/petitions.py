@@ -26,6 +26,7 @@ from app.schemas.petitions import (
     DismissRequest,
     DraftRequest,
     EditRequest,
+    ImageRemovalRequest,
     LedgerMatch,
     LedgerSearchRequest,
     MyPetitions,
@@ -330,6 +331,14 @@ def remove(code: str, request: RemovalRequest, principal: Contributor, proof: Ph
     removed = petition_removals.remove(principal, proof, code, Ground(request.ground), request.duplicate_of,
                                        request.note, utc_now())
     tasks.add_task(petition_updates.notify_quietly, removed.petition, Update.REMOVED)
+    return reported(principal)
+
+
+@router.post("/{code}/images/removal", response_model=ReportQueue, dependencies=[Changes])
+def remove_image(code: str, request: ImageRemovalRequest, principal: Contributor) -> ReportQueue:
+    """A contributor takes one photo off on a named ground. The petition and its other photos stand: taking the
+    whole petition down over one image would cost its signatures for something its creator can mend."""
+    petition_images.remove_image(principal, code, request.image_id, Ground(request.ground), utc_now())
     return reported(principal)
 
 

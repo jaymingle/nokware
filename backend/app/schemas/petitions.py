@@ -125,7 +125,7 @@ class PetitionCard(BaseModel):
 
 class TimelineEntry(BaseModel):
     action: Literal["published", "edited", "republished", "removed", "withdrawn", "closed", "threshold_reached",
-                    "responded", "no_response", "shared", "department_note", "creator_replied",
+                    "responded", "no_response", "shared", "department_note", "creator_replied", "image_removed",
                     # not an action anyone took: the day a petition already in the database came to this process
                     "moved_to_new_process"]
     at: str
@@ -352,6 +352,13 @@ class CommentReportRequest(BaseModel):
 
     ground: Ground
     note: str | None = Field(None, max_length=REPORT_NOTE_MAX + 100)
+
+
+class ImageRemovalRequest(BaseModel):
+    """The photo is named as the petition stores it, so a contributor removes the one they are looking at."""
+
+    image_id: str = Field(max_length=200)
+    ground: Ground
 
 
 class CommentRemovalRequest(BaseModel):
