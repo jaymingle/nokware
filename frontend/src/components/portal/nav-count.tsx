@@ -1,7 +1,7 @@
 "use client";
 
 import { useNow } from "@/hooks/use-now";
-import { useAwaitingResponses, useCaseOversight, useCaseQueue, useEscalations, usePetitionReview, useReviewQueue, useSubmissions } from "@/lib/api/queries";
+import { useAwaitingResponses, useCaseOversight, useCaseQueue, useEscalations, usePetitionReports, useReviewQueue, useSubmissions } from "@/lib/api/queries";
 import { openForMe } from "@/lib/cases";
 import { awaitingResponse, splitByClock, splitHeld } from "@/lib/documents";
 import { cn } from "@/lib/utils";
@@ -55,13 +55,15 @@ function CaseEscalationsCount({ active }: { active: boolean }) {
   return <Count value={data?.stats.escalated ?? 0} active={active} testId="nav-count-case-escalations" />;
 }
 
-/** Petitions past their review deadline publish on their own, so they aren't counted. */
+/** Only what the MCE owes: petitions that reached their signatures and are waiting for a public response. */
 function PetitionsCount({ active }: { active: boolean }) {
-  const now = useNow();
-  const review = usePetitionReview();
-  const responses = useAwaitingResponses();
-  const deciding = review.data ? review.data.petitions.filter((p) => Date.parse(p.review_deadline) > now).length : 0;
-  return <Count value={deciding + (responses.data?.length ?? 0)} active={active} testId="nav-count-petitions" />;
+  const { data } = useAwaitingResponses();
+  return <Count value={data?.length ?? 0} active={active} testId="nav-count-petitions" />;
+}
+
+function PetitionReportsCount({ active }: { active: boolean }) {
+  const { data } = usePetitionReports();
+  return <Count value={data?.reports.length ?? 0} active={active} testId="nav-count-petition-reports" />;
 }
 
 export function NavCount({ kind, active }: { kind: NavCountKind; active: boolean }) {
@@ -71,5 +73,6 @@ export function NavCount({ kind, active }: { kind: NavCountKind; active: boolean
   if (kind === "cases") return <CasesCount active={active} />;
   if (kind === "case-escalations") return <CaseEscalationsCount active={active} />;
   if (kind === "petitions") return <PetitionsCount active={active} />;
+  if (kind === "petition-reports") return <PetitionReportsCount active={active} />;
   return null;
 }

@@ -14,7 +14,7 @@ import { usePetitionLedger } from "@/lib/api/petition-queries";
 import { useDepartments, useRespondToPetition } from "@/lib/api/queries";
 import { spacedCode } from "@/lib/petitions";
 
-import type { AwaitingResponse, ResponseKind } from "@/lib/api/types";
+import type { ResponseKind } from "@/lib/api/types";
 
 const TEXT_MAX = 4000;
 const CITE_MAX = 3;
@@ -62,55 +62,91 @@ function Citable({ draft, change, code }: { draft: Draft; change: (next: Partial
   );
 }
 
-function RespondForm({ petition, late, onDone }: { petition: AwaitingResponse; late: boolean; onDone: () => void }) {
-  const [draft, setDraft] = useState<Draft>({ kind: "", department: "", text: "", documents: [] });
-  const change = (next: Partial<Draft>) => setDraft((d) => ({ ...d, ...next }));
+function Check({ draft, late, code }: { draft: Draft; late: boolean; code: string }) {
+  const kind = KINDS.find((k) => k.id === draft.kind);
+  return (
+    <div className="flex flex-col gap-3" data-testid={`respond-${code}-check`}>
+      <p className="rounded-lg bg-gold-tint px-3 py-2.5 text-[13.5px]">
+        Your response: <strong className="font-medium">{kind?.label}</strong>
+      </p>
+      <p className="max-h-52 overflow-y-auto rounded-lg border px-3 py-2.5 text-[13.5px] whitespace-pre-line">{draft.text}</p>
+      <p className="text-[14px]">
+        This goes on the petition&apos;s page now, word for word, and can&apos;t be changed afterwards. The petition
+        then takes no more signatures.{late ? " The page will say how many days late it came." : ""}
+      </p>
+    </div>
+  );
+}
+
+function useResponse(code: string, draft: Draft, onDone: () => void) {
   const respond = useRespondToPetition();
-  const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  const send = async () => {
     if (!draft.kind) return;
     const response = { kind: draft.kind, text: draft.text, department: draft.kind === "referred" ? draft.department : null, documents: draft.documents };
     try {
-      await respond.mutateAsync({ code: petition.code, response });
+      await respond.mutateAsync({ code, response });
       toast.success("Published on the petition's page. The person who started it is told.");
       onDone();
     } catch {
-      // respond.error is shown below
+      // respond.error is shown in the dialog
     }
   };
+  return { respond, send };
+}
+
+function RespondForm({ code, late, onDone }: { code: string; late: boolean; onDone: () => void }) {
+  const [draft, setDraft] = useState<Draft>({ kind: "", department: "", text: "", documents: [] });
+  const [checking, setChecking] = useState(false);
+  const change = (next: Partial<Draft>) => setDraft((d) => ({ ...d, ...next }));
+  const { respond, send } = useResponse(code, draft, onDone);
+  const onSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (checking) void send();
+    else setChecking(true);
+  };
   return (
-    <form onSubmit={(e) => void onSubmit(e)} className="flex flex-col gap-4">
-      <KindChoice draft={draft} change={change} code={petition.code} />
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor={`respond-${petition.code}-text`}>The statement</Label>
-        <Textarea id={`respond-${petition.code}-text`} value={draft.text} onChange={(e) => change({ text: e.target.value })} required
-          minLength={50} maxLength={TEXT_MAX} rows={6} data-testid={`respond-${petition.code}-text`} />
-      </div>
-      <Citable draft={draft} change={change} code={petition.code} />
-      {late ? <p className="rounded-lg bg-gold-tint px-3 py-2 text-[13px]">The 30 days have passed: the page will say how many days late this response came.</p> : null}
+    <form onSubmit={onSubmit} className="flex flex-col gap-4">
+      {checking ? <Check draft={draft} late={late} code={code} /> : (
+        <>
+          <KindChoice draft={draft} change={change} code={code} />
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor={`respond-${code}-text`}>The statement</Label>
+            <Textarea id={`respond-${code}-text`} value={draft.text} onChange={(e) => change({ text: e.target.value })} required
+              minLength={50} maxLength={TEXT_MAX} rows={6} data-testid={`respond-${code}-text`} />
+          </div>
+          <Citable draft={draft} change={change} code={code} />
+          {late ? <p className="rounded-lg bg-gold-tint px-3 py-2 text-[13px]">The 30 days have passed: the page will say how many days late this response came.</p> : null}
+        </>
+      )}
       {respond.error ? <ErrorNote>{respond.error.message}</ErrorNote> : null}
       <DialogFooter>
-        <DialogClose asChild><Button type="button" variant="secondary" data-testid={`respond-${petition.code}-cancel`}>Cancel</Button></DialogClose>
-        <Button type="submit" disabled={respond.isPending || !draft.kind} data-testid={`respond-${petition.code}-confirm`}>Publish the response</Button>
+        {checking ? (
+          <Button type="button" variant="secondary" onClick={() => setChecking(false)} data-testid={`respond-${code}-back`}>Back</Button>
+        ) : (
+          <DialogClose asChild><Button type="button" variant="secondary" data-testid={`respond-${code}-cancel`}>Cancel</Button></DialogClose>
+        )}
+        <Button type="submit" disabled={respond.isPending || !draft.kind} data-testid={`respond-${code}-confirm`}>
+          {checking ? "Publish the response" : "Check it over"}
+        </Button>
       </DialogFooter>
     </form>
   );
 }
 
-export function RespondDialog({ petition, late }: { petition: AwaitingResponse; late: boolean }) {
+export function RespondDialog({ code, late }: { code: string; late: boolean }) {
   const [open, setOpen] = useState(false);
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild><Button className="w-fit" data-testid={`respond-${petition.code}`}>Respond publicly</Button></DialogTrigger>
+      <DialogTrigger asChild><Button className="w-fit" data-testid={`respond-${code}`}>Respond publicly</Button></DialogTrigger>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle className="text-[20px]">Respond to petition {spacedCode(petition.code)}</DialogTitle>
+          <DialogTitle className="text-[20px]">Respond to petition {spacedCode(code)}</DialogTitle>
           <DialogDescription>
             It is published on the petition&apos;s page as you write it, and can&apos;t be changed afterwards. The page says it came from
             the MCE; the audit trail keeps your name. The petition then takes no more signatures.
           </DialogDescription>
         </DialogHeader>
-        {open ? <RespondForm petition={petition} late={late} onDone={() => setOpen(false)} /> : null}
+        {open ? <RespondForm code={code} late={late} onDone={() => setOpen(false)} /> : null}
       </DialogContent>
     </Dialog>
   );

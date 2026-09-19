@@ -1,6 +1,7 @@
 import type { Me, Role } from "@/lib/api/types";
 
-export type NavCountKind = "review" | "responses" | "escalations" | "cases" | "case-escalations" | "petitions";
+export type NavCountKind =
+  | "review" | "responses" | "escalations" | "cases" | "case-escalations" | "petitions" | "petition-reports";
 
 type NavItem = { href: string; label: string; testId: string; count?: NavCountKind };
 
@@ -22,6 +23,7 @@ export const ROLE_NAV: Record<Role, NavItem[]> = {
   contributor: [
     { href: "/portal/contributor", label: "My submissions", testId: "portal-nav-submissions", count: "responses" },
     { href: "/portal/contributor/submit", label: "Submit a document", testId: "portal-nav-submit" },
+    { href: "/portal/contributor/petitions", label: "Reported petitions", testId: "portal-nav-petition-reports", count: "petition-reports" },
   ],
   mce: [
     { href: "/portal/mce", label: "Document disputes", testId: "portal-nav-escalations", count: "escalations" },
