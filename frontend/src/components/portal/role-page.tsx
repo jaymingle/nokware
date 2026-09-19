@@ -1,6 +1,6 @@
 "use client";
 
-import { PageIntro } from "@/components/portal/page-intro";
+import { PageShell } from "@/components/page-shell";
 import { Card, CardContent } from "@/components/ui/card";
 import { useMe } from "@/lib/auth/auth-context";
 import { roleLabel } from "@/lib/portal/navigation";
@@ -15,18 +15,16 @@ type RolePageProps = {
   children?: ReactNode;
 };
 
+/** Every portal page is a page like any other, at the width its queues and tables need. */
 export function RolePage({ title, lead, eyebrow, children }: RolePageProps) {
   const me = useMe();
   return (
-    <>
-      <PageIntro eyebrow={eyebrow ?? roleLabel(me)} title={title}>
-        {lead}
-      </PageIntro>
+    <PageShell width="data" eyebrow={eyebrow ?? roleLabel(me)} title={title} lead={lead}>
       {children ?? (
         <Card>
           <CardContent className="text-sm text-ink-soft">This view is built in the next step.</CardContent>
         </Card>
       )}
-    </>
+    </PageShell>
   );
 }

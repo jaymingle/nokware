@@ -14,7 +14,8 @@ const LABEL_ROOM = 30; // below this much room per month, every other month is l
 
 function MonthsTable({ months }: { months: MonthFigures[] }) {
   return (
-    <table className="sr-only">
+    <div className="sr-only">
+      <table>
       <caption>Reports received and resolved each month</caption>
       <thead>
         <tr><th scope="col">Month</th><th scope="col">Received</th><th scope="col">Resolved</th></tr>
@@ -25,6 +26,7 @@ function MonthsTable({ months }: { months: MonthFigures[] }) {
         ))}
       </tbody>
     </table>
+    </div>
   );
 }
 

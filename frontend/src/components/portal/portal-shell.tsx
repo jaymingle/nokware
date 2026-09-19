@@ -54,7 +54,8 @@ export function PortalShell({ children }: { children: ReactNode }) {
     <div className="relative flex flex-1 flex-col">
       <SkipLink />
       <PortalHeader />
-      <main id="main" className="mx-auto w-full max-w-[1360px] flex-1 px-7 pt-9 pb-16">{children}</main>
+      {/* The gutter lines up with the header's; the page shell inside spends the vertical space. */}
+      <main id="main" className="mx-auto w-full max-w-[1360px] flex-1 px-7">{children}</main>
     </div>
   );
 }

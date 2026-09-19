@@ -4,11 +4,11 @@ import Link from "next/link";
 import { useState, type ReactNode } from "react";
 
 import { ErrorNote, ErrorPanel, LoadingPanel } from "@/components/documents/panels";
+import { PageShell } from "@/components/page-shell";
 import { DraftFields } from "@/components/petitions/draft-fields";
 import { LedgerMatches } from "@/components/petitions/ledger-matches";
 import { NameChoice } from "@/components/petitions/name-choice";
 import { PhoneConfirm, PhoneConfirmed } from "@/components/petitions/phone-confirm";
-import { PageIntro } from "@/components/portal/page-intro";
 import { Button } from "@/components/ui/button";
 import { useMounted } from "@/hooks/use-mounted";
 import { checkKey, toRequest, usePetitionDraft, type DraftState } from "@/hooks/use-petition-draft";
@@ -115,8 +115,9 @@ function WhatHappensNext({ options }: { options: PetitionOptions }) {
 
 function Submitted({ petition }: { petition: OwnPetition }) {
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 rounded-xl border bg-card p-6" data-testid="petition-submitted">
-      <h1 className="text-[28px]">Sent to the MCE</h1>
+    <div className="flex flex-col gap-4 rounded-xl border bg-card p-6" data-testid="petition-submitted">
+      {/* An h2: the page's h1 is "Start a petition", which is still above it. */}
+      <h2 className="text-[24px] leading-snug">Sent to the MCE</h2>
       <p className="text-[15px]">
         Your petition is number <strong className="font-medium tabular-nums">{spacedCode(petition.code)}</strong>. The MCE can
         publish it or refuse it for one of the stated reasons.
@@ -177,7 +178,7 @@ function Form({ options, issue }: { options: PetitionOptions; issue: string | nu
   if (done) return <Submitted petition={done} />;
   const ready = check.current !== null && !check.current.screen.stop && phone.proof !== null;
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-5">
+    <div className="flex flex-col gap-5">
       {restored ? <KeptDraft onDiscard={clear} /> : null}
       <Step number={1} title="Your petition" testId="petition-step-words">
         <DraftFields draft={draft} change={change} options={options} testId="petition-draft" />
@@ -205,14 +206,19 @@ export function NewPetitionPage({ issue }: { issue: string | null }) {
   const mounted = useMounted();
   const options = usePetitionOptions();
   return (
-    <>
-      <PageIntro eyebrow="Petitions" title="Start a petition">
-        Ask the Accra Metropolitan Assembly to do something, and gather support for it. Your draft is kept in this browser
-        until you send it.
-      </PageIntro>
+    <PageShell
+      eyebrow="Petitions"
+      title="Start a petition"
+      lead={
+        <>
+          Ask the Accra Metropolitan Assembly to do something, and gather support for it. Your draft is kept in this browser
+          until you send it.
+        </>
+      }
+    >
       {options.isPending || !mounted ? <LoadingPanel label="Loading…" /> : null}
       {options.error ? <ErrorPanel message={options.error.message} onRetry={() => void options.refetch()} /> : null}
       {options.data && mounted ? <Form options={options.data} issue={issue} /> : null}
-    </>
+    </PageShell>
   );
 }

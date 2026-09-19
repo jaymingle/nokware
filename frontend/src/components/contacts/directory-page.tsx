@@ -3,7 +3,7 @@
 import { ContactItem } from "@/components/contacts/contact-item";
 import { WhoRepresentsYou } from "@/components/contacts/who-represents-you";
 import { ErrorPanel, LoadingPanel } from "@/components/documents/panels";
-import { PageIntro } from "@/components/portal/page-intro";
+import { PageShell } from "@/components/page-shell";
 import { EmergencyNote } from "@/components/report/notes";
 import { useContacts } from "@/lib/api/public-queries";
 import { TIERS } from "@/lib/contacts";
@@ -52,17 +52,22 @@ export function Services({ directory }: { directory: ContactDirectory }) {
 export function DirectoryPage() {
   const directory = useContacts();
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-7">
-      <PageIntro eyebrow="Contacts" title="Who to call">
-        Emergency lines, the Assembly, the services that act on reports, and who represents your area. Every number
-        shows where it comes from, the same way Ask shows the source of every answer.
-      </PageIntro>
+    <PageShell
+      eyebrow="Contacts"
+      title="Who to call"
+      lead={
+        <>
+          Emergency lines, the Assembly, the services that act on reports, and who represents your area. Every number
+          shows where it comes from, the same way Ask shows the source of every answer.
+        </>
+      }
+    >
       <EmergencyNote />
       <WhoRepresentsYou />
       <TierKey />
       {directory.isPending ? <LoadingPanel label="Loading the numbers…" /> : null}
       {directory.error ? <ErrorPanel message={directory.error.message} onRetry={() => directory.refetch()} /> : null}
       {directory.data ? <Services directory={directory.data} /> : null}
-    </div>
+    </PageShell>
   );
 }

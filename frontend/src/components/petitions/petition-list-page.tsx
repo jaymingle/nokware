@@ -4,9 +4,9 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { ErrorPanel, LoadingPanel } from "@/components/documents/panels";
+import { PageShell } from "@/components/page-shell";
 import { ModerationRecord } from "@/components/petitions/moderation-record";
 import { PetitionCard } from "@/components/petitions/petition-card";
-import { PageIntro } from "@/components/portal/page-intro";
 import { Button } from "@/components/ui/button";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { useNow } from "@/hooks/use-now";
@@ -78,15 +78,22 @@ export function PetitionListPage() {
   const petitions = usePetitions({ group, topic, limit: PAGE, offset });
   const choose = (next: PetitionGroup) => { setGroup(next); setOffset(0); };
   return (
-    <div className="mx-auto flex w-full max-w-4xl flex-col gap-6">
-      <PageIntro eyebrow="Petitions" title="Ask the Assembly to act">
-        Residents asking the Accra Metropolitan Assembly to do something, and the support each has gathered. The MCE
-        reviews each petition first, and has to decide within 72 hours or it publishes automatically.
-      </PageIntro>
-      <div className="flex flex-wrap gap-2">
-        <Button asChild><Link href="/petitions/new" data-testid="petitions-start">Start a petition</Link></Button>
-        <Button asChild variant="secondary"><Link href="/petitions/mine" data-testid="petitions-mine">Your petitions</Link></Button>
-      </div>
+    <PageShell
+      eyebrow="Petitions"
+      title="Ask the Assembly to act"
+      lead={
+        <>
+          Residents asking the Accra Metropolitan Assembly to do something, and the support each has gathered. The MCE
+          reviews each petition first, and has to decide within 72 hours or it publishes automatically.
+        </>
+      }
+      actions={
+        <>
+          <Button asChild><Link href="/petitions/new" data-testid="petitions-start">Start a petition</Link></Button>
+          <Button asChild variant="secondary"><Link href="/petitions/mine" data-testid="petitions-mine">Your petitions</Link></Button>
+        </>
+      }
+    >
       {petitions.error ? <ErrorPanel message={petitions.error.message} onRetry={() => void petitions.refetch()} /> : null}
       {petitions.data ? <ModerationRecord moderation={petitions.data.moderation} /> : null}
       <section className="flex flex-col gap-3 rounded-xl border bg-card p-5" aria-label="Petitions">
@@ -101,6 +108,6 @@ export function PetitionListPage() {
         {petitions.data ? <Listing page={petitions.data} group={group} now={now} /> : null}
         {petitions.data ? <Paging total={petitions.data.total} offset={offset} onOffset={setOffset} /> : null}
       </section>
-    </div>
+    </PageShell>
   );
 }

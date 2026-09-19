@@ -4,12 +4,12 @@ import { CheckIcon, CopyIcon, MessageCircleIcon } from "lucide-react";
 import { useState, type ReactNode } from "react";
 
 import { ErrorPanel, LoadingPanel } from "@/components/documents/panels";
+import { PageColumn, PageShell } from "@/components/page-shell";
 import { DocumentLine, LedgerMatches } from "@/components/petitions/ledger-matches";
 import { MceResponse } from "@/components/petitions/mce-response";
 import { Progress } from "@/components/petitions/petition-card";
 import { SignPanel } from "@/components/petitions/sign-panel";
 import { Signers } from "@/components/petitions/signers";
-import { PageIntro } from "@/components/portal/page-intro";
 import { Button } from "@/components/ui/button";
 import { useMounted } from "@/hooks/use-mounted";
 import { useNow } from "@/hooks/use-now";
@@ -127,11 +127,16 @@ function Petition({ petition }: { petition: PetitionDetail }) {
   const now = useNow();
   const byline = [startedBy(petition.started_by), publishedLine(petition)].filter(Boolean).join(" · ");
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-5">
-      <PageIntro eyebrow={`Petition ${spacedCode(petition.code)} · ${petition.topic}`} title={petition.title}>
-        To the Accra Metropolitan Assembly, concerning {joinNames(petition.departments)}. {placeLine(petition)}.
-      </PageIntro>
-      <p className="-mt-4 text-[13px] text-ink-soft" data-testid="petition-byline">{byline}</p>
+    <PageShell
+      eyebrow={`Petition ${spacedCode(petition.code)} · ${petition.topic}`}
+      title={petition.title}
+      lead={
+        <span className="flex flex-col gap-1.5">
+          <span>To the Accra Metropolitan Assembly, concerning {joinNames(petition.departments)}. {placeLine(petition)}.</span>
+          <span className="text-[13px]" data-testid="petition-byline">{byline}</span>
+        </span>
+      }
+    >
       <Standing petition={petition} now={now} />
       <MceResponse petition={petition} />
       {signable(petition, now) ? <SignPanel petition={petition} /> : null}
@@ -143,13 +148,16 @@ function Petition({ petition }: { petition: PetitionDetail }) {
       <Cited petition={petition} />
       <LedgerContext code={petition.code} />
       <Timeline petition={petition} />
-    </div>
+    </PageShell>
   );
 }
 
 export function PetitionPage({ code }: { code: string }) {
   const petition = usePetition(code);
-  if (petition.isPending) return <LoadingPanel label="Loading the petition…" />;
-  if (petition.error) return <ErrorPanel message={petition.error.message} onRetry={() => void petition.refetch()} />;
+  // The page's title is the petition's, so until it loads there is nothing to head the page with.
+  if (petition.isPending) return <PageColumn><LoadingPanel label="Loading the petition…" /></PageColumn>;
+  if (petition.error) {
+    return <PageColumn><ErrorPanel message={petition.error.message} onRetry={() => void petition.refetch()} /></PageColumn>;
+  }
   return <Petition petition={petition.data} />;
 }

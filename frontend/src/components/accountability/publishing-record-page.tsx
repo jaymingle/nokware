@@ -8,7 +8,7 @@ import { RecordDetail } from "@/components/accountability/record-detail";
 import { ReportingGaps } from "@/components/accountability/reporting-gaps";
 import { UnpublishedRecord } from "@/components/accountability/unpublished-data";
 import { ErrorPanel, LoadingPanel } from "@/components/documents/panels";
-import { PageIntro } from "@/components/portal/page-intro";
+import { PageShell } from "@/components/page-shell";
 import { ASSUMPTION_NOTE, LEDGER_YEAR_NOTE, STATE_LABELS, dateLabel, periodsIn, planSpan, recordTestId, yearFromLedger, yearsOf, type RecordState } from "@/lib/accountability";
 import { usePublishingRecord } from "@/lib/api/public-queries";
 import { cn } from "@/lib/utils";
@@ -213,10 +213,12 @@ export function PublishingRecordPage() {
   const onSelect: Select = (requirement, period) =>
     setSelected((current) => (current?.requirement === requirement.id && current.period === period.label ? null : { requirement: requirement.id, period: period.label }));
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-7">
-      <PageIntro eyebrow="Accountability" title="What the Assembly publishes">
-        The documents the Accra Metropolitan Assembly is required to publish, against what The Ledger holds, year by year. It shows the gaps, not just the contents.
-      </PageIntro>
+    <PageShell
+      width="data"
+      eyebrow="Accountability"
+      title="What the Assembly publishes"
+      lead="The documents the Accra Metropolitan Assembly is required to publish, against what The Ledger holds, year by year. It shows the gaps, not just the contents."
+    >
       <OtherView href="/accountability/departments" title="How departments respond" testId="record-to-responsiveness">
         The same Assembly measured by what it does with what residents report.
       </OtherView>
@@ -236,6 +238,6 @@ export function PublishingRecordPage() {
           ))}
         </>
       ) : null}
-    </div>
+    </PageShell>
   );
 }

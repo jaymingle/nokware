@@ -12,7 +12,8 @@ export default function PublicGroupLayout({ children }: { children: ReactNode })
       <div className="relative flex flex-1 flex-col">
         <SkipLink />
         <PublicHeader />
-        <main id="main" className="flex w-full flex-1 flex-col px-5 pt-8 pb-10 sm:px-7 sm:pt-10">{children}</main>
+        {/* Vertical rhythm belongs to the page shell; the gutter belongs here, with the header's. */}
+        <main id="main" className="flex w-full flex-1 flex-col px-5 sm:px-7">{children}</main>
         <AskWidget />
       </div>
     </AskThreadProvider>

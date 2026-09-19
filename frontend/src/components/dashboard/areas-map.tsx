@@ -107,7 +107,8 @@ function AreaTile({ area, largest }: { area: ElectoralAreaFigures; largest: numb
 
 function AreasTable({ subMetros, areas }: Areas) {
   return (
-    <table className="sr-only">
+    <div className="sr-only">
+      <table>
       <caption>Reports received and resolved in the last twelve months, by sub-metro and electoral area</caption>
       <thead>
         <tr><th scope="col">Sub-metro</th><th scope="col">Electoral area</th><th scope="col">Received</th><th scope="col">Resolved</th></tr>
@@ -126,6 +127,7 @@ function AreasTable({ subMetros, areas }: Areas) {
         ))}
       </tbody>
     </table>
+    </div>
   );
 }
 

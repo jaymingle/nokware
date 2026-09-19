@@ -4,7 +4,7 @@ import { CheckIcon, CopyIcon } from "lucide-react";
 import { useState } from "react";
 
 import { RtiPanel } from "@/components/ask/rti-panel";
-import { PageIntro } from "@/components/portal/page-intro";
+import { PageShell } from "@/components/page-shell";
 import { Button } from "@/components/ui/button";
 import { requestWording } from "@/lib/accountability";
 
@@ -38,13 +38,18 @@ export function RtiPage({ document, period, elsewhere }: { document?: string; pe
   const name = clean(document);
   const when = clean(period);
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
-      <PageIntro eyebrow="Right to Information" title="Request a document">
-        How to ask the Assembly for a document it hasn&apos;t published. Nokware doesn&apos;t send requests for you: you send yours to the
-        Assembly&apos;s Information Unit.
-      </PageIntro>
+    <PageShell
+      eyebrow="Right to Information"
+      title="Request a document"
+      lead={
+        <>
+          How to ask the Assembly for a document it hasn&apos;t published. Nokware doesn&apos;t send requests for you: you send yours to the
+          Assembly&apos;s Information Unit.
+        </>
+      }
+    >
       {name && when ? <Wording text={requestWording(name, when, Boolean(elsewhere))} /> : null}
       <RtiPanel testId="rti-page-panel" heading="h2" />
-    </div>
+    </PageShell>
   );
 }

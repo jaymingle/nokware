@@ -5,7 +5,7 @@ import { OtherView } from "@/components/accountability/other-view";
 import { PetitionFigures } from "@/components/accountability/petition-figures";
 import { CountValue } from "@/components/dashboard/count";
 import { ErrorPanel, LoadingPanel } from "@/components/documents/panels";
-import { PageIntro } from "@/components/portal/page-intro";
+import { PageShell } from "@/components/page-shell";
 import { isActive } from "@/lib/accountability";
 import { useResponsiveness } from "@/lib/api/public-queries";
 import { formatDays } from "@/lib/report/dashboard";
@@ -101,11 +101,17 @@ export function ResponsivenessPage() {
   const active = data?.departments.filter(isActive) ?? [];
   const quiet = data?.departments.filter((d) => !isActive(d)) ?? [];
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-7">
-      <PageIntro eyebrow="Accountability" title="How departments respond">
-        Evidence about the Assembly&apos;s own behaviour: how quickly each department starts and resolves what residents report, and how it
-        handles the documents contributors send it.
-      </PageIntro>
+    <PageShell
+      width="data"
+      eyebrow="Accountability"
+      title="How departments respond"
+      lead={
+        <>
+          Evidence about the Assembly&apos;s own behaviour: how quickly each department starts and resolves what residents report, and how it
+          handles the documents contributors send it.
+        </>
+      }
+    >
       <OtherView href="/accountability" title="What the Assembly publishes" testId="responsiveness-to-record">
         The same Assembly measured by the documents it is required to publish.
       </OtherView>
@@ -126,6 +132,6 @@ export function ResponsivenessPage() {
           ) : null}
         </>
       ) : null}
-    </div>
+    </PageShell>
   );
 }
