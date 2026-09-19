@@ -115,8 +115,16 @@ export const TIMELINE_WORDS: Record<PetitionTimelineEntry["action"], string> = {
   moved_to_new_process: "Moved to the new petition process",
 };
 
+/** Two steps are about a named department, and read as English rather than as a label with a value after it. */
+const NAMES_A_DEPARTMENT: Partial<Record<PetitionTimelineEntry["action"], (department: string) => string>> = {
+  shared: (department) => `Sent to ${department} for its answer`,
+  department_note: (department) => `${department} answered`,
+};
+
 export function timelineText(entry: PetitionTimelineEntry): string {
-  return entry.reason ? `${TIMELINE_WORDS[entry.action]}: ${entry.reason}` : TIMELINE_WORDS[entry.action];
+  if (!entry.reason) return TIMELINE_WORDS[entry.action];
+  const named = NAMES_A_DEPARTMENT[entry.action];
+  return named ? named(entry.reason) : `${TIMELINE_WORDS[entry.action]}: ${entry.reason}`;
 }
 
 // Editing, and being removed. A petition can be mended and published again, so both are ordinary things for a

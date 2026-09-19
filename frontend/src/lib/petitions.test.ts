@@ -58,6 +58,13 @@ describe("how a petition reads in public", () => {
     expect(decodeURIComponent(whatsappShareUrl("Desilt the drain", "https://nokware.tstitagency.com/petitions/482913"))).toContain(
       "Petition to the Accra Metropolitan Assembly: Desilt the drain\nhttps://nokware.tstitagency.com/petitions/482913");
   });
+
+  it("names the department in the line rather than hanging it off a label", () => {
+    expect(timelineText({ action: "shared", at: "t", reason: "Works Department" })).toBe(
+      "Sent to Works Department for its answer");
+    expect(timelineText({ action: "department_note", at: "t", reason: "Works Department" })).toBe(
+      "Works Department answered");
+  });
 });
 
 describe("a petition that was edited, or taken down", () => {
