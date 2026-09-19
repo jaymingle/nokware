@@ -408,7 +408,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Escalate */
+        /**
+         * Escalate
+         * @description Multipart, like filing: the note and, with it, what the resident can show of what is still wrong.
+         */
         post: operations["escalate_api_reports__reference__escalate_post"];
         delete?: never;
         options?: never;
@@ -1483,6 +1486,20 @@ export interface components {
              */
             audio: string;
         };
+        /** Body_escalate_api_reports__reference__escalate_post */
+        Body_escalate_api_reports__reference__escalate_post: {
+            /**
+             * Note
+             * @description What is still wrong.
+             */
+            note: string;
+            /**
+             * Photos
+             * @description Up to 5 JPEG, PNG or WebP photos.
+             * @default []
+             */
+            photos: string[];
+        };
         /** Body_file_report_api_reports_post */
         Body_file_report_api_reports_post: {
             /**
@@ -1616,6 +1633,8 @@ export interface components {
             description: string | null;
             /** Photos */
             photos: string[];
+            /** Escalation Photos */
+            escalation_photos: string[];
             /** Escalation Note */
             escalation_note: string | null;
             /** Classification Note */
@@ -2115,11 +2134,6 @@ export interface components {
             type: "error";
             /** Message */
             message: string;
-        };
-        /** EscalationRequest */
-        EscalationRequest: {
-            /** Note */
-            note: string;
         };
         /**
          * ExportSource
@@ -2888,6 +2902,8 @@ export interface components {
             safety_types: components["schemas"]["SafetyType"][];
             /** Max Photos */
             max_photos: number;
+            /** Max Escalation Photos */
+            max_escalation_photos: number;
             /** Max Photo Bytes */
             max_photo_bytes: number;
             /** Description Min */
@@ -3365,6 +3381,8 @@ export interface components {
             description: string;
             /** Note */
             note?: string | null;
+            /** Photos */
+            photos?: string[];
         };
         /** TopicFigures */
         TopicFigures: {
@@ -4100,7 +4118,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["EscalationRequest"];
+                "multipart/form-data": components["schemas"]["Body_escalate_api_reports__reference__escalate_post"];
             };
         };
         responses: {

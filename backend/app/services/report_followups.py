@@ -24,10 +24,12 @@ from app.services.case_workflow import (
     escalate,
     escalation_open,
 )
+from app.services.citizen_reports import MAX_ESCALATION_PHOTOS
 from app.services.issue_voices import sync_voice_retention
 from app.services.ledger_documents import parse_datetime
 from app.services.report_contacts import contact_for, contacts_due_for_deletion, delete_contact, update_contact
 from app.services.report_intake import token_hash
+from app.services.report_photos import clean_photos, photo_link, store_photos
 from app.services.report_rules import normalise_reference
 from app.services.report_taxonomy import TOPICS_BY_ID, Category
 from app.services.workflow import NotAllowed
@@ -86,6 +88,17 @@ def _resolution_notes(assignments: list[dict[str, Any]]) -> list[dict[str, str]]
     ]
 
 
+def _escalation_photos(case: dict[str, Any]) -> list[str]:
+    """Short-lived links to what the resident sent when they escalated, for the escalation step of their timeline.
+
+    A personal-safety case shows no photo anywhere on the status page: whoever holds the reference is not always
+    the person who filed, and a photo of a bruise or a house is the whole story. Its staff see them in the portal.
+    Nothing is even signed here, so no such link can leak into a response by an oversight further down."""
+    if case.get("isSensitive"):
+        return []
+    return [photo_link(name) for name in case.get("escalationPhotoIds") or []]
+
+
 def public_status(case: dict[str, Any], assignments: list[dict[str, Any]], now: datetime,
                   history: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     common = {
@@ -94,7 +107,8 @@ def public_status(case: dict[str, Any], assignments: list[dict[str, Any]], now: 
         "submitted_at": case["createdAt"],
         "escalated": bool(case.get("escalatedAt")),
         "escalate_until": _escalate_until(case, now),
-        "timeline": case_timeline.for_resident(case, assignments, history or [], now),
+        "timeline": case_timeline.for_resident(case, assignments, history or [], now,
+                                               escalation_photos=_escalation_photos(case)),
     }
     if case.get("isSensitive"):
         stage = PRIVATE_STAGES[CaseStatus(case["status"])]
@@ -114,10 +128,21 @@ def public_status(case: dict[str, Any], assignments: list[dict[str, Any]], now: 
     }
 
 
-def escalate_case(reference_or_id: str, note: str | None, now: datetime) -> dict[str, Any]:
-    """The numbers are kept while the case is open again."""
+def escalate_case(reference_or_id: str, note: str | None, now: datetime,
+                  photos: list[bytes] | None = None) -> dict[str, Any]:
+    """The numbers are kept while the case is open again.
+
+    Photos sent with the escalation go through exactly what filing puts a photo through, and are stored apart from
+    the ones sent when the report was filed, so both the portal and the timeline can say which stage each came from.
+    """
     case = find(reference_or_id)
     changes = escalate(case, (note or "").strip() or None, now)
+    # The window and the once-only rule are settled first, so a late or repeated escalation costs no image work;
+    # the photos are then cleaned and stored before the case is touched, so one that can't be accepted stops the
+    # escalation with nothing written — the same order filing uses.
+    cleaned = clean_photos(photos or [], MAX_ESCALATION_PHOTOS)
+    if cleaned:
+        changes["escalationPhotoIds"] = store_photos(case["$id"], cleaned)
     updated = report_store.update_case(case["$id"], changes)
     # A personal-safety note is the citizen's own words: kept for its recipients, never copied into the MCE's trail.
     trail_note = "The citizen escalated the case." if case.get("isSensitive") else changes["escalationNote"]

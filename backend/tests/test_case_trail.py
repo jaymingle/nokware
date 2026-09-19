@@ -63,7 +63,7 @@ def test_a_closed_case_ends_with_the_day_nothing_more_could_happen() -> None:
     assert timeline(closed, trail)[-1]["action"] == "resolved"  # the 14 days to escalate are still open
     ended = timeline(closed, trail, now=resolved_at + timedelta(days=15))
     assert ended[-1] == {"action": "closed", "at": (resolved_at + timedelta(days=14)).isoformat(),
-                         "description": "This report is closed.", "note": None}
+                         "description": "This report is closed.", "note": None, "photos": []}
 
 
 SAFETY = {**CIVIC, "$id": "c2", "reference": "M3RD-8WQA", "category": "personal_safety", "isSensitive": True,

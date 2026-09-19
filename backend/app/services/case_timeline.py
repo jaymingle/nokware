@@ -14,7 +14,7 @@ from the phrase catalogue, beside the rest of Nokware's fixed text.
 Times go out as they were stored, in UTC and in ISO 8601. The web renders them in Africa/Accra.
 """
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from typing import Any
 
@@ -50,6 +50,9 @@ class Event:
     at: str  # ISO 8601, UTC, as stored
     description: str  # the resident's own sentence about this step; an office is named, a person never is
     note: str | None = None  # what staff wrote at this step, when they wrote anything
+    # Links to the photos the resident themselves sent at this step: the escalation only, and never on a
+    # personal-safety case, whose steps are fixed lines built without reading anything of the case.
+    photos: list[str] = field(default_factory=list)
 
 
 def reaches_the_resident(action: str, *, private: bool) -> bool:
@@ -99,13 +102,16 @@ def _closing(case: dict[str, Any], now: datetime) -> datetime | None:
     return closed if closed is not None and closed <= now else None
 
 
-def _everyday(case: dict[str, Any], history: list[dict[str, Any]], now: datetime) -> list[Event]:
+def _everyday(case: dict[str, Any], history: list[dict[str, Any]], now: datetime,
+              escalation_photos: list[str]) -> list[Event]:
     events = []
     for entry in history:
         action = SHOWN.get(str(entry.get("action")))
         if action is None or not entry.get("timestamp"):
             continue
-        events.append(Event(action, entry["timestamp"], _description(action, entry), entry.get("staffNote") or None))
+        photos = escalation_photos if action == "escalated" else []
+        events.append(Event(action, entry["timestamp"], _description(action, entry), entry.get("staffNote") or None,
+                            photos))
     closed = _closing(case, now)
     if closed is not None:
         events.append(Event("closed", closed.isoformat(), _description("closed", {})))
@@ -133,10 +139,15 @@ def _safety(case: dict[str, Any], assignments: list[dict[str, Any]], now: dateti
 
 
 def for_resident(case: dict[str, Any], assignments: list[dict[str, Any]], history: list[dict[str, Any]],
-                 now: datetime, language: Language = Language.ENGLISH) -> list[dict[str, Any]]:
-    """The whole trail, oldest first."""
+                 now: datetime, language: Language = Language.ENGLISH,
+                 escalation_photos: list[str] | None = None) -> list[dict[str, Any]]:
+    """The whole trail, oldest first.
+
+    escalation_photos: links to what the resident attached when they escalated, hung on that one step. The
+    personal-safety trail is built without them, as it is built without everything else about the case."""
     private = bool(case.get("isSensitive"))
-    events = _safety(case, assignments, now, language) if private else _everyday(case, history, now)
+    events = (_safety(case, assignments, now, language) if private
+              else _everyday(case, history, now, escalation_photos or []))
     return [asdict(event) for event in sorted(events, key=lambda event: parse_datetime(event.at) or now)]
 
 

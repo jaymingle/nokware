@@ -6,9 +6,8 @@ from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, Header, Upl
 
 from app import contacts, safety_steps
 from app.dependencies import rate_limited
-from app.schemas.documents import Option, blank_to_none
+from app.schemas.documents import NOTE_MAX, Option, blank_to_none
 from app.schemas.reports import (
-    EscalationRequest,
     PreferencesRequest,
     PreferencesResult,
     ReportOptions,
@@ -18,7 +17,7 @@ from app.schemas.reports import (
     SubMetroOption,
 )
 from app.services import rate_limit, report_followups, report_intake, report_store
-from app.services.citizen_reports import DESCRIPTION_MAX, MAX_PHOTOS, NotificationEvent
+from app.services.citizen_reports import DESCRIPTION_MAX, MAX_ESCALATION_PHOTOS, MAX_PHOTOS, NotificationEvent
 from app.services.ledger_documents import utc_now
 from app.services.notifications import notify_quietly
 from app.services.report_intake import DESCRIPTION_MIN, ReportSubmission
@@ -50,6 +49,7 @@ def options() -> ReportOptions:
         sub_metros=grouped,
         safety_types=safety,
         max_photos=MAX_PHOTOS,
+        max_escalation_photos=MAX_ESCALATION_PHOTOS,
         max_photo_bytes=MAX_PHOTO_BYTES,
         description_min=DESCRIPTION_MIN,
         description_max=DESCRIPTION_MAX,
@@ -80,9 +80,10 @@ def report_form(
     )
 
 
-def _read_photos(photos: list[UploadFile]) -> list[bytes]:
-    if len(photos) > MAX_PHOTOS:
-        raise PhotoRejected(f"Attach at most {MAX_PHOTOS} photos.")
+def _read_photos(photos: list[UploadFile], limit: int = MAX_PHOTOS) -> list[bytes]:
+    """Read no further than one byte past the cap: what is over it is refused, not held in memory."""
+    if len(photos) > limit:
+        raise PhotoRejected(f"Attach at most {limit} photos.")
     return [photo.file.read(MAX_PHOTO_BYTES + 1) for photo in photos if photo.filename]
 
 
@@ -129,8 +130,14 @@ def status(reference: str) -> ReportStatus:
 
 
 @router.post("/{reference}/escalate", response_model=ReportStatus, dependencies=[Escalations])
-def escalate(reference: str, request: EscalationRequest, tasks: BackgroundTasks) -> ReportStatus:
-    case = report_followups.escalate_case(reference, request.note, utc_now())
+def escalate(
+    reference: str,
+    tasks: BackgroundTasks,
+    note: Annotated[str, Form(max_length=NOTE_MAX, description="What is still wrong.")],
+    photos: Annotated[list[UploadFile], File(description="Up to 5 JPEG, PNG or WebP photos.")] = [],  # noqa: B006
+) -> ReportStatus:
+    """Multipart, like filing: the note and, with it, what the resident can show of what is still wrong."""
+    case = report_followups.escalate_case(reference, note, utc_now(), _read_photos(photos, MAX_ESCALATION_PHOTOS))
     tasks.add_task(notify_quietly, case, NotificationEvent.ESCALATED)
     return _status(case)
 

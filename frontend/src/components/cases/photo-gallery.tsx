@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
  * Only ever rendered where the description is shown, so an oversight view of a personal-safety case still has no
  * photos to open.
  */
-export function PhotoGallery({ photos }: { photos: string[] }) {
+export function PhotoGallery({ photos, testIdPrefix = "case-photo" }: { photos: string[]; testIdPrefix?: string }) {
   const [open, setOpen] = useState<number | null>(null);
   const showing = open === null ? null : photos[open];
   useEffect(() => {
@@ -34,7 +34,7 @@ export function PhotoGallery({ photos }: { photos: string[] }) {
         {photos.map((url, index) => (
           <li key={url}>
             <button type="button" onClick={() => setOpen(index)} className="block w-full cursor-zoom-in rounded-md"
-              aria-label={`Open photo ${index + 1} of ${photos.length}`} data-testid={`case-photo-${index}`}>
+              aria-label={`Open photo ${index + 1} of ${photos.length}`} data-testid={`${testIdPrefix}-${index}`}>
               <Image src={url} alt={`Photo ${index + 1} from the citizen`} width={160} height={120} unoptimized
                 className="aspect-4/3 w-full rounded-md border object-cover" />
             </button>
@@ -42,7 +42,7 @@ export function PhotoGallery({ photos }: { photos: string[] }) {
         ))}
       </ul>
       <Dialog open={open !== null} onOpenChange={(next) => setOpen(next ? open : null)}>
-        <DialogContent className="max-w-[min(94vw,1100px)] gap-3 sm:max-w-[min(94vw,1100px)]" data-testid="case-photo-viewer">
+        <DialogContent className="max-w-[min(94vw,1100px)] gap-3 sm:max-w-[min(94vw,1100px)]" data-testid={`${testIdPrefix}-viewer`}>
           <DialogTitle className="text-[14px] font-normal text-ink-soft">
             {open === null ? "" : `Photo ${open + 1} of ${photos.length} from the citizen`}
           </DialogTitle>
@@ -52,11 +52,11 @@ export function PhotoGallery({ photos }: { photos: string[] }) {
           ) : null}
           {photos.length > 1 ? (
             <div className="flex items-center justify-between">
-              <Button variant="secondary" size="sm" onClick={() => step(-1)} data-testid="case-photo-previous">
+              <Button variant="secondary" size="sm" onClick={() => step(-1)} data-testid={`${testIdPrefix}-previous`}>
                 <ChevronLeftIcon data-icon="inline-start" />
                 Previous
               </Button>
-              <Button variant="secondary" size="sm" onClick={() => step(1)} data-testid="case-photo-next">
+              <Button variant="secondary" size="sm" onClick={() => step(1)} data-testid={`${testIdPrefix}-next`}>
                 Next
                 <ChevronRightIcon data-icon="inline-end" />
               </Button>

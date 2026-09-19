@@ -17,6 +17,9 @@ PHOTOS_BUCKET = "nokware-report-photos"
 
 DESCRIPTION_MAX = 8192
 MAX_PHOTOS = 10
+# What a resident may attach when escalating a resolved case: fewer than when filing, because an escalation is
+# "here is what is still wrong", not the whole report again.
+MAX_ESCALATION_PHOTOS = 5
 VOICE_NAME_MAX = 80
 
 

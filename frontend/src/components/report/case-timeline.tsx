@@ -1,7 +1,23 @@
+import Image from "next/image";
+
 import { timelineSteps } from "@/lib/report/timeline";
 
 import type { ReportTimelineEvent } from "@/lib/api/types";
 import type { TimelineStep } from "@/lib/report/timeline";
+
+/** The photos the resident sent with an escalation, shown back to them where they sent them. */
+function StepPhotos({ photos }: { photos: string[] }) {
+  return (
+    <ul className="mt-1 grid grid-cols-3 gap-2 sm:grid-cols-4" aria-label="Photos you sent" data-testid="status-timeline-photos">
+      {photos.map((url, index) => (
+        <li key={url}>
+          <Image src={url} alt={`Photo ${index + 1} you sent with this escalation`} width={160} height={120} unoptimized
+            className="aspect-4/3 w-full rounded-md border object-cover" />
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 function Step({ step, connected }: { step: TimelineStep; connected: boolean }) {
   return (
@@ -15,6 +31,7 @@ function Step({ step, connected }: { step: TimelineStep; connected: boolean }) {
           {step.note}
         </p>
       ) : null}
+      {step.photos.length ? <StepPhotos photos={step.photos} /> : null}
     </li>
   );
 }

@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field
 
 from app.schemas.contacts import PublicContact
-from app.schemas.documents import NOTE_MAX, Option
+from app.schemas.documents import Option
 
 
 class SubMetroOption(BaseModel):
@@ -21,6 +21,7 @@ class ReportOptions(BaseModel):
     sub_metros: list[SubMetroOption]
     safety_types: list[SafetyType]
     max_photos: int
+    max_escalation_photos: int  # fewer than when filing: an escalation shows what is still wrong, not the whole report
     max_photo_bytes: int
     description_min: int
     description_max: int
@@ -57,6 +58,9 @@ class TimelineEvent(BaseModel):
     at: str  # ISO 8601, UTC; the web renders it in Africa/Accra
     description: str
     note: str | None = None  # what staff wrote at this step; never set on a personal-safety case
+    # Short-lived links to the photos the resident sent at this step: the escalation only, and never on a
+    # personal-safety case, whose status page shows no photo at all.
+    photos: list[str] = Field(default_factory=list)
 
 
 class ReportStatus(BaseModel):
@@ -82,10 +86,6 @@ class ReportStatus(BaseModel):
     location_views: list[LocationViewNote] = Field(default_factory=list)
     # The whole trail, oldest first. Fixed neutral lines only for personal safety.
     timeline: list[TimelineEvent] = Field(default_factory=list)
-
-
-class EscalationRequest(BaseModel):
-    note: str = Field(max_length=NOTE_MAX)
 
 
 class PreferencesRequest(BaseModel):

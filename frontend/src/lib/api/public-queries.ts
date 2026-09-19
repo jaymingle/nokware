@@ -50,12 +50,12 @@ export function useReportStatus(reference: string | null) {
   });
 }
 
-type EscalateInput = { reference: string; note: string };
+type EscalateInput = { reference: string; note: string; photos: File[] };
 
-export function useEscalateReport() {
+export function useEscalateReport(onProgress?: (sending: Sending) => void) {
   const queryClient = useQueryClient();
   return useMutation<ReportStatus, Error, EscalateInput>({
-    mutationFn: ({ reference, note }) => escalateReport(reference, note),
+    mutationFn: ({ reference, note, photos }) => escalateReport(reference, note, photos, onProgress),
     onSuccess: (status, { reference }) => queryClient.setQueryData(publicKeys.reportStatus(reference), status),
   });
 }

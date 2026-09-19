@@ -92,6 +92,12 @@ def _voice_names(principal: Principal, case: dict[str, Any], assignments: list[d
     return issue_voices.named_voices(case["$id"]) if case.get("voiceCount") else []
 
 
+def _photos(case: dict[str, Any], stored_in: str, full: bool) -> list[str]:
+    """The photos held under one attribute of the case, as links good for a few minutes. Which stage a photo
+    belongs to is the attribute it is stored in — never its file name, which is meaningless on purpose."""
+    return [photo_link(name) for name in case.get(stored_in) or []] if full else []
+
+
 def detail(principal: Principal, case: dict[str, Any], assignments: list[dict[str, Any]]) -> CaseDetail:
     full = case_view(principal, case) == CaseView.FULL
     private = bool(case.get("isSensitive"))
@@ -99,7 +105,8 @@ def detail(principal: Principal, case: dict[str, Any], assignments: list[dict[st
     return CaseDetail(
         **summary(principal, case, assignments).model_dump(),
         description=case["description"] if full else None,
-        photos=[photo_link(p) for p in case.get("photoIds") or []] if full else [],
+        photos=_photos(case, "photoIds", full),
+        escalation_photos=_photos(case, "escalationPhotoIds", full),
         escalation_note=case.get("escalationNote") if full else None,
         classification_note=case.get("classificationNote") if full else None,
         contact=_contact(principal, case) if full else None,

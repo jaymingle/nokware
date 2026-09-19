@@ -68,9 +68,11 @@ def clean_photo(data: bytes, position: int = 1) -> CleanPhoto:
     return CleanPhoto(out.getvalue(), pixels_only.width, pixels_only.height)
 
 
-def clean_photos(photos: list[bytes]) -> list[CleanPhoto]:
-    if len(photos) > MAX_PHOTOS:
-        raise PhotoRejected(f"Attach at most {MAX_PHOTOS} photos.")
+def clean_photos(photos: list[bytes], limit: int = MAX_PHOTOS) -> list[CleanPhoto]:
+    """limit: how many this moment allows — filing takes MAX_PHOTOS, escalating MAX_ESCALATION_PHOTOS. Every
+    other rule (type, size, pixels, the re-encoding that leaves nothing but the pixels) is the same either way."""
+    if len(photos) > limit:
+        raise PhotoRejected(f"Attach at most {limit} photos.")
     return [clean_photo(data, position) for position, data in enumerate(photos, start=1)]
 
 

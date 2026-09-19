@@ -9,6 +9,7 @@ export type TimelineStep = {
   when: string;
   description: string;
   note: string | null;
+  photos: string[];  // only an escalation carries any, and never on a personal-safety case
 };
 
 /**
@@ -24,5 +25,6 @@ export function timelineSteps(timeline: ReportTimelineEvent[] | undefined): Time
       when: formatDateTime(event.at),
       description: event.description.trim(),
       note: event.note?.trim() ? event.note.trim() : null,
+      photos: event.photos ?? [],
     }));
 }

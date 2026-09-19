@@ -10,7 +10,9 @@
   wrote for the resident at a stage) and the "reopened" action; notifications
   gains the "reassigned" and "reopened" events; citizen_reports gains
   reassignedAt / reassignedFrom / reassignedTo and reopenedAt, with an index on
-  each date so the missed-message sweep can find a case by them.
+  each date so the missed-message sweep can find a case by them, and
+  escalationPhotoIds (the photos a resident attaches when escalating, kept
+  apart from the photoIds sent when the report was filed).
 - New collections: case_assignments, report_contacts (numbers encrypted at
   rest) and notifications (the outbox).
 
@@ -61,6 +63,7 @@ LISTING = [Query.limit(500)]
 ID = 36  # a UUID
 TEAM = 64
 HASH = 64  # a sha256 hex digest
+OBJECT_NAME = 256  # a photo's name in MinIO: "reports/<case id>/01-<hex>.jpg" is 64, with room to spare
 ENCRYPTED_MIN = 150  # Appwrite's minimum size for an encrypted string; a phone number needs far less
 Creator = Callable[[], object]
 
@@ -93,6 +96,11 @@ def report_attributes() -> dict[str, Creator]:
         "resolvedAt": lambda: db.create_datetime_attribute(*c, "resolvedAt", False),
         "escalatedAt": lambda: db.create_datetime_attribute(*c, "escalatedAt", False),
         "escalationNote": lambda: db.create_string_attribute(*c, "escalationNote", NOTE_MAX, False),
+        # The photos sent with an escalation, in their own attribute rather than mixed into photoIds: a photo's
+        # stage is then a fact about where it is stored, not something to be read back out of a file name, and
+        # every case filed before today is already correct with the attribute empty.
+        "escalationPhotoIds": lambda: db.create_string_attribute(*c, "escalationPhotoIds", OBJECT_NAME, False,
+                                                                 array=True),
         # The last move and the last reopening, stamped on the case itself. The message about either is composed
         # from the case alone, which is what lets the missed-message sweep send it again if the first send was lost.
         "reassignedAt": lambda: db.create_datetime_attribute(*c, "reassignedAt", False),

@@ -90,8 +90,13 @@ export function getReportStatus(reference: string): Promise<ReportStatus> {
   return publicRequest<ReportStatus>(reportPath(reference));
 }
 
-export function escalateReport(reference: string, note: string): Promise<ReportStatus> {
-  return postJson<ReportStatus>(`${reportPath(reference)}/escalate`, { note });
+export function escalateReport(reference: string, note: string, photos: File[],
+                               onProgress?: (sending: Sending) => void): Promise<ReportStatus> {
+  const form = new FormData();
+  form.append("note", note);
+  for (const photo of photos) form.append("photos", photo);
+  if (!onProgress) return publicRequest<ReportStatus>(`${reportPath(reference)}/escalate`, { method: "POST", body: form });
+  return postWithProgress<ReportStatus>(`${reportPath(reference)}/escalate`, form, onProgress);
 }
 
 /** A one-time answer, authorised by the token from the receipt. */

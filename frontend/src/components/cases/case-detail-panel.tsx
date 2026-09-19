@@ -100,9 +100,23 @@ function Body({ detail }: { detail: CaseDetail }) {
   return (
     <>
       <p className="text-[14.5px] whitespace-pre-line break-words">{detail.description}</p>
-      <PhotoGallery photos={detail.photos} />
+      {/* What the escalation says leads, with the photos sent at that moment: it is why the case is open again. */}
       {detail.escalation_note ? (
-        <p className="rounded-lg bg-brick-tint px-3.5 py-3 text-[13px]"><span className="font-medium text-brick">The citizen escalated it: </span>{detail.escalation_note}</p>
+        <div className="flex flex-col gap-2 rounded-lg bg-brick-tint px-3.5 py-3">
+          <p className="text-[13px]"><span className="font-medium text-brick">The citizen escalated it: </span>{detail.escalation_note}</p>
+          {detail.escalation_photos?.length ? (
+            <div className="flex flex-col gap-1.5">
+              <p className="text-[12px] font-medium tracking-wide text-ink-soft uppercase">Added at escalation</p>
+              <PhotoGallery photos={detail.escalation_photos} testIdPrefix="case-escalation-photo" />
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+      {detail.photos.length ? (
+        <div className="flex flex-col gap-1.5">
+          {detail.escalation_photos?.length ? <p className="text-[12px] font-medium tracking-wide text-ink-soft uppercase">Sent when it was reported</p> : null}
+          <PhotoGallery photos={detail.photos} />
+        </div>
       ) : null}
       <Callback detail={detail} />
       <SharedLocation key={detail.case_id} detail={detail} />

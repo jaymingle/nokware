@@ -60,7 +60,10 @@ class Contact(BaseModel):
 
 class CaseDetail(CaseSummary):
     description: str | None
-    photos: list[str]  # short-lived links
+    photos: list[str]  # short-lived links to what the resident sent when they filed
+    # What the resident attached when they escalated, kept apart from the filing photos so the escalation view can
+    # lead with them and label them; short-lived links too. Empty in an outline, as photos is.
+    escalation_photos: list[str]
     escalation_note: str | None
     classification_note: str | None
     contact: Contact | None
