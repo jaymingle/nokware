@@ -8,10 +8,16 @@ type Params = Promise<{ code: string }>;
 
 const DESCRIPTION_MAX = 200;
 
-/** For the preview a shared link shows. A removed petition answers here too, as its tombstone. */
+/**
+ * For the preview a shared link shows. A removed petition answers here too, as its tombstone.
+ *
+ * Never cached. A cached answer would keep previewing a petition's title and first words for as long as it was
+ * held, which is the petition still in circulation after it came down — the one thing the rule below forbids. One
+ * call per preview is what that costs.
+ */
 async function petitionFor(code: string): Promise<PetitionOrTombstone | null> {
   try {
-    const response = await fetch(`${env.apiUrl}/api/petitions/${encodeURIComponent(code)}`, { next: { revalidate: 300 } });
+    const response = await fetch(`${env.apiUrl}/api/petitions/${encodeURIComponent(code)}`, { cache: "no-store" });
     return response.ok ? ((await response.json()) as PetitionOrTombstone) : null;
   } catch {
     return null;
