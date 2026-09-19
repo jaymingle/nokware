@@ -141,8 +141,16 @@ def test_an_sms_answer_is_plain_two_pages_at_most_with_one_source() -> None:
     for answer in (ANSWER, long_answer):
         text = for_sms(answer, SITE)  # type: ignore[arg-type]
         assert is_gsm7(text) and pages(text) <= 2 and text.startswith("Nokware: ")
-        assert text.endswith("Source: Accra Climate Action Plan (Central Administration, 2026).")
+        assert "Source: Accra Climate Action Plan (Central Administration, 2026)." in text
         assert "[" not in text and "*" not in text and " ." not in text
+
+
+def test_an_answer_too_long_for_two_pages_says_it_is_only_the_first_part() -> None:
+    """Cut mid-thought, the reader can't tell a short answer from a truncated one, and doesn't know to look further."""
+    long_answer = {**ANSWER, "answer": ANSWER["answer"] + " Also a sentence that goes on and on. " * 20}
+    text = for_sms(long_answer, SITE)  # type: ignore[arg-type]
+    assert text.endswith("First part only. All of it: nokware.example.org/ask") and pages(text) <= 2
+    assert "First part" not in for_sms(ANSWER, SITE)  # type: ignore[arg-type]
     refused = for_sms({**ANSWER, "answer": "Nokware doesn't publish figures on reports about someone's safety.",
                        "figures": []}, SITE)  # type: ignore[arg-type]
     assert refused == "Nokware doesn't publish figures on reports about someone's safety."  # no second "Nokware:"

@@ -8,10 +8,11 @@ import re
 
 from app.services.citations import FIGURE_KINDS, KINDS
 from app.services.rag import NO_INFO_ANSWER, RagAnswer, Source
-from app.services.sms_text import pages, plain
+from app.services.sms_text import bare_address, pages, plain
 
 CHAT_TITLE_MAX = 90
 SMS_PAGES = 2
+MIN_BODY = 60  # however little room the pointer leaves, the answer still gets this much
 SMS_TITLE_MAX = 40
 LIVE_DATA_NOTE = (
     "Counts called live report data come from reports residents filed with Nokware, not from a published "
@@ -69,14 +70,15 @@ def for_chat(answer: RagAnswer, site: str) -> str:
     return "\n\n".join(parts)
 
 
-def _fit(body: str, room: int) -> str:
+def _fit(body: str, room: int) -> tuple[str, bool]:
+    """(what fits, whether anything was left behind)."""
     if len(body) <= room:
-        return body
+        return body, False
     cut = body[:room]
     sentence_end = cut.rfind(". ")
     if sentence_end > room // 2:
-        return cut[: sentence_end + 1]
-    return cut[: room - 3].rsplit(" ", 1)[0] + "..."
+        return cut[: sentence_end + 1], True
+    return cut[: room - 3].rsplit(" ", 1)[0] + "...", True
 
 
 def _sms_source(answer: RagAnswer) -> str:
@@ -88,15 +90,27 @@ def _sms_source(answer: RagAnswer) -> str:
 
 
 def for_sms(answer: RagAnswer, site: str) -> str:
+    """Two pages, and when the answer doesn't fit in them it says so rather than stopping mid-thought: a reader
+    who can't tell a short answer from a cut one doesn't know whether to go looking for the rest."""
     if answer["status"] == "no_information":
         return plain(f"Nokware: {NO_INFO_ANSWER} More at {site}/ask")
     flat = _ANY_TAG.sub("", answer["answer"])
     flat = plain(" ".join(_HEADING.sub("", _BOLD.sub(r"\1", _BULLET.sub(r"\1", flat))).replace("*", "").split()))
     prefix = "" if flat.startswith("Nokware") else "Nokware: "  # the sender ID may not say Nokware
     suffix = plain(_sms_source(answer))
+    more = plain(f" First part only. All of it: {bare_address(site)}/ask")
     room = SMS_PAGES * 153 - len(prefix) - len(suffix)
-    message = f"{prefix}{_fit(flat, room)}{suffix}"
+    message, cut = _compose(prefix, flat, suffix, more, room)
     while pages(message) > SMS_PAGES:  # extended characters take two places: trim until it fits
         room -= 10
-        message = f"{prefix}{_fit(flat, room)}{suffix}"
+        message, cut = _compose(prefix, flat, suffix, more, room)
     return message
+
+
+def _compose(prefix: str, flat: str, suffix: str, more: str, room: int) -> tuple[str, bool]:
+    """The pointer to the rest is paid for out of the room the answer has, never added on top of a full two pages."""
+    body, cut = _fit(flat, room)
+    if not cut:
+        return f"{prefix}{body}{suffix}", False
+    body, _ = _fit(flat, max(room - len(more), MIN_BODY))
+    return f"{prefix}{body}{suffix}{more}", True
