@@ -93,12 +93,42 @@ On WhatsApp (following the language someone writes in), on the site, and on USSD
 before the menu. See the Languages section above for what each costs and why Twi
 and Arabic wait.
 
+### Department-initiated escalation
+
+Escalation today is the resident's to make, once, within 14 days of a resolution.
+A department cannot send a case upward — if it needs the MCE, the only route is to
+resolve it and wait for the resident to disagree. Building it means a new action on
+a documented state machine (`escalated` currently freezes every recipient action),
+its own history entry and message, and a rule for who may do it and when.
+
 ### A fixed vocabulary for resolution notes
 
 Staff notes on a case are free text today, screened but unconstrained. A short
 fixed vocabulary ("cleared", "repaired", "referred to a contractor", "not the
 Assembly's to act on") offered alongside the free text would make resolutions
 comparable across departments without flattening what staff can say.
+
+## Known limitations
+
+Things that work, with their edges named:
+
+- **Reading an answer aloud starts after about 7 seconds.** Almost all of it is
+  the speech model: it takes roughly 0.7 seconds for every second of audio it
+  makes, and the first chunk can't be shorter than a sentence without sounding
+  cut. Hovering Listen starts the audio early, so a press usually plays at once,
+  but a cold press waits. Streaming synthesis would fix it properly.
+- **A message a resident is owed is repaired, with three gaps left.** If someone
+  agreed to both SMS and WhatsApp and only one channel is unresolved, repairing it
+  would duplicate the other, so the case is left alone. A row stuck at "queued"
+  after a crash can be settled but never *learned about*: the process died before
+  the provider's message id existed, so no delivery report can say what happened.
+  And messages recorded while `SMS_PROVIDER=log` are never backfilled when a real
+  provider is configured.
+- **Escalation photos are web only.** A resident escalating by USSD or WhatsApp
+  can write, but not attach; the browser is where the shrinking and EXIF-stripping
+  happen.
+- **No screen-reader test with a real user**, and the report form's photo field
+  has a duplicate tab stop (see [`frontend/README.md`](frontend/README.md)).
 
 ## Future work: structure
 
