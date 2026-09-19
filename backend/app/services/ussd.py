@@ -420,8 +420,10 @@ def _check(dial: Dial, state: State, later: Later) -> tuple[Reply, State | None]
         case = report_followups.find(reference)
     except report_followups.CaseNotFound:
         return end(f"No case has the reference {reference}. Check it and dial again."), None
-    status = report_followups.public_status(case, report_store.assignments_for(case["$id"]), utc_now())
-    return end(status_text(status, _site(), compact=True)), None
+    status = report_followups.public_status(
+        case, report_store.assignments_for(case["$id"]), utc_now(), report_followups.history_for(case)
+    )
+    return end(status_text(status, _site(), compact=True, limit=SCREEN_MAX)), None
 
 
 CODE_REPLIES = {

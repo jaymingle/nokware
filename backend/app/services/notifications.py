@@ -1,10 +1,16 @@
 """Messages to citizens about their reports, by SMS and WhatsApp.
 
-Four moments only (received, work started, resolved, escalation received): anything more would feel like spam, and
-each message costs money. "Work started" goes once, when the FIRST recipient starts: a citizen doesn't need to know
-that the Police and Social Welfare each opened their own part. Personal-safety messages say nothing but the
-reference, not even the word "report": a phone can be shared. Every other message fits one GSM-7 SMS page (one
-credit), except an emergency's "received" message, whose numbers to call are worth a second page.
+Six moments only (received, work started, moved to another office, resolved, reopened, escalation received):
+anything more would feel like spam, and each message costs money. "Work started" goes once, when the FIRST recipient
+starts: a citizen doesn't need to know that the Police and Social Welfare each opened their own part.
+Personal-safety messages say nothing but the reference, not even the word "report": a phone can be shared. Every
+other message fits one GSM-7 SMS page (one credit), except an emergency's "received" message, whose numbers to call
+are worth a second page.
+
+A personal-safety case is told nothing at all when it moves between the Police and Social Welfare, or when the MCE
+reopens it: which service holds such a case is itself the sensitive fact, and work starting again already has its
+own neutral message when a recipient picks it up. notifiable() is the one place that says so, and both the ordinary
+path and the missed-message sweep ask it.
 
 The outbox row never holds the number; it is read from report_contacts at the moment of sending.
 
@@ -66,7 +72,11 @@ EVENT_NAMES = {
     NotificationEvent.STARTED: "Work started",
     NotificationEvent.RESOLVED: "Resolution",
     NotificationEvent.ESCALATED: "Escalation",
+    NotificationEvent.REASSIGNED: "Reassignment",
+    NotificationEvent.REOPENED: "Reopening",
 }
+# What a personal-safety case's resident is never written to about, because the routing itself is the sensitive fact.
+SILENT_ON_SAFETY = (NotificationEvent.REASSIGNED, NotificationEvent.REOPENED)
 
 
 class Provider(Protocol):
@@ -98,13 +108,34 @@ def _one_page(render: Callable[[str], str], case: dict[str, Any], pages_allowed:
 
 
 def _neutral(event: NotificationEvent, reference: str) -> Message:
+    """The only words a personal-safety case is ever sent. The two moments nothing is sent about fall back to "being
+    worked on", which is true of both and says nothing more, so a caller that reaches here by mistake still can't
+    write anything revealing; notifiable() is what stops them being sent at all."""
+    working = f"Nokware: reference {reference} is being worked on."
     bodies = {
         NotificationEvent.SUBMITTED: f"Nokware: reference {reference} received.",
-        NotificationEvent.STARTED: f"Nokware: reference {reference} is being worked on.",
+        NotificationEvent.STARTED: working,
         NotificationEvent.RESOLVED: f"Nokware: reference {reference} has been updated.",
         NotificationEvent.ESCALATED: f"Nokware: reference {reference}: your request has been received.",
+        NotificationEvent.REASSIGNED: working,
+        NotificationEvent.REOPENED: working,
     }
     return Message(f"private_{event.value}", bodies[event])
+
+
+def notifiable(case: dict[str, Any], event: NotificationEvent) -> bool:
+    """Whether this case's resident is written to about this moment at all."""
+    return not (case.get("category") == Category.PERSONAL_SAFETY and event in SILENT_ON_SAFETY)
+
+
+def _moved(case: dict[str, Any], reference: str, status_page: str) -> Message:
+    """Where the case went, and where the reason is. Both offices are named when they fit one page; when they don't,
+    the office that has it now is named, which is what a resident asking "who has my report?" needs."""
+    came, went = short_name(case.get("reassignedFrom") or ""), short_name(case.get("reassignedTo") or "")
+    tail = f"Why and what's next: {status_page}"
+    moves = [f"moved from {came} to {went}", f"moved to {went}", "moved to another office"]
+    bodies = [f"Nokware: report {reference} {move}. {tail}" for move in moves]
+    return Message("reassigned", next((body for body in bodies if pages(body) <= 1), bodies[-1]))
 
 
 def compose(event: NotificationEvent, case: dict[str, Any]) -> Message:
@@ -119,6 +150,8 @@ def compose(event: NotificationEvent, case: dict[str, Any]) -> Message:
         return Message("resolved_after_escalation", f"Nokware: report {reference} was reviewed and resolved. Outcome: {status_page}")
     if event == NotificationEvent.ESCALATED:
         return Message(event.value, f"Nokware: we've received your escalation of report {reference}. The MCE's office will review it.")
+    if event == NotificationEvent.REASSIGNED:
+        return _moved(case, reference, status_page)
     if event == NotificationEvent.SUBMITTED and case.get("topic") in EMERGENCY_TOPICS:  # worth a second page
         numbers = f"If anyone is in danger: {short_line(case['topic'], None)} More numbers: {site}/contacts/emergency"
         return Message("submitted_emergency", _one_page(lambda who: f"Nokware: report {reference} is with {who}. {numbers}", case, pages_allowed=2))
@@ -128,6 +161,8 @@ def compose(event: NotificationEvent, case: dict[str, Any]) -> Message:
         # The receipt already promised a message at the end, so this one carries the news and the link and stops.
         NotificationEvent.STARTED: lambda who: f"Nokware: {who} has started work on report {reference}. "
         f"Track it: {status_page}",
+        NotificationEvent.REOPENED: lambda who: f"Nokware: report {reference} is open again: the MCE sent it back "
+        f"to {who}. Track it: {status_page}",
         NotificationEvent.RESOLVED: lambda who: f"Nokware: {who} marked report {reference} resolved. "
         f"Not fixed? Escalate within 14 days: {status_page}",
     }
@@ -298,6 +333,12 @@ def notify_channel(case: dict[str, Any], event: NotificationEvent, channel: Noti
     same number even though the first attempt went (or tried to go) by WhatsApp, and the other way round. The row it
     writes then names the SMS channel, which is why the sweep reads a stand-in row as settling the WhatsApp channel.
     """
+    if not notifiable(case, event):
+        # A personal-safety case moving between services, or being reopened: refused here, the one place every send
+        # passes through, so the sweep can't send later what the ordinary path wouldn't send now. Said aloud, so the
+        # quiet is a decision on the record rather than a message that went missing.
+        logger.info("No %s about case %s (%s): a safety case is never told this", channel.value, case["$id"], EVENT_NAMES[event])
+        return
     contact = contact_for(case["$id"]) or {}
     number = dict(channels_for(contact)).get(channel)
     if number is None:

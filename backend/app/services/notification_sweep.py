@@ -1,8 +1,8 @@
 """The messages a resident agreed to and never got, on the channel they never got them on.
 
-A case reaches four moments a resident is told about: it was received, a recipient started work on it, it was
-resolved, and — if they escalated it — the escalation was received. Each one answers 201 or 200 and hands the
-message to a background task. If the process restarts or dies in that moment the task goes with it: nothing is sent,
+A case reaches six moments a resident is told about: it was received, a recipient started work on it, it moved to
+another office, it was resolved, the MCE sent it back to be finished, and — if they escalated it — the escalation
+was received. Each one answers 201 or 200 and hands the message to a background task. If the process restarts or dies in that moment the task goes with it: nothing is sent,
 and — because the outbox row is written by the send itself — nothing anywhere records that a message was owed. This
 sweep looks for that gap and sends the message the ordinary way, so the outbox row, the case-history line and the
 daily SMS budget all behave as they do on the ordinary path. The start of work, the resolution and the escalation
@@ -56,6 +56,7 @@ from app.services.notifications import (
     mark_repaired,
     mark_stale_queued,
     nothing_was_sent,
+    notifiable,
     notify_channel,
     provider_for,
     provider_unreachable,
@@ -71,7 +72,7 @@ logger = logging.getLogger(__name__)
 WINDOW = timedelta(days=7)
 # These are real messages and real credits, so one run repairs a little at a time, oldest first. A case counts once
 # however many of its moments and channels are repaired: the cap is there to keep a run small, and a case has at
-# most four moments on at most two channels.
+# most six moments on at most two channels.
 PER_RUN = 20
 # How many recent cases each of the three scans looks at. The gap is rare, so this bounds the work, not the repair:
 # a case further back than this is picked up by a later run, for as long as it stays inside the window.
@@ -94,8 +95,10 @@ RESOLUTION_ACTIONS = (CaseHistoryAction.RESOLVED, CaseHistoryAction.ESCALATION_C
 ESCALATION_ACTIONS = (CaseHistoryAction.ESCALATED,)
 HISTORY_ACTIONS = [action.value for action in (*RESOLUTION_ACTIONS, *ESCALATION_ACTIONS)]
 # The fields a case's own moments are read from, and so the scans that find a case with a recent one. The start of
-# work isn't among them: it is stamped on the assignment, not the case, and is scanned for there.
-DATED_BY = ("createdAt", "resolvedAt", "escalatedAt")
+# work isn't among them: it is stamped on the assignment, not the case, and is scanned for there. A case moved or
+# reopened more than once keeps only the latest of each: the message about the move before last is not one a
+# resident still wants, and a stamp that moved on is how the sweep knows not to send it.
+DATED_BY = ("createdAt", "resolvedAt", "escalatedAt", "reassignedAt", "reopenedAt")
 STARTED_BY = "acknowledgedAt"  # on the assignment: when that recipient started work
 
 NOTHING_RECORDED = "nothing was ever written to the outbox"
@@ -220,6 +223,9 @@ def _reached(case: dict[str, Any], history: list[dict[str, Any]],
       case resolved twice — resolved, escalated, then the MCE's ruling — is owed it again, at the second resolution.
     Escalation received: once the citizen has escalated, and still owed after the MCE has ruled, because "we have
       your escalation" stays true. Late is not wrong; it can only be overtaken.
+    Moved, and reopened: when the case itself was last moved or last sent back. Only the latest of each is stored,
+      so only the latest is owed — an older move has been overtaken by where the case is now. Neither is ever owed
+      on a personal-safety case; notifiable() says so, and _moments asks it.
     """
     reached: dict[NotificationEvent, datetime | None] = {NotificationEvent.SUBMITTED: _at(case.get("createdAt"))}
     started, started_at = _first_start(assignments)
@@ -230,6 +236,9 @@ def _reached(case: dict[str, Any], history: list[dict[str, Any]],
     escalated = _at(case.get("escalatedAt")) or _last_entry(history, ESCALATION_ACTIONS)
     if case.get("escalatedAt") or escalated:
         reached[NotificationEvent.ESCALATED] = escalated
+    for event, field in ((NotificationEvent.REASSIGNED, "reassignedAt"), (NotificationEvent.REOPENED, "reopenedAt")):
+        if case.get(field):
+            reached[event] = _at(case.get(field))
     return reached
 
 
@@ -240,6 +249,8 @@ def _moments(case: dict[str, Any], history: list[dict[str, Any]], assignments: l
     ever or bury a message the resident is owed somewhere in the past."""
     moments = []
     for event, at in _reached(case, history, assignments).items():
+        if not notifiable(case, event):
+            continue
         if at is None:
             logger.warning(
                 "Missed-message sweep can't date the %s message for case %s: nothing stored says when it happened, "

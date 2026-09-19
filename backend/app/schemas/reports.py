@@ -50,6 +50,15 @@ class LocationViewNote(BaseModel):
     at: str
 
 
+class TimelineEvent(BaseModel):
+    """One step of the case, as the resident reads it. Departments only: never the name of a member of staff."""
+
+    action: str  # filed | routed | started | reassigned | resolved | escalated | mce_response | reopened | closed
+    at: str  # ISO 8601, UTC; the web renders it in Africa/Accra
+    description: str
+    note: str | None = None  # what staff wrote at this step; never set on a personal-safety case
+
+
 class ReportStatus(BaseModel):
     """A case's status. For personal safety, only the stage: no category, service, place or note."""
 
@@ -71,6 +80,8 @@ class ReportStatus(BaseModel):
     voices: int | None = None  # civic reports only: other residents who said it affects them too
     # Personal safety only: each time a service opened the location the citizen shared (the service, never a person).
     location_views: list[LocationViewNote] = Field(default_factory=list)
+    # The whole trail, oldest first. Fixed neutral lines only for personal safety.
+    timeline: list[TimelineEvent] = Field(default_factory=list)
 
 
 class EscalationRequest(BaseModel):

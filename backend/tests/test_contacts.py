@@ -100,6 +100,7 @@ def test_the_directory_groups_every_contact_by_service() -> None:
 def lookup(monkeypatch: pytest.MonkeyPatch) -> Callable[[dict[str, Any]], None]:
     rate_limit.LOOKUPS._hits.clear()
     monkeypatch.setattr(routes.report_store, "assignments_for", lambda case_id: [])
+    monkeypatch.setattr(routes.report_followups, "history_for", lambda case: [])  # the timeline's entries
 
     def found(case: dict[str, Any]) -> None:
         monkeypatch.setattr(routes.report_followups, "find", lambda reference: case)

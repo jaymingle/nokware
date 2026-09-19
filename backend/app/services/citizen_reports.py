@@ -31,6 +31,8 @@ class NotificationEvent(StrEnum):
     STARTED = "started"  # the first recipient started work; the others starting is not news to the citizen
     RESOLVED = "resolved"
     ESCALATED = "escalated"
+    REASSIGNED = "reassigned"  # the case moved to another office; never sent about a personal-safety case
+    REOPENED = "reopened"  # the MCE sent it back to be finished
 
 
 class NotificationChannel(StrEnum):

@@ -1,7 +1,11 @@
 """What a citizen can do after filing with only the case reference, and the deletion of numbers past retention.
 
 Anyone holding a reference can open its status, so a personal-safety case's status says only how far along it is:
-no category, service, place or note.
+no category, service, place or note — including in its timeline, which case_timeline builds from fixed lines alone.
+
+The timeline is the whole trail, oldest first. Its entries come from the case's audit trail, so a caller that has
+one passes it in; a caller that doesn't (nothing else about the status needs it) gets the steps that can be read
+from the case's own dates.
 """
 
 import hmac
@@ -11,7 +15,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-from app.services import case_history, report_locations, report_store
+from app.services import case_history, case_timeline, report_locations, report_store
 from app.services.case_history import CITIZEN, SYSTEM, CaseEntry, CaseHistoryAction
 from app.services.case_workflow import (
     ESCALATION_WINDOW,
@@ -45,6 +49,12 @@ class CaseNotFound(Exception):
     """No case has that reference (or ID)."""
 
 
+def history_for(case: dict[str, Any]) -> list[dict[str, Any]]:
+    """The case's audit trail, for the timeline. A personal-safety case never needs it: its timeline is built
+    from fixed lines and the case's own dates, so the words in its trail are not even read."""
+    return [] if case.get("isSensitive") else case_history.entries_for(case["$id"])
+
+
 def find(reference_or_id: str) -> dict[str, Any]:
     reference = normalise_reference(reference_or_id)
     case = report_store.find_by_reference(reference) if reference else None
@@ -76,13 +86,15 @@ def _resolution_notes(assignments: list[dict[str, Any]]) -> list[dict[str, str]]
     ]
 
 
-def public_status(case: dict[str, Any], assignments: list[dict[str, Any]], now: datetime) -> dict[str, Any]:
+def public_status(case: dict[str, Any], assignments: list[dict[str, Any]], now: datetime,
+                  history: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     common = {
         "reference": case["reference"],
         "case_id": case["$id"],
         "submitted_at": case["createdAt"],
         "escalated": bool(case.get("escalatedAt")),
         "escalate_until": _escalate_until(case, now),
+        "timeline": case_timeline.for_resident(case, assignments, history or [], now),
     }
     if case.get("isSensitive"):
         stage = PRIVATE_STAGES[CaseStatus(case["status"])]

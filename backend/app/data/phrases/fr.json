@@ -99,6 +99,15 @@
     "speech.not_in_this_language": {
       "critical": false,
       "text": "La lecture à voix haute n'est pas encore disponible dans cette langue."
+    },
+    "case.safety.received": {
+      "text": "Votre référence a bien été reçue."
+    },
+    "case.safety.in_progress": {
+      "text": "Votre référence est en cours de traitement."
+    },
+    "case.safety.closed": {
+      "text": "Ce dossier est clos."
     }
   }
 }

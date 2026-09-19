@@ -116,7 +116,8 @@ def file_report(
 
 def _status(case: dict[str, Any]) -> ReportStatus:
     assignments = report_store.assignments_for(case["$id"])
-    view = ReportStatus.model_validate(report_followups.public_status(case, assignments, utc_now()))
+    history = report_followups.history_for(case)
+    view = ReportStatus.model_validate(report_followups.public_status(case, assignments, utc_now(), history))
     if not view.private:  # anyone with the reference sees this; a safety case shows no hint of what it is
         view.contacts = contacts.for_report(case["topic"], case.get("subMetro"))
     return view

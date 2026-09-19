@@ -49,3 +49,9 @@ export function formatDateTime(iso: string): string {
 export function formatDate(iso: string): string {
   return dateFormat.format(new Date(iso));
 }
+
+/** The machine-readable instant for a <time> element. Unreadable timestamps are passed through. */
+export function machineTime(iso: string): string {
+  const parsed = new Date(iso);
+  return Number.isNaN(parsed.getTime()) ? iso : parsed.toISOString();
+}

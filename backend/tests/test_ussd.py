@@ -288,9 +288,10 @@ def test_a_slow_model_leaves_the_rules_to_decide_and_they_still_catch_danger(mon
 def test_checking_a_case_shows_its_status_in_one_screen(session: list[tuple[Any, ...]], monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(report_followups, "find", lambda ref: CIVIC if ref == "K7QM-4TXP" else (_ for _ in ()).throw(report_followups.CaseNotFound(ref)))
     monkeypatch.setattr(ussd.report_store, "assignments_for", lambda case_id: [])
+    monkeypatch.setattr(report_followups, "history_for", lambda case: [])
     status = {"reference": "K7QM-4TXP", "private": False, "status": "in_progress", "topic": "Drainage and flooding",
               "ward": "Kaneshie", "recipients": ["Works Department"]}
-    monkeypatch.setattr(report_followups, "public_status", lambda case, assignments, now: status)
+    monkeypatch.setattr(report_followups, "public_status", lambda case, assignments, now, history=None: status)
     assert keys(session, "4", "k7qm 4txp").message == "Report K7QM-4TXP (Drainage and flooding in Kaneshie) is in progress with Works Department."
     assert keys(session, "4", "hello", session_id="x").more  # not a reference: asked again
     assert keys(session, "4", "ZZZZ-2222", session_id="y").message.startswith("No case has the reference ZZZZ-2222")

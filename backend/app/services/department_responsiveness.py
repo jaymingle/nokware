@@ -69,7 +69,10 @@ def _disputes(history: list[dict[str, Any]], cases: set[str]) -> dict[str, dict[
             found[entry["caseId"]]["disputed"] += 1
         elif action == CaseHistoryAction.ESCALATION_CONFIRMED:
             found[entry["caseId"]]["confirmed"] += 1
-        elif action == CaseHistoryAction.REASSIGNED and entry.get("fromStatus") == "escalated" and not entry.get("fromDept"):
+        elif action == CaseHistoryAction.REOPENED or (
+            # Before `reopened` was an action of its own, reopening was written as a move with nowhere to move from.
+            action == CaseHistoryAction.REASSIGNED and entry.get("fromStatus") == "escalated" and not entry.get("fromDept")
+        ):
             found[entry["caseId"]]["reopened"] += 1  # reopen() sends the case back to the same departments
     return found
 
@@ -162,7 +165,8 @@ def _history(collection: str, actions: list[str]) -> list[dict[str, Any]]:
 
 def responsiveness(now: datetime) -> dict[str, Any]:
     def make() -> dict[str, Any]:
-        case_actions = [CaseHistoryAction.ESCALATED.value, CaseHistoryAction.ESCALATION_CONFIRMED.value, CaseHistoryAction.REASSIGNED.value]
+        case_actions = [CaseHistoryAction.ESCALATED.value, CaseHistoryAction.ESCALATION_CONFIRMED.value,
+                        CaseHistoryAction.REASSIGNED.value, CaseHistoryAction.REOPENED.value]
         document_actions = [a.value for a in HistoryAction]
         figures = build(public_cases(), every_record(ASSIGNMENTS_COLLECTION, [Query.equal("active", True)]),
                         _history(CASE_HISTORY, case_actions), _history(DOCUMENT_HISTORY, document_actions), now)

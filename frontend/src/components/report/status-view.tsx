@@ -1,6 +1,7 @@
 import { ContactList } from "@/components/contacts/contact-list";
 import { Tag } from "@/components/documents/tag";
 import { ReadAloud } from "@/components/read-aloud/read-aloud";
+import { CaseTimeline } from "@/components/report/case-timeline";
 import { EscalateForm } from "@/components/report/escalate-form";
 import { Card, CardContent } from "@/components/ui/card";
 import { reportAudio } from "@/lib/api/public";
@@ -92,6 +93,7 @@ export function CivicStatus({ status }: { status: ReportStatus }) {
         </p>
       ) : null}
       <ResolutionNotes status={status} />
+      <CaseTimeline timeline={status.timeline} />
       <CivicFollowUp status={status} />
       <ContactList title="Numbers for this report" contacts={status.contacts ?? []} testId="status-contacts" />
     </StatusFrame>
@@ -116,6 +118,7 @@ export function PrivateStatus({ status }: { status: ReportStatus }) {
     <StatusFrame status={status}>
       <p className="text-[13.5px] text-ink-soft">This page shows only how far along the case is. Nothing about what was reported appears here.</p>
       <LocationViews views={status.location_views ?? []} />
+      <CaseTimeline timeline={status.timeline} />
       {status.escalate_until ? (
         <EscalateForm reference={status.reference} until={status.escalate_until} intro="Not satisfied with how this was handled? You can ask for a review." action="Ask for a review" />
       ) : null}

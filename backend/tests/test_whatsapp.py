@@ -364,9 +364,10 @@ def test_a_fire_gets_its_numbers_first_then_the_area_question(monkeypatch: pytes
 def test_a_reference_gets_its_status(monkeypatch: pytest.MonkeyPatch, chat: list[str]) -> None:
     monkeypatch.setattr(report_followups, "find", lambda ref: CIVIC)
     monkeypatch.setattr(whatsapp_conversation.report_store, "assignments_for", lambda case_id: [])
+    monkeypatch.setattr(report_followups, "history_for", lambda case: [])
     status = {"reference": "K7QM-4TXP", "private": False, "status": "assigned", "topic": "Drainage and flooding",
               "ward": "Kaneshie", "recipients": ["Works Department"]}
-    monkeypatch.setattr(report_followups, "public_status", lambda case, assignments, now: status)
+    monkeypatch.setattr(report_followups, "public_status", lambda case, assignments, now, history=None: status)
     say("K7QM-4TXP")
     assert chat[-1] == "Report K7QM-4TXP (Drainage and flooding in Kaneshie) was received and is with Works Department."
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { deadlineFrom, formatDate, formatDateTime, formatRemaining, URGENT_WITHIN_MS } from "@/lib/time";
+import { deadlineFrom, formatDate, formatDateTime, formatRemaining, machineTime, URGENT_WITHIN_MS } from "@/lib/time";
 
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
@@ -49,5 +49,15 @@ describe("Accra dates", () => {
   it("formats in GMT whatever the viewer's time zone", () => {
     expect(formatDateTime("2026-03-15T14:05:00.000+00:00")).toBe("Sun 15 Mar, 14:05 GMT");
     expect(formatDate("2026-03-15T23:30:00.000+00:00")).toBe("15 Mar 2026");
+  });
+});
+
+describe("machineTime", () => {
+  it("normalises an offset timestamp to a UTC instant", () => {
+    expect(machineTime("2026-03-15T14:05:00.000+00:00")).toBe("2026-03-15T14:05:00.000Z");
+  });
+
+  it("passes through what it cannot read", () => {
+    expect(machineTime("soon")).toBe("soon");
   });
 });

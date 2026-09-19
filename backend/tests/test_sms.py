@@ -70,6 +70,34 @@ def test_names_give_way_to_a_count_only_when_they_would_not_fit(monkeypatch: pyt
     assert pages(notifications.compose(NotificationEvent.SUBMITTED, crowded).body) == 1  # the count stands in if ever needed
 
 
+def test_a_move_says_where_the_report_went_now_and_fits_one_page(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Checked against every pair of offices, so the two longest names can't quietly cost a second credit. Where the
+    case is NOW is never given up: the office it came from is what gives way when both will not fit."""
+    monkeypatch.setattr(notifications, "get_settings", lambda: get_settings().model_copy(update={"public_site_url": SITE}))
+    for came in RECIPIENT_NAMES:
+        for went in RECIPIENT_NAMES:
+            if came == went:
+                continue
+            case = {"reference": "K7QM-4TXP", "category": "civic_service", "recipients": [went],
+                    "reassignedFrom": came, "reassignedTo": went}
+            body = notifications.compose(NotificationEvent.REASSIGNED, case).body
+            assert is_gsm7(body) and pages(body) == 1, (len(body), body)
+            assert short_name(went) in body and "nokware.tstitagency.com/report/status" in body, body
+            assert "https://" not in body and "K7QM-4TXP/" not in body
+
+
+def test_a_safety_case_is_never_told_it_moved_or_that_it_was_reopened() -> None:
+    """Which service holds such a case is the sensitive fact. Work starting again has its own neutral message."""
+    safety = {"$id": "c2", "reference": "M3RD-8WQA", "category": "personal_safety", "recipients": ["agency-police"]}
+    everyday = {**safety, "$id": "c1", "category": "civic_service", "recipients": ["dept-works"]}
+    silent = (NotificationEvent.REASSIGNED, NotificationEvent.REOPENED)
+
+    assert [e for e in NotificationEvent if not notifications.notifiable(safety, e)] == list(silent)
+    assert all(notifications.notifiable(everyday, event) for event in NotificationEvent)
+    for event in silent:  # and if one is ever composed by mistake, it still says nothing but "being worked on"
+        assert notifications.compose(event, safety).body == "Nokware: reference M3RD-8WQA is being worked on."
+
+
 def _client(handler: Any) -> httpx.Client:
     return httpx.Client(transport=httpx.MockTransport(handler))
 

@@ -696,3 +696,36 @@ def test_no_stored_field_and_no_log_line_ever_holds_a_number(
     assert "+233" not in written and "241234567" not in written
     assert "+233" not in caplog.text and "241234567" not in caplog.text
     assert "can't date the resolved message for case c3" in caplog.text  # and no number in that line either
+
+
+def test_a_move_and_a_reopening_are_repaired_like_any_other_moment(
+    storage: dict[str, list[dict[str, Any]]], sent: list[str]
+) -> None:
+    """Both are stamped on the case, so the sweep finds them by when they happened and composes the message from
+    the case alone — the same words the first attempt would have carried."""
+    filed, moved, reopened = NOW - timedelta(days=3), NOW - timedelta(hours=5), NOW - timedelta(hours=2)
+    storage[REPORTS_COLLECTION].append(case(
+        "c1", filed, status=CaseStatus.ASSIGNED.value, recipients=["dept-urban-roads"],
+        reassignedAt=moved.isoformat(), reassignedFrom="dept-works", reassignedTo="dept-urban-roads",
+        reopenedAt=reopened.isoformat()))
+    storage[CONTACTS_COLLECTION].append({"$id": "c1", "caseId": "c1", **CONSENTED})
+    storage[NOTIFICATIONS_COLLECTION].append(outbox("c1", NotificationStatus.SENT, SUBMITTED, written=filed))
+
+    assert notification_sweep.run_sweep(NOW) == ["c1"]
+    assert sent == ["c1/reassigned/sms", "c1/reopened/sms"]  # oldest moment first
+    assert notification_sweep.run_sweep(NOW) == [] and len(sent) == 2
+
+
+def test_a_safety_case_is_never_sent_a_move_or_a_reopening_even_years_later(
+    storage: dict[str, list[dict[str, Any]]], sent: list[str]
+) -> None:
+    """Which service holds it is the sensitive fact, so there is nothing to repair. The receipt still is."""
+    filed, moved = NOW - timedelta(days=2), NOW - timedelta(hours=3)
+    storage[REPORTS_COLLECTION].append({
+        **case("c1", filed, status=CaseStatus.ASSIGNED.value, reassignedAt=moved.isoformat(),
+               reassignedFrom="agency-police", reassignedTo="dept-social-welfare",
+               reopenedAt=moved.isoformat()),
+        "category": "personal_safety", "recipients": ["dept-social-welfare"]})
+    storage[CONTACTS_COLLECTION].append({"$id": "c1", "caseId": "c1", **CONSENTED})
+
+    assert notification_sweep.run_sweep(NOW) == ["c1"] and sent == ["c1/submitted/sms"]

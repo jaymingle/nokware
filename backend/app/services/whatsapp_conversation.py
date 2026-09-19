@@ -244,7 +244,9 @@ def status(number: str, reference: str) -> None:
     except report_followups.CaseNotFound:
         whatsapp_reply.reply(number, f"No case has the reference {reference}. Check it and send it again.")
         return
-    found = report_followups.public_status(case, report_store.assignments_for(case["$id"]), utc_now())
+    found = report_followups.public_status(
+        case, report_store.assignments_for(case["$id"]), utc_now(), report_followups.history_for(case)
+    )
     whatsapp_reply.reply(number, status_text(found, _site()))
 
 

@@ -136,6 +136,21 @@
       "critical": false,
       "text": "Reading aloud isn't available in this language yet.",
       "note": "Shown where the Listen button would be. Nokware reads aloud only in languages whose fixed text it has written."
+    },
+    "case.safety.received": {
+      "critical": false,
+      "text": "Your reference has been received.",
+      "note": "A personal-safety case's status page and nothing else. Whoever holds the reference may not be the person who filed it, so the line says how far along the case is and never what it is about."
+    },
+    "case.safety.in_progress": {
+      "critical": false,
+      "text": "Your reference is being worked on.",
+      "note": "The same neutral wording the SMS about a personal-safety case uses."
+    },
+    "case.safety.closed": {
+      "critical": false,
+      "text": "This case is closed.",
+      "note": "Says nothing about the outcome: an outcome would say what the case was."
     }
   }
 }
