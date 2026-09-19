@@ -119,6 +119,15 @@ class FakeDatabases:
         row = next(row for row in self.collections[collection] if row["$id"] == document_id)
         row.update(data)
 
+    def create_document(self, database: str, collection: str, document_id: str, data: dict[str, Any]) -> Document:
+        """Appwrite's own `unique()` stands for "give it an ID", so the fake gives it one: rows the repair writes
+        have to be told apart from each other, and from the ones the case already had."""
+        assert database == DATABASE_ID
+        rows = self.collections.setdefault(collection, [])
+        row = {"$id": f"{collection}-{len(rows) + 1}" if document_id == "unique()" else document_id, **data}
+        rows.append(row)
+        return Document(row)
+
 
 @pytest.fixture
 def storage(monkeypatch: pytest.MonkeyPatch) -> dict[str, list[dict[str, Any]]]:
@@ -148,6 +157,42 @@ def sent(storage: dict[str, list[dict[str, Any]]], monkeypatch: pytest.MonkeyPat
 
     monkeypatch.setattr(notification_sweep, "notify_channel", fake_notify_channel)
     return done
+
+
+class FakeProvider:
+    """Accepts whatever it is handed, so a message that reached a provider is visible as one that was sent."""
+
+    delivers = True
+
+    def __init__(self, channel: NotificationChannel, sent: list[tuple[str, str, str]]) -> None:
+        self.name, self.channel, self.sent = f"fake-{channel.value}", channel, sent
+
+    def send(self, to: str, body: str) -> str:
+        self.sent.append((self.channel.value, to, body))
+        return f"m-{len(self.sent)}"
+
+
+@pytest.fixture
+def delivered(storage: dict[str, list[dict[str, Any]]], monkeypatch: pytest.MonkeyPatch) -> list[tuple[str, str, str]]:
+    """The repair as it really runs, with nothing of the sending faked out but the provider itself: the sweep's own
+    notify_channel, its consent check, the message it composes, the outbox row and the case-history line.
+
+    Each entry is (channel, number, body) as the provider was asked for it — the channel a message really went out
+    on, which is the thing a per-channel repair has to get right and which faking notify_channel cannot show.
+    """
+    done: list[tuple[str, str, str]] = []
+    monkeypatch.setattr(notifications, "provider_for", lambda channel: FakeProvider(channel, done))
+    monkeypatch.setattr(notification_sweep, "provider_for", lambda channel: FakeProvider(channel, done))
+    monkeypatch.setattr(case_history, "get_databases", lambda: FakeDatabases(storage))
+    monkeypatch.setattr(
+        notifications, "contact_for",
+        lambda case_id: next((row for row in storage[CONTACTS_COLLECTION] if row["caseId"] == case_id), None),
+    )
+    return done
+
+
+def history_notes(storage: dict[str, list[dict[str, Any]]]) -> list[str]:
+    return [str(row.get("note") or "") for row in storage[case_history.COLLECTION_ID]]
 
 
 @pytest.fixture
@@ -323,6 +368,64 @@ def test_only_the_channel_the_resident_is_still_owed_on_is_sent_on(
 
     assert notification_sweep.run_sweep(NOW) == ["c1"] and sent == ["c1/submitted/whatsapp"]
     assert notification_sweep.run_sweep(NOW) == [] and sent == ["c1/submitted/whatsapp"]
+
+
+@pytest.mark.parametrize("failed", [SMS, WHATSAPP])
+def test_a_repair_reaches_the_provider_on_the_failed_channel_alone(
+    storage: dict[str, list[dict[str, Any]]], delivered: list[tuple[str, str, str]], failed: NotificationChannel
+) -> None:
+    """End to end, through the real notify_channel: one channel's message went, the other's never got an answer out
+    of the provider. Exactly one message leaves, on the channel that still owes one. A second message on the
+    channel that worked would be a duplicate of one the resident already has — and this asserts on the channel the
+    provider was really asked for, not on the one the sweep meant to ask for.
+    """
+    worked = WHATSAPP if failed == SMS else SMS
+    storage[REPORTS_COLLECTION].append(case("c1", NOW - timedelta(hours=2)))
+    storage[CONTACTS_COLLECTION].append({"$id": "c1", "caseId": "c1", **BOTH})
+    storage[NOTIFICATIONS_COLLECTION].append(outbox("c1", NotificationStatus.SENT, channel=worked))
+    storage[NOTIFICATIONS_COLLECTION].append(
+        outbox("c1", NotificationStatus.FAILED, channel=failed, error=f"{notifications.UNREACHABLE}ReadTimeout")
+    )
+
+    assert notification_sweep.run_sweep(NOW) == ["c1"]
+    assert [channel for channel, _, _ in delivered] == [failed.value]
+    assert notification_sweep.run_sweep(NOW) == [] and len(delivered) == 1  # and never a second time
+
+
+def test_a_repair_of_one_channel_leaves_the_other_moments_and_channels_alone(
+    storage: dict[str, list[dict[str, Any]]], delivered: list[tuple[str, str, str]]
+) -> None:
+    """The resolution went by both; only the receipt's WhatsApp message never did. One message, on one channel."""
+    filed, done = NOW - timedelta(days=2), NOW - timedelta(hours=2)
+    storage[REPORTS_COLLECTION].append(resolved_case("c1", filed, done))
+    storage[CONTACTS_COLLECTION].append({"$id": "c1", "caseId": "c1", **BOTH})
+    for channel in (SMS, WHATSAPP):
+        storage[NOTIFICATIONS_COLLECTION].append(outbox("c1", NotificationStatus.SENT, RESOLVED, written=done, channel=channel))
+    storage[NOTIFICATIONS_COLLECTION].append(outbox("c1", NotificationStatus.SENT, SUBMITTED, written=filed, channel=SMS))
+
+    assert notification_sweep.run_sweep(NOW) == ["c1"]
+    assert [(channel, body) for channel, _, body in delivered] == [(WHATSAPP.value, "Nokware: report K7QM-C1 is with "
+                                                                   "Works Department. We'll message you when it's "
+                                                                   "resolved. Track it: localhost:3000/report/status")]
+
+
+def test_a_safety_case_s_repair_carries_neither_its_category_nor_its_service_anywhere(
+    storage: dict[str, list[dict[str, Any]]], delivered: list[tuple[str, str, str]]
+) -> None:
+    """The message a resident gets, the outbox row it is kept in and the line written into the case's own trail: a
+    phone can be shared, and the trail is read in the portal, so none of the three names what the case is."""
+    storage[REPORTS_COLLECTION].append({
+        **case("c1", NOW - timedelta(hours=2)), "category": "personal_safety", "topic": "abuse",
+        "recipients": ["agency-police", "dept-social-welfare"]})
+    storage[CONTACTS_COLLECTION].append({"$id": "c1", "caseId": "c1", **CONSENTED})
+
+    assert notification_sweep.run_sweep(NOW) == ["c1"]
+    assert delivered == [(SMS.value, "+233241234567", "Nokware: reference K7QM-C1 received.")]
+    written = [row for row in storage[NOTIFICATIONS_COLLECTION] if row["status"] == NotificationStatus.SENT.value]
+    said = " ".join([*history_notes(storage), *(str(row.get("body") or "") for row in written)]).lower()
+    for giveaway in ("safety", "abuse", "police", "welfare", "report", "sensitive"):
+        assert giveaway not in said
+    assert written[0]["template"] == "private_submitted"
 
 
 def test_each_channel_is_repaired_when_both_are_owed(storage: dict[str, list[dict[str, Any]]], sent: list[str]) -> None:

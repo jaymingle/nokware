@@ -6,6 +6,7 @@ from typing import Any
 
 import pytest
 
+from app.config import get_settings
 from app.services import notifications
 from app.services.citizen_reports import NotificationChannel, NotificationEvent, NotificationStatus
 from app.services.notifications import channels_for, compose
@@ -127,7 +128,8 @@ def test_a_resolution_after_the_escalation_is_final_and_offers_no_second_escalat
 
 
 def test_a_report_with_no_agreed_channel_says_so_in_the_log(monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture) -> None:
-    """A safety reclassification holds consent: nothing is sent and nothing fails, so the quiet has to be findable."""
+    """A resident who turned messages off on the confirmation page: nothing is sent and nothing fails, so the quiet
+    has to be findable — otherwise it is indistinguishable from a message that went missing."""
     monkeypatch.setattr(notifications, "contact_for", lambda case_id: {"phone": "", "whatsapp": "", "notify": False})
     with caplog.at_level(logging.INFO):
         notifications.notify({"$id": "case-1"}, NotificationEvent.SUBMITTED)
@@ -179,6 +181,22 @@ def test_repairing_the_whatsapp_channel_obeys_the_window_as_a_first_send_would(
     notifications.notify_channel(CIVIC, NotificationEvent.SUBMITTED, NotificationChannel.WHATSAPP)
 
     assert sends == [("sms", "+233241234567", notifications.WINDOW_CLOSED)]
+
+
+def test_a_whatsapp_repair_never_stands_in_by_sms_for_a_resident_who_has_both(
+    monkeypatch: pytest.MonkeyPatch, sends: list[tuple[str, str, str]]
+) -> None:
+    """The stand-in exists for a resident who gave a WhatsApp number only. Here the SMS is a channel of its own,
+    and by the time a repair runs it is the channel that already worked: standing in would put a second copy of the
+    message on it, which is the one thing a per-channel repair is for."""
+    both = {"notify": True, "phone": "+233241234567", "whatsapp": "+233241234567"}
+    monkeypatch.setattr(notifications, "contact_for", lambda case_id: both)
+    monkeypatch.setattr(notifications, "window_open", lambda number: False)  # the window closed hours ago
+    monkeypatch.setattr(notifications, "get_settings", lambda: get_settings().model_copy(update={"whatsapp_provider": "twilio"}))
+
+    notifications.notify_channel(CIVIC, NotificationEvent.SUBMITTED, NotificationChannel.WHATSAPP)
+
+    assert sends == [("whatsapp", "+233241234567", "")]
 
 
 def test_a_send_our_own_side_never_attempted_is_told_apart_from_one_the_provider_refused() -> None:
