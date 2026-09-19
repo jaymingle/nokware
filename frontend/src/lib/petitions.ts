@@ -179,9 +179,6 @@ export function sendingLabel(sending: Sending | null, settling = "Publishing…"
   return `Sending your photos… ${Math.round((sending.sent / Math.max(sending.total, 1)) * 100)}%`;
 }
 
-export const REPORT_HIDES_NOTHING =
-  "Reporting hides nothing. The petition stays up, exactly as it is, while a contributor reads what you send.";
-
 export function whatsappShareUrl(title: string, pageUrl: string): string {
   return `https://wa.me/?text=${encodeURIComponent(`Petition to the Accra Metropolitan Assembly: ${title}\n${pageUrl}`)}`;
 }

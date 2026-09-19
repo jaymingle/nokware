@@ -4,34 +4,19 @@ import { FlagIcon } from "lucide-react";
 import { useState } from "react";
 
 import { ErrorNote } from "@/components/documents/panels";
+import { ReportGrounds, reportHidesNothing } from "@/components/petitions/report-grounds";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { usePetitionOptions, useReportPetition } from "@/lib/api/petition-queries";
-import { REPORT_HIDES_NOTHING } from "@/lib/petitions";
 
 import type { PetitionGround, PetitionGroundOption } from "@/lib/api/types";
 
 type Chosen = { ground: PetitionGround; duplicateOf: string; note: string };
 
 const EMPTY: Chosen = { ground: "private_individual", duplicateOf: "", note: "" };
-
-function Grounds({ grounds, chosen, onChoose }: { grounds: PetitionGroundOption[]; chosen: Chosen; onChoose: (ground: PetitionGround) => void }) {
-  return (
-    <fieldset className="flex flex-col gap-1">
-      <legend className="mb-1.5 text-[14px] font-medium">Why are you reporting it?</legend>
-      {grounds.map((ground) => (
-        <label key={ground.id} className="flex items-center gap-2.5 text-[14px]">
-          <input type="radio" name="petition-report-ground" checked={chosen.ground === ground.id} onChange={() => onChoose(ground.id)}
-            className="size-4 accent-teal" data-testid={`petition-report-ground-${ground.id}`} />
-          {ground.label}
-        </label>
-      ))}
-    </fieldset>
-  );
-}
 
 /** A duplicate is the one ground that can't be judged alone: the contributor needs the other petition. */
 function DuplicateNumber({ value, onChange }: { value: string; onChange: (value: string) => void }) {
@@ -80,7 +65,8 @@ type Report = ReturnType<typeof useReport>;
 function ReportFields({ state, grounds, noteMax }: { state: Report; grounds: PetitionGroundOption[]; noteMax: number }) {
   return (
     <div className="flex flex-col gap-4">
-      <Grounds grounds={grounds} chosen={state.chosen} onChoose={(ground) => state.change({ ground })} />
+      <ReportGrounds grounds={grounds} chosen={state.chosen.ground} onChoose={(ground) => state.change({ ground })}
+        name="petition-report-ground" testIdPrefix="petition-report-ground" />
       {state.wantsNumber ? <DuplicateNumber value={state.chosen.duplicateOf} onChange={(duplicateOf) => state.change({ duplicateOf })} /> : null}
       <Note value={state.chosen.note} max={noteMax} onChange={(note) => state.change({ note })} />
       {/* The API's own words, as it gave them: it is the only thing that knows why it refused. */}
@@ -122,7 +108,7 @@ export function ReportPetition({ code }: { code: string }) {
       <DialogContent className="sm:max-w-lg" data-testid="petition-report-dialog">
         <DialogHeader>
           <DialogTitle className="text-[20px]">Report this petition</DialogTitle>
-          <DialogDescription>{REPORT_HIDES_NOTHING} You don&apos;t need to sign in.</DialogDescription>
+          <DialogDescription>{reportHidesNothing("petition")} You don&apos;t need to sign in.</DialogDescription>
         </DialogHeader>
         {report.data ? (
           <p className="text-[14px]" data-testid="petition-report-filed">{report.data.message}</p>

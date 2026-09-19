@@ -4,6 +4,7 @@ import { FlagIcon } from "lucide-react";
 import { useState } from "react";
 
 import { ErrorNote } from "@/components/documents/panels";
+import { ReportGrounds, reportHidesNothing } from "@/components/petitions/report-grounds";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -12,30 +13,9 @@ import { usePetitionOptions, useReportComment } from "@/lib/api/petition-queries
 
 import type { PetitionGround, PetitionGroundOption } from "@/lib/api/types";
 
-const HIDES_NOTHING =
-  "Reporting hides nothing. The comment stays up, exactly as it is, while a contributor reads what you send.";
-
 const FIRST_GROUND: PetitionGround = "private_individual";
 
 type Props = { code: string; commentId: string };
-
-function Grounds({ commentId, chosen, onChoose, grounds }: {
-  commentId: string; chosen: PetitionGround; onChoose: (ground: PetitionGround) => void; grounds: PetitionGroundOption[];
-}) {
-  return (
-    <fieldset className="flex flex-col gap-1">
-      <legend className="mb-1.5 text-[14px] font-medium">Why are you reporting it?</legend>
-      {grounds.map((ground) => (
-        <label key={ground.id} className="flex items-center gap-2.5 text-[14px]">
-          {/* Named for this comment, so two report dialogs on one page are never one group of radios. */}
-          <input type="radio" name={`comment-report-${commentId}`} checked={chosen === ground.id} onChange={() => onChoose(ground.id)}
-            className="size-4 accent-teal" data-testid={`comment-report-ground-${ground.id}`} />
-          {ground.label}
-        </label>
-      ))}
-    </fieldset>
-  );
-}
 
 function useCommentReport(code: string, commentId: string) {
   const [ground, setGround] = useState<PetitionGround>(FIRST_GROUND);
@@ -58,7 +38,8 @@ function Fields({ state, commentId, grounds, noteMax }: {
   const noteId = `comment-report-note-${commentId}`;
   return (
     <div className="flex flex-col gap-4">
-      <Grounds commentId={commentId} grounds={grounds} chosen={state.ground} onChoose={state.setGround} />
+      <ReportGrounds grounds={grounds} chosen={state.ground} onChoose={state.setGround}
+        name={`comment-report-${commentId}`} testIdPrefix="comment-report-ground" />
       <div className="flex flex-col gap-1.5">
         <Label htmlFor={noteId}>Anything to add (optional)</Label>
         <Textarea id={noteId} value={state.note} onChange={(e) => state.setNote(e.target.value)} maxLength={noteMax} rows={3}
@@ -91,7 +72,7 @@ export function ReportComment({ code, commentId }: Props) {
       <DialogContent className="sm:max-w-lg" data-testid="comment-report-dialog">
         <DialogHeader>
           <DialogTitle className="text-[20px]">Report this comment</DialogTitle>
-          <DialogDescription>{HIDES_NOTHING} You don&apos;t need to sign in.</DialogDescription>
+          <DialogDescription>{reportHidesNothing("comment")} You don&apos;t need to sign in.</DialogDescription>
         </DialogHeader>
         {filed ? (
           <p className="text-[14px]" data-testid="comment-report-filed">{state.report.data?.message}</p>
