@@ -85,7 +85,7 @@ function useComponents({ titles, onCite, testIdPrefix, repeatedBelow }: Omit<Ans
 export function AnswerText({ markdown, ...rest }: AnswerTextProps) {
   const components = useComponents(rest);
   return (
-    <div className="flex flex-col gap-3 text-[15.5px] leading-[1.65] break-words text-ink" data-testid={`${rest.testIdPrefix}-answer`}>
+    <div className="flex flex-col gap-3.5 text-[17px] leading-[1.6] break-words text-ink sm:text-[18px] sm:leading-[1.62]" data-testid={`${rest.testIdPrefix}-answer`}>
       <Markdown allowedElements={ALLOWED} unwrapDisallowed skipHtml components={components}>
         {linkCitations(markdown)}
       </Markdown>
