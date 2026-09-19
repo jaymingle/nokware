@@ -43,6 +43,11 @@ EMBEDDING_MODEL = "models/gemini-embedding-2"
 EMBEDDING_DIMENSIONS = 768  # must equal the VECTOR(n) size of the embedding column
 FULLTEXT_COLUMN = "chunk_tsv"  # generated tsvector over chunk_text (migration 0002)
 POOL_MAX_SIZE = 8  # enough for retrieval's parallel keyword queries
+POOL_CONNECT_SECONDS = 10
+# What a caller waits is the pool's checkout timeout, not connect_timeout: its 30s default retried until the page
+# had already given up at 30s, so an unreachable index reached the reader as a generic timeout instead of our 503.
+# One connect attempt plus a second's grace surfaces the first failure rather than a retry loop.
+POOL_CHECKOUT_SECONDS = POOL_CONNECT_SECONDS + 1
 
 _DELETE_SQL = f'DELETE FROM "{TABLE_NAME}" WHERE "{DOCUMENT_ID_COLUMN}" = %s'
 _INSERT_SQL = (
@@ -96,7 +101,8 @@ def get_pool() -> ConnectionPool:
         libpq_url(get_settings().postgres_url),
         min_size=1,
         max_size=POOL_MAX_SIZE,
-        kwargs={"connect_timeout": 10},
+        timeout=POOL_CHECKOUT_SECONDS,
+        kwargs={"connect_timeout": POOL_CONNECT_SECONDS},
         configure=register_vector,
         check=ConnectionPool.check_connection,
         open=True,
