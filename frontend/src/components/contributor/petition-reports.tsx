@@ -59,9 +59,12 @@ function Petition({ report }: { report: PetitionReport }) {
   );
 }
 
-type CardProps = { report: PetitionReport; grounds: PetitionGroundOption[]; reasons: PetitionDismissalOption[] };
+type CardProps = {
+  report: PetitionReport; grounds: PetitionGroundOption[]; imageGrounds: PetitionGroundOption[];
+  reasons: PetitionDismissalOption[];
+};
 
-function ReportCard({ report, grounds, reasons }: CardProps) {
+function ReportCard({ report, grounds, imageGrounds, reasons }: CardProps) {
   return (
     <Card className="gap-0 py-0" data-testid={`report-${report.id}`}>
       <Reported report={report} />
@@ -72,7 +75,7 @@ function ReportCard({ report, grounds, reasons }: CardProps) {
             What the reader added: &ldquo;{report.note}&rdquo;
           </p>
         ) : null}
-        <ReportedImages code={report.petition.code} images={report.images} grounds={grounds} />
+        <ReportedImages code={report.petition.code} images={report.images} grounds={imageGrounds} />
         <div className="flex flex-wrap gap-2 pt-1">
           <RemovePetitionDialog code={report.petition.code} grounds={grounds} />
           <DismissReportDialog id={report.id} reasons={reasons} />
@@ -142,7 +145,8 @@ export function PetitionReports() {
       {data.reports.length > 0 ? (
         <section aria-label="Reported petitions" className="flex flex-col gap-4">
           {data.reports.map((report) => (
-            <ReportCard key={report.id} report={report} grounds={data.grounds} reasons={data.dismissal_reasons} />
+            <ReportCard key={report.id} report={report} grounds={data.grounds} imageGrounds={data.image_grounds}
+              reasons={data.dismissal_reasons} />
           ))}
         </section>
       ) : null}

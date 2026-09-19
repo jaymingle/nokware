@@ -17,9 +17,10 @@ from app.config import get_settings
 from app.services import petitions
 from app.services.auth import Principal
 from app.services.locks import record_lock
-from app.services.petition_grounds import Ground
-from app.services.petition_rules import PetitionAction
+from app.services.petition_grounds import Ground, Subject, grounds_for
+from app.services.petition_rules import InvalidPetition, PetitionAction
 from app.services.petitions import PetitionNotFound
+from app.services.phrases import phrase
 from app.services.report_photos import clean_photos, photo_link
 from app.services.storage import get_minio
 
@@ -53,6 +54,8 @@ def remove_image(principal: Principal, code: str, image_id: str, ground: Ground,
     where it is, exactly as a removed petition's images are — nothing serves it once its name is off the petition,
     and a removal that destroyed the evidence could not be undone.
     """
+    if ground not in grounds_for(Subject.IMAGE):
+        raise InvalidPetition(phrase("petition.image.not_a_ground"))
     petition = petitions.public(code)
     with record_lock(petition["$id"]):
         petition = petitions.public(code)

@@ -291,6 +291,10 @@
     },
     "petition.channel.not_found_whatsapp": {
       "text": "Aucune pétition ne porte le numéro {number}. Vérifiez-le et renvoyez-le."
+    },
+    "petition.image.not_a_ground": {
+      "critical": false,
+      "text": "Une photographie ne peut pas dupliquer une pétition. Choisissez le motif qui s'applique."
     }
   }
 }

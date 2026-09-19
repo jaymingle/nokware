@@ -72,6 +72,7 @@ class PetitionOptions(BaseModel):
     comment_max: int
     grounds: list[GroundOption]
     comment_grounds: list[GroundOption]  # the same ids, in the words a comment is judged by
+    image_grounds: list[GroundOption]  # a photograph duplicates nothing, so that ground is not among these
     dismissal_reasons: list[DismissalOption]
     status_words: dict[Status, str]  # one wording for a status, wherever it is shown
     verification: Verification
@@ -389,6 +390,7 @@ class ReportQueue(BaseModel):
     comments: list[ReportedComment]  # reported comments reach the same contributor
     grounds: list[GroundOption]
     comment_grounds: list[GroundOption]  # the same ids, in the words a comment is judged by
+    image_grounds: list[GroundOption]  # a photograph duplicates nothing, so that ground is not among these
     dismissal_reasons: list[DismissalOption]
 
 

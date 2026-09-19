@@ -54,10 +54,10 @@ from app.services import (
 from app.services.case_workflow import CaseStatus
 from app.services.petition_grounds import (
     DISMISSALS,
-    GROUNDS,
     Ground,
     Subject,
     dismissal_in_plain_words,
+    grounds_for,
     in_plain_words,
     needs_another_petition,
 )
@@ -268,7 +268,7 @@ def grounds(subject: Subject = Subject.PETITION) -> list[GroundOption]:
     words that subject is judged by."""
     return [GroundOption(id=ground.value, label=in_plain_words(ground, subject=subject),
                          needs_petition_number=needs_another_petition(ground, subject))
-            for ground in GROUNDS]
+            for ground in grounds_for(subject)]
 
 
 def dismissal_reasons() -> list[DismissalOption]:

@@ -422,6 +422,10 @@
     "petition.channel.not_found_whatsapp": {
       "critical": false,
       "text": "No petition has the number {number}. Check it and send it again."
+    },
+    "petition.image.not_a_ground": {
+      "critical": false,
+      "text": "A photograph can't duplicate a petition. Choose the ground it actually comes down on."
     }
   }
 }

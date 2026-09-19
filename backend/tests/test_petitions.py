@@ -34,7 +34,7 @@ from app.services import (
     whatsapp_reply,
 )
 from app.services.auth import Principal, Role
-from app.services.petition_grounds import Dismissal, Ground, in_plain_words
+from app.services.petition_grounds import Dismissal, Ground, Subject, grounds_for, in_plain_words
 from app.services.petition_reports import ReportState
 from app.services.petition_rules import (
     Draft,
@@ -679,3 +679,15 @@ def test_a_contributor_takes_one_photo_off_and_the_petition_and_the_rest_stand(s
     assert stored.trail[-1][:2] == (PetitionAction.IMAGE_REMOVED, "contributor")
     with pytest.raises(petitions.PetitionNotFound):
         petition_images.remove_image(KOFI, "482913", "b.jpg", Ground.PERSONAL_DATA, NOW)
+
+
+def test_a_photograph_is_never_judged_as_a_duplicate(stored: Fake, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A photograph can carry a face, a threat or somebody's details; it cannot duplicate a petition. The ground
+    is not offered, and it is refused if it is sent anyway."""
+    assert Ground.DUPLICATE not in grounds_for(Subject.IMAGE)
+    assert [g.id for g in present.grounds(Subject.IMAGE)] == ["private_individual", "incites_violence", "personal_data"]
+    monkeypatch.setattr(petitions, "public", lambda code: dict(stored.petition))
+    _publish(stored)
+    petitions.update_petition("p1", {"imageIds": ["a.jpg"]})
+    with pytest.raises(InvalidPetition, match="duplicate a petition"):
+        petition_images.remove_image(KOFI, "482913", "a.jpg", Ground.DUPLICATE, NOW)

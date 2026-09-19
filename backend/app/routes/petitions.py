@@ -138,6 +138,7 @@ def options() -> PetitionOptions:
         max_documents=DOCUMENTS_MAX, report_note_max=REPORT_NOTE_MAX, removal_note_max=REMOVAL_NOTE_MAX,
         department_note_max=DEPARTMENT_NOTE_MAX, reply_max=REPLY_MAX, comment_max=COMMENT_MAX,
         grounds=present.grounds(), comment_grounds=present.grounds(Subject.COMMENT),
+        image_grounds=present.grounds(Subject.IMAGE),
         dismissal_reasons=present.dismissal_reasons(), status_words=present.status_catalogue(),
         verification=Verification(whatsapp=phone_proof.whatsapp_available(), ussd_code=phone_proof.ussd_code(),
                                   sms=phone_proof.sms_available()),
@@ -185,6 +186,7 @@ def reported(_: Contributor) -> ReportQueue:
     return ReportQueue(reports=[present.reported(item) for item in petition_reports.queue()],
                        comments=[_reported_comment(item) for item in petition_comments.queue()],
                        grounds=present.grounds(), comment_grounds=present.grounds(Subject.COMMENT),
+                       image_grounds=present.grounds(Subject.IMAGE),
                        dismissal_reasons=present.dismissal_reasons())
 
 

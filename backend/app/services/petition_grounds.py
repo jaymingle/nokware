@@ -31,6 +31,7 @@ class Subject(StrEnum):
 
     PETITION = "petition"
     COMMENT = "comment"
+    IMAGE = "image"
 
 
 class Dismissal(StrEnum):
@@ -78,3 +79,11 @@ def needs_another_petition(ground: Ground, subject: Subject = Subject.PETITION) 
     """Only a petition's duplicate names one. A comment's repeats another comment on the page it already stands
     on, so there is no number to ask for and none is stored."""
     return GROUNDS[ground].names_another_petition and subject is Subject.PETITION
+
+
+def grounds_for(subject: Subject) -> tuple[Ground, ...]:
+    """Which grounds apply at all. A photograph can carry a face, a threat or somebody's details, but it cannot
+    duplicate a petition or repeat a comment: it is the words around it that would be the repetition."""
+    if subject is Subject.IMAGE:
+        return tuple(ground for ground in GROUNDS if ground is not Ground.DUPLICATE)
+    return tuple(GROUNDS)
