@@ -71,6 +71,7 @@ from app.services import (
 )
 from app.services.auth import Principal, Role
 from app.services.ledger_documents import utc_now
+from app.services.petition_comments import COMMENT_MAX
 from app.services.petition_grounds import Dismissal, Ground, in_plain_words
 from app.services.petition_rules import (
     DEPARTMENT_NOTE_MAX,
@@ -133,7 +134,7 @@ def options() -> PetitionOptions:
         threshold_area=settings.petition_threshold_area, threshold_metro=settings.petition_threshold_metro,
         open_days=OPEN_FOR.days, response_days=RESPONSE_WINDOW.days, max_images=IMAGES_MAX,
         max_documents=DOCUMENTS_MAX, report_note_max=REPORT_NOTE_MAX, removal_note_max=REMOVAL_NOTE_MAX,
-        department_note_max=DEPARTMENT_NOTE_MAX, reply_max=REPLY_MAX,
+        department_note_max=DEPARTMENT_NOTE_MAX, reply_max=REPLY_MAX, comment_max=COMMENT_MAX,
         grounds=present.grounds(), dismissal_reasons=present.dismissal_reasons(),
         status_words=present.status_catalogue(),
         verification=Verification(whatsapp=phone_proof.whatsapp_available(), ussd_code=phone_proof.ussd_code(),

@@ -10,14 +10,11 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { usePhoneProof, type PhoneProof } from "@/hooks/use-phone-proof";
-import { useAddComment, usePetitionComments } from "@/lib/api/petition-queries";
+import { useAddComment, usePetitionComments, usePetitionOptions } from "@/lib/api/petition-queries";
 import { formatDate } from "@/lib/time";
 
 import type { PetitionComment } from "@/lib/api/types";
 import type { KeptProof } from "@/lib/petitions";
-
-// The API publishes every other limit in its options but not this one, and refuses anything longer in its own words.
-const COMMENT_MAX = 500;
 
 const HOW_COMMENTS_WORK =
   "A comment is published as you write it: nobody approves it. One confirmed Ghanaian number, as a signature is, and the number itself is never shown.";
@@ -91,12 +88,16 @@ function useCommenting(code: string, phone: PhoneProof) {
 }
 
 function Fields({ state }: { state: ReturnType<typeof useCommenting> }) {
+  // The API owns the limit and refuses anything longer in its own words; the box only keeps a writer inside it.
+  const limit = usePetitionOptions().data?.comment_max;
   return (
     <div className="flex flex-col gap-1.5">
       <Label htmlFor="petition-comment-text">Add your comment</Label>
       <Textarea id="petition-comment-text" value={state.text} onChange={(e) => state.setText(e.target.value)} rows={4}
-        maxLength={COMMENT_MAX} autoComplete="off" data-testid="petition-comment-text" />
-      <p className="text-[12px] text-ink-muted tabular-nums">{state.text.length.toLocaleString()} / {COMMENT_MAX.toLocaleString()}</p>
+        maxLength={limit} autoComplete="off" data-testid="petition-comment-text" />
+      {limit ? (
+        <p className="text-[12px] text-ink-muted tabular-nums">{state.text.length.toLocaleString()} / {limit.toLocaleString()}</p>
+      ) : null}
     </div>
   );
 }

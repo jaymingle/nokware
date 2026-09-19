@@ -68,6 +68,7 @@ class PetitionOptions(BaseModel):
     removal_note_max: int
     department_note_max: int  # a department's one note on a petition shared with it
     reply_max: int  # the petitioner's reply to the MCE's response
+    comment_max: int
     grounds: list[GroundOption]
     dismissal_reasons: list[DismissalOption]
     status_words: dict[Status, str]  # one wording for a status, wherever it is shown

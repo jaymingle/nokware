@@ -1469,7 +1469,7 @@ export interface paths {
          * @description A spoken reply, fetched by Twilio as it sends the voice note. The link is random and lasts 10 minutes, and
          *     the audio is an answer from public documents, never anything about a report.
          */
-        get: operations["whatsapp_audio_api_channels_whatsapp_audio__name__get"];
+        get: operations["whatsapp_audio_api_channels_whatsapp_audio__name__head"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1479,7 +1479,7 @@ export interface paths {
          * @description A spoken reply, fetched by Twilio as it sends the voice note. The link is random and lasts 10 minutes, and
          *     the audio is an answer from public documents, never anything about a report.
          */
-        head: operations["whatsapp_audio_api_channels_whatsapp_audio__name__get"];
+        head: operations["whatsapp_audio_api_channels_whatsapp_audio__name__head"];
         patch?: never;
         trace?: never;
     };
@@ -3012,6 +3012,8 @@ export interface components {
             department_note_max: number;
             /** Reply Max */
             reply_max: number;
+            /** Comment Max */
+            comment_max: number;
             /** Grounds */
             grounds: components["schemas"]["GroundOption"][];
             /** Dismissal Reasons */
@@ -6439,7 +6441,7 @@ export interface operations {
             };
         };
     };
-    whatsapp_audio_api_channels_whatsapp_audio__name__get: {
+    whatsapp_audio_api_channels_whatsapp_audio__name__head: {
         parameters: {
             query?: never;
             header?: never;
@@ -6470,7 +6472,7 @@ export interface operations {
             };
         };
     };
-    whatsapp_audio_api_channels_whatsapp_audio__name__get: {
+    whatsapp_audio_api_channels_whatsapp_audio__name__head: {
         parameters: {
             query?: never;
             header?: never;
