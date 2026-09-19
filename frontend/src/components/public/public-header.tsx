@@ -1,5 +1,6 @@
 "use client";
 
+import { PhoneIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -39,25 +40,29 @@ export function PublicHeader() {
           <NavLink href="/" testId="public-home-link">
             Home
           </NavLink>
-          <NavLink href="/ask" testId="public-ask-link">
-            Ask
+          <NavLink href="/accountability" testId="public-accountability-link">
+            Accountability
+          </NavLink>
+          <NavLink href="/dashboard" testId="public-dashboard-link">
+            Dashboard
           </NavLink>
           <NavLink href="/report" testId="public-report-link">
             <span className="lg:hidden">Report</span>
             <span className="hidden lg:inline">Report an issue</span>
           </NavLink>
-          <NavLink href="/dashboard" testId="public-dashboard-link">
-            Dashboard
-          </NavLink>
-          <NavLink href="/accountability" testId="public-accountability-link">
-            Accountability
+          <NavLink href="/ask" testId="public-ask-link">
+            Ask
           </NavLink>
           <NavLink href="/petitions" testId="public-petitions-link">
             Petitions
           </NavLink>
-          <NavLink href="/contacts" testId="public-contacts-link">
+          {/* Contacts is the emergency route: the number to call when nothing on this site is fast enough. It is
+              marked out because in that moment nobody scans a row of equal-weight words. */}
+          <Link href="/contacts" data-touch-target data-testid="public-contacts-link"
+            className="ms-1 inline-flex items-center gap-1.5 rounded-lg border border-brick/35 bg-brick-tint px-3 py-2 text-[13.5px] font-medium whitespace-nowrap text-brick transition-colors hover:border-brick">
+            <PhoneIcon aria-hidden className="size-4" />
             Contacts
-          </NavLink>
+          </Link>
           <NavLink href="/login" testId="public-portal-link">
             <span className="lg:hidden">Portal</span>
             <span className="hidden lg:inline">Institution portal</span>
