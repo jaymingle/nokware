@@ -180,6 +180,7 @@ def test_an_sms_answer_is_never_cut_and_never_calls_itself_the_first_part() -> N
         for parts in (for_sms(answer, SITE), for_sms(answer, SITE, lambda: _long())):  # type: ignore[arg-type]
             text = " ".join(parts)
             assert "..." not in text and "First part" not in text
+            assert "*" not in text and " - " not in text  # no markdown reaches a phone, on any path
             assert all(pages(part) == 1 for part in parts)  # a part is a page: none of them costs two credits
             assert sum(pages(part) for part in parts) <= channel_answers.SMS_PARTS
     assert "don't have information" in for_sms(nothing, SITE)[0] and len(for_sms(nothing, SITE)) == 1

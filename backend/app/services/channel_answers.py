@@ -227,9 +227,10 @@ def for_sms(answer: RagAnswer, site: str, shorter: Reask | None = None) -> list[
 def _as_much_as_fits(answer: RagAnswer, site: str) -> list[str]:
     """Whole sentences as far as they go, and the last part says where the rest is. A sentence is kept entire or
     dropped entire, and the citation then names what was kept rather than what was dropped."""
+    # Kept as lines, not run together: a bullet is only recognised, and dropped, at the start of one.
     sentences = _SENTENCE.split(answer["answer"].strip())
     for keep in range(len(sentences) - 1, 0, -1):
-        parts = _sms_parts({**answer, "answer": " ".join(sentences[:keep])}, site, "More at")
+        parts = _sms_parts({**answer, "answer": "\n".join(sentences[:keep])}, site, "More at")
         if parts is not None:
             return parts
     # One sentence wider than the whole ceiling: it goes out complete over a page more, which is cheaper than a
