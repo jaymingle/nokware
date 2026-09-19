@@ -47,6 +47,9 @@ class Settings(BaseSettings):
     arkesel_sender_id: str = ""
     arkesel_sandbox: bool = True
     sms_daily_limit: int = 50
+    # Answers by SMS one number may have in a day, on top of SMS_DAILY_LIMIT: one resident asking all afternoon must
+    # not use up the day for everyone else. Nothing is counted while SMS_PROVIDER=log, which is what a test pass runs.
+    sms_answer_daily_limit: int = 5
     arkesel_webhook_secret: str = ""
     # BMS has no sandbox: every message is live and charged. The key travels in the request address, so it is
     # redacted from logs and never stored.

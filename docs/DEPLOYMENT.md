@@ -183,6 +183,7 @@ from development:
 | `BMS_API_KEY`, `BMS_SENDER_ID` | secret, `Nokware` | the same (the sender ID is approved on BMS) |
 | `BMS_DELIVERY_POLL_SECONDS` | `120` | `120`: BMS sends no delivery reports, so the API asks it |
 | `SMS_DAILY_LIMIT` | `50` | unchanged unless decided otherwise |
+| `SMS_ANSWER_DAILY_LIMIT` | `5` | unchanged: Ask answers one number may have sent to it in a day, counted only when a real provider takes them |
 | `ARKESEL_USSD_TOKEN` | the development token | **the new token from step 3** |
 | `USSD_SERVICE_CODE` | empty | empty until Arkesel confirms the dial code (e.g. `*920*123#`); then petition pages offer USSD |
 | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` | secrets | unchanged |

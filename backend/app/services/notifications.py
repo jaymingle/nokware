@@ -191,6 +191,18 @@ def provider_for(channel: NotificationChannel) -> Provider | None:
     raise NotImplementedError(f"{channel.value} provider {configured!r} is not wired in yet")
 
 
+def sms_is_charged() -> bool:
+    """Whether an SMS is handed to a provider that delivers and bills for it, rather than only logged or accepted by
+    a sandbox.
+
+    A per-number cap exists to protect credits. Under SMS_PROVIDER=log, and in Arkesel's sandbox, there are none to
+    protect — the day's page budget already declines to count there — and counting anyway left a resident with
+    nothing sent and nothing left to ask for.
+    """
+    provider = provider_for(NotificationChannel.SMS)
+    return provider is not None and provider.delivers
+
+
 def check_providers() -> None:
     """A provider that is named but can't be built stops the API at startup, not the first message.
 
