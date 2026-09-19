@@ -198,3 +198,18 @@ def test_the_same_thing_in_two_years_is_charted_as_peers() -> None:
                budget("B2", "Approved budget · 2026 · Public Works", "GH¢ 20,232,848")]
     chart, _ = chart_for("Compare them as a chart", figures)
     assert chart and chart["figures"] == ["B1", "B2"] and "left out" not in (chart["note"] or "")
+
+
+def test_a_department_is_found_by_the_words_that_name_it_not_by_spelling() -> None:
+    """The model asks for "the Department of Education" where the budget says "Education", and for "Health" where
+    it says "Metro. Health Directorate". A plain substring found neither, and the answer reported a gap that
+    wasn't there while offering the Assembly's whole budget in its place."""
+    rows = [{"year": 2026, "department": "Education", "program": "", "fund_source": "GOG", "amount": 100.0,
+             "economic": "", "sector": "", "sub_program": "", "page": 1},
+            {"year": 2026, "department": "Metro. Health Directorate", "program": "", "fund_source": "GOG",
+             "amount": 50.0, "economic": "", "sector": "", "sub_program": "", "page": 1}]
+    named = lambda wanted: [r["department"] for r in rows if budget_figures._names(wanted, str(r["department"]))]
+    assert named("Department of Education") == ["Education"]
+    assert named("education") == ["Education"]
+    assert named("Health") == ["Metro. Health Directorate"]
+    assert named("Sanitation") == []  # a department that truly isn't there is still a gap

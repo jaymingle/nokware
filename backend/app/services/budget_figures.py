@@ -9,6 +9,7 @@ These are approved amounts: released and actual spending aren't in the documents
 """
 
 import json
+import re
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
@@ -80,12 +81,31 @@ def cedis(amount: float) -> str:
     return f"GH¢ {amount:,.0f}"
 
 
+# Words that name no department on their own. The model asks for "the Department of Education" where the budget
+# says "Education", and for "Health" where it says "Metro. Health Directorate": a plain substring match found
+# neither, and the answer then reported a gap that wasn't there.
+_GENERIC = frozenset({"the", "of", "and", "department", "departments", "metro", "unit", "units", "directorate",
+                      "office", "ama", "assembly", "accra", "metropolitan", "for"})
+
+
+def _significant(name: str) -> set[str]:
+    return {word for word in re.findall(r"[a-z]+", name.lower()) if word not in _GENERIC}
+
+
+def _names(wanted: str, held: str) -> bool:
+    """Every meaningful word of what was asked for is in the name the budget uses."""
+    asked, has = _significant(wanted), _significant(held)
+    return bool(asked) and asked <= has
+
+
 def _matching(call: BudgetFigures) -> list[dict[str, Any]]:
     found = [row for row in rows() if int(row["year"]) == call.year]
-    for field, value in (("department", call.department), ("program", call.program), ("fund_source", call.fund_source)):
+    for field, value in (("department", call.department), ("program", call.program)):
         if value:
-            wanted = value.strip().lower()
-            found = [row for row in found if wanted in str(row[field]).lower()]
+            found = [row for row in found if _names(value, str(row[field]))]
+    if call.fund_source:  # a code or a short tag, matched as written
+        wanted = call.fund_source.strip().lower()
+        found = [row for row in found if wanted in str(row["fund_source"]).lower()]
     return found
 
 

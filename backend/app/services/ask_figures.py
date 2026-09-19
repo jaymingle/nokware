@@ -7,7 +7,7 @@ live report data and which come from a document.
 
 import logging
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from typing import Any, Literal, TypeVar
 
@@ -265,9 +265,14 @@ def _nearest_held(missing: list[str]) -> list[BudgetFigure]:
     """
     if not missing:
         return []
-    wanted = [BudgetFigures(year=year) for year in budget_figures.years()]
-    return [found for found in (budget_figures.figure(call, f"{budget_figures.LABEL_PREFIX}{i}")
-                                for i, call in enumerate(wanted, 1)) if found]
+    offered = []
+    for index, year in enumerate(budget_figures.years(), 1):
+        found = budget_figures.figure(BudgetFigures(year=year), f"{budget_figures.LABEL_PREFIX}{index}")
+        if found:
+            # Named for what it is. Offered beside a gap, a bare "Approved budget · 2026" can be read as the
+            # department or the year that was asked for; this one can only be read as the Assembly's whole budget.
+            offered.append(replace(found, description=f"{found.description} · the Assembly's whole budget"))
+    return offered
 
 
 def _budget_figures(wanted_figures: list[BudgetFigures]) -> tuple[list[BudgetFigure], list[str]]:
