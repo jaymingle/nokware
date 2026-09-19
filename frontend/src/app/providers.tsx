@@ -2,17 +2,9 @@
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
-import { ApiError } from "@/lib/api/errors";
+import { shouldRetry } from "@/lib/api/errors";
 
 import type { ReactNode } from "react";
-
-const MAX_RETRIES = 2;
-
-function shouldRetry(failureCount: number, error: Error): boolean {
-  // Retry only when the service may recover (unreachable or a 5xx), never a refusal.
-  const transient = !(error instanceof ApiError) || error.status === 0 || error.status >= 500;
-  return transient && failureCount < MAX_RETRIES;
-}
 
 let browserQueryClient: QueryClient | undefined;
 

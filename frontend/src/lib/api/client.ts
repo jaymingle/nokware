@@ -22,7 +22,8 @@ async function send(path: string, init: RequestInit): Promise<Response> {
   try {
     return await fetch(`${env.apiUrl}${path}`, withTimeout({ ...init, headers }));
   } catch (error) {
-    throw new ApiError(0, timedOut(error) ? timedOutMessage(init) : UNREACHABLE);
+    const late = timedOut(error);
+    throw new ApiError(0, late ? timedOutMessage(init) : UNREACHABLE, late);
   }
 }
 

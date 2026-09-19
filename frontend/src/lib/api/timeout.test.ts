@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { ApiError, UNREACHABLE, shouldRetry } from "@/lib/api/errors";
 import { REPLY_MS, TIMED_OUT, TIMED_OUT_SENDING, UPLOAD_MS, timedOut, timedOutMessage, timeoutFor, withTimeout } from "@/lib/api/timeout";
 
 describe("a request that runs out of time", () => {
@@ -27,5 +28,16 @@ describe("a request that runs out of time", () => {
     expect(init.signal?.aborted).toBe(false);
     own.abort();
     expect(init.signal?.aborted).toBe(true);
+  });
+});
+
+describe("a request that ran out of time", () => {
+  it("is not tried again: the reader has already waited the whole deadline once", () => {
+    const late = new ApiError(0, TIMED_OUT, true);
+    const unreachable = new ApiError(0, UNREACHABLE);
+    expect(shouldRetry(0, late)).toBe(false);
+    expect(shouldRetry(0, unreachable)).toBe(true);
+    expect(shouldRetry(0, new ApiError(503, "The Ledger can't be searched right now."))).toBe(true);
+    expect(shouldRetry(0, new ApiError(404, "Not found"))).toBe(false);
   });
 });

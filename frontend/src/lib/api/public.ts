@@ -27,7 +27,8 @@ async function publicFetch(path: string, init: RequestInit): Promise<Response> {
   try {
     response = await fetch(`${env.apiUrl}${path}`, withTimeout(init));
   } catch (error) {
-    throw new ApiError(0, timedOut(error) ? timedOutMessage(init) : UNREACHABLE);
+    const late = timedOut(error);
+    throw new ApiError(0, late ? timedOutMessage(init) : UNREACHABLE, late);
   }
   if (!response.ok) throw new ApiError(response.status, await errorMessage(response));
   return response;
