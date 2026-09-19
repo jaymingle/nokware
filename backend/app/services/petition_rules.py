@@ -40,7 +40,7 @@ REPLY_MAX = 1000  # the petitioner's reply to the response the MCE published
 REMOVAL_NOTE_MAX = 500  # what a contributor writes for the record when they remove a petition
 REPORT_NOTE_MAX = 300  # what a reader may add when they report one
 DOCUMENTS_MAX = 3
-IMAGES_MAX = 3
+IMAGES_MAX = 4  # a petition shows more of a place than a report does: four sides of one problem
 CODE_DIGITS = 6  # digits only, so a petition can be typed on a USSD keypad or read aloud
 FIRST_VERSION = 1
 

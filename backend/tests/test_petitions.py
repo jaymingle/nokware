@@ -97,7 +97,7 @@ def test_a_draft_is_tidied_and_checked() -> None:
     tidy = clean_draft(Draft("  Desilt   the Odaw drain before the rains ", DRAFT.body, "drainage", Scope.METRO, "kaneshie", " ", ("d1", "d1")))
     assert (tidy.title, tidy.ward, tidy.issue, tidy.documents) == ("Desilt the Odaw drain before the rains", None, None, ("d1",))
     for bad in ({"title": "Fix it"}, {"body": "Too short."}, {"ward": None}, {"ward": "nowhere"},
-                {"documents": ("a", "b", "c", "d")}, {"images": ("a", "b", "c", "d")}):
+                {"documents": ("a", "b", "c", "d")}, {"images": ("a", "b", "c", "d", "e")}):
         with pytest.raises(InvalidPetition):
             clean_draft(Draft(**{**DRAFT.__dict__, **bad}))
 
@@ -623,6 +623,15 @@ def test_the_tabs_are_told_how_many_petitions_stand_in_each_group(monkeypatch: p
               {"status": "closed"}, {"status": "removed"}]
     monkeypatch.setattr(petitions, "every_record", lambda collection, queries: stored)
     assert petitions.public_counts() == {"open": 2, "awaiting": 1, "responded": 1, "closed": 1, "removed": 1}
+
+
+def test_a_petition_carries_four_photos_and_refuses_a_fifth(stored: Fake) -> None:
+    """The cap is one number: the options the form reads, the request's own limit and this check are all IMAGES_MAX."""
+    four = Draft(**{**DRAFT.__dict__, "images": tuple(f"petitions/a/{n:02d}.jpg" for n in range(1, 5))})
+    assert petitions.submit(proof_of(PHONE), four, False, None, NOW)["imageIds"] == list(four.images)
+    five = Draft(**{**four.__dict__, "images": (*four.images, "petitions/a/05.jpg")})
+    with pytest.raises(InvalidPetition, match="at most 4 images"):
+        petitions.submit(proof_of("+233241234598"), five, False, None, NOW)
 
 
 def test_taking_a_photo_off_is_an_edit_and_the_petition_and_its_signatures_stand(stored: Fake) -> None:
