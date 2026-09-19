@@ -35,7 +35,7 @@ from app.services import (
     report_intake,
     report_store,
 )
-from app.services.channel_answers import for_sms
+from app.services.channel_answers import for_sms, screens
 from app.services.channel_contacts import ambulance_calls, call_lines, desk_line, emergency_call, first_calls, numbers_sms
 from app.services.channel_messages import send_sms
 from app.services.channel_status import status_text
@@ -115,8 +115,13 @@ class Dial:
 
 
 def _screen(text: str) -> str:
+    """A last guard, not a way of fitting text: every screen is built to fit, so cutting one means a screen was
+    composed wrong and a resident is reading half a sentence. It is logged rather than passing quietly."""
     text = plain(text)
-    return text if len(text) <= SCREEN_MAX else text[: SCREEN_MAX - 3].rstrip() + "..."
+    if len(text) <= SCREEN_MAX:
+        return text
+    logger.error("A USSD screen ran past %d characters and was cut: %r", SCREEN_MAX, text[:80])
+    return text[: SCREEN_MAX - 3].rstrip() + "..."
 
 
 def con(text: str) -> Reply:
@@ -156,13 +161,32 @@ def _site() -> str:
     return get_settings().public_site_url.rstrip("/")
 
 
-def answer_by_sms(msisdn: str, question: str) -> None:
+# The lines under an answer screen. The room they take is kept back from every screen, so a screen is never
+# composed to the full width and then squeezed by its own menu.
+MORE_MENU = "\n1 More  0 Back"
+LAST_MENU = "\n1 Send by SMS  0 Menu"
+MENU_COST = max(len(MORE_MENU), len(LAST_MENU))
+ANSWER_FAILED = "Sorry, we couldn't answer your question just now. Please try again later."
+
+
+def answer_screens(question: str) -> list[str]:
+    """The answer, already paged for the screen. The same pipeline the web and WhatsApp use: only the length
+    asked of the model differs, so a question never gets a lighter answer for having been dialled.
+
+    The SMS budget is asked for here too, so what a resident reads on the screen is what arrives if they then
+    ask for it by text, rather than a longer answer they would find cut down when it came."""
+    return screens(answer_question(question, AnswerLength.SMS)["answer"], MENU_COST)
+
+
+def send_answer_by_sms(msisdn: str, question: str) -> None:
+    """The parts go one after another: each is a whole thought, numbered, and the last carries the citation."""
     try:
-        text = for_sms(answer_question(question, AnswerLength.SMS), _site())
+        parts = for_sms(answer_question(question, AnswerLength.SMS), _site())
     except Exception:
         logger.exception("Answering a USSD question for %s failed", masked(msisdn))
-        text = "Nokware: sorry, we couldn't answer your question just now. Please try again later."
-    send_sms(msisdn, text)
+        parts = [f"Nokware: {ANSWER_FAILED}"]
+    for part in parts:
+        send_sms(msisdn, part)
 
 
 def _menu(dial: Dial, state: State, later: Later) -> tuple[Reply, State | None]:
@@ -170,7 +194,7 @@ def _menu(dial: Dial, state: State, later: Later) -> tuple[Reply, State | None]:
     if choice == "1":  # nothing is filed here, and the screen says so before the numbers
         return end(EMERGENCY_NUMBERS), None
     if choice == "2":
-        return con("Type your question. The answer comes by SMS."), {"step": "ask"}
+        return con("Type your question. You'll read the answer here, free."), {"step": "ask"}
     if choice == "3":
         return con("Describe the problem and where it is (a street or a landmark):"), {"step": "describe"}
     if choice == "4":
@@ -185,13 +209,52 @@ def _menu(dial: Dial, state: State, later: Later) -> tuple[Reply, State | None]:
 
 
 def _ask(dial: Dial, state: State, later: Later) -> tuple[Reply, State | None]:
+    """The answer is read on the screen, which costs the resident nothing. Only sending it by SMS is capped, and
+    that is asked for at the end of it."""
     question = dial.text.strip()
     if len(question) < QUESTION_MIN:
         return con("Type your question in a few words:"), state
+    try:
+        pages = answer_screens(question)
+    except Exception:
+        logger.exception("Answering a USSD question for %s failed", masked(dial.msisdn))
+        return end(ANSWER_FAILED), None
+    if not pages:
+        return end(ANSWER_FAILED), None
+    return _answer_page({"question": question, "pages": pages}, 0)
+
+
+def _answer_page(state: State, page: int) -> tuple[Reply, State]:
+    pages = state["pages"]
+    last = page == len(pages) - 1
+    return con(pages[page] + (LAST_MENU if last else MORE_MENU)), {**state, "step": "answer", "page": page}
+
+
+def _answer(dial: Dial, state: State, later: Later) -> tuple[Reply, State | None]:
+    page = int(state["page"])
+    choice, last = dial.text.strip(), page == len(state["pages"]) - 1
+    if choice == "1" and not last:
+        return _answer_page(state, page + 1)
+    if choice == "1":
+        return _send_answer(dial, state, later)
+    if choice == "0" and page > 0:
+        return _answer_page(state, page - 1)
+    if choice == "0":
+        return con(MENU), {"step": "menu"}
+    return _answer_page(state, page)
+
+
+def _send_answer(dial: Dial, state: State, later: Later) -> tuple[Reply, State | None]:
+    """The cap is the Assembly's SMS credit, not the resident's right to the answer: refused, they keep reading."""
     if not channel_limits.SMS_ANSWERS.allow(dial.msisdn, utc_now().timestamp()):
-        return end(f"You've had today's answers by SMS. Ask again tomorrow, or at {_site()}/ask"), None
-    later(answer_by_sms, dial.msisdn, question)
+        return _refused_sms(state)
+    later(send_answer_by_sms, dial.msisdn, state["question"])
     return end("Thank you. Your answer is on its way by SMS."), None
+
+
+def _refused_sms(state: State) -> tuple[Reply, State]:
+    return con("You've had today's answers by SMS. The answer is still on this screen, free to read."
+               + MORE_MENU.replace("1 More", "1 Read it again")), {**state, "step": "answer", "page": 0}
 
 
 def _read(description: str) -> Classification:
@@ -520,7 +583,7 @@ def _sign_name(dial: Dial, state: State, later: Later) -> tuple[Reply, State | N
 
 
 STEPS: dict[str, Callable[[Dial, State, Later], tuple[Reply, State | None]]] = {
-    "menu": _menu, "ask": _ask, "describe": _describe, "medical": _medical, "help": _help, "sub_metro": _sub_metro,
+    "menu": _menu, "ask": _ask, "answer": _answer, "describe": _describe, "medical": _medical, "help": _help, "sub_metro": _sub_metro,
     "ward": _ward, "safety_sub_metro": _safety_sub_metro, "confirm": _confirm, "updates": _updates, "call": _call,
     "numbers_sms": _numbers_sms, "check": _check, "code": _code, "petition": _petition, "sign_code": _sign_code,
     "sign_choice": _sign_choice, "sign_name": _sign_name,

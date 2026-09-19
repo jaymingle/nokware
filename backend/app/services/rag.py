@@ -120,9 +120,12 @@ _LENGTH_RULES = {
         "\n\nThis answer goes to a phone chat: keep it under 1,000 characters. Give the most important points "
         "only, as short paragraphs or a few bullets, and still cite each one."
     ),
+    # The composer pages this into three SMS parts and spends the rest of them on the citation and the web address,
+    # so what is asked for here is what is left. An answer written past it is asked for again, never cut.
     AnswerLength.SMS: (
-        "\n\nThis answer goes by SMS: at most 240 characters of plain text, one or two sentences with the single "
-        "most important point, cited. No lists and no formatting."
+        "\n\nThis answer goes by SMS: at most 300 characters of plain text. Write a complete answer in two or "
+        "three short sentences — the figures first, then what they are cited from. Never stop mid-thought, and "
+        "never say this is only part of the answer. No lists and no formatting."
     ),
 }
 

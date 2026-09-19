@@ -14,7 +14,16 @@ from app.contacts import CONTACTS_FILE, EMERGENCY_TOPICS
 from app.main import RedactChannelSecrets, app
 from app.routes import channels
 from app.safety_steps import STEPS
-from app.services import channel_intent, channel_limits, channel_sessions, redis_store, report_followups, report_intake, ussd
+from app.services import (
+    channel_answers,
+    channel_intent,
+    channel_limits,
+    channel_sessions,
+    redis_store,
+    report_followups,
+    report_intake,
+    ussd,
+)
 from app.services.channel_contacts import numbers_sms
 from app.services.citizen_reports import IntakeChannel, NotificationEvent
 from app.services.report_contacts import ContactChoice, normalise_phone
@@ -60,27 +69,59 @@ def test_every_fixed_screen_fits_one_plain_screen() -> None:
         assert len(screen) <= ussd.SCREEN_MAX and is_gsm7(screen), screen
 
 
-def test_a_question_ends_the_session_and_its_answer_follows_by_sms(session: list[tuple[Any, ...]]) -> None:
-    reply = keys(session, "2", "What does AMA charge for a market stall?")
-    assert reply == ussd.Reply("Thank you. Your answer is on its way by SMS.", False)
-    assert session == [(ussd.answer_by_sms, PHONE, "What does AMA charge for a market stall?")]
+LONG_ANSWER = ("The approved budget for 2026 is GH1 million. Waste management takes GH200,000 of it. "
+               "Drains take GH50,000. Street lighting takes GH50,000 more. The rest is staff and offices. "
+               "These are approved amounts, not money released or spent, and they come from the 2026 budget.")
 
 
-def test_answers_by_sms_are_limited_per_number(session: list[tuple[Any, ...]], monkeypatch: pytest.MonkeyPatch) -> None:
+def _answering(monkeypatch: pytest.MonkeyPatch, text: str = LONG_ANSWER) -> None:
+    monkeypatch.setattr(ussd, "answer_question", lambda question, length: {"answer": text, "status": "answered"})
+
+
+def test_an_answer_is_read_on_the_screen_and_nothing_is_texted_unless_it_is_asked_for(
+        session: list[tuple[Any, ...]], monkeypatch: pytest.MonkeyPatch) -> None:
+    """Reading it costs the resident nothing, so nothing is sent and nothing is capped until they ask for it."""
+    _answering(monkeypatch)
+    reply = keys(session, "2", "What is AMA's approved budget for 2026?")
+    assert reply.more and reply.message.endswith(ussd.MORE_MENU) and session == []
+
+
+def test_paging_reaches_the_end_of_the_answer_and_loses_none_of_it(
+        session: list[tuple[Any, ...]], monkeypatch: pytest.MonkeyPatch) -> None:
+    """The screens a resident reads, joined, are the answer: none is cut and nothing falls between them."""
+    _answering(monkeypatch)
+    pages, reply = [], keys(session, "2", "What is AMA's approved budget for 2026?")
+    while True:
+        assert len(reply.message) <= ussd.SCREEN_MAX and "..." not in reply.message
+        last = reply.message.endswith(ussd.LAST_MENU)
+        pages.append(reply.message.removesuffix(ussd.LAST_MENU if last else ussd.MORE_MENU))
+        if last:
+            break
+        reply = ussd.respond(Dial("s1", PHONE, "1", False), lambda *args: session.append(args))
+    assert len(pages) > 1 and " ".join(pages) == channel_answers.flat_text(LONG_ANSWER)
+
+
+def test_the_cap_falls_on_sending_the_answer_not_on_reading_it(
+        session: list[tuple[Any, ...]], monkeypatch: pytest.MonkeyPatch) -> None:
+    """Refused the text, the resident still has the answer in front of them, and the screen says so."""
+    _answering(monkeypatch, "Short enough for one screen.")
     monkeypatch.setattr(channel_limits, "SMS_ANSWERS", channel_limits.NumberLimit("sms-answers", 1, 86400))
-    keys(session, "2", "What are the market fees?", session_id="a")
-    assert "today's answers" in keys(session, "2", "And the toll fees?", session_id="b").message
+    assert keys(session, "2", "What are the market fees?", "1", session_id="a").message.startswith("Thank you")
+    refused = keys(session, "2", "And the toll fees?", "1", session_id="b")
+    assert "still on this screen, free to read" in refused.message and refused.more
     assert len(session) == 1
 
 
-def test_the_answer_sms_is_the_sms_layout_and_a_failure_still_gets_a_reply(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_the_answer_goes_by_sms_in_parts_and_a_failure_still_gets_a_reply(monkeypatch: pytest.MonkeyPatch) -> None:
     sent: list[tuple[str, str]] = []
     monkeypatch.setattr(ussd, "send_sms", lambda to, text: sent.append((to, text)) or True)
-    monkeypatch.setattr(ussd, "answer_question", lambda q, length: {"status": "no_information"})
-    ussd.answer_by_sms(PHONE, "Where is the moon?")
+    monkeypatch.setattr(ussd, "for_sms", lambda answer, site: ["Nokware: first. (1/2)", "second. (2/2)"])
+    monkeypatch.setattr(ussd, "answer_question", lambda q, length: {"status": "answered", "answer": "x"})
+    ussd.send_answer_by_sms(PHONE, "What is the budget?")
+    assert [text for _, text in sent] == ["Nokware: first. (1/2)", "second. (2/2)"]
     monkeypatch.setattr(ussd, "answer_question", lambda q, length: 1 / 0)
-    ussd.answer_by_sms(PHONE, "Where is the moon?")
-    assert "don't have information" in sent[0][1] and "sorry" in sent[1][1] and {to for to, _ in sent} == {PHONE}
+    ussd.send_answer_by_sms(PHONE, "Where is the moon?")
+    assert ussd.ANSWER_FAILED in sent[-1][1] and {to for to, _ in sent} == {PHONE}
 
 
 def _classified(topic: str) -> Classification:

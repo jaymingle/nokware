@@ -7,7 +7,7 @@ import fakeredis
 import pytest
 import redis
 
-from app.services import channel_answers, channel_intent, channel_limits, channel_sessions, rag, redis_store, sms
+from app.services import channel_answers, channel_intent, channel_limits, channel_sessions, rag, redis_store, sms, ussd
 from app.services.channel_answers import LIVE_DATA_NOTE, for_chat, for_sms
 from app.services.channel_intent import Intent, find_reference, read_message
 from app.services.channel_status import status_text
@@ -107,7 +107,8 @@ def test_the_model_reads_the_rest_and_a_failure_means_ask(monkeypatch: pytest.Mo
 def test_only_the_length_rule_changes_between_channels() -> None:
     prepared = Prepared("What are the fees?", [], {}, [])
     web, chat, text = (rag._prompt_input(prepared, length) for length in AnswerLength)
-    assert web["length"] == "" and "1,000 characters" in chat["length"] and "240 characters" in text["length"]
+    assert web["length"] == "" and "1,000 characters" in chat["length"] and "300 characters" in text["length"]
+    assert "complete answer" in text["length"] and "only part" in text["length"]
     assert {k: v for k, v in web.items() if k != "length"} == {k: v for k, v in text.items() if k != "length"}
 
 
@@ -136,26 +137,95 @@ def test_a_chat_answer_numbers_its_sources_and_explains_live_data() -> None:
     assert channel_answers._describe(ANSWER["sources"][3], 90) == "Fee-Fixing Resolution (Central Administration, 2026)"
 
 
-def test_an_sms_answer_is_plain_two_pages_at_most_with_one_source() -> None:
-    long_answer = {**ANSWER, "answer": ANSWER["answer"] + " Also a sentence that goes on and on. " * 20}
-    for answer in (ANSWER, long_answer):
-        text = for_sms(answer, SITE)  # type: ignore[arg-type]
-        assert is_gsm7(text) and pages(text) <= 2 and text.startswith("Nokware: ")
-        assert "Source: Accra Climate Action Plan (Central Administration, 2026)." in text
-        assert "[" not in text and "*" not in text and " ." not in text
+BUDGET_FIGURE = {"label": "B1", "cited": True, "description": "Waste budget", "value": "GH¢ 20,270,110", "rows": [],
+                 "counted_at": None, "source": "documents", "document_title": "Composite Budget 2026", "year": 2026}
+LONG = " Also a sentence that goes on and on about the collection rounds. " * 8
 
 
-def test_an_answer_too_long_for_two_pages_says_it_is_only_the_first_part() -> None:
-    """Cut mid-thought, the reader can't tell a short answer from a truncated one, and doesn't know to look further."""
-    long_answer = {**ANSWER, "answer": ANSWER["answer"] + " Also a sentence that goes on and on. " * 20}
-    text = for_sms(long_answer, SITE)  # type: ignore[arg-type]
-    assert text.endswith("First part only. All of it: nokware.example.org/ask") and pages(text) <= 2
-    assert "First part" not in for_sms(ANSWER, SITE)  # type: ignore[arg-type]
+def _long() -> Any:
+    return {**ANSWER, "answer": ANSWER["answer"] + LONG}
+
+
+def _body(part: str) -> str:
+    """A part without its "(1/3)"."""
+    return part.rsplit(" (", 1)[0] if part.endswith(")") else part
+
+
+def test_an_sms_answer_is_plain_numbered_parts_no_wider_than_a_page() -> None:
+    parts = for_sms(ANSWER, SITE)  # type: ignore[arg-type]
+    assert [part[-6:] for part in parts] == [f" ({n}/{len(parts)})" for n in range(1, len(parts) + 1)]
+    assert all(is_gsm7(part) and pages(part) == 1 for part in parts)
+    assert sum(pages(part) for part in parts) <= channel_answers.SMS_PARTS
+    joined = " ".join(_body(part) for part in parts)
+    assert joined.startswith(f"Nokware: {channel_answers.flat_text(ANSWER['answer'])}")  # nothing of it is lost
+    assert "[" not in joined and "*" not in joined and " ." not in joined
+    assert "Also at nokware.example.org/ask" in parts[-1]
+
+
+def test_sms_parts_break_where_a_sentence_ends_and_never_mid_word() -> None:
+    parts = for_sms(_long(), SITE, shorter=lambda: ANSWER)  # type: ignore[arg-type]
+    whole = f"Nokware: {channel_answers.flat_text(ANSWER['answer'])}"
+    assert len(parts) > 1 and all(_body(part).endswith(".") for part in parts[:-1])
+    assert " ".join(_body(part) for part in parts).startswith(whole)  # every word, in order, none broken
+    assert _body(parts[0]) == whole[: len(_body(parts[0]))]  # the first break is where its last sentence ends
+
+
+def test_an_sms_answer_is_never_cut_and_never_calls_itself_the_first_part() -> None:
+    """A reader who can't tell a short answer from a cut one doesn't know whether to go looking for the rest."""
+    nothing: Any = {**ANSWER, "status": "no_information"}
+    for answer in (ANSWER, _long(), nothing):
+        for parts in (for_sms(answer, SITE), for_sms(answer, SITE, lambda: _long())):  # type: ignore[arg-type]
+            text = " ".join(parts)
+            assert "..." not in text and "First part" not in text
+            assert sum(pages(part) for part in parts) <= channel_answers.SMS_PARTS
+    assert "don't have information" in for_sms(nothing, SITE)[0] and len(for_sms(nothing, SITE)) == 1
     refused = for_sms({**ANSWER, "answer": "Nokware doesn't publish figures on reports about someone's safety.",
                        "figures": []}, SITE)  # type: ignore[arg-type]
-    assert refused == "Nokware doesn't publish figures on reports about someone's safety."  # no second "Nokware:"
-    nothing = for_sms({**ANSWER, "status": "no_information"}, SITE)  # type: ignore[arg-type]
-    assert "don't have information" in nothing and pages(nothing) == 1
+    assert refused[0].startswith("Nokware doesn't publish")  # no second "Nokware:"
+
+
+def test_every_document_the_answer_cites_is_named_not_only_the_first() -> None:
+    """One document named as the source of a whole answer tells the resident a figure came from a document it didn't."""
+    last = for_sms(ANSWER, SITE)[-1]  # type: ignore[arg-type]
+    assert "Sources: " in last and "Source: " not in last
+    assert "Accra Climate Action Plan" in last and ("MEDIUM TERM" in last or "and 1 more" in last)
+    one: Any = {**ANSWER, "answer": "A stall costs GH¢30 a month [S2].", "figures": []}
+    assert "Source: Accra Climate Action Plan (Central Administration, 2026)." in for_sms(one, SITE)[-1]
+
+
+def test_a_budget_figure_names_the_document_it_was_read_from_and_costs_one_alphabet() -> None:
+    both: Any = {**ANSWER, "figures": [BUDGET_FIGURE],
+                 "answer": "AMA budgeted GH¢ 20,270,110 for waste in 2026 [B1]. It plans door-to-door collection [S2]."}
+    parts = for_sms(both, SITE)
+    assert "GHS 20,270,110" in parts[0] and all(is_gsm7(part) for part in parts)  # a cedi sign would treble the cost
+    assert "Composite Budget 2026" in parts[-1] and "Accra Climate Action Plan" in parts[-1]
+
+
+def test_an_answer_too_long_is_asked_for_again_shorter_once_and_only_once(caplog: pytest.LogCaptureFixture) -> None:
+    asked: list[str] = []
+
+    def shorter() -> Any:
+        asked.append("asked")
+        return {**ANSWER, "answer": "Fewer than 5 waste reports are open [R1]."}
+
+    parts = for_sms(_long(), SITE, shorter)
+    assert asked == ["asked"] and "Fewer than 5 waste reports are open." in parts[0]
+    for_sms(ANSWER, SITE, shorter)  # type: ignore[arg-type]
+    assert asked == ["asked"]  # an answer that fits is never re-asked
+    with caplog.at_level("WARNING"):
+        stubborn = for_sms(_long(), SITE, lambda: _long())
+    assert asked == ["asked"] and "shorter" in caplog.text
+    assert stubborn[-1].endswith(f"More at nokware.example.org/ask ({len(stubborn)}/{len(stubborn)})")
+    assert all(_body(part).endswith(".") for part in stubborn[:-1])  # only whole sentences went out
+
+
+def test_ussd_screens_page_the_answer_and_leave_the_menu_its_room() -> None:
+    menu = "\n1 More\n0 Back"
+    screens = channel_answers.screens(_long()["answer"], len(menu))
+    assert len(screens) > 1 and all(len(screen) + len(menu) <= ussd.SCREEN_MAX and is_gsm7(screen) for screen in screens)
+    assert all(screen.endswith((".", "!", "?", ",", ";", ":")) for screen in screens)
+    assert " ".join(screens) == channel_answers.flat_text(_long()["answer"])  # the whole answer, and only it
+    assert channel_answers.SCREEN_MAX == ussd.SCREEN_MAX
 
 
 CIVIC = {"reference": "UACQ-J75K", "private": False, "status": "resolved", "topic": "Street lighting", "ward": "Kinka",
