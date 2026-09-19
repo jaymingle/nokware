@@ -106,7 +106,7 @@ export function ResponsivenessPage() {
         Evidence about the Assembly&apos;s own behaviour: how quickly each department starts and resolves what residents report, and how it
         handles the documents contributors send it.
       </PageIntro>
-      <OtherView href="/accountability/documents" title="What the Assembly publishes" testId="responsiveness-to-record">
+      <OtherView href="/accountability" title="What the Assembly publishes" testId="responsiveness-to-record">
         The same Assembly measured by the documents it is required to publish.
       </OtherView>
       {figures.isPending ? <LoadingPanel label="Counting…" /> : null}

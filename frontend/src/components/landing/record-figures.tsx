@@ -12,7 +12,7 @@ function figures(documents?: number, departments?: number, missing?: number, due
     found.push({
       value: documents.toLocaleString(),
       label: departments ? `documents held, from ${departments} departments` : "documents held",
-      href: "/accountability/documents",
+      href: "/accountability",
       testId: "landing-figure-documents",
     });
   }
@@ -21,7 +21,7 @@ function figures(documents?: number, departments?: number, missing?: number, due
       value: missing.toLocaleString(),
       // "we would expect", as the record itself says it: the list of required documents is Nokware's own.
       label: `of the ${due} documents we would expect are not there`,
-      href: "/accountability/documents",
+      href: "/accountability",
       testId: "landing-figure-missing",
     });
   }
@@ -57,7 +57,7 @@ export function RecordFigures() {
       </ul>
       <p className="border-t pt-3 text-[12.5px] text-ink-soft">
         Counted from the Ledger against what the Assembly is required to publish.{" "}
-        <Link href="/accountability/documents" className="text-teal underline underline-offset-2" data-testid="landing-figures-record">
+        <Link href="/accountability" className="text-teal underline underline-offset-2" data-testid="landing-figures-record">
           See the record
         </Link>
       </p>
