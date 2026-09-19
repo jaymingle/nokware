@@ -185,8 +185,7 @@ for after the deadline:
   160-character limit.
 - **`services/report_followups.py`** handles a resident's actions on a case and
   the scheduled purge of contact numbers; those are two jobs.
-- **The frontend repeats rules the API owns:** petition durations (72 hours, 30
-  and 90 days) and form limits are written into components, though the API returns
+- **The frontend repeats rules the API owns:** petition durations (30 and 90 days) and form limits are written into components, though the API returns
   or enforces them; the emergency numbers on the report and emergency pages are
   written in rather than read from the contacts API.
 - **Frontend dialogs.** Seven dialogs rewrite the same open/reset/error/cancel

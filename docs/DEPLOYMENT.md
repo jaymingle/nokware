@@ -57,7 +57,7 @@ Nothing here is secret. Secret values live in Coolify's environment settings
 ## Constraints that must hold
 
 - **The API runs as one instance, with one worker.** The Ledger's deadline job
-  (72-hour clocks), the petition clock (72-hour review, 90-day close, 30-day
+  (72-hour clocks), the petition clock (90-day close, 30-day
   response) and the purge of expired phone numbers run inside the API process,
   and the locks that stop two changes to one record interleaving live in that
   process too. Two instances would run every job twice. In Coolify, never
