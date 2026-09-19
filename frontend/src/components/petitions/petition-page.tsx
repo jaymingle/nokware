@@ -7,6 +7,7 @@ import { useState, type ReactNode } from "react";
 import { PhotoGallery } from "@/components/cases/photo-gallery";
 import { ErrorPanel, LoadingPanel } from "@/components/documents/panels";
 import { PageShell } from "@/components/page-shell";
+import { DepartmentNotes } from "@/components/petitions/department-notes";
 import { DocumentLine, LedgerMatches } from "@/components/petitions/ledger-matches";
 import { MceResponse } from "@/components/petitions/mce-response";
 import { Progress } from "@/components/petitions/petition-card";
@@ -169,6 +170,7 @@ function Petition({ petition }: { petition: PetitionDetail }) {
     >
       <Standing petition={petition} now={now} />
       <MceResponse petition={petition} />
+      <DepartmentNotes petition={petition} />
       {signable(petition, now) ? <SignPanel petition={petition} /> : null}
       <Share petition={petition} />
       <Section title="Why" testId="petition-body">
