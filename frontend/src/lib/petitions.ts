@@ -99,7 +99,7 @@ export function closingLine(petition: Pick<PetitionCard, "status" | "closes_at" 
   return `Closed on ${formatDate(petition.closed_at)}.${goal}`;
 }
 
-const TIMELINE: Record<PetitionTimelineEntry["action"], string> = {
+export const TIMELINE_WORDS: Record<PetitionTimelineEntry["action"], string> = {
   published: "Published by the person who started it",
   edited: "Edited",
   republished: "Edited and published again",
@@ -116,7 +116,7 @@ const TIMELINE: Record<PetitionTimelineEntry["action"], string> = {
 };
 
 export function timelineText(entry: PetitionTimelineEntry): string {
-  return entry.reason ? `${TIMELINE[entry.action]}: ${entry.reason}` : TIMELINE[entry.action];
+  return entry.reason ? `${TIMELINE_WORDS[entry.action]}: ${entry.reason}` : TIMELINE_WORDS[entry.action];
 }
 
 // Editing, and being removed. A petition can be mended and published again, so both are ordinary things for a

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { STATUS_LABELS } from "@/lib/petitions";
+import { STATUS_LABELS, TIMELINE_WORDS } from "@/lib/petitions";
 import {
   caseEventTone, caseStatus, disputeStatus, historyTone, ingestionStatus, issueStage, ledgerStatus, petitionEventTone,
   petitionStatus, recordStatus, reportEventTone, reportStatus, submissionTone, unknownStatus, type StatusTone,
@@ -88,9 +88,11 @@ describe("a petition", () => {
   });
 
   it("gives every step of its timeline a tone", () => {
-    const actions: PetitionTimelineEntry["action"][] = ["published", "edited", "republished", "removed",
-      "withdrawn", "closed", "threshold_reached", "responded", "no_response"];
-    for (const action of actions) expect(TONES).toContain(petitionEventTone(action));
+    // Read from the words the page shows, which the type makes exhaustive: a new step can't be given one and not
+    // the other.
+    for (const action of Object.keys(TIMELINE_WORDS) as PetitionTimelineEntry["action"][]) {
+      expect(TONES).toContain(petitionEventTone(action));
+    }
     expect(petitionEventTone("no_response")).toBe("attention");
   });
 });
