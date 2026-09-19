@@ -26,6 +26,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Protocol
 
+from appwrite.exception import AppwriteException
 from appwrite.id import ID
 from appwrite.query import Query
 
@@ -322,6 +323,30 @@ def _send(case_id: str, event: NotificationEvent, channel: NotificationChannel, 
 
 def _sms_can_stand_in(number: str, contact: dict[str, Any]) -> bool:
     return get_settings().whatsapp_provider == "twilio" and number.startswith(f"+{GHANA_CODE}") and not contact.get("phone")
+
+
+def record_reply(case_id: str, event: NotificationEvent, channel: NotificationChannel, body: str,
+                 provider_message_id: str | None) -> None:
+    """A message the conversation itself already sent, written to the outbox as what it is.
+
+    A report filed in a WhatsApp chat gets its confirmation as the reply to that chat, so nothing went through
+    notify() and the outbox held nothing. The sweep reads an empty outbox as a message a resident never got, and
+    sent it again a quarter of an hour later — a duplicate, and a charge, for every filing on that channel.
+    """
+    sent = provider_message_id is not None
+    outcome = ({"status": NotificationStatus.SENT.value, "provider": "twilio", "providerMessageId": provider_message_id,
+                "sentAt": now_iso()} if sent
+               else {"status": NotificationStatus.NOT_SENT.value, "provider": "log"})
+    said = f"{EVENT_NAMES[event]} {CHANNEL_NAMES[channel]}"
+    note = f"{said} sent." if sent else f"{said} recorded, not sent: no provider is configured yet."
+    try:
+        outbox_id = _outbox(case_id, event, channel, Message("reply", body))
+        get_databases().update_document(DATABASE_ID, NOTIFICATIONS_COLLECTION, outbox_id, outcome)
+        case_history.record(case_id, CaseEntry(CaseHistoryAction.NOTIFIED, SYSTEM, note=note, channel=channel.value))
+    except AppwriteException:
+        # The message is already in the resident's hand; the record of it is what failed. Telling them their report
+        # went wrong would be false, and the worst the lost row costs is one duplicate from the sweep.
+        logger.exception("The WhatsApp confirmation for case %s couldn't be written to the outbox", case_id)
 
 
 def notify_channel(case: dict[str, Any], event: NotificationEvent, channel: NotificationChannel) -> None:

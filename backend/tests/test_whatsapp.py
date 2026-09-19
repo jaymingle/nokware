@@ -7,6 +7,7 @@ from urllib.parse import parse_qsl
 import fakeredis
 import httpx
 import pytest
+from appwrite.exception import AppwriteException
 from fastapi.testclient import TestClient
 from PIL import Image
 from twilio.request_validator import RequestValidator
@@ -493,3 +494,33 @@ def test_the_hourly_report_limit_never_turns_away_someone_in_danger(monkeypatch:
     say("0")
     say("1")
     assert len(filed) == 1 and chat[-1].startswith("This has gone to")
+
+
+def test_a_report_filed_in_the_chat_is_recorded_as_told_so_the_sweep_does_not_say_it_twice(
+    monkeypatch: pytest.MonkeyPatch, chat: list[str]
+) -> None:
+    """The reply to the chat IS the "we have it" message. With nothing in the outbox the sweep read that silence as
+    a message the resident never got, and sent a second one a quarter of an hour later — at a charge, every time."""
+    recorded: list[tuple[Any, Any]] = []
+    monkeypatch.setattr(whatsapp_conversation.notifications, "record_reply",
+                        lambda case_id, event, channel, body, message_id: recorded.append((event, channel)))
+    _reads(monkeypatch, "report")
+    _filing(monkeypatch, CIVIC)
+    say("The drain at Kaneshie market is choked")
+    say("1")
+    assert recorded == [(NotificationEvent.SUBMITTED, NotificationChannel.WHATSAPP)]
+
+
+def test_a_confirmation_that_cannot_be_written_down_still_reaches_the_resident(
+    monkeypatch: pytest.MonkeyPatch, chat: list[str]
+) -> None:
+    """The message is already in their hand; only the record of it failed. Saying their report went wrong is false."""
+    def refuse(*args: Any, **kwargs: Any) -> str:
+        raise AppwriteException("the database is away")
+
+    monkeypatch.setattr(notifications, "_outbox", refuse)
+    _reads(monkeypatch, "report")
+    _filing(monkeypatch, CIVIC)
+    say("The drain at Kaneshie market is choked")
+    say("1")
+    assert chat[-1].startswith("Filed. Your reference is")

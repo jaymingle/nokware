@@ -22,6 +22,7 @@ from app.contacts import EMERGENCY_TOPICS
 from app.services import (
     channel_limits,
     channel_sessions,
+    notifications,
     phone_proof,
     report_followups,
     report_intake,
@@ -34,7 +35,7 @@ from app.services.channel_answers import for_chat
 from app.services.channel_contacts import medical_text, numbers_text, steps_text
 from app.services.channel_intent import Intent, read_message
 from app.services.channel_status import status_text
-from app.services.citizen_reports import MAX_PHOTOS, IntakeChannel
+from app.services.citizen_reports import MAX_PHOTOS, IntakeChannel, NotificationChannel, NotificationEvent
 from app.services.ledger_documents import utc_now
 from app.services.rag import AnswerLength, answer_question
 from app.services.redis_store import get_redis, key, subject_key
@@ -221,7 +222,12 @@ def _file(number: str, state: State) -> None:
     if receipt.case["isSensitive"]:
         whatsapp_safety.after_filing(number, receipt)
     else:
-        whatsapp_reply.reply(number, _receipt_text(receipt))
+        text = _receipt_text(receipt)
+        sent = whatsapp_reply.reply(number, text)
+        # This reply IS the "we have it" message, so the outbox says so; otherwise the sweep reads the silence as a
+        # message the resident never got and sends a second one a quarter of an hour later.
+        notifications.record_reply(receipt.case["$id"], NotificationEvent.SUBMITTED, NotificationChannel.WHATSAPP,
+                                   text, sent)
 
 
 def answer(number: str, question: str, heard: Heard | None = None) -> None:

@@ -10,17 +10,18 @@ from app.services.whatsapp import WhatsAppError, split
 logger = logging.getLogger(__name__)
 
 
-def reply(number: str, text: str) -> None:
-    """The citizen just wrote, so the 24-hour window is open."""
+def reply(number: str, text: str) -> str | None:
+    """The citizen just wrote, so the 24-hour window is open. Returns the last message's id where one was sent, so
+    a caller whose reply IS the confirmation of something can record it as sent."""
     provider = provider_for(NotificationChannel.WHATSAPP)
     if provider is None:
         logger.info("WhatsApp reply to %s not sent (no provider is configured): %s", masked(number), text)
-        return
+        return None
     try:
-        for piece in split(text):
-            provider.send(number, piece)
+        return [provider.send(number, piece) for piece in split(text)][-1]
     except WhatsAppError:
         logger.exception("WhatsApp reply to %s failed", masked(number))
+        return None
 
 
 def reply_audio(number: str, media_url: str, about: str) -> str | None:
