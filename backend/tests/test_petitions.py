@@ -623,3 +623,15 @@ def test_the_tabs_are_told_how_many_petitions_stand_in_each_group(monkeypatch: p
               {"status": "closed"}, {"status": "removed"}]
     monkeypatch.setattr(petitions, "every_record", lambda collection, queries: stored)
     assert petitions.public_counts() == {"open": 2, "awaiting": 1, "responded": 1, "closed": 1, "removed": 1}
+
+
+def test_taking_a_photo_off_is_an_edit_and_the_petition_and_its_signatures_stand(stored: Fake) -> None:
+    """A photo comes off the way any word does: a new version. Nothing about it takes the petition down."""
+    with_photos = Draft(**{**DRAFT.__dict__, "images": ("petitions/a/01.jpg", "petitions/a/02.jpg")})
+    petitions.submit(proof_of(PHONE), with_photos, False, None, NOW)
+    petitions.update_petition("p1", {"signatureCount": 12})
+    kept = Draft(**{**with_photos.__dict__, "images": ("petitions/a/01.jpg",)})
+    edited = petitions.edit("482913", proof_of(PHONE), kept, NOW + timedelta(days=1))
+    assert edited["status"] == PetitionStatus.OPEN and edited["signatureCount"] == 12
+    assert edited["imageIds"] == ["petitions/a/01.jpg"] and edited["version"] == 2
+    assert present.versions("p1")[1].changed == ["imageIds"]
