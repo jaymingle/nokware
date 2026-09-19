@@ -21,6 +21,7 @@ from app.services.export_docx import docx
 from app.services.export_pdf import pdf
 from app.services.export_xlsx import xlsx
 from app.services.ledger_documents import utc_now
+from app.services.phrases import Language, phrase
 from app.services.rag import answer_question, stream_answer
 from app.services.voice_audio import AudioRejected
 from app.services.voice_transcribe import TranscriptionFailed, Unusable, listen, understood
@@ -62,7 +63,9 @@ def _spoken(result: dict[str, Any], question: str, in_english: str) -> tuple[Ans
     if not read_aloud.may_speak_answer(question, in_english):
         return answered, False, None  # nothing is said: an answer about someone's safety isn't discussed at all
     if not read_aloud.may_speak_language(language):
-        return answered, False, read_aloud.NOT_IN_THIS_LANGUAGE
+        # In the reader's language where the catalogue has it; Twi has no text at all, so it falls back to English,
+        # which is the same rule every other fixed sentence follows.
+        return answered, False, phrase("speech.not_in_this_language", Language(language))
     return answered, True, None
 
 
