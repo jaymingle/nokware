@@ -2040,8 +2040,8 @@ export interface components {
         };
         /**
          * CommentReportRequest
-         * @description A comment is reported on the same four grounds a petition is, and names no other petition: a duplicate
-         *     here repeats what is on the same page.
+         * @description A comment is reported on the same four stored grounds a petition is, and names no other petition: a
+         *     duplicate here repeats another comment on the same page.
          */
         CommentReportRequest: {
             /**
@@ -2513,7 +2513,8 @@ export interface components {
         };
         /**
          * GroundOption
-         * @description One of the four grounds, in the words every screen shows.
+         * @description One of the four grounds, in the words every screen shows it in. The same id is stored whether it was read
+         *     about a petition or about a comment; only the label differs.
          */
         GroundOption: {
             /**
@@ -3016,6 +3017,8 @@ export interface components {
             comment_max: number;
             /** Grounds */
             grounds: components["schemas"]["GroundOption"][];
+            /** Comment Grounds */
+            comment_grounds: components["schemas"]["GroundOption"][];
             /** Dismissal Reasons */
             dismissal_reasons: components["schemas"]["DismissalOption"][];
             /** Status Words */
@@ -3330,6 +3333,8 @@ export interface components {
             comments: components["schemas"]["ReportedComment"][];
             /** Grounds */
             grounds: components["schemas"]["GroundOption"][];
+            /** Comment Grounds */
+            comment_grounds: components["schemas"]["GroundOption"][];
             /** Dismissal Reasons */
             dismissal_reasons: components["schemas"]["DismissalOption"][];
         };

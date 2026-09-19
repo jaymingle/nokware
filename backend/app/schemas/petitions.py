@@ -35,11 +35,12 @@ class AreaOption(BaseModel):
 
 
 class GroundOption(BaseModel):
-    """One of the four grounds, in the words every screen shows."""
+    """One of the four grounds, in the words every screen shows it in. The same id is stored whether it was read
+    about a petition or about a comment; only the label differs."""
 
     id: Ground
     label: str
-    needs_petition_number: bool  # a duplicate names the petition it duplicates
+    needs_petition_number: bool  # a petition's duplicate names the petition it duplicates; a comment's names none
 
 
 class DismissalOption(BaseModel):
@@ -70,6 +71,7 @@ class PetitionOptions(BaseModel):
     reply_max: int  # the petitioner's reply to the MCE's response
     comment_max: int
     grounds: list[GroundOption]
+    comment_grounds: list[GroundOption]  # the same ids, in the words a comment is judged by
     dismissal_reasons: list[DismissalOption]
     status_words: dict[Status, str]  # one wording for a status, wherever it is shown
     verification: Verification
@@ -333,8 +335,8 @@ class CommentRequest(BaseModel):
 
 
 class CommentReportRequest(BaseModel):
-    """A comment is reported on the same four grounds a petition is, and names no other petition: a duplicate
-    here repeats what is on the same page."""
+    """A comment is reported on the same four stored grounds a petition is, and names no other petition: a
+    duplicate here repeats another comment on the same page."""
 
     ground: Ground
     note: str | None = Field(None, max_length=REPORT_NOTE_MAX + 100)
@@ -348,7 +350,7 @@ class ReportedComment(BaseModel):
     id: str  # the report, for dismissing it
     reported_at: str
     ground: Ground
-    ground_words: str
+    ground_words: str  # in a comment's words: a duplicate repeats another comment
     note: str | None  # what the reader added, as they wrote it
     reports_on_this_comment: int
     code: str  # the petition the comment stands under
@@ -359,6 +361,7 @@ class ReportQueue(BaseModel):
     reports: list[ReportedPetition]
     comments: list[ReportedComment]  # reported comments reach the same contributor
     grounds: list[GroundOption]
+    comment_grounds: list[GroundOption]  # the same ids, in the words a comment is judged by
     dismissal_reasons: list[DismissalOption]
 
 

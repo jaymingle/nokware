@@ -50,7 +50,15 @@ from app.services import (
     petitions,
 )
 from app.services.case_workflow import CaseStatus
-from app.services.petition_grounds import DISMISSALS, GROUNDS, Ground, dismissal_in_plain_words, in_plain_words
+from app.services.petition_grounds import (
+    DISMISSALS,
+    GROUNDS,
+    Ground,
+    Subject,
+    dismissal_in_plain_words,
+    in_plain_words,
+    needs_another_petition,
+)
 from app.services.petition_images import image_links
 from app.services.petition_ledger import describe
 from app.services.petition_removals import Tombstone as RemovalTombstone
@@ -238,9 +246,12 @@ def own(petition: dict[str, Any]) -> OwnPetition:
     )
 
 
-def grounds() -> list[GroundOption]:
-    return [GroundOption(id=ground.value, label=in_plain_words(ground), needs_petition_number=rule.names_another_petition)
-            for ground, rule in GROUNDS.items()]
+def grounds(subject: Subject = Subject.PETITION) -> list[GroundOption]:
+    """The four grounds as one screen offers them: the same stored keys whatever is being judged, each in the
+    words that subject is judged by."""
+    return [GroundOption(id=ground.value, label=in_plain_words(ground, subject=subject),
+                         needs_petition_number=needs_another_petition(ground, subject))
+            for ground in GROUNDS]
 
 
 def dismissal_reasons() -> list[DismissalOption]:

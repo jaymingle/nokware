@@ -55,7 +55,7 @@ function Fields({ state, commentId, grounds, noteMax }: {
 export function ReportComment({ code, commentId }: Props) {
   const [open, setOpen] = useState(false);
   const options = usePetitionOptions();
-  const grounds = options.data?.grounds ?? [];
+  const grounds = options.data?.comment_grounds ?? [];
   const state = useCommentReport(code, commentId);
   const filed = state.report.data !== undefined;
   const close = (next: boolean) => {

@@ -80,6 +80,7 @@ function ReportCard({ report, grounds, reasons }: CardProps) {
   );
 }
 
+/** `grounds` here are the comment wording: the same stored ids, but a duplicate repeats another comment. */
 function CommentCard({ report, grounds, reasons }: {
   report: ReportedComment; grounds: PetitionGroundOption[]; reasons: PetitionDismissalOption[];
 }) {
@@ -147,7 +148,7 @@ export function PetitionReports() {
         <section aria-label="Reported comments" className="flex flex-col gap-4">
           <h2 className="text-[17px]">Reported comments</h2>
           {data.comments.map((report) => (
-            <CommentCard key={report.id} report={report} grounds={data.grounds} reasons={data.dismissal_reasons} />
+            <CommentCard key={report.id} report={report} grounds={data.comment_grounds} reasons={data.dismissal_reasons} />
           ))}
         </section>
       ) : null}

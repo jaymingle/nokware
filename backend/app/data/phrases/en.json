@@ -194,6 +194,11 @@
       "text": "Duplicates an open petition",
       "note": "The only ground that names another petition: its number is stored, so the tombstone can point there."
     },
+    "petition.ground.duplicate_comment": {
+      "critical": false,
+      "text": "Repeats another comment",
+      "note": "The same stored ground as petition.ground.duplicate, read about a comment: a comment repeats what is already on its own page and names no petition, so no number is asked for or stored."
+    },
     "petition.removal.duplicate_needs_code": {
       "critical": false,
       "text": "Give the number of the open petition this one duplicates."
@@ -291,7 +296,7 @@
     "petition.comment.removed": {
       "critical": false,
       "text": "Comment removed by a verified contributor: {ground}",
-      "note": "What stands where a removed comment's words were. {ground} is one of the four grounds, in the words petition.ground.* gives it; a translation may put it wherever that language wants it."
+      "note": "What stands where a removed comment's words were. {ground} is one of the four grounds in the words a comment is judged by, which is petition.ground.duplicate_comment for a duplicate and petition.ground.* for the rest; a translation may put it wherever that language wants it."
     },
     "petition.comment.already_removed": {
       "critical": false,

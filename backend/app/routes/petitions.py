@@ -72,7 +72,7 @@ from app.services import (
 from app.services.auth import Principal, Role
 from app.services.ledger_documents import utc_now
 from app.services.petition_comments import COMMENT_MAX
-from app.services.petition_grounds import Dismissal, Ground, in_plain_words
+from app.services.petition_grounds import Dismissal, Ground, Subject, in_plain_words
 from app.services.petition_rules import (
     DEPARTMENT_NOTE_MAX,
     DOCUMENTS_MAX,
@@ -135,8 +135,8 @@ def options() -> PetitionOptions:
         open_days=OPEN_FOR.days, response_days=RESPONSE_WINDOW.days, max_images=IMAGES_MAX,
         max_documents=DOCUMENTS_MAX, report_note_max=REPORT_NOTE_MAX, removal_note_max=REMOVAL_NOTE_MAX,
         department_note_max=DEPARTMENT_NOTE_MAX, reply_max=REPLY_MAX, comment_max=COMMENT_MAX,
-        grounds=present.grounds(), dismissal_reasons=present.dismissal_reasons(),
-        status_words=present.status_catalogue(),
+        grounds=present.grounds(), comment_grounds=present.grounds(Subject.COMMENT),
+        dismissal_reasons=present.dismissal_reasons(), status_words=present.status_catalogue(),
         verification=Verification(whatsapp=phone_proof.whatsapp_available(), ussd_code=phone_proof.ussd_code(),
                                   sms=phone_proof.sms_available()),
     )
@@ -182,7 +182,8 @@ def reported(_: Contributor) -> ReportQueue:
     """What readers have reported, newest first: the petitions, and the comments standing under them."""
     return ReportQueue(reports=[present.reported(item) for item in petition_reports.queue()],
                        comments=[_reported_comment(item) for item in petition_comments.queue()],
-                       grounds=present.grounds(), dismissal_reasons=present.dismissal_reasons())
+                       grounds=present.grounds(), comment_grounds=present.grounds(Subject.COMMENT),
+                       dismissal_reasons=present.dismissal_reasons())
 
 
 def _comment(seen: petition_comments.Seen) -> Comment:
@@ -192,7 +193,7 @@ def _comment(seen: petition_comments.Seen) -> Comment:
 def _reported_comment(item: petition_comments.ReportedComment) -> ReportedComment:
     ground = Ground(item.report["ground"])
     return ReportedComment(id=item.report["$id"], reported_at=item.report["createdAt"], ground=ground.value,
-                           ground_words=in_plain_words(ground), note=item.report.get("note"),
+                           ground_words=in_plain_words(ground, subject=Subject.COMMENT), note=item.report.get("note"),
                            reports_on_this_comment=item.reports_on_this_comment, code=item.report["code"],
                            comment=_comment(item.comment))
 

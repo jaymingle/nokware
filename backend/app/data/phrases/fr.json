@@ -136,6 +136,9 @@
     "petition.ground.duplicate": {
       "text": "Fait double emploi avec une pétition ouverte"
     },
+    "petition.ground.duplicate_comment": {
+      "text": "Répète un autre commentaire"
+    },
     "petition.removal.duplicate_needs_code": {
       "text": "Indiquez le numéro de la pétition ouverte que celle-ci répète."
     },

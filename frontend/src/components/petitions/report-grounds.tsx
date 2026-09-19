@@ -1,6 +1,7 @@
 import type { PetitionGround, PetitionGroundOption } from "@/lib/api/types";
 
-/** What a report is and isn't, said before anyone sends one. The same four grounds judge a petition and a comment. */
+/** What a report is and isn't, said before anyone sends one. A petition and a comment are judged on the same four
+ * grounds; the caller passes the words that subject is judged in. */
 export function reportHidesNothing(subject: "petition" | "comment"): string {
   return `Reporting hides nothing. The ${subject} stays up, exactly as it is, while a contributor reads what you send.`;
 }

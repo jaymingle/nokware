@@ -31,10 +31,11 @@ from app.services import (
 from app.services.appwrite_client import as_record
 from app.services.auth import Principal, Role
 from app.services.petition_comments import COMMENT_MAX
-from app.services.petition_grounds import Dismissal, Ground, in_plain_words
+from app.services.petition_grounds import Dismissal, Ground, Subject, in_plain_words
 from app.services.petition_reports import ReportState
 from app.services.petition_rules import Draft, InvalidPetition, PetitionStatus, Scope, WrongState
 from app.services.phone_proof import Channel
+from app.services.phrases import Language
 
 NOW = datetime(2026, 9, 15, 9, 0, tzinfo=UTC)
 PHONE, OTHER_PHONE, CONTRIBUTOR_PHONE = "+233241234567", "+233209876543", "+233207654321"
@@ -277,6 +278,41 @@ def test_a_contributor_takes_one_comment_down_and_the_petition_and_the_others_st
     assert stored.comments[1]["removedByName"] == "Kofi Asante" and filed["state"] == ReportState.OPEN
     with pytest.raises(WrongState, match="already been removed"):
         petition_comments.remove(KOFI, "482913", struck.id, Ground.INCITES_VIOLENCE, NOW)
+
+
+def test_a_comments_ground_is_never_put_in_a_petitions_words(stored: Fake) -> None:
+    """The stored ground is the same for both; the words are not. A comment duplicates no petition — it repeats
+    another comment on its own page — so nowhere a comment's ground is shown may say otherwise."""
+    _publish(stored)
+    said = _comment(stored, PHONE, "Ama")
+    petition_of_a_duplicate = in_plain_words(Ground.DUPLICATE)
+    comment_of_a_duplicate = in_plain_words(Ground.DUPLICATE, subject=Subject.COMMENT)
+    assert comment_of_a_duplicate == "Repeats another comment" != petition_of_a_duplicate
+    filed = petition_comments.file_report("482913", said.id, Ground.DUPLICATE, None, NOW)
+    assert filed["ground"] == Ground.DUPLICATE  # the enum value is untouched: stored rows keep their meaning
+    client = TestClient(app)
+    offered = client.get("/api/petitions/options").json()
+    assert [g["id"] for g in offered["comment_grounds"]] == [g["id"] for g in offered["grounds"]]
+    assert not any(g["needs_petition_number"] for g in offered["comment_grounds"])  # there is no number to ask for
+    assert petition_of_a_duplicate not in str(offered["comment_grounds"])
+    app.dependency_overrides[current_principal] = lambda: KOFI
+    try:
+        queue = client.get("/api/petitions/reports").json()
+    finally:
+        app.dependency_overrides.clear()
+    assert queue["comments"][0]["ground_words"] == comment_of_a_duplicate
+    assert queue["comments"][0]["ground"] == Ground.DUPLICATE
+    assert petition_of_a_duplicate not in str([queue["comments"], queue["comment_grounds"]])
+
+
+def test_the_notice_where_a_removed_comment_stood_is_in_a_comments_words(stored: Fake) -> None:
+    _publish(stored)
+    said = _comment(stored, OTHER_PHONE, "Ama", "The drain by the lorry park has not been cleared since May.")
+    removed = petition_comments.remove(KOFI, "482913", said.id, Ground.DUPLICATE, NOW)
+    assert removed.text == "Comment removed by a verified contributor: Repeats another comment"
+    assert in_plain_words(Ground.DUPLICATE) not in removed.text
+    assert stored.comments[0]["removalGround"] == Ground.DUPLICATE
+    assert petition_comments.removal_words(Ground.DUPLICATE, Language.FRENCH).endswith("Répète un autre commentaire")
 
 
 def test_a_reported_comment_reaches_the_same_queue_and_a_dismissal_leaves_it_up(stored: Fake) -> None:

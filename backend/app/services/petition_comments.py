@@ -27,7 +27,7 @@ from app.services import petitions
 from app.services.appwrite_client import DATABASE_ID, as_record, every_record, get_databases
 from app.services.auth import Principal
 from app.services.locks import record_lock
-from app.services.petition_grounds import Dismissal, Ground, in_plain_words
+from app.services.petition_grounds import Dismissal, Ground, Subject, in_plain_words
 from app.services.petition_reports import ReportNotFound, ReportState
 from app.services.petition_reports import clean_note as clean_report_note
 from app.services.petition_rules import PetitionError, WrongState, clean_signer_name
@@ -88,8 +88,10 @@ def clean_comment(text: str) -> str:
 
 
 def removal_words(ground: Ground, language: Language = Language.ENGLISH) -> str:
-    """What stands where a removed comment's words were: the ground, in the words every screen names it by."""
-    return phrase("petition.comment.removed", language).format(ground=in_plain_words(ground, language))
+    """What stands where a removed comment's words were: the ground, in the words every screen names a comment's
+    grounds by — a duplicate here repeats another comment, and says so."""
+    return phrase("petition.comment.removed", language).format(
+        ground=in_plain_words(ground, language, Subject.COMMENT))
 
 
 def report_received() -> str:
@@ -148,9 +150,9 @@ def _under_petition(code: str, comment_id: str) -> tuple[dict[str, Any], dict[st
 
 
 def file_report(code: str, comment_id: str, ground: Ground, note: str | None, now: datetime) -> dict[str, Any]:
-    """Anyone reading, without signing in, on the same four grounds a petition is reported on. A report hides
-    nothing here either: the comment stays exactly as it is while a contributor reads it. A duplicate names no
-    other petition — a comment repeats what is on its own page, and nothing is built from the answer."""
+    """Anyone reading, without signing in, on the same four stored grounds a petition is reported on, read in a
+    comment's words. A report hides nothing here either: the comment stays exactly as it is while a contributor
+    reads it. A duplicate names no other petition — a comment repeats another comment on its own page."""
     note = clean_report_note(note)
     comment, petition = _under_petition(code, comment_id)
     return as_record(get_databases().create_document(DATABASE_ID, COMMENT_REPORTS_COLLECTION, ID.unique(), {
