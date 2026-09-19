@@ -54,38 +54,57 @@ rebuild. What is left, and why it isn't in this release:
   reference or amount in left-to-right order inside Arabic text are exactly what
   old handsets show as boxes. A reordered emergency number is dangerous.
 
+## Petitions
+
+A petition is public the moment its creator publishes it. Nobody in the Assembly
+approves it first — the office a petition is usually about cannot decide whether
+it exists.
+
+A **verified contributor** is the referee instead: not Assembly staff, no stake in
+the outcome. A contributor may remove a petition only on four fixed grounds — it
+names or attacks a private individual, incites violence, carries personal data, or
+duplicates an open petition, which must cite the other petition's number. Never
+their own petition, and never one they signed. "Not the Assembly's
+responsibility" is a judgement on the merits and belongs in the MCE's response,
+not in a removal.
+
+A removal is public and anonymous: the ground in plain words, the date, and
+"Removed by a verified contributor". The identity stays in the audit trail,
+because naming the person exposes them to whoever wanted the petition up. What
+replaces the petition is built from the removal record rather than by hiding the
+petition's fields, so it cannot leak the title, the text, the images, the
+comments, the signature count or the MCE's response.
+
+Any reader can **report** a petition on the same grounds. A report hides nothing:
+it joins the contributor's queue. Removals are counted publicly by ground, so a
+contributor removing too freely becomes visible.
+
+The creator can **edit and republish** at any time, including after a removal.
+Each edit is a version: the history is public, signatures carry over, each
+remembering the version it was given on, and the removal count is shown.
+
+The **MCE responds** to a petition that reaches its threshold, within 30 days, or
+shares it with a department, which can add one note shown publicly under its name.
+The petitioner can reply to the response. Signatures, thresholds and the response
+clock are unchanged.
+
+Comments are open to anyone who can sign, under a display name and never a phone
+number, screened like everything else and removable one at a time without taking
+the petition down.
+
 ## Roadmap
 
-### Petitions, reworked
+### Voice notes on a petition
 
-Petitions today wait for the MCE to publish or refuse them. The agreed design
-removes that gate and gives the referee's part to a verified contributor, who is
-not Assembly staff and has no stake in the outcome — an institution that can
-remove petitions against itself taints every removal, however honest the reason.
+A petition can be written but not spoken. The voice path exists for reports and
+for Ask; petitions would need the same transcription, the same confirmation of
+what was heard, and the same rule that a machine transcription is labelled.
 
-- **A petition publishes when its creator publishes it.** No approval gate.
-- **A verified contributor can remove a published petition**, only on fixed
-  grounds: it names a private individual, incites violence, contains personal
-  data, or duplicates an open petition — and a duplicate must cite the other
-  petition's code, shown and linked. "Not the Assembly's responsibility" is a
-  judgement on merit: it belongs in the MCE's response, never in a removal.
-- **The reason is public**, on the page where the petition was, as "Removed by a
-  verified contributor". The identity stays in the audit trail: naming the person
-  exposes them to whoever wanted the petition up.
-- **The tombstone shows the reason and the date, and nothing else** — not the
-  text, not the title, since a title can name someone just as easily.
-- **Removals are counted publicly by reason**, as document disputes are, so a
-  contributor removing too freely becomes visible. Repeat removals of the same
-  petition are counted, not capped: "removed twice for naming a private
-  individual" is itself information.
-- **The petitioner can edit and republish.** Signatures carry over, with the page
-  saying "signed before the edit of 19 September" and the edit history shown.
-- **Any reader can report a petition** on the same grounds. Removal power nobody
-  can trigger is not a remedy.
-- **The MCE responds, or shares a petition with a department**, and sees the
-  petitioner's reply. No power over whether a petition exists.
-- Each petition on its own page, with comments (named or anonymous), images, and
-  a creator who can find and edit their petitions with the code they were given.
+### Restoring a removal without republishing
+
+A contributor who removes a petition in error can only wait for its creator to
+edit and republish it. Undoing a removal, with the undo itself public, is the
+missing half of that power.
 
 ### Language switchers
 
@@ -127,6 +146,13 @@ Things that work, with their edges named:
 - **Escalation photos are web only.** A resident escalating by USSD or WhatsApp
   can write, but not attach; the browser is where the shrinking and EXIF-stripping
   happen.
+- **Comments are web only.** USSD and WhatsApp show how many there are and point
+  at the page; writing one needs a browser.
+- **Moderation depends on contributors being active.** Nothing hides a petition
+  automatically: if no contributor reads the queue, a reported petition stays up.
+  That is the trade for an institution not deciding what may be said about it.
+- **Verification codes by SMS are off by default** (`SMS_VERIFICATION_CODES`),
+  pending a live sender ID, so a phone is confirmed over WhatsApp or USSD.
 - **No screen-reader test with a real user**, and the report form's photo field
   has a duplicate tab stop (see [`frontend/README.md`](frontend/README.md)).
 

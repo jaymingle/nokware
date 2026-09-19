@@ -29,6 +29,9 @@ def _in(moment: str | None, start: datetime) -> bool:
     return at is not None and at >= start
 
 
+LEGACY_REFUSED = "refused"  # the old process's own word, kept on the record by the migration
+
+
 def standing(petition: dict[str, Any], now: datetime) -> str:
     if petition.get("status") == PetitionStatus.RESPONDED:
         return "answered_late" if responded_late(petition) else "answered_in_time"
@@ -36,7 +39,10 @@ def standing(petition: dict[str, Any], now: datetime) -> str:
     return "unanswered" if due is not None and due <= now else "waiting"
 
 
-def build(history: list[dict[str, Any]], reached: list[dict[str, Any]], start: datetime, now: datetime) -> dict[str, Any]:
+def build(history: list[dict[str, Any]], reached: list[dict[str, Any]], start: datetime, now: datetime,
+          refused_before: int = 0) -> dict[str, Any]:
+    """refused_before: petitions the MCE refused under the review process this one replaced. Counted apart from
+    removals, and never called one: a refusal was a judgement on the merits by the office being petitioned."""
     steps = Counter(e["action"] for e in history if _in(e.get("at"), start))
     grounds = Counter(e.get("reason") for e in history if e["action"] == PetitionAction.REMOVED and _in(e.get("at"), start))
     standings = Counter(standing(p, now) for p in reached if _in(p.get("thresholdReachedAt"), start))
@@ -46,6 +52,7 @@ def build(history: list[dict[str, Any]], reached: list[dict[str, Any]], start: d
         "removals": [{"ground": g.value, "label": in_plain_words(g), "count": grounds.get(g.value, 0)} for g in Ground],
         "reached_threshold": sum(standings.values()), "answered_in_time": standings["answered_in_time"],
         "answered_late": standings["answered_late"], "unanswered": standings["unanswered"], "waiting": standings["waiting"],
+        "refused_under_the_earlier_process": refused_before,
     }
 
 
@@ -56,4 +63,6 @@ def figures(start: datetime, now: datetime) -> dict[str, Any]:
                                                                  Query.select(["action", "reason", "at", "petitionId"])])
                if row.get("petitionId") not in tests]
     reached = every_record(PETITIONS_COLLECTION, [Query.is_not_null("thresholdReachedAt"), NOT_TEST, Query.select(RESPONSE_FIELDS)])
-    return build(history, reached, start, now)
+    refused_before = len(every_record(PETITIONS_COLLECTION, [Query.equal("legacyStatus", LEGACY_REFUSED), NOT_TEST,
+                                                             Query.select(["code"])]))
+    return build(history, reached, start, now, refused_before)

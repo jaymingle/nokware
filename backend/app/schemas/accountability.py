@@ -163,6 +163,7 @@ class PetitionFigures(BaseModel):
     answered_late: int
     unanswered: int  # 30 days passed, no response yet
     waiting: int  # still within the 30 days
+    refused_under_the_earlier_process: int  # the MCE refused these before it stopped deciding; never a removal
 
 
 class Responsiveness(BaseModel):
