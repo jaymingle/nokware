@@ -209,8 +209,9 @@ export function historyTone(action: HistoryAction): StatusTone {
 }
 
 const PETITION_EVENT: Record<PetitionTimelineEntry["action"], StatusTone> = {
-  edited: "active", threshold_reached: "active",
-  published: "done", republished: "done", responded: "done",
+  edited: "active", threshold_reached: "active", shared: "active", creator_replied: "active",
+  moved_to_new_process: "waiting",
+  published: "done", republished: "done", responded: "done", department_note: "done",
   no_response: "attention", removed: "ended", withdrawn: "ended", closed: "ended",
 };
 

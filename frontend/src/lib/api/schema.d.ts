@@ -752,12 +752,21 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Published */
+        /**
+         * Published
+         * @description The petitions standing in one group, or — for "removed" — the tombstones of the ones taken down, which are
+         *     built from the removal records and carry nothing of the petitions. `topic` doesn't narrow that group: a
+         *     tombstone has no topic, and reading one off the petition is the leak the tombstone exists to prevent.
+         */
         get: operations["published_api_petitions_get"];
         put?: never;
         /**
          * Submit
          * @description A form, so the petition's images arrive with its words. It is published by this call: nobody approves it.
+         *
+         *     `File()`, not `Form()`: the form carries file parts, and only File() has FastAPI declare the multipart the
+         *     route actually reads. Under Form() the schema said urlencoded, which no browser can send an image in and no
+         *     generated client can type.
          */
         post: operations["submit_api_petitions_post"];
         delete?: never;
@@ -775,6 +784,26 @@ export interface paths {
         };
         /** Responses */
         get: operations["responses_api_petitions_responses_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/petitions/shared": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Shared
+         * @description The petitions the MCE has shared with the caller's department, newest first.
+         */
+        get: operations["shared_api_petitions_shared_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1043,6 +1072,66 @@ export interface paths {
          * @description The MCE's public response; then the petitions still waiting for one.
          */
         post: operations["respond_api_petitions__code__response_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/petitions/{code}/share": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Share
+         * @description The MCE asks one department of the Assembly to answer this petition. The page comes back with it on.
+         */
+        post: operations["share_api_petitions__code__share_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/petitions/{code}/note": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Note
+         * @description The one note the caller's department writes on a petition shared with it, public under its name.
+         */
+        post: operations["note_api_petitions__code__note_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/petitions/{code}/reply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reply
+         * @description The creator answers the MCE's response, once, on the confirmed number they started the petition with.
+         */
+        post: operations["reply_api_petitions__code__reply_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2099,6 +2188,20 @@ export interface components {
             /** Reopened */
             reopened: number | null;
         };
+        /**
+         * DepartmentShare
+         * @description One department the MCE sent this petition to, and the one note that department wrote back.
+         */
+        DepartmentShare: {
+            /** Department */
+            department: string;
+            /** Shared At */
+            shared_at: string;
+            /** Note */
+            note: string | null;
+            /** Note At */
+            note_at: string | null;
+        };
         /** DismissRequest */
         DismissRequest: {
             /**
@@ -2615,14 +2718,6 @@ export interface components {
             /** Total */
             total: number;
         };
-        /**
-         * NoteRequest
-         * @description A note the stage requires: resolving, and the reason for a move.
-         */
-        NoteRequest: {
-            /** Note */
-            note: string;
-        };
         /** Option */
         Option: {
             /** Id */
@@ -2861,6 +2956,8 @@ export interface components {
              * @default 0
              */
             comments: number;
+            /** Shared With */
+            shared_with?: components["schemas"]["DepartmentShare"][];
         };
         /**
          * PetitionFigures
@@ -2886,6 +2983,8 @@ export interface components {
             unanswered: number;
             /** Waiting */
             waiting: number;
+            /** Refused Under The Earlier Process */
+            refused_under_the_earlier_process: number;
         };
         /** PetitionOptions */
         PetitionOptions: {
@@ -2909,6 +3008,10 @@ export interface components {
             report_note_max: number;
             /** Removal Note Max */
             removal_note_max: number;
+            /** Department Note Max */
+            department_note_max: number;
+            /** Reply Max */
+            reply_max: number;
             /** Grounds */
             grounds: components["schemas"]["GroundOption"][];
             /** Dismissal Reasons */
@@ -2919,10 +3022,16 @@ export interface components {
             };
             verification: components["schemas"]["Verification"];
         };
-        /** PetitionPage */
+        /**
+         * PetitionPage
+         * @description One group of petitions. The removed group fills `removed` instead of `petitions`: there are no cards to
+         *     show, only the tombstones, which carry nothing of the petitions they stand for.
+         */
         PetitionPage: {
             /** Petitions */
             petitions: components["schemas"]["PetitionCard"][];
+            /** Removed */
+            removed: components["schemas"]["Tombstone"][];
             /** Total */
             total: number;
             /** Counts */
@@ -2941,6 +3050,16 @@ export interface components {
             label: string;
             /** Count */
             count: number;
+        };
+        /**
+         * PetitionReply
+         * @description The petitioner's one answer to the response. Their name is the petition's own: none unless they showed it.
+         */
+        PetitionReply: {
+            /** Text */
+            text: string;
+            /** At */
+            at: string;
         };
         /**
          * PetitionResponse
@@ -2966,6 +3085,7 @@ export interface components {
             late: boolean;
             /** Days Late */
             days_late: number;
+            reply: components["schemas"]["PetitionReply"] | null;
         };
         /** PreferencesRequest */
         PreferencesRequest: {
@@ -3166,6 +3286,11 @@ export interface components {
             total: number;
             /** Grounds */
             grounds: components["schemas"]["RemovalCount"][];
+        };
+        /** ReplyRequest */
+        ReplyRequest: {
+            /** Text */
+            text: string;
         };
         /** ReportFiled */
         ReportFiled: {
@@ -3476,6 +3601,14 @@ export interface components {
             contacts: components["schemas"]["PublicContact"][];
         };
         /**
+         * ShareRequest
+         * @description The department the MCE sends the petition to, from /api/departments — the Assembly's one list of them.
+         */
+        ShareRequest: {
+            /** Department */
+            department: string;
+        };
+        /**
          * SharedLocationView
          * @description A shared location, opened on purpose. The view is recorded and the citizen is told.
          */
@@ -3488,6 +3621,19 @@ export interface components {
             longitude: number | null;
             /** Shared At */
             shared_at: string;
+        };
+        /**
+         * SharedPetition
+         * @description A petition as the department it was shared with meets it, with the note it has written, if it has.
+         */
+        SharedPetition: {
+            petition: components["schemas"]["PetitionCard"];
+            /** Shared At */
+            shared_at: string;
+            /** Note */
+            note: string | null;
+            /** Note At */
+            note_at: string | null;
         };
         /** SignRequest */
         SignRequest: {
@@ -3672,7 +3818,7 @@ export interface components {
              * Action
              * @enum {string}
              */
-            action: "published" | "edited" | "republished" | "removed" | "withdrawn" | "closed" | "threshold_reached" | "responded" | "no_response";
+            action: "published" | "edited" | "republished" | "removed" | "withdrawn" | "closed" | "threshold_reached" | "responded" | "no_response" | "shared" | "department_note" | "creator_replied" | "moved_to_new_process";
             /** At */
             at: string;
             /** Reason */
@@ -3830,6 +3976,19 @@ export interface components {
             voices: number;
             /** Added */
             added: boolean;
+        };
+        /**
+         * NoteRequest
+         * @description A note the stage requires: resolving, and the reason for a move.
+         */
+        app__schemas__cases__NoteRequest: {
+            /** Note */
+            note: string;
+        };
+        /** NoteRequest */
+        app__schemas__petitions__NoteRequest: {
+            /** Text */
+            text: string;
         };
     };
     responses: never;
@@ -4648,7 +4807,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["NoteRequest"];
+                "application/json": components["schemas"]["app__schemas__cases__NoteRequest"];
             };
         };
         responses: {
@@ -5042,7 +5201,7 @@ export interface operations {
     published_api_petitions_get: {
         parameters: {
             query?: {
-                group?: "open" | "awaiting" | "responded" | "closed";
+                group?: "open" | "awaiting" | "responded" | "closed" | "removed";
                 topic?: string | null;
                 limit?: number;
                 offset?: number;
@@ -5084,7 +5243,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/x-www-form-urlencoded": components["schemas"]["SubmitRequest"];
+                "multipart/form-data": components["schemas"]["SubmitRequest"];
             };
         };
         responses: {
@@ -5124,6 +5283,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AwaitingResponse"][];
+                };
+            };
+        };
+    };
+    shared_api_petitions_shared_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SharedPetition"][];
                 };
             };
         };
@@ -5390,7 +5569,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/x-www-form-urlencoded": components["schemas"]["EditRequest"];
+                "multipart/form-data": components["schemas"]["EditRequest"];
             };
         };
         responses: {
@@ -5574,6 +5753,113 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AwaitingResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    share_api_petitions__code__share_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ShareRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PetitionDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    note_api_petitions__code__note_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["app__schemas__petitions__NoteRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SharedPetition"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reply_api_petitions__code__reply_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-phone-proof"?: string | null;
+            };
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReplyRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PetitionDetail"];
                 };
             };
             /** @description Validation Error */

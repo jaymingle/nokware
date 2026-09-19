@@ -109,6 +109,10 @@ const TIMELINE: Record<PetitionTimelineEntry["action"], string> = {
   threshold_reached: "Reached its signatures and went to the MCE for a response",
   responded: "The MCE responded",
   no_response: "No response 30 days after the petition reached its threshold",
+  shared: "Sent to a department for its answer",
+  department_note: "A department answered",
+  creator_replied: "The person who started it replied",
+  moved_to_new_process: "Moved to the new petition process",
 };
 
 export function timelineText(entry: PetitionTimelineEntry): string {

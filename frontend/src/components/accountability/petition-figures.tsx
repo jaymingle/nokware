@@ -16,6 +16,9 @@ export function PetitionFigures({ figures }: { figures: Figures }) {
         { label: "Published", value: figures.published.toLocaleString(), testId: "responsiveness-petitions-published" },
         { label: "Mended and published again", value: figures.republished.toLocaleString(), testId: "responsiveness-petitions-republished" },
         { label: "Removed by a contributor", value: figures.removed.toLocaleString(), testId: "responsiveness-petitions-removed" },
+        ...(figures.refused_under_the_earlier_process
+          ? [{ label: "Refused under the earlier review process", value: figures.refused_under_the_earlier_process.toLocaleString(), testId: "responsiveness-petitions-refused-before" }]
+          : []),
       ]}>
         {grounds.length ? <p className="text-[12.5px] text-ink-soft">Removed for: {grounds.map((r) => `${lowerFirst(r.label)} (${r.count})`).join(", ")}.</p> : null}
       </Lines>
