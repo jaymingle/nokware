@@ -5,8 +5,9 @@ from typing import Any
 
 import pytest
 
-from app.services import ask_figures, rag, stats
+from app.services import ask_figures, budget_figures, rag, stats
 from app.services.ask_figures import CountReports, FigurePlan, count_figure, plan, wants_figures
+from app.services.budget_figures import BudgetFigure
 from app.services.retrieval import Chunk, Retrieval, RetrievedChunk
 
 NOW = datetime(2026, 9, 14, 12, 0, tzinfo=UTC)
@@ -127,3 +128,25 @@ def test_a_safety_question_still_gets_what_the_documents_say(monkeypatch: pytest
     assert result["answer"].startswith(ask_figures.SAFETY_FIGURES_ANSWER)
     assert ask_figures.SAFETY_IN_DOCUMENTS in result["answer"] and result["answer"].endswith(answer)
     assert result["status"] == "answered" and result["sources"][0]["cited"]
+
+
+def test_asking_what_was_spent_plans_figures_like_asking_what_was_budgeted() -> None:
+    """"Expenses" is how a resident asks what the Assembly spent. It matched neither the gate nor the budget
+    check, so such a question planned nothing and its gap was never even looked for."""
+    for question in ("What was AMA Expenses between 2023 and 2026?", "What did AMA spend on roads?",
+                     "What was AMA expenditure in 2023?", "What does a market stall cost in 2026?"):
+        assert wants_figures(question), question
+        assert ask_figures.BUDGET_WORDS.search(question), question
+
+
+def test_a_year_that_is_not_held_is_answered_with_the_years_that_are(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A gap said on its own leaves the resident with nothing. The years Nokware does hold are offered beside it,
+    cited, and never as the year that was asked for."""
+    monkeypatch.setattr(ask_figures, "_tool_calls", lambda question, now: [])
+    monkeypatch.setattr(budget_figures, "years", lambda: [2022, 2026])
+    monkeypatch.setattr(budget_figures, "figure",
+                        lambda call, label: BudgetFigure(label, budget_figures.describe(call), "GH¢ 1", [],
+                                                         "doc", "A Budget", call.year, "90%"))
+    planned = plan("What was AMA Expenses between 2023 and 2026?", NOW)
+    assert planned.budget_missing == ["Approved budget · 2023"]
+    assert [(f.label, f.year) for f in planned.budget] == [("B1", 2022), ("B2", 2026)]

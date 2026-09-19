@@ -306,10 +306,12 @@ def _budget_gap(prepared: Prepared) -> str:
         return ""
     held = ", ".join(str(year) for year in budget_years()) or "none"
     return ("Nokware holds no budget figures for: " + "; ".join(missing) + f". The budget years it holds are {held}. "
-            "Do not give the no-information reply here. Say plainly that the figures they asked for aren't "
-            "available and name the budget years there are, so the gap is explained rather than left looking like "
-            "the figures are being withheld. Never estimate them from another year, another department or a "
-            "document not listed above.")
+            "Do not give the no-information reply here. Say plainly, in your first sentence, what was asked for "
+            "and isn't held. Then give the figures above that are held, with their [B#] citations, saying which "
+            "year each belongs to — an answer that names the gap and stops leaves the resident with nothing, when "
+            "the figures beside the one they asked for are right here. Never present a year you do hold as the "
+            "year they asked for, and never estimate one from another year, another department or a document not "
+            "listed above.")
 
 
 BODY = "\x00body"  # where the answer itself goes among the fixed sentences around it

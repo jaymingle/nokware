@@ -34,10 +34,14 @@ FIGURE_LABEL_PREFIX = "R"
 MAX_FIGURES = 4
 # Only a question that might want figures pays for the planning call. A comparison often names no count at all
 # ("compare the approved budget for Public Works in 2022 and 2026"), so the budget words stand beside the counting ones.
+# How a resident asks about money, written once: both the gate below and the budget check further down read it,
+# and when they were written out twice they drifted — neither knew the word "expenses".
+_MONEY_TERMS = (r"budgets?|budget(ed|ing)?|approv(e|es|ed|al)|allocat(e|es|ed|ion)|spend(ing)?|spent|expenses?|"
+                r"expenditures?|cost(s|ing)?|cedis|GH¢|GHS")
 FIGURE_WORDS = re.compile(
     r"\b(how many|how much|number of|count|figures?|statistics|stats|totals?|most|reports?|reported|cases?|"
     r"complaints?|open|resolved|escalated|filed|pending|outstanding|charts?|graphs?|plot|"
-    r"budgets?|budget(ed|ing)?|approv(e|es|ed|al)|allocat(e|es|ed|ion)|spend(ing)?|spent|cedis|GH¢|GHS|"
+    rf"{_MONEY_TERMS}|"
     r"compare|comparison|against|versus|vs)\b",
     re.IGNORECASE,
 )
@@ -225,6 +229,7 @@ def plan(question: str, now: datetime) -> FigurePlan:
     counts = _asked_for(calls, CountReports)[:MAX_FIGURES]
     budget, missing = _budget_figures(_asked_for(calls, BudgetFigures)[:MAX_FIGURES])
     missing = _only_the_specific(list(dict.fromkeys(missing + _years_not_held(question))))
+    budget = budget or _nearest_held(missing)
     if not counts:
         return FigurePlan([], safety, budget, missing)
     cases = stats.public_cases()
@@ -233,7 +238,7 @@ def plan(question: str, now: datetime) -> FigurePlan:
     return FigurePlan(figures, safety, budget, missing)
 
 
-BUDGET_WORDS = re.compile(r"\b(budgets?|budget(ed|ing)?|approv(e|es|ed|al)|allocat(e|es|ed|ion)|spend(ing)?|spent|cedis|GH¢|GHS)\b", re.IGNORECASE)
+BUDGET_WORDS = re.compile(rf"\b({_MONEY_TERMS})\b", re.IGNORECASE)
 _YEAR_ASKED = re.compile(r"\b(20[0-3]\d)\b")
 
 
@@ -249,6 +254,20 @@ def _years_not_held(question: str) -> list[str]:
         return []
     held = set(budget_figures.years())
     return [f"Approved budget · {year}" for year in sorted({int(y) for y in _YEAR_ASKED.findall(question)} - held)]
+
+
+def _nearest_held(missing: list[str]) -> list[BudgetFigure]:
+    """The years Nokware does hold, when the ones asked for it doesn't.
+
+    A gap said on its own — "no figures for 2023" — leaves a resident with nothing, when the same document set
+    answers the question next to the one they asked. So where a budget figure was wanted and none was found, every
+    year that is held is read and offered, cited like any other figure and never presented as the year asked for.
+    """
+    if not missing:
+        return []
+    wanted = [BudgetFigures(year=year) for year in budget_figures.years()]
+    return [found for found in (budget_figures.figure(call, f"{budget_figures.LABEL_PREFIX}{i}")
+                                for i, call in enumerate(wanted, 1)) if found]
 
 
 def _budget_figures(wanted_figures: list[BudgetFigures]) -> tuple[list[BudgetFigure], list[str]]:
