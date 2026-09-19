@@ -139,7 +139,7 @@ def _configured() -> tuple[str, str]:
 def bms() -> BmsSms:
     api_key, sender = _configured()
     settings = get_settings()
-    return BmsSms(api_key, sender, DailyBudget(settings.sms_daily_limit, _RedisCount() if settings.redis_url else _MemoryCount()))
+    return BmsSms(api_key, sender, DailyBudget(lambda: get_settings().sms_daily_limit, _RedisCount() if settings.redis_url else _MemoryCount()))
 
 
 @lru_cache
@@ -148,4 +148,4 @@ def bms_codes() -> BmsSms:
     api_key, sender = _configured()
     settings = get_settings()
     counter = _RedisCount("code-pages") if settings.redis_url else _MemoryCount()
-    return BmsSms(api_key, sender, DailyBudget(settings.sms_code_daily_limit, counter))
+    return BmsSms(api_key, sender, DailyBudget(lambda: get_settings().sms_code_daily_limit, counter))

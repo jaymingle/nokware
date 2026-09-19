@@ -156,9 +156,15 @@ def provider_for(channel: NotificationChannel) -> Provider | None:
 
 
 def check_providers() -> None:
-    """A provider that is named but can't be built stops the API at startup, not the first message."""
+    """A provider that is named but can't be built stops the API at startup, not the first message.
+
+    The daily limit is logged with them: it is read once at startup, and a message refused by a number nobody can
+    see is indistinguishable from a provider that is turned off."""
     for channel in NotificationChannel:
         provider_for(channel)
+    settings = get_settings()
+    logger.info("SMS: %s, up to %d pages a day (%d for codes); WhatsApp: %s", settings.sms_provider,
+                settings.sms_daily_limit, settings.sms_code_daily_limit, settings.whatsapp_provider)
 
 
 def _outbox(case_id: str, event: NotificationEvent, channel: NotificationChannel, message: Message) -> str:

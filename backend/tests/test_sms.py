@@ -185,3 +185,16 @@ def test_an_emergencys_received_message_carries_numbers_to_try_but_personal_safe
     private = notifications.compose(NotificationEvent.SUBMITTED, {"reference": "M3RD-8WQA", "category": "personal_safety",
                                                                    "topic": "abuse", "recipients": ["agency-police"]})
     assert private.body == "Nokware: reference M3RD-8WQA received."
+
+
+def test_the_daily_limit_is_the_one_set_now_not_the_one_the_client_was_built_with() -> None:
+    """The SMS clients are cached for the life of the process. A limit captured when one was built outlived every
+    change to it, and the refusal then named a number that was no longer set anywhere — 10, after it was raised."""
+    allowed = 2
+    budget = DailyBudget(lambda: allowed)
+    budget.take(2, TODAY)
+    with pytest.raises(SmsLimitReached, match="limit of 2"):
+        budget.take(1, TODAY)
+    allowed = 100
+    budget.take(1, TODAY)  # the same client, the raised limit
+    assert budget.limit == 100

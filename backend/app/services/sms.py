@@ -8,6 +8,7 @@ plain GSM-7 first so a page holds 160 characters, and an error never carries the
 import logging
 import re
 import threading
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import date
 from functools import lru_cache
@@ -87,9 +88,21 @@ class _RedisCount:
 
 
 class DailyBudget:
-    def __init__(self, limit: int, counter: "_MemoryCount | _RedisCount | None" = None) -> None:
-        self.limit = limit
+    """How many SMS pages Nokware will pay for in a day.
+
+    The limit is read when a message is sent, not when the client was built: the clients are cached for the life of
+    the process, so a number captured at construction outlives every change to it, and the refusal then names a
+    limit that is no longer set anywhere. Raising SMS_DAILY_LIMIT still needs a restart, because the settings
+    themselves are read once — but the number in the message is the one the process is actually using.
+    """
+
+    def __init__(self, limit: int | Callable[[], int], counter: "_MemoryCount | _RedisCount | None" = None) -> None:
+        self._limit = limit
         self._counter = counter or _MemoryCount()
+
+    @property
+    def limit(self) -> int:
+        return self._limit() if callable(self._limit) else self._limit
 
     def take(self, count: int, today: date) -> None:
         if self._counter.add(today, count) > self.limit:
@@ -179,7 +192,7 @@ def arkesel() -> ArkeselSms:
         api_key=settings.arkesel_api_key,
         sender=settings.arkesel_sender_id,
         sandbox=settings.arkesel_sandbox,
-        budget=DailyBudget(settings.sms_daily_limit, _RedisCount() if settings.redis_url else _MemoryCount()),
+        budget=DailyBudget(lambda: get_settings().sms_daily_limit, _RedisCount() if settings.redis_url else _MemoryCount()),
         callback_url=delivery_report_url(),
     )
 
@@ -193,7 +206,7 @@ def code_sms() -> ArkeselSms:
         api_key=report_sms.api_key,
         sender=report_sms.sender,
         sandbox=report_sms.sandbox,
-        budget=DailyBudget(settings.sms_code_daily_limit, _RedisCount("code-pages") if settings.redis_url else _MemoryCount()),
+        budget=DailyBudget(lambda: get_settings().sms_code_daily_limit, _RedisCount("code-pages") if settings.redis_url else _MemoryCount()),
     )
 
 
