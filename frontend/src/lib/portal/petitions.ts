@@ -1,5 +1,9 @@
+import { formatDate } from "@/lib/time";
+
 import type { PetitionGroup } from "@/lib/api/petitions";
-import type { PetitionGround, PetitionGroundOption, PetitionPage, PetitionStatus } from "@/lib/api/types";
+import type {
+  Option, PetitionDepartmentShare, PetitionGround, PetitionGroundOption, PetitionPage, PetitionStatus, SharedPetition,
+} from "@/lib/api/types";
 
 /**
  * The portal's side of petitions. Nobody in here approves one: a contributor takes a petition down on a named
@@ -71,3 +75,42 @@ export function emptyGroup(group: PortalPetitionGroup): string {
 }
 
 export const petitionHref = (code: string) => `/portal/mce/petitions/${encodeURIComponent(code)}`;
+
+/**
+ * Sharing a petition with a department asks that department to answer it. It settles nothing: the MCE's own
+ * response is a separate act, and the same petition can go to more than one department.
+ */
+export const SHARE_IS_AN_ASK =
+  "This asks the department to answer. It isn't a decision on the petition, and it isn't your response: the "
+  + "petition's status doesn't move, and it keeps taking signatures. You can ask more than one department.";
+
+/** Said above the field, before a word is written: a note stands under the department, never under the officer. */
+export const NOTE_IS_PUBLIC =
+  "Your note is published on the petition's public page under your department's name. Your own name is never "
+  + "shown with it. Your department writes one note, and it can't be changed or taken back afterwards.";
+
+/** The departments this petition has not gone to yet. The share carries the department's name, as the list does. */
+export function notYetAsked(departments: Option[], shared: PetitionDepartmentShare[]): Option[] {
+  const asked = new Set(shared.map((share) => share.department));
+  return departments.filter((department) => !asked.has(department.name));
+}
+
+/** For the MCE: when a department was asked, and whether it has answered. */
+export function askedLine(share: PetitionDepartmentShare): string {
+  const asked = `Asked on ${formatDate(share.shared_at)}`;
+  return share.note_at ? `${asked} · answered on ${formatDate(share.note_at)}` : `${asked} · no answer yet`;
+}
+
+/** For the department: what it was asked, and what it has said. */
+export function noteLine(shared: SharedPetition): string {
+  const asked = `Shared with you on ${formatDate(shared.shared_at)}`;
+  return shared.note_at ? `${asked} · you answered on ${formatDate(shared.note_at)}` : asked;
+}
+
+/** What the department still owes, and what it has already said. A department writes one note per petition. */
+export function splitShared(shared: SharedPetition[]): { waiting: SharedPetition[]; answered: SharedPetition[] } {
+  return {
+    waiting: shared.filter((item) => item.note === null),
+    answered: shared.filter((item) => item.note !== null),
+  };
+}

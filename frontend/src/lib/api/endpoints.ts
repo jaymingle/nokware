@@ -13,14 +13,17 @@ import type {
   FileLink,
   Me,
   Option,
+  PetitionDetail,
   PetitionDismissal,
   PetitionRemovalRequest,
   PetitionReportQueue,
   PetitionResponseRequest,
   ReviewAction,
+  SharedPetition,
 } from "@/lib/api/types";
 
 const documentPath = (id: string) => `/api/documents/${encodeURIComponent(id)}`;
+const petitionPath = (code: string) => `/api/petitions/${encodeURIComponent(code)}`;
 
 export function getMe(): Promise<Me> {
   return apiRequest<Me>("/api/me");
@@ -125,7 +128,7 @@ export function dismissPetitionReport(reportId: string, reason: PetitionDismissa
  * is how the server can tell they neither started nor signed this petition.
  */
 export function removePetition(code: string, removal: PetitionRemovalRequest, proof: string): Promise<PetitionReportQueue> {
-  return apiRequest<PetitionReportQueue>(`/api/petitions/${encodeURIComponent(code)}/removal`, {
+  return apiRequest<PetitionReportQueue>(`${petitionPath(code)}/removal`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-Phone-Proof": proof },
     body: JSON.stringify(removal),
@@ -138,9 +141,36 @@ export function getAwaitingResponses(): Promise<AwaitingResponse[]> {
 }
 
 export function respondToPetition(code: string, response: PetitionResponseRequest): Promise<AwaitingResponse[]> {
-  return apiRequest<AwaitingResponse[]>(`/api/petitions/${encodeURIComponent(code)}/response`, {
+  return apiRequest<AwaitingResponse[]>(`${petitionPath(code)}/response`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(response),
+  });
+}
+
+/**
+ * The MCE asks one department of the Assembly to answer this petition, by the department's team ID from
+ * /api/departments. It is not a decision on the petition: the status doesn't move, and the page comes back with
+ * the department on it.
+ */
+export function sharePetition(code: string, department: string): Promise<PetitionDetail> {
+  return apiRequest<PetitionDetail>(`${petitionPath(code)}/share`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ department }),
+  });
+}
+
+/** The petitions shared with the caller's own department, newest first. The server reads the department, never a page. */
+export function getSharedPetitions(): Promise<SharedPetition[]> {
+  return apiRequest<SharedPetition[]>("/api/petitions/shared");
+}
+
+/** The one note this department writes on a petition shared with it, published under the department's name. */
+export function writeDepartmentNote(code: string, text: string): Promise<SharedPetition> {
+  return apiRequest<SharedPetition>(`${petitionPath(code)}/note`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text }),
   });
 }

@@ -5,6 +5,7 @@ import Link from "next/link";
 
 import { ErrorPanel, LoadingPanel } from "@/components/documents/panels";
 import { RespondDialog } from "@/components/mce/respond-dialog";
+import { AskedDepartments } from "@/components/mce/share-petition";
 import { DocumentLine } from "@/components/petitions/ledger-matches";
 import { Progress } from "@/components/petitions/petition-card";
 import { PetitionVersions } from "@/components/petitions/petition-versions";
@@ -91,6 +92,15 @@ function Response({ response }: { response: PetitionResponseOut }) {
   );
 }
 
+/** The departments this petition sits with. Their notes are theirs: this office asks, and reads what comes back. */
+function Departments({ petition }: { petition: PetitionDetail }) {
+  return (
+    <Section title="Departments asked to answer" testId="mce-petition-departments">
+      <AskedDepartments code={petition.code} shared={petition.shared_with ?? []} />
+    </Section>
+  );
+}
+
 const NOT_YOURS =
   "Petitions are reported to contributors, not to this office, and a contributor removes one on a named ground. You can't see who reported a petition, and you can't take one down: the Assembly is usually what a petition is about.";
 
@@ -169,6 +179,7 @@ function Found({ petition, now }: { petition: PetitionDetail; now: number }) {
       <Standing petition={petition} now={now} />
       <Words petition={petition} />
       {petition.response ? <Response response={petition.response} /> : null}
+      <Departments petition={petition} />
       <Versions petition={petition} />
       <Moderation petition={petition} />
       <Timeline petition={petition} />

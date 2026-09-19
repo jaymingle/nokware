@@ -18,11 +18,14 @@ import {
   getEscalations,
   getLibrary,
   getReviewQueue,
+  getSharedPetitions,
   getSubmissions,
   resubmitDocument,
+  sharePetition,
   takeAction,
   takeCaseAction,
   uploadDocument,
+  writeDepartmentNote,
   type CaseActionBody,
 } from "@/lib/api/endpoints";
 import { anyPublishingNow } from "@/lib/documents";
@@ -32,12 +35,14 @@ import type {
   CaseAction,
   CaseDetail,
   DocumentOut,
+  PetitionDetail,
   PetitionDismissal,
   PetitionRemovalRequest,
   PetitionReportQueue,
   PetitionResponseRequest,
   ReviewAction,
   SharedLocationView,
+  SharedPetition,
 } from "@/lib/api/types";
 
 export const LIBRARY_PAGE_SIZE = 25;
@@ -62,6 +67,7 @@ const queryKeys = {
   departments: ["departments"] as const,
   petitionReports: ["petition-reports"] as const,
   awaitingResponses: ["petition-responses"] as const,
+  sharedPetitions: ["petitions-shared"] as const,
 };
 
 /** Every list or view of documents; refreshed after any change to one. */
@@ -198,7 +204,7 @@ function refreshPetitions(queryClient: QueryClient): Promise<void> {
   return queryClient.invalidateQueries({ predicate: (query) => PETITION_QUERY_ROOTS.has(String(query.queryKey[0])) });
 }
 
-const PETITION_QUERY_ROOTS = new Set(["petitions", "petition", "petition-responses"]);
+const PETITION_QUERY_ROOTS = new Set(["petitions", "petition", "petition-responses", "petitions-shared"]);
 
 export function useRespondToPetition() {
   const queryClient = useQueryClient();
@@ -208,6 +214,28 @@ export function useRespondToPetition() {
       queryClient.setQueryData(queryKeys.awaitingResponses, waiting);
       return refreshPetitions(queryClient);
     },
+  });
+}
+
+/** Asking a department to answer is not a decision on the petition, so nothing here waits on its status. */
+export function useSharePetition() {
+  const queryClient = useQueryClient();
+  return useMutation<PetitionDetail, Error, { code: string; department: string }>({
+    mutationFn: ({ code, department }) => sharePetition(code, department),
+    onSuccess: () => refreshPetitions(queryClient),
+  });
+}
+
+/** What the caller's own department has been asked to answer. The server reads the department from the session. */
+export function useSharedPetitions() {
+  return useQuery({ queryKey: queryKeys.sharedPetitions, queryFn: getSharedPetitions, refetchInterval: PETITIONS_REFRESH_MS });
+}
+
+export function useWriteDepartmentNote() {
+  const queryClient = useQueryClient();
+  return useMutation<SharedPetition, Error, { code: string; text: string }>({
+    mutationFn: ({ code, text }) => writeDepartmentNote(code, text),
+    onSuccess: () => refreshPetitions(queryClient),
   });
 }
 

@@ -1,9 +1,10 @@
 "use client";
 
 import { useNow } from "@/hooks/use-now";
-import { useAwaitingResponses, useCaseOversight, useCaseQueue, useEscalations, usePetitionReports, useReviewQueue, useSubmissions } from "@/lib/api/queries";
+import { useAwaitingResponses, useCaseOversight, useCaseQueue, useEscalations, usePetitionReports, useReviewQueue, useSharedPetitions, useSubmissions } from "@/lib/api/queries";
 import { openForMe } from "@/lib/cases";
 import { awaitingResponse, splitByClock, splitHeld } from "@/lib/documents";
+import { splitShared } from "@/lib/portal/petitions";
 import { cn } from "@/lib/utils";
 
 import type { NavCountKind } from "@/lib/portal/navigation";
@@ -61,6 +62,12 @@ function PetitionsCount({ active }: { active: boolean }) {
   return <Count value={data?.length ?? 0} active={active} testId="nav-count-petitions" />;
 }
 
+/** Only what the department owes: a petition it was asked about and hasn't written its one note on yet. */
+function SharedPetitionsCount({ active }: { active: boolean }) {
+  const { data } = useSharedPetitions();
+  return <Count value={data ? splitShared(data).waiting.length : 0} active={active} testId="nav-count-shared-petitions" />;
+}
+
 function PetitionReportsCount({ active }: { active: boolean }) {
   const { data } = usePetitionReports();
   return <Count value={data?.reports.length ?? 0} active={active} testId="nav-count-petition-reports" />;
@@ -74,5 +81,6 @@ export function NavCount({ kind, active }: { kind: NavCountKind; active: boolean
   if (kind === "case-escalations") return <CaseEscalationsCount active={active} />;
   if (kind === "petitions") return <PetitionsCount active={active} />;
   if (kind === "petition-reports") return <PetitionReportsCount active={active} />;
+  if (kind === "shared-petitions") return <SharedPetitionsCount active={active} />;
   return null;
 }

@@ -98,6 +98,10 @@ export type PetitionDismissalOption = Schemas["DismissalOption"];
 export type PetitionDismissal = Schemas["DismissRequest"]["reason"];
 export type PetitionRemovalNotice = Schemas["RemovalNotice"];
 export type PetitionResponseOut = Schemas["PetitionResponse"];
+/** One department the MCE asked to answer a petition, under the department's name, and the note it wrote back. */
+export type PetitionDepartmentShare = Schemas["DepartmentShare"];
+/** A petition as the department it was shared with meets it, with its own note if it has written one. */
+export type SharedPetition = Schemas["SharedPetition"];
 export type PhoneChallenge = Schemas["ChallengeResult"];
 export type PhoneChallengeStatus = Schemas["ChallengeStatus"];
 export type SmsCodeSent = Schemas["SmsCodeSent"];
