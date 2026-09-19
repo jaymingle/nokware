@@ -314,6 +314,13 @@ class ReportFiled(BaseModel):
     reported_at: str
 
 
+class PetitionImage(BaseModel):
+    """A photograph as a contributor meets it: a link to look at, and the name that takes it down."""
+
+    id: str
+    url: str  # short-lived
+
+
 class ReportedPetition(BaseModel):
     id: str  # the report, for dismissing it
     reported_at: str
@@ -323,6 +330,7 @@ class ReportedPetition(BaseModel):
     note: str | None  # what the reader added, as they wrote it
     reports_on_this_petition: int
     petition: PetitionCard
+    images: list[PetitionImage]  # what a contributor judging it can see, and take down one at a time
 
 
 class Comment(BaseModel):

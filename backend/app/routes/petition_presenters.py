@@ -30,6 +30,7 @@ from app.schemas.petitions import (
     OwnPetitionDetail,
     PetitionCard,
     PetitionDetail,
+    PetitionImage,
     PetitionReply,
     PetitionResponse,
     RemovalCount,
@@ -280,8 +281,14 @@ def reported(item: Reported) -> ReportedPetition:
         id=item.report["$id"], reported_at=item.report["createdAt"], ground=ground.value,
         ground_words=in_plain_words(ground), duplicate_of=item.report.get("duplicateOf"),
         note=item.report.get("note"), reports_on_this_petition=item.reports_on_this_petition,
-        petition=card(item.petition),
+        petition=card(item.petition), images=petition_images(item.petition),
     )
+
+
+def petition_images(petition: dict[str, Any]) -> list[PetitionImage]:
+    """Paired with their stored names, because a contributor removes the photograph they are looking at."""
+    names = petition.get("imageIds") or []
+    return [PetitionImage(id=name, url=url) for name, url in zip(names, image_links(names), strict=True)]
 
 
 def removals(by_ground: dict[str, int]) -> Removals:

@@ -94,6 +94,8 @@ export type PetitionEdit = Schemas["EditRequest"];
 export type ScreenResult = Schemas["ScreenResult"];
 /** What a reader reported, and the petition it is about: a contributor's queue, newest first. */
 export type PetitionReport = Schemas["ReportedPetition"];
+/** A petition's photograph as a contributor meets it: a link to look at, and the name that takes it down. */
+export type PetitionImage = Schemas["PetitionImage"];
 export type PetitionReportQueue = Schemas["ReportQueue"];
 /** A reported comment, as the contributor who must judge it meets it. */
 export type ReportedComment = Schemas["ReportedComment"];

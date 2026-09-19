@@ -5,6 +5,7 @@ import Link from "next/link";
 import { DismissReportDialog } from "@/components/contributor/dismiss-report-dialog";
 import { RemoveCommentDialog } from "@/components/contributor/remove-comment-dialog";
 import { RemovePetitionDialog } from "@/components/contributor/remove-petition-dialog";
+import { ReportedImages } from "@/components/contributor/reported-images";
 import { EmptyPanel, ErrorPanel, LoadingPanel } from "@/components/documents/panels";
 import { Progress } from "@/components/petitions/petition-card";
 import { StatusTag } from "@/components/status-tag";
@@ -71,6 +72,7 @@ function ReportCard({ report, grounds, reasons }: CardProps) {
             What the reader added: &ldquo;{report.note}&rdquo;
           </p>
         ) : null}
+        <ReportedImages code={report.petition.code} images={report.images} grounds={grounds} />
         <div className="flex flex-wrap gap-2 pt-1">
           <RemovePetitionDialog code={report.petition.code} grounds={grounds} />
           <DismissReportDialog id={report.id} reasons={reasons} />

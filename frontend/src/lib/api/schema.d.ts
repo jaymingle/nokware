@@ -3130,6 +3130,16 @@ export interface components {
             /** Refused Under The Earlier Process */
             refused_under_the_earlier_process: number;
         };
+        /**
+         * PetitionImage
+         * @description A photograph as a contributor meets it: a link to look at, and the name that takes it down.
+         */
+        PetitionImage: {
+            /** Id */
+            id: string;
+            /** Url */
+            url: string;
+        };
         /** PetitionOptions */
         PetitionOptions: {
             /** Topics */
@@ -3597,6 +3607,8 @@ export interface components {
             /** Reports On This Petition */
             reports_on_this_petition: number;
             petition: components["schemas"]["PetitionCard"];
+            /** Images */
+            images: components["schemas"]["PetitionImage"][];
         };
         /**
          * ReportingGap

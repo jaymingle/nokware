@@ -11,6 +11,7 @@ import {
   openSharedLocation,
   removeComment,
   removePetition,
+  removePetitionImage,
   respondToPetition,
   getCaseOversight,
   getCaseQueue,
@@ -272,6 +273,12 @@ export function useDismissCommentReport() {
 export function useRemoveComment() {
   return useSettleReport<{ code: string; commentId: string; ground: PetitionGround }>(
     ({ code, commentId, ground }) => removeComment(code, commentId, ground), true);
+}
+
+/** The petition stays up, so its own pages are refreshed too: one of its photographs has gone. */
+export function useRemovePetitionImage() {
+  return useSettleReport<{ code: string; imageId: string; ground: PetitionGround }>(
+    ({ code, imageId, ground }) => removePetitionImage(code, imageId, ground), true);
 }
 
 export function useRemovePetition() {

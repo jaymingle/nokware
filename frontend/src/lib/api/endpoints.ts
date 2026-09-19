@@ -142,6 +142,15 @@ export function removeComment(code: string, commentId: string, ground: PetitionG
   });
 }
 
+/** Takes one photograph off. The petition, its words and its other photographs stand. */
+export function removePetitionImage(code: string, imageId: string, ground: PetitionGround): Promise<PetitionReportQueue> {
+  return apiRequest<PetitionReportQueue>(`${petitionPath(code)}/images/removal`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ image_id: imageId, ground }),
+  });
+}
+
 /**
  * Takes a petition down on a named ground. It needs the contributor's sign-in *and* a confirmed phone: the number
  * is how the server can tell they neither started nor signed this petition.
