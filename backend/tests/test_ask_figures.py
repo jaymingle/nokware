@@ -61,6 +61,17 @@ def test_planning_turns_tool_calls_into_labelled_figures(monkeypatch: pytest.Mon
     assert [f.label for f in planned.figures] == ["R1"] and planned.figures[0].value == "5" and planned.safety_asked
 
 
+def test_an_argument_the_model_invented_costs_its_own_figure_and_not_the_answer(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`group_by: "department"` is what Gemini actually returned for "which department handles drains"; it is not
+    one of the groupings the tool offers, and validating the calls as a list took the whole answer down with it."""
+    calls = [{"name": "CountReports", "args": {"status": "open", "group_by": "department"}},
+             {"name": "CountReports", "args": {"status": "open"}}]
+    monkeypatch.setattr(ask_figures, "_tool_calls", lambda question, now: calls)
+    monkeypatch.setattr(stats.CASES, "get", lambda: (NOW.timestamp(), [case() for _ in range(5)]))
+    planned = plan("Show me a chart of which department handles drains", NOW)
+    assert [f.label for f in planned.figures] == ["R1"] and planned.figures[0].value == "5"
+
+
 def test_a_planning_failure_means_no_figures_not_a_failed_answer(monkeypatch: pytest.MonkeyPatch) -> None:
     def broken(question: str, now: datetime) -> list[dict[str, Any]]:
         raise TimeoutError("planner timed out")

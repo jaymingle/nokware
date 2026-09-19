@@ -9,7 +9,7 @@ import logging
 import re
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Any, Literal
+from typing import Any, Literal, TypeVar
 
 from langchain_core.prompts import ChatPromptTemplate
 from pydantic import BaseModel, Field, ValidationError
@@ -192,6 +192,26 @@ def _tool_calls(question: str, now: datetime) -> list[dict[str, Any]]:
     return list(getattr(message, "tool_calls", []) or [])
 
 
+Asked = TypeVar("Asked", bound=BaseModel)
+
+
+def _asked_for(calls: list[dict[str, Any]], tool: type[Asked]) -> list[Asked]:
+    """The calls to one tool that make sense of their arguments.
+
+    A model can hand back a value outside the set it was given — `group_by: "department"` — and one such call must
+    cost its own figure and nothing else. Validating the whole list at once cost the answer instead.
+    """
+    wanted: list[Asked] = []
+    for call in calls:
+        if call["name"] != tool.__name__:
+            continue
+        try:
+            wanted.append(tool.model_validate(call["args"]))
+        except ValidationError as error:
+            logger.warning("A figure the model asked for made no sense and was dropped: %s", error)
+    return wanted
+
+
 def plan(question: str, now: datetime) -> FigurePlan:
     """A planning failure means no figures, never a failed answer."""
     if not wants_figures(question):
@@ -202,8 +222,8 @@ def plan(question: str, now: datetime) -> FigurePlan:
         logger.exception("Planning Ask's live figures failed; answering from documents only")
         return NO_FIGURES
     safety = any(c["name"] == PersonalSafetyFigures.__name__ for c in calls)
-    counts = [CountReports.model_validate(c["args"]) for c in calls if c["name"] == CountReports.__name__][:MAX_FIGURES]
-    budget, missing = _budget_figures([c for c in calls if c["name"] == BudgetFigures.__name__][:MAX_FIGURES])
+    counts = _asked_for(calls, CountReports)[:MAX_FIGURES]
+    budget, missing = _budget_figures(_asked_for(calls, BudgetFigures)[:MAX_FIGURES])
     missing = _only_the_specific(list(dict.fromkeys(missing + _years_not_held(question))))
     if not counts:
         return FigurePlan([], safety, budget, missing)
@@ -231,15 +251,10 @@ def _years_not_held(question: str) -> list[str]:
     return [f"Approved budget · {year}" for year in sorted({int(y) for y in _YEAR_ASKED.findall(question)} - held)]
 
 
-def _budget_figures(calls: list[dict[str, Any]]) -> tuple[list[BudgetFigure], list[str]]:
+def _budget_figures(wanted_figures: list[BudgetFigures]) -> tuple[list[BudgetFigure], list[str]]:
     """A gap is said, not filled."""
     found, missing = [], []
-    for index, call in enumerate(calls, 1):
-        try:
-            wanted = BudgetFigures.model_validate(call["args"])
-        except ValidationError as error:  # dropped without this line, and seen only as a figure that never arrives
-            logger.warning("A budget figure the model asked for made no sense and was dropped: %s", error)
-            continue
+    for index, wanted in enumerate(wanted_figures, 1):
         figure = budget_figures.figure(wanted, f"{budget_figures.LABEL_PREFIX}{index}")
         if figure:
             found.append(figure)
