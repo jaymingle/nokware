@@ -30,9 +30,10 @@ export function useCaseDialog(success: string) {
   return { open, onOpenChange, run, pending: mutation.isPending, error: mutation.error };
 }
 
-type FooterProps = { pending: boolean; error: Error | null; confirmLabel: string; testId: string };
+/** disabled: a stage that requires a note has none yet, so there is nothing to send. */
+type FooterProps = { pending: boolean; error: Error | null; confirmLabel: string; testId: string; disabled?: boolean };
 
-export function CaseDialogFooter({ pending, error, confirmLabel, testId }: FooterProps) {
+export function CaseDialogFooter({ pending, error, confirmLabel, testId, disabled = false }: FooterProps) {
   return (
     <>
       {error ? <ErrorNote>{error.message}</ErrorNote> : null}
@@ -42,7 +43,7 @@ export function CaseDialogFooter({ pending, error, confirmLabel, testId }: Foote
             Cancel
           </Button>
         </DialogClose>
-        <Button type="submit" disabled={pending} data-testid={`${testId}-confirm`}>
+        <Button type="submit" disabled={pending || disabled} data-testid={`${testId}-confirm`}>
           {pending ? "Saving…" : confirmLabel}
         </Button>
       </DialogFooter>

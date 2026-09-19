@@ -95,11 +95,11 @@ def test_the_mce_reassigns_with_a_reason_and_safety_cases_stay_with_safety_servi
 
 def test_the_mce_can_confirm_an_escalated_resolution_which_closes_the_case() -> None:
     escalated = case(status="escalated", escalatedAt=NOW.isoformat(), resolvedAt=(NOW - timedelta(days=3)).isoformat())
-    changes = confirm_resolution(MCE, escalated, "The drain was cleared on 4 September.", NOW)
+    changes = confirm_resolution(MCE, escalated, NOW)
     closed = {**escalated, **changes}
     assert contact_purge_at(closed) == NOW + timedelta(days=30)
     with pytest.raises(WrongState):
-        confirm_resolution(MCE, case(), "n", NOW)
+        confirm_resolution(MCE, case(), NOW)
 
 
 def test_numbers_are_kept_thirty_days_after_the_escalation_window_ends() -> None:
@@ -141,16 +141,16 @@ def test_each_person_is_offered_only_what_they_may_do() -> None:
     assert allowed_case_actions(MCE, case(status="resolved"), works) == []
 
 
-def test_the_mce_reopens_an_escalated_case_with_a_note_for_the_recipients() -> None:
+def test_only_the_mce_reopens_an_escalated_case_and_a_note_is_offered_not_required() -> None:
+    """Reopening says its own thing to the recipients and to the citizen, so the MCE may add nothing to it. Moving
+    a case and resolving one are the two that must carry a reason."""
     from app.services.case_workflow import reopen
 
-    reopen(MCE, case(status="escalated"), "The water still stands at the gate.")
-    with pytest.raises(MissingInput):
-        reopen(MCE, case(status="escalated"), "")
+    reopen(MCE, case(status="escalated"))
     with pytest.raises(WrongState):
-        reopen(MCE, case(status="in_progress"), "Why?")
+        reopen(MCE, case(status="in_progress"))
     with pytest.raises(NotAllowed):
-        reopen(WORKS, case(status="escalated"), "Me")
+        reopen(WORKS, case(status="escalated"))
 
 
 def test_reassign_is_offered_only_when_there_is_somewhere_to_move_the_case() -> None:

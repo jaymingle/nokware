@@ -1,7 +1,13 @@
 """Staff changes to a citizen report, each re-read under the case's lock.
 
-A personal-safety case's trail never carries what anyone wrote about it: the MCE reads the trail but not the content.
-The words stay on the case, for its recipients.
+Every stage takes a note written for the resident: starting work, moving the case, resolving it, reopening it, and
+the MCE's answer to an escalation. Moving and resolving require one; the rest offer it. Each note is screened and
+then stored on the history entry for the stage it belongs to, in `staff_note`, apart from the server's own line
+about what happened.
+
+A personal-safety case's trail never carries what anyone wrote about it: the MCE reads the trail but not the
+content. The words stay on the case, for its recipients — a staff note on such a case is internal, kept in the audit
+trail and returned by no resident-facing endpoint.
 """
 
 from dataclasses import dataclass, replace
@@ -11,6 +17,7 @@ from typing import Any
 from app.services import case_history, case_workflow, report_store
 from app.services.auth import Principal
 from app.services.case_history import CaseEntry, CaseHistoryAction, actor
+from app.services.case_notes import clean_note, not_naming_anyone
 from app.services.case_workflow import AssignmentStatus, CaseStatus, Reassignment
 from app.services.locks import record_lock
 from app.services.report_followups import CaseNotFound, sync_contact_retention
@@ -23,6 +30,8 @@ class Outcome:
     case: dict[str, Any]
     resolved: bool  # the citizen gets the resolution message
     started: bool = False  # ...and the "work started" message, once, when the first recipient starts
+    reassigned: bool = False  # the case moved to another office, and the citizen is told where it went
+    reopened: bool = False  # the MCE sent it back, and the citizen is told it is open again
 
 
 def _load(case_id: str) -> tuple[dict[str, Any], list[dict[str, Any]]]:
@@ -57,9 +66,11 @@ def _replace(assignments: list[dict[str, Any]], updated: dict[str, Any]) -> list
     return [updated if a["$id"] == updated["$id"] else a for a in assignments]
 
 
-def acknowledge(principal: Principal, case_id: str, now: datetime) -> Outcome:
+def acknowledge(principal: Principal, case_id: str, note: str | None, now: datetime) -> Outcome:
+    said = clean_note(note, required=False)
     with record_lock(case_id):
         case, assignments = _load(case_id)
+        not_naming_anyone(said, read_by_the_resident=not case.get("isSensitive"))
         mine = _mine(principal, case, assignments)
         # Read under the same lock as the change itself, so two recipients starting at once can't both be the first.
         first = not any(case_workflow.has_started(a) for a in assignments if a["$id"] != mine["$id"])
@@ -71,29 +82,35 @@ def acknowledge(principal: Principal, case_id: str, now: datetime) -> Outcome:
             case["status"],
             outcome.case["status"],
             note=f"{_named(mine['recipient'])} started work.",
+            staff_note=said,
         )
         case_history.record(case_id, entry)
         return outcome
 
 
 def resolve(principal: Principal, case_id: str, note: str | None, now: datetime) -> Outcome:
+    note = clean_note(note, required=True, ask="Say what was done, for the citizen and the record.")
     with record_lock(case_id):
         case, assignments = _load(case_id)
+        not_naming_anyone(note, read_by_the_resident=not case.get("isSensitive"))
         mine = _mine(principal, case, assignments)
         updated = report_store.update_assignment(mine["$id"], case_workflow.resolve(principal, mine, note, now))
         outcome = _settle(case, _replace(assignments, updated), now)
         said = f"Resolved by {_named(mine['recipient'])}."
         trail_note = said if case.get("isSensitive") else f"{said} {note}"
         entry = CaseEntry(
-            CaseHistoryAction.RESOLVED, actor(principal), case["status"], outcome.case["status"], note=trail_note
+            CaseHistoryAction.RESOLVED, actor(principal), case["status"], outcome.case["status"], note=trail_note,
+            staff_note=note,
         )
         case_history.record(case_id, entry)
         return outcome
 
 
 def reassign(principal: Principal, case_id: str, move: Reassignment, reason: str | None, now: datetime) -> Outcome:
+    reason = clean_note(reason, required=True, ask="Give a reason; the resident reads it and it goes to the record.")
     with record_lock(case_id):
         case, assignments = _load(case_id)
+        not_naming_anyone(reason, read_by_the_resident=not case.get("isSensitive"))
         case_workflow.check_reassign(principal, case, move, reason)
         leaving = next(a for a in assignments if a.get("active", True) and a["recipient"] == move.from_recipient)
         report_store.update_assignment(leaving["$id"], {"active": False})
@@ -109,9 +126,9 @@ def reassign(principal: Principal, case_id: str, move: Reassignment, reason: str
             }
         )
         recipients = [move.to_recipient if r == move.from_recipient else r for r in case["recipients"]]
-        case = report_store.update_case(case_id, {"recipients": recipients})
+        case = report_store.update_case(case_id, {"recipients": recipients, **case_workflow.reassignment_fields(move, now)})
         remaining = [a for a in assignments if a["$id"] != leaving["$id"]] + [arriving]
-        outcome = _settle(case, remaining, now)
+        outcome = replace(_settle(case, remaining, now), reassigned=True)
         entry = CaseEntry(
             CaseHistoryAction.REASSIGNED,
             actor(principal),
@@ -120,41 +137,49 @@ def reassign(principal: Principal, case_id: str, move: Reassignment, reason: str
             from_recipient=move.from_recipient,
             to_recipient=move.to_recipient,
             note=f"Moved from {_named(move.from_recipient)} to {_named(move.to_recipient)}: {reason}",
+            staff_note=reason,
         )
         case_history.record(case_id, entry)
         return outcome
 
 
 def reopen(principal: Principal, case_id: str, note: str | None, now: datetime) -> Outcome:
+    note = clean_note(note, required=False)
     with record_lock(case_id):
         case, assignments = _load(case_id)
-        case_workflow.reopen(principal, case, note)
+        not_naming_anyone(note, read_by_the_resident=not case.get("isSensitive"))
+        case_workflow.reopen(principal, case)
         active = [a for a in assignments if a.get("active", True)]
         reopened = [report_store.update_assignment(a["$id"], case_workflow.reopened_assignment()) for a in active]
-        outcome = _settle(case, reopened, now)
+        settled = _settle(case, reopened, now)
+        outcome = replace(settled, case=report_store.update_case(case_id, case_workflow.reopened_fields(now)), reopened=True)
         names = " and ".join(_named(a["recipient"]) for a in active)
         entry = CaseEntry(
-            CaseHistoryAction.REASSIGNED,
+            CaseHistoryAction.REOPENED,
             actor(principal),
             case["status"],
             outcome.case["status"],
-            note=f"Reopened for {names}: {note}",
+            note=f"Reopened for {names}." + (f" {note}" if note else ""),
+            staff_note=note,
         )
         case_history.record(case_id, entry)
         return outcome
 
 
 def confirm_resolution(principal: Principal, case_id: str, note: str | None, now: datetime) -> Outcome:
+    note = clean_note(note, required=False)
     with record_lock(case_id):
         case, _ = _load(case_id)
-        updated = report_store.update_case(case_id, case_workflow.confirm_resolution(principal, case, note, now))
+        not_naming_anyone(note, read_by_the_resident=not case.get("isSensitive"))
+        updated = report_store.update_case(case_id, case_workflow.confirm_resolution(principal, case, now))
         sync_contact_retention(updated)
         entry = CaseEntry(
             CaseHistoryAction.ESCALATION_CONFIRMED,
             actor(principal),
             case["status"],
             updated["status"],
-            note=f"The MCE confirmed the resolution: {note}",
+            note="The MCE confirmed the resolution." + (f" {note}" if note else ""),
+            staff_note=note,
         )
         case_history.record(case_id, entry)
         return Outcome(updated, resolved=True)

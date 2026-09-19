@@ -180,26 +180,36 @@ def check_reassign(principal: Principal, case: dict[str, Any], move: Reassignmen
         raise MissingInput("Give a reason; it is written to the audit trail.")
 
 
-def confirm_resolution(principal: Principal, case: dict[str, Any], note: str | None, now: datetime) -> dict[str, Any]:
+def confirm_resolution(principal: Principal, case: dict[str, Any], now: datetime) -> dict[str, Any]:
+    """The MCE's answer to an escalation. The note is offered, not required: the MCE may have nothing to add beyond
+    the recipients' own resolution, which the citizen already has."""
     _mce(principal)
     if case.get("status") != CaseStatus.ESCALATED:
         raise WrongState("Only an escalated case can be confirmed as resolved.")
-    if not note:
-        raise MissingInput("Say why the resolution stands, for the citizen and the record.")
     return {"status": CaseStatus.RESOLVED.value, "resolvedAt": now.isoformat()}
 
 
-def reopen(principal: Principal, case: dict[str, Any], note: str | None) -> None:
+def reopen(principal: Principal, case: dict[str, Any]) -> None:
+    """Reopening says its own thing: the case goes back to the recipients it was already with, and the citizen is
+    told it is open again. A note is offered, not required."""
     _mce(principal)
     if case.get("status") != CaseStatus.ESCALATED:
         raise WrongState("Only an escalated case can be reopened.")
-    if not note:
-        raise MissingInput("Say what is still to be done; the recipients see it.")
 
 
 def reopened_assignment() -> dict[str, Any]:
     """The earlier resolution stays in the audit trail."""
     return {"status": AssignmentStatus.ASSIGNED.value, "acknowledgedAt": None, "resolvedAt": None, "resolutionNote": None}
+
+
+def reassignment_fields(move: Reassignment, now: datetime) -> dict[str, Any]:
+    """Stamped on the case itself, not only in the trail, so the message about a move can be composed from the case
+    alone — which is what lets the missed-message sweep send it again if the first attempt was lost."""
+    return {"reassignedAt": now.isoformat(), "reassignedFrom": move.from_recipient, "reassignedTo": move.to_recipient}
+
+
+def reopened_fields(now: datetime) -> dict[str, Any]:
+    return {"reopenedAt": now.isoformat()}
 
 
 def closes_at(case: dict[str, Any]) -> datetime | None:

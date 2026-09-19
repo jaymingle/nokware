@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { arrange, caseAge, caseEventText, caseStatusTag, openForMe } from "@/lib/cases";
+import { arrange, caseAge, caseEventText, caseNoteCopy, caseNoteReader, caseStatusTag, caseTrail, openForMe } from "@/lib/cases";
 
-import type { CaseSummary } from "@/lib/api/types";
+import type { CaseDetail, CaseEvent, CaseSummary } from "@/lib/api/types";
 
 const NOW = Date.parse("2026-09-13T12:00:00Z");
 
@@ -33,6 +33,41 @@ describe("caseEventText", () => {
   it("prefers the entry's note, and names bare steps plainly", () => {
     expect(caseEventText({ action: "submitted", note: null })).toBe("Reported by a resident");
     expect(caseEventText({ action: "resolved", note: "Resolved by Works. Drain desilted." })).toBe("Resolved by Works. Drain desilted.");
+  });
+});
+
+describe("a staff note's reader", () => {
+  it("names the resident on an everyday case", () => {
+    expect(caseNoteCopy(false).label).toBe("The resident will see this note");
+    expect(caseNoteCopy(false).hint).toBe("Say what was done or what happens next. Don't include names, phone numbers or addresses.");
+    expect(caseNoteReader(false)).toBe("The resident reads this note");
+  });
+
+  it("says a personal-safety note is internal, in the field and in the trail alike", () => {
+    expect(caseNoteCopy(true).label).toBe("Internal: not shown to the resident");
+    expect(caseNoteCopy(true).hint).toContain("audit trail");
+    expect(caseNoteReader(true)).toBe("Internal: not shown to the resident");
+  });
+});
+
+describe("caseTrail", () => {
+  // seen_by_the_resident is the API's answer, not a rule this file keeps: these events carry it as the server would.
+  const event = (action: string, staffNote: string | null = null, seen = true) =>
+    ({ action, actor_name: "Waste Management", actor_role: "department", note: null, staff_note: staffNote,
+       at: "2026-09-12T09:00:00Z", seen_by_the_resident: seen }) as CaseEvent;
+  const trail = (isPrivate: boolean, history: CaseEvent[]) => caseTrail({ private: isPrivate, history } as Pick<CaseDetail, "private" | "history">);
+
+  it("keeps the order the case took, and marks the steps the resident reads", () => {
+    const steps = trail(false, [event("submitted"), event("notified", null, false), event("resolved", "Drain desilted.")]);
+    expect(steps.map((step) => [step.event.action, step.seen])).toEqual([["submitted", true], ["notified", false], ["resolved", true]]);
+    expect(steps[2].note).toBe("Drain desilted.");
+    expect(steps[2].internal).toBe(false);
+  });
+
+  it("marks every note internal on a personal-safety case, where the page shows only how far it has got", () => {
+    const steps = trail(true, [event("acknowledged", "Officer visited."), event("reassigned", "Police hold it now.", false)]);
+    expect(steps.map((step) => step.seen)).toEqual([true, false]);
+    expect(steps.every((step) => step.internal)).toBe(true);
   });
 });
 

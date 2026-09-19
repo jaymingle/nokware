@@ -1,4 +1,4 @@
-import type { CaseSummary } from "@/lib/api/types";
+import type { CaseDetail, CaseEvent, CaseSummary } from "@/lib/api/types";
 import type { Tone } from "@/lib/documents";
 
 const HOUR_MS = 3_600_000;
@@ -57,6 +57,52 @@ const EVENT_LABELS: Record<string, string> = {
 
 export function caseEventText(event: { action: string; note?: string | null }): string {
   return event.note ?? EVENT_LABELS[event.action] ?? event.action;
+}
+
+const INTERNAL_LABEL = "Internal: not shown to the resident";
+
+/**
+ * The field a stage's note is written in. On an everyday case the note is written for the resident and appears on
+ * their status page; on a personal-safety case that page carries fixed lines only, so the note stays internal.
+ */
+export function caseNoteCopy(isPrivate: boolean): { label: string; hint: string } {
+  if (isPrivate) {
+    return { label: INTERNAL_LABEL, hint: "It stays in the audit trail with your name. The resident's status page says only how far the case has got." };
+  }
+  return {
+    label: "The resident will see this note",
+    hint: "Say what was done or what happens next. Don't include names, phone numbers or addresses.",
+  };
+}
+
+/** Said beside a note in the trail, so staff can see at a glance who reads it. */
+export function caseNoteReader(internal: boolean): string {
+  return internal ? INTERNAL_LABEL : "The resident reads this note";
+}
+
+export type TrailStep = {
+  event: CaseEvent;
+  /** Whether the resident sees this step on their status page. */
+  seen: boolean;
+  /** What staff wrote at this step, when they wrote anything. */
+  note: string | null;
+  /** Whether that note is kept from the resident. */
+  internal: boolean;
+};
+
+/**
+ * The trail in the order it happened, marked with what the resident reads of it.
+ *
+ * Which steps those are is the API's answer (`seen_by_the_resident`), not a rule kept here: a second copy would
+ * go on saying "the resident reads this" long after the server stopped showing it.
+ */
+export function caseTrail(detail: Pick<CaseDetail, "private" | "history">): TrailStep[] {
+  return detail.history.map((event) => ({
+    event,
+    seen: event.seen_by_the_resident,
+    note: event.staff_note,
+    internal: detail.private,
+  }));
 }
 
 /** What a department sees its own part of a case as: the MCE's view of the whole case is filtered separately. */

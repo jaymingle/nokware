@@ -67,7 +67,7 @@ def fake(monkeypatch: pytest.MonkeyPatch) -> Fake:
 
 def test_a_department_starts_and_finishes_a_case_and_the_citizen_is_told(fake: Fake) -> None:
     fake.add_case("c1", ["dept-works"])
-    assert case_actions.acknowledge(WORKS, "c1", NOW).case["status"] == "in_progress"
+    assert case_actions.acknowledge(WORKS, "c1", None, NOW).case["status"] == "in_progress"
     outcome = case_actions.resolve(WORKS, "c1", "Drain desilted on 12 September.", NOW)
     assert outcome.resolved and outcome.case["status"] == "resolved" and outcome.case["resolvedAt"]
     assert [e.action for e in fake.trail] == ["acknowledged", "resolved"]
@@ -79,19 +79,19 @@ def test_the_citizen_hears_that_work_started_when_the_first_recipient_starts_and
     is one piece of news told twice, at two credits."""
     fake.add_case("c5", ["agency-police", "dept-social-welfare"], category="personal_safety", isSensitive=True)
 
-    assert case_actions.acknowledge(POLICE, "c5", NOW).started
-    assert not case_actions.acknowledge(WELFARE, "c5", NOW).started
+    assert case_actions.acknowledge(POLICE, "c5", None, NOW).started
+    assert not case_actions.acknowledge(WELFARE, "c5", None, NOW).started
     assert [e.action for e in fake.trail] == ["acknowledged", "acknowledged"]
 
 
 def test_a_recipient_the_case_has_moved_away_from_had_already_started_it(fake: Fake) -> None:
     """The message went when Works started; the case moving to Waste Management is not a second start for the citizen."""
     fake.add_case("c6", ["dept-works"])
-    assert case_actions.acknowledge(WORKS, "c6", NOW).started
+    assert case_actions.acknowledge(WORKS, "c6", None, NOW).started
     case_actions.reassign(MCE, "c6", Reassignment("dept-works", "dept-waste-management"), "Refuse, not drains.", NOW)
 
     waste = Principal("u-wm", "Ama (Waste)", "wm@x.org", Role.DEPARTMENT, "dept-waste-management")
-    assert not case_actions.acknowledge(waste, "c6", NOW).started
+    assert not case_actions.acknowledge(waste, "c6", None, NOW).started
 
 
 def test_work_starting_again_after_the_mce_reopens_a_case_is_told_again(fake: Fake) -> None:
@@ -100,7 +100,7 @@ def test_work_starting_again_after_the_mce_reopens_a_case_is_told_again(fake: Fa
     fake.assignments["a1"].update({"status": "in_progress", "acknowledgedAt": NOW.isoformat()})
     case_actions.reopen(MCE, "c7", "The drain is choked again.", NOW)
 
-    assert case_actions.acknowledge(WORKS, "c7", NOW).started
+    assert case_actions.acknowledge(WORKS, "c7", "Back on site this morning.", NOW).started
 
 
 def test_a_two_recipient_case_waits_for_both_and_its_trail_never_quotes_them(fake: Fake) -> None:
@@ -116,7 +116,7 @@ def test_an_escalated_case_waits_for_the_mce(fake: Fake) -> None:
     with pytest.raises(WrongState):
         case_actions.resolve(WORKS, "c3", "Done again", NOW)
     with pytest.raises(NotAllowed):
-        case_actions.acknowledge(POLICE, "c3", NOW)
+        case_actions.acknowledge(POLICE, "c3", None, NOW)
 
 
 def test_the_mce_reassigns_one_part_and_the_trail_gives_the_reason(fake: Fake) -> None:

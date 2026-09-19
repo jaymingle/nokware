@@ -190,7 +190,7 @@ def test_whatsapp_and_ussd_hand_a_code_to_the_page(server: fakeredis.FakeRedis, 
 
 
 def test_danger_to_a_person_and_personal_data_stop_a_petition(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(petition_screen, "_private_person", lambda text: None)
+    monkeypatch.setattr(petition_screen, "private_person", lambda text: None)
     assert petition_screen.screen("Stop the landlord who beats his wife", DRAFT.body).stop == petition_screen.SAFETY_STOP
     for text in ("Call me on 024 123 4567", "Write to ama@example.com", "Card GHA-123456789-0", "Ring +233 20 765 4321"):
         assert "Take it out" in (petition_screen.screen(DRAFT.title, f"{DRAFT.body} {text}").stop or ""), text
@@ -198,10 +198,10 @@ def test_danger_to_a_person_and_personal_data_stop_a_petition(monkeypatch: pytes
 
 
 def test_a_private_person_only_warns_and_a_missing_model_lets_it_through(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(petition_screen, "_private_person", lambda text: "Auntie Esi")
+    monkeypatch.setattr(petition_screen, "private_person", lambda text: "Auntie Esi")
     screened = petition_screen.screen(DRAFT.title, DRAFT.body)
     assert screened.stop is None and "Auntie Esi" in (screened.warning or "")
-    monkeypatch.setattr(petition_screen, "_private_person", lambda text: None)
+    monkeypatch.setattr(petition_screen, "private_person", lambda text: None)
     assert petition_screen.screen(DRAFT.title, DRAFT.body) == petition_screen.Screening(None, None)
 
 

@@ -1236,7 +1236,7 @@ export interface paths {
          * @description A spoken reply, fetched by Twilio as it sends the voice note. The link is random and lasts 10 minutes, and
          *     the audio is an answer from public documents, never anything about a report.
          */
-        get: operations["whatsapp_audio_api_channels_whatsapp_audio__name__head"];
+        get: operations["whatsapp_audio_api_channels_whatsapp_audio__name__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1246,7 +1246,7 @@ export interface paths {
          * @description A spoken reply, fetched by Twilio as it sends the voice note. The link is random and lasts 10 minutes, and
          *     the audio is an answer from public documents, never anything about a report.
          */
-        head: operations["whatsapp_audio_api_channels_whatsapp_audio__name__head"];
+        head: operations["whatsapp_audio_api_channels_whatsapp_audio__name__get"];
         patch?: never;
         trace?: never;
     };
@@ -1640,8 +1640,12 @@ export interface components {
             actor_role: string;
             /** Note */
             note: string | null;
+            /** Staff Note */
+            staff_note: string | null;
             /** At */
             at: string;
+            /** Seen By The Resident */
+            seen_by_the_resident: boolean;
         };
         /** CaseOversight */
         CaseOversight: {
@@ -2391,7 +2395,10 @@ export interface components {
             /** Total */
             total: number;
         };
-        /** NoteRequest */
+        /**
+         * NoteRequest
+         * @description A note the stage requires: resolving, and the reason for a move.
+         */
         NoteRequest: {
             /** Note */
             note: string;
@@ -2402,6 +2409,18 @@ export interface components {
             id: string;
             /** Name */
             name: string;
+        };
+        /**
+         * OptionalNoteRequest
+         * @description A note the stage offers: starting work, reopening, and the MCE's answer to an escalation. The body itself may
+         *     be left off altogether, so the route's default is one shared instance: frozen, so it stays one.
+         */
+        OptionalNoteRequest: {
+            /**
+             * Note
+             * @default
+             */
+            note: string;
         };
         /** OversightStats */
         OversightStats: {
@@ -2940,6 +2959,8 @@ export interface components {
             voices?: number | null;
             /** Location Views */
             location_views?: components["schemas"]["LocationViewNote"][];
+            /** Timeline */
+            timeline?: components["schemas"]["TimelineEvent"][];
         };
         /**
          * ReportingGap
@@ -3330,6 +3351,20 @@ export interface components {
             at: string;
             /** Reason */
             reason: string | null;
+        };
+        /**
+         * TimelineEvent
+         * @description One step of the case, as the resident reads it. Departments only: never the name of a member of staff.
+         */
+        TimelineEvent: {
+            /** Action */
+            action: string;
+            /** At */
+            at: string;
+            /** Description */
+            description: string;
+            /** Note */
+            note?: string | null;
         };
         /** TopicFigures */
         TopicFigures: {
@@ -4206,7 +4241,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["OptionalNoteRequest"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -4307,9 +4346,9 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody: {
+        requestBody?: {
             content: {
-                "application/json": components["schemas"]["NoteRequest"];
+                "application/json": components["schemas"]["OptionalNoteRequest"];
             };
         };
         responses: {
@@ -4342,9 +4381,9 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody: {
+        requestBody?: {
             content: {
-                "application/json": components["schemas"]["NoteRequest"];
+                "application/json": components["schemas"]["OptionalNoteRequest"];
             };
         };
         responses: {
@@ -5494,7 +5533,7 @@ export interface operations {
             };
         };
     };
-    whatsapp_audio_api_channels_whatsapp_audio__name__head: {
+    whatsapp_audio_api_channels_whatsapp_audio__name__get: {
         parameters: {
             query?: never;
             header?: never;
@@ -5525,7 +5564,7 @@ export interface operations {
             };
         };
     };
-    whatsapp_audio_api_channels_whatsapp_audio__name__head: {
+    whatsapp_audio_api_channels_whatsapp_audio__name__get: {
         parameters: {
             query?: never;
             header?: never;

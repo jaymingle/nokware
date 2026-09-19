@@ -5,6 +5,12 @@
   place: new attributes are added and two existing ones adjusted (status gains
   "escalated"; assignedDepartment becomes optional, since recipients now live in
   case_assignments). Nothing is deleted.
+- Later additions, all additive, all re-derived from the Python enums so a
+  re-run writes the same set again: case_history gains staffNote (what staff
+  wrote for the resident at a stage) and the "reopened" action; notifications
+  gains the "reassigned" and "reopened" events; citizen_reports gains
+  reassignedAt / reassignedFrom / reassignedTo and reopenedAt, with an index on
+  each date so the missed-message sweep can find a case by them.
 - New collections: case_assignments, report_contacts (numbers encrypted at
   rest) and notifications (the outbox).
 
@@ -24,7 +30,7 @@ from appwrite.query import Query
 
 from app.services.appwrite_client import DATABASE_ID, get_databases, get_teams, quiet_sdk_deprecation_warnings
 from app.services.case_history import COLLECTION_ID as HISTORY
-from app.services.case_history import NOTE_MAX, ActorRole, CaseHistoryAction
+from app.services.case_history import NOTE_MAX, STAFF_NOTE_MAX, ActorRole, CaseHistoryAction
 from app.services.case_workflow import AssignmentStatus, CaseStatus
 from app.services.citizen_reports import (
     ASSIGNMENTS_COLLECTION as ASSIGNMENTS,
@@ -87,6 +93,12 @@ def report_attributes() -> dict[str, Creator]:
         "resolvedAt": lambda: db.create_datetime_attribute(*c, "resolvedAt", False),
         "escalatedAt": lambda: db.create_datetime_attribute(*c, "escalatedAt", False),
         "escalationNote": lambda: db.create_string_attribute(*c, "escalationNote", NOTE_MAX, False),
+        # The last move and the last reopening, stamped on the case itself. The message about either is composed
+        # from the case alone, which is what lets the missed-message sweep send it again if the first send was lost.
+        "reassignedAt": lambda: db.create_datetime_attribute(*c, "reassignedAt", False),
+        "reassignedFrom": lambda: db.create_string_attribute(*c, "reassignedFrom", TEAM, False),
+        "reassignedTo": lambda: db.create_string_attribute(*c, "reassignedTo", TEAM, False),
+        "reopenedAt": lambda: db.create_datetime_attribute(*c, "reopenedAt", False),
     }
 
 
@@ -105,18 +117,22 @@ def history_attributes() -> dict[str, Creator]:
         "fromStatus": lambda: db.create_enum_attribute(*c, "fromStatus", values(CaseStatus), False),
         "toStatus": lambda: db.create_enum_attribute(*c, "toStatus", values(CaseStatus), False),
         "note": lambda: db.create_string_attribute(*c, "note", NOTE_MAX, False),
+        # What a member of staff wrote at this stage, for the resident: kept apart from the server's own line, so it
+        # can be shown, trimmed or withheld on its own.
+        "staffNote": lambda: db.create_string_attribute(*c, "staffNote", STAFF_NOTE_MAX, False),
         "channel": lambda: db.create_enum_attribute(*c, "channel", values(NotificationChannel), False),
     }
 
 
 def adjust_history() -> None:
     get_databases().update_enum_attribute(DATABASE_ID, HISTORY, "action", values(CaseHistoryAction), True, None)
-    print("updated   case_history.action (the full set of case steps)")
+    print("updated   case_history.action (the full set of case steps, now including reopened)")
 
 
 def adjust_notifications() -> None:
     """The outbox's enums, re-derived from the Python ones: status gained "not_sent" (recorded while no provider is
-    wired in) and event gained "started" (a recipient began work). Re-running writes the same set again."""
+    wired in) and event gained "started" (a recipient began work), then "reassigned" (the case moved to another
+    office) and "reopened" (the MCE sent it back). Re-running writes the same set again."""
     db = get_databases()
     existing = {a.key for a in db.list_attributes(DATABASE_ID, NOTIFICATIONS, queries=LISTING).attributes}
     if "status" in existing:
@@ -187,6 +203,8 @@ INDEXES: dict[str, dict[str, tuple[DatabasesIndexType, list[str]]]] = {
         "idx_createdAt": (KEY, ["createdAt"]),
         "idx_resolvedAt": (KEY, ["resolvedAt"]),
         "idx_escalatedAt": (KEY, ["escalatedAt"]),
+        "idx_reassignedAt": (KEY, ["reassignedAt"]),
+        "idx_reopenedAt": (KEY, ["reopenedAt"]),
     },
     HISTORY: {"idx_case_timestamp": (KEY, ["caseId", "timestamp"])},
     ASSIGNMENTS: {

@@ -8,11 +8,12 @@ import { SharedLocation } from "@/components/cases/shared-location";
 import { ErrorNote } from "@/components/documents/panels";
 import { Tag } from "@/components/documents/tag";
 import { useCase } from "@/lib/api/queries";
-import { caseEventText, caseStatusTag, SEVERITY_LABELS } from "@/lib/cases";
+import { caseEventText, caseNoteReader, caseStatusTag, caseTrail, SEVERITY_LABELS } from "@/lib/cases";
 import { formatDateTime } from "@/lib/time";
 import { voicesTally } from "@/lib/voices";
 
 import type { CaseDetail, Option } from "@/lib/api/types";
+import type { TrailStep } from "@/lib/cases";
 
 function Facts({ detail }: { detail: CaseDetail }) {
   const facts = [
@@ -49,17 +50,37 @@ function Callback({ detail }: { detail: CaseDetail }) {
   );
 }
 
+const SAFETY_TRAIL = "A personal-safety case: the resident's page says only that it was filed, started and closed. Nothing written here reaches them.";
+const TRAIL_CAPTION = "The steps marked are the ones the resident reads, in this order, with the notes written at them.";
+
+function TrailNote({ step, testId }: { step: TrailStep; testId: string }) {
+  if (!step.note) return null;
+  return (
+    <div className="mt-1" data-testid={testId}>
+      <p className="text-[12.5px] text-ink-soft break-words">&ldquo;{step.note}&rdquo;</p>
+      <p className="text-[12px] text-ink-muted">{caseNoteReader(step.internal)}</p>
+    </div>
+  );
+}
+
 function Trail({ detail }: { detail: CaseDetail }) {
   return (
     <div className="flex flex-col gap-2.5">
-      <p className="text-[12.5px] text-ink-soft">Chain of custody</p>
+      <div>
+        <p className="text-[12.5px] text-ink-soft">Chain of custody</p>
+        <p className="text-[12.5px] text-ink-soft">{detail.private ? SAFETY_TRAIL : TRAIL_CAPTION}</p>
+      </div>
       <ol className="flex flex-col gap-3" data-testid={`case-trail-${detail.case_id}`}>
-        {detail.history.map((event, index) => (
-          <li key={`${event.at}-${index}`} className="grid grid-cols-[12px_minmax(0,1fr)] gap-2.5">
+        {caseTrail(detail).map((step, index) => (
+          <li key={`${step.event.at}-${index}`} className="grid grid-cols-[12px_minmax(0,1fr)] gap-2.5">
             <span aria-hidden className="mt-[7px] size-[5px] rounded-full bg-teal" />
             <div>
-              <p className="text-[13px] break-words">{caseEventText(event)}</p>
-              <p className="text-[12px] text-ink-soft tabular-nums">{event.actor_name} · {formatDateTime(event.at)}</p>
+              <p className="text-[13px] break-words">{caseEventText(step.event)}</p>
+              <p className="text-[12px] text-ink-soft tabular-nums">
+                {step.event.actor_name} · {formatDateTime(step.event.at)}
+                {step.seen ? " · On the resident's status page" : ""}
+              </p>
+              <TrailNote step={step} testId={`case-trail-note-${detail.case_id}-${index}`} />
             </div>
           </li>
         ))}

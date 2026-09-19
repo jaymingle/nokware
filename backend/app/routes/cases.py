@@ -6,7 +6,16 @@ from fastapi import APIRouter, BackgroundTasks, Depends
 
 from app.dependencies import require_roles
 from app.routes.case_presenters import detail, summary
-from app.schemas.cases import CaseDetail, CaseOversight, CaseQueue, NoteRequest, OversightStats, ReassignRequest, SharedLocationView
+from app.schemas.cases import (
+    CaseDetail,
+    CaseOversight,
+    CaseQueue,
+    NoteRequest,
+    OptionalNoteRequest,
+    OversightStats,
+    ReassignRequest,
+    SharedLocationView,
+)
 from app.schemas.documents import Option
 from app.services import case_actions, case_queries, report_locations
 from app.services.auth import Principal, Role
@@ -54,39 +63,51 @@ def case(principal: Staff, case_id: str) -> CaseDetail:
     return _visible(principal, case_id)
 
 
+# What the citizen is told, in the order it happened. A personal-safety case is told nothing about a move or a
+# reopening; notifications.notifiable is the one place that decides, so the sweep can't send later what wouldn't be
+# sent now.
+TOLD = (
+    ("reassigned", NotificationEvent.REASSIGNED),
+    ("reopened", NotificationEvent.REOPENED),
+    ("started", NotificationEvent.STARTED),
+    ("resolved", NotificationEvent.RESOLVED),
+)
+
+
 def _after(principal: Principal, outcome: Outcome, tasks: BackgroundTasks) -> CaseDetail:
-    if outcome.resolved:
-        tasks.add_task(notify_quietly, outcome.case, NotificationEvent.RESOLVED)
-    if outcome.started:
-        tasks.add_task(notify_quietly, outcome.case, NotificationEvent.STARTED)
+    for field, event in TOLD:
+        if getattr(outcome, field):
+            tasks.add_task(notify_quietly, outcome.case, event)
     return _visible(principal, outcome.case["$id"])
 
 
 @router.post("/{case_id}/acknowledge", response_model=CaseDetail)
-def acknowledge(principal: Recipient, case_id: str, tasks: BackgroundTasks) -> CaseDetail:
-    return _after(principal, case_actions.acknowledge(principal, case_id, utc_now()), tasks)
+def acknowledge(principal: Recipient, case_id: str, tasks: BackgroundTasks,
+                request: OptionalNoteRequest = OptionalNoteRequest()) -> CaseDetail:  # noqa: B008
+    return _after(principal, case_actions.acknowledge(principal, case_id, request.note, utc_now()), tasks)
 
 
 @router.post("/{case_id}/resolve", response_model=CaseDetail)
 def resolve(principal: Recipient, case_id: str, request: NoteRequest, tasks: BackgroundTasks) -> CaseDetail:
-    return _after(principal, case_actions.resolve(principal, case_id, request.note.strip() or None, utc_now()), tasks)
+    return _after(principal, case_actions.resolve(principal, case_id, request.note, utc_now()), tasks)
 
 
 @router.post("/{case_id}/reassign", response_model=CaseDetail)
 def reassign(principal: Mce, case_id: str, request: ReassignRequest, tasks: BackgroundTasks) -> CaseDetail:
     move = Reassignment(request.from_recipient, request.to_recipient)
-    return _after(principal, case_actions.reassign(principal, case_id, move, request.reason.strip() or None, utc_now()), tasks)
+    return _after(principal, case_actions.reassign(principal, case_id, move, request.reason, utc_now()), tasks)
 
 
 @router.post("/{case_id}/reopen", response_model=CaseDetail)
-def reopen(principal: Mce, case_id: str, request: NoteRequest, tasks: BackgroundTasks) -> CaseDetail:
-    return _after(principal, case_actions.reopen(principal, case_id, request.note.strip() or None, utc_now()), tasks)
+def reopen(principal: Mce, case_id: str, tasks: BackgroundTasks,
+           request: OptionalNoteRequest = OptionalNoteRequest()) -> CaseDetail:  # noqa: B008
+    return _after(principal, case_actions.reopen(principal, case_id, request.note, utc_now()), tasks)
 
 
 @router.post("/{case_id}/confirm-resolution", response_model=CaseDetail)
-def confirm_resolution(principal: Mce, case_id: str, request: NoteRequest, tasks: BackgroundTasks) -> CaseDetail:
-    outcome = case_actions.confirm_resolution(principal, case_id, request.note.strip() or None, utc_now())
-    return _after(principal, outcome, tasks)
+def confirm_resolution(principal: Mce, case_id: str, tasks: BackgroundTasks,
+                       request: OptionalNoteRequest = OptionalNoteRequest()) -> CaseDetail:  # noqa: B008
+    return _after(principal, case_actions.confirm_resolution(principal, case_id, request.note, utc_now()), tasks)
 
 
 @router.get("/{case_id}/location", response_model=SharedLocationView)

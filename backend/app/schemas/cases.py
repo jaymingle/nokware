@@ -3,9 +3,10 @@ recipients see everything; the MCE sees a personal-safety case only in outline."
 
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
-from app.schemas.documents import NOTE_MAX, Option
+from app.schemas.documents import Option
+from app.services.case_notes import NOTE_MAX
 from app.services.case_workflow import CaseAction
 
 CaseViewName = Literal["full", "oversight"]
@@ -44,8 +45,10 @@ class CaseEvent(BaseModel):
     action: str
     actor_name: str
     actor_role: str
-    note: str | None
+    note: str | None  # the server's own line about what happened
+    staff_note: str | None  # what staff wrote for the resident; full view only, so an outline never carries it
     at: str
+    seen_by_the_resident: bool  # whether this step appears on the resident's own status page
 
 
 class Contact(BaseModel):
@@ -95,7 +98,18 @@ class CaseOversight(BaseModel):
 
 
 class NoteRequest(BaseModel):
+    """A note the stage requires: resolving, and the reason for a move."""
+
     note: str = Field(max_length=NOTE_MAX)
+
+
+class OptionalNoteRequest(BaseModel):
+    """A note the stage offers: starting work, reopening, and the MCE's answer to an escalation. The body itself may
+    be left off altogether, so the route's default is one shared instance: frozen, so it stays one."""
+
+    model_config = ConfigDict(frozen=True)
+
+    note: str = Field(default="", max_length=NOTE_MAX)
 
 
 class ReassignRequest(BaseModel):

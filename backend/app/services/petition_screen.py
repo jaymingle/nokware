@@ -58,7 +58,9 @@ def personal_data(text: str) -> str | None:
     return next((kind for kind, pattern in _PERSONAL_DATA if pattern.search(text)), None)
 
 
-def _private_person(text: str) -> str | None:
+def private_person(text: str) -> str | None:
+    """Whether the words name a private individual, as the model reads them. Advisory: a model that fails or times
+    out returns None, because a check nobody can run is not a reason to stop someone working."""
     config = types.GenerateContentConfig(
         temperature=0.0, thinking_config=types.ThinkingConfig(thinking_budget=0),
         response_mime_type="application/json", response_schema=_Reading,
@@ -87,7 +89,7 @@ def screen(title: str, body: str) -> Screening:
     stop = hard_stop(title, body)
     if stop:
         return Screening(stop, None)
-    person = _private_person(f"{title}\n\n{body}")
+    person = private_person(f"{title}\n\n{body}")
     warning = (f"This seems to name a private person (“{person}”). A petition can't: the MCE can refuse it for that. "
                "Edit it, or send it as it is if they are a public official acting in their role.") if person else None
     return Screening(None, warning)
