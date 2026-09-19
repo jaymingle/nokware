@@ -1,5 +1,5 @@
-"""Petitions: public pages, the creator's own petitions (by a confirmed phone), the contributors' queue of reported
-petitions, and the MCE's responses.
+"""Petitions: public pages, the creator's own petitions (by a confirmed phone), what residents say under one, the
+contributors' queue of what has been reported, and the MCE's responses.
 
 Nobody approves a petition here. A draft that passes the screen is published by the person who wrote it; what comes
 down, comes down on a named ground, by a contributor who neither started it nor signed it.
@@ -17,6 +17,11 @@ from app.schemas.documents import Option
 from app.schemas.petitions import (
     AreaOption,
     AwaitingResponse,
+    Comment,
+    CommentPage,
+    CommentRemovalRequest,
+    CommentReportRequest,
+    CommentRequest,
     DismissRequest,
     DraftRequest,
     EditRequest,
@@ -30,6 +35,7 @@ from app.schemas.petitions import (
     PetitionOptions,
     PetitionPage,
     RemovalRequest,
+    ReportedComment,
     ReportFiled,
     ReportQueue,
     ReportRequest,
@@ -43,6 +49,7 @@ from app.schemas.petitions import (
     Verification,
 )
 from app.services import (
+    petition_comments,
     petition_images,
     petition_ledger,
     petition_removals,
@@ -57,7 +64,7 @@ from app.services import (
 )
 from app.services.auth import Principal, Role
 from app.services.ledger_documents import utc_now
-from app.services.petition_grounds import Dismissal, Ground
+from app.services.petition_grounds import Dismissal, Ground, in_plain_words
 from app.services.petition_rules import (
     DOCUMENTS_MAX,
     IMAGES_MAX,
@@ -142,15 +149,35 @@ def responses(_: Mce) -> list[AwaitingResponse]:
 
 @router.get("/reports", response_model=ReportQueue)
 def reported(_: Contributor) -> ReportQueue:
-    """What readers have reported, newest first, with the petition each report is about."""
+    """What readers have reported, newest first: the petitions, and the comments standing under them."""
     return ReportQueue(reports=[present.reported(item) for item in petition_reports.queue()],
+                       comments=[_reported_comment(item) for item in petition_comments.queue()],
                        grounds=present.grounds(), dismissal_reasons=present.dismissal_reasons())
+
+
+def _comment(seen: petition_comments.Seen) -> Comment:
+    return Comment(id=seen.id, name=seen.name, text=seen.text, at=seen.at, removed=seen.removed)
+
+
+def _reported_comment(item: petition_comments.ReportedComment) -> ReportedComment:
+    ground = Ground(item.report["ground"])
+    return ReportedComment(id=item.report["$id"], reported_at=item.report["createdAt"], ground=ground.value,
+                           ground_words=in_plain_words(ground), note=item.report.get("note"),
+                           reports_on_this_comment=item.reports_on_this_comment, code=item.report["code"],
+                           comment=_comment(item.comment))
 
 
 @router.post("/reports/{report_id}/dismiss", response_model=ReportQueue, dependencies=[Changes])
 def dismiss(report_id: str, request: DismissRequest, principal: Contributor) -> ReportQueue:
     """The report is settled with one of two fixed reasons; the petition is untouched."""
     petition_reports.dismiss(principal, report_id, Dismissal(request.reason), utc_now())
+    return reported(principal)
+
+
+@router.post("/comment-reports/{report_id}/dismiss", response_model=ReportQueue, dependencies=[Changes])
+def dismiss_comment_report(report_id: str, request: DismissRequest, principal: Contributor) -> ReportQueue:
+    """The same two fixed reasons settle a report about a comment; the comment stays as it is."""
+    petition_comments.dismiss(principal, report_id, Dismissal(request.reason), utc_now())
     return reported(principal)
 
 
@@ -192,9 +219,12 @@ def _stop_if_screened(title: str, body: str) -> None:
 def petition(code: str) -> PetitionDetail | Tombstone:
     """A petition, or — where one was removed — the tombstone, which is built from the removal record alone."""
     try:
-        return present.detail(petitions.public(code))
+        standing = petitions.public(code)
     except petitions.PetitionNotFound:
         return _tombstone(code)
+    # Counted only for a petition this call has already read publicly, so a removed one carries no count, as it
+    # carries no comments.
+    return present.detail(standing).model_copy(update={"comments": petition_comments.count_on(standing)})
 
 
 def _tombstone(code: str) -> Tombstone:
@@ -290,3 +320,43 @@ def names(
 ) -> NamedSignatures:
     rows, total = petition_signatures.named(code, limit, offset)
     return NamedSignatures(names=[present.named_signature(r) for r in rows if r.get("name")], total=total)
+
+
+def comment_limits(code: str, proof: Phone) -> None:
+    """Two counts, as a report's are: one confirmed number can't flood the petitions, and one petition can't be
+    buried under comments. The number itself is never a key here — its keyed hash is."""
+    refuse_if_over(rate_limit.PETITION_COMMENTS, f"comments:{phone_proof.phone_key(proof.number)}")
+    refuse_if_over(rate_limit.PETITION_COMMENTS_ON_ONE, f"petition:{code}")
+
+
+@router.get("/{code}/comments", response_model=CommentPage)
+def comments(
+    code: str,
+    limit: Annotated[int, Query(ge=1, le=petition_comments.PAGE_MAX)] = 20,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> CommentPage:
+    """Newest first. A removed petition has none to give: they went down with it, and are back when it is."""
+    seen, total = petition_comments.on_petition(code, limit, offset)
+    return CommentPage(comments=[_comment(said) for said in seen], total=total)
+
+
+@router.post("/{code}/comments", response_model=Comment, status_code=201, dependencies=[Depends(comment_limits)])
+def comment(code: str, request: CommentRequest, proof: Phone) -> Comment:
+    """The same confirmed number a signature is given with, and no more stored with the comment than with one."""
+    return _comment(petition_comments.add(code, proof, request.name, request.text, utc_now()))
+
+
+@router.post("/{code}/comments/{comment_id}/report", response_model=ReportFiled, status_code=201,
+             dependencies=[Depends(report_limits)])
+def report_comment(code: str, comment_id: str, request: CommentReportRequest) -> ReportFiled:
+    """Anyone, without signing in. The comment stays exactly as it is while a contributor reads this."""
+    filed = petition_comments.file_report(code, comment_id, Ground(request.ground), request.note, utc_now())
+    return ReportFiled(message=petition_comments.report_received(), reported_at=filed["createdAt"])
+
+
+@router.post("/{code}/comments/{comment_id}/removal", response_model=ReportQueue, dependencies=[Changes])
+def remove_comment(code: str, comment_id: str, request: CommentRemovalRequest, principal: Contributor) -> ReportQueue:
+    """A contributor takes one comment down on a named ground. The petition stays up and so does every other
+    comment: it was this comment that was judged, and the ground stands where its words were."""
+    petition_comments.remove(principal, code, comment_id, Ground(request.ground), utc_now())
+    return reported(principal)

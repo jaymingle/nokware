@@ -265,6 +265,42 @@
     "petition.legacy.closed_in_move": {
       "critical": false,
       "text": "Closed during the move to the new petition process"
+    },
+    "petition.comment.default_name": {
+      "critical": false,
+      "text": "Resident",
+      "note": "The name over a comment whose writer chose none. A comment never shows a number, so it shows this."
+    },
+    "petition.comment.empty": {
+      "critical": false,
+      "text": "Write your comment first."
+    },
+    "petition.comment.too_long": {
+      "critical": false,
+      "text": "Keep your comment to 500 characters or fewer."
+    },
+    "petition.comment.personal_data": {
+      "critical": false,
+      "text": "Your comment holds personal data, such as a phone number, an email address or a Ghana Card number. Take it out and say it another way.",
+      "note": "Refused, never quietly mended: the person writing it decides how to say it instead."
+    },
+    "petition.comment.private_individual": {
+      "critical": false,
+      "text": "Your comment seems to name a private person. Comments on a petition are public, so say it without naming anyone."
+    },
+    "petition.comment.removed": {
+      "critical": false,
+      "text": "Comment removed by a verified contributor: {ground}",
+      "note": "What stands where a removed comment's words were. {ground} is one of the four grounds, in the words petition.ground.* gives it; a translation may put it wherever that language wants it."
+    },
+    "petition.comment.already_removed": {
+      "critical": false,
+      "text": "This comment has already been removed."
+    },
+    "petition.comment.report_received": {
+      "critical": false,
+      "text": "Thank you. A contributor will read this. The comment stays up while they do.",
+      "note": "Said to whoever reports a comment: a report never hides anything, and the wording must not suggest it did."
     }
   }
 }

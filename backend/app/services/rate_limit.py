@@ -41,6 +41,8 @@ PETITION_CHECKS = RateLimit(limit=30, window_seconds=3600)  # each reads the dra
 PETITION_CHANGES = RateLimit(limit=20, window_seconds=3600)
 PETITION_REPORTS = RateLimit(limit=10, window_seconds=3600)  # reports one device can send about any petitions
 PETITION_REPORTS_ABOUT_ONE = RateLimit(limit=30, window_seconds=3600)  # and how many one petition takes in an hour
+PETITION_COMMENTS = RateLimit(limit=10, window_seconds=3600)  # comments one confirmed number can leave anywhere
+PETITION_COMMENTS_ON_ONE = RateLimit(limit=60, window_seconds=3600)  # and how many one petition takes in an hour
 PHONE_CHALLENGES = RateLimit(limit=20, window_seconds=3600)
 PHONE_POLLS = RateLimit(limit=400, window_seconds=900)  # the page asks every few seconds while it waits
 SIGNING = RateLimit(limit=120, window_seconds=3600)  # generous: many phones share one address on a mobile network

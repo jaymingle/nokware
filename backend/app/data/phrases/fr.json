@@ -186,6 +186,30 @@
     },
     "petition.legacy.closed_in_move": {
       "text": "Close lors du passage à la nouvelle procédure"
+    },
+    "petition.comment.default_name": {
+      "text": "Résident"
+    },
+    "petition.comment.empty": {
+      "text": "Écrivez d'abord votre commentaire."
+    },
+    "petition.comment.too_long": {
+      "text": "Limitez votre commentaire à 500 caractères."
+    },
+    "petition.comment.personal_data": {
+      "text": "Votre commentaire contient des données personnelles, par exemple un numéro de téléphone, une adresse e-mail ou un numéro de Ghana Card. Retirez-les et dites-le autrement."
+    },
+    "petition.comment.private_individual": {
+      "text": "Votre commentaire semble nommer une personne privée. Les commentaires d'une pétition sont publics : dites-le sans nommer personne."
+    },
+    "petition.comment.removed": {
+      "text": "Commentaire retiré par un contributeur vérifié : {ground}"
+    },
+    "petition.comment.already_removed": {
+      "text": "Ce commentaire a déjà été retiré."
+    },
+    "petition.comment.report_received": {
+      "text": "Merci. Un contributeur le lira. Le commentaire reste en ligne pendant ce temps."
     }
   }
 }

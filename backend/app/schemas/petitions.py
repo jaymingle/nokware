@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 
 from app.schemas.documents import Option
 from app.services.ledger_documents import Provenance
+from app.services.petition_comments import COMMENT_MAX
 from app.services.petition_rules import (
     BODY_MAX,
     DOCUMENTS_MAX,
@@ -154,6 +155,7 @@ class PetitionDetail(PetitionCard):
     issue: LinkedIssue | None
     documents: list[DocumentRef]  # what the creator cited
     response: PetitionResponse | None
+    comments: int = 0  # how many stand under it, so a page or a channel can say so; the route counts them
 
 
 class Tombstone(BaseModel):
@@ -280,8 +282,53 @@ class ReportedPetition(BaseModel):
     petition: PetitionCard
 
 
+class Comment(BaseModel):
+    """One comment as a reader meets it: what somebody wrote, or — where a contributor removed it — the notice
+    that stands in its place. Never a phone number: a comment holds none."""
+
+    id: str
+    name: str | None  # the name its writer chose, or "Resident"; none on a removed comment
+    text: str  # the comment, or the removal notice naming the ground
+    at: str
+    removed: bool
+
+
+class CommentPage(BaseModel):
+    comments: list[Comment]
+    total: int  # every comment under the petition, however many this page holds
+
+
+class CommentRequest(BaseModel):
+    text: str = Field(max_length=COMMENT_MAX + 100)
+    name: str | None = Field(None, max_length=NAME_MAX + 20)  # empty for "Resident"
+
+
+class CommentReportRequest(BaseModel):
+    """A comment is reported on the same four grounds a petition is, and names no other petition: a duplicate
+    here repeats what is on the same page."""
+
+    ground: Ground
+    note: str | None = Field(None, max_length=REPORT_NOTE_MAX + 100)
+
+
+class CommentRemovalRequest(BaseModel):
+    ground: Ground
+
+
+class ReportedComment(BaseModel):
+    id: str  # the report, for dismissing it
+    reported_at: str
+    ground: Ground
+    ground_words: str
+    note: str | None  # what the reader added, as they wrote it
+    reports_on_this_comment: int
+    code: str  # the petition the comment stands under
+    comment: Comment
+
+
 class ReportQueue(BaseModel):
     reports: list[ReportedPetition]
+    comments: list[ReportedComment]  # reported comments reach the same contributor
     grounds: list[GroundOption]
     dismissal_reasons: list[DismissalOption]
 

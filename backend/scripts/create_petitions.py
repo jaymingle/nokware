@@ -12,6 +12,11 @@
   it (public).
 - P3 adds the MCE's response to petitions. The MCE's name is kept for the
   trail and never shown.
+- Stage E adds what residents say under a petition: petition_comments (one
+  row per comment, holding a keyed hash of the number and the petition
+  together and never the number, plus what a contributor's removal leaves on
+  it) and petition_comment_reports (what readers report about a comment,
+  settled in the same queue as a report about a petition).
 - Stage A takes the MCE's review gate out and adds what replaces it, all
   additively: petition_versions (every wording a petition has had),
   petition_removals (a contributor's removal, and the only thing a tombstone
@@ -39,6 +44,9 @@ from appwrite.services.databases import Databases
 from create_citizen_reports import ENCRYPTED_MIN, HASH, ID, KEY, TEAM, UNIQUE, Creator, ensure, ensure_indexes, values, wait_for_attributes
 
 from app.services.appwrite_client import DATABASE_ID, get_databases, quiet_sdk_deprecation_warnings
+from app.services.petition_comments import COMMENT_MAX
+from app.services.petition_comments import COMMENT_REPORTS_COLLECTION as COMMENT_REPORTS
+from app.services.petition_comments import COMMENTS_COLLECTION as COMMENTS
 from app.services.petition_grounds import Dismissal, Ground
 from app.services.petition_removals import REMOVALS_COLLECTION as REMOVALS
 from app.services.petition_reports import REPORTS_COLLECTION as REPORTS
@@ -229,6 +237,44 @@ def report_attributes() -> dict[str, Creator]:
     }
 
 
+def comment_attributes() -> dict[str, Creator]:
+    db, c = get_databases(), (DATABASE_ID, COMMENTS)
+    return {
+        "petitionId": lambda: db.create_string_attribute(*c, "petitionId", ID, True),
+        # The commenter as stored: a keyed hash of their confirmed number and the petition together, as a
+        # signature's is. No number, and nothing to match against another petition's comments.
+        "commenterKey": lambda: db.create_string_attribute(*c, "commenterKey", HASH, True),
+        "name": lambda: db.create_string_attribute(*c, "name", NAME_MAX + 20, True),
+        "text": lambda: db.create_string_attribute(*c, "text", COMMENT_MAX + 24, True),
+        "createdAt": lambda: db.create_datetime_attribute(*c, "createdAt", True),
+        # What a contributor's removal leaves: the ground stands where the words were, and the words are no
+        # longer read.
+        "removalGround": lambda: db.create_enum_attribute(*c, "removalGround", values(Ground), False),
+        "removedAt": lambda: db.create_datetime_attribute(*c, "removedAt", False),
+        "removedById": lambda: db.create_string_attribute(*c, "removedById", ID, False),
+        "removedByName": lambda: db.create_string_attribute(*c, "removedByName", 256, False),
+    }
+
+
+def comment_report_attributes() -> dict[str, Creator]:
+    db, c = get_databases(), (DATABASE_ID, COMMENT_REPORTS)
+    return {
+        "petitionId": lambda: db.create_string_attribute(*c, "petitionId", ID, True),
+        "code": lambda: db.create_string_attribute(*c, "code", CODE_DIGITS, True),
+        "commentId": lambda: db.create_string_attribute(*c, "commentId", ID, True),
+        # The same four grounds a petition is reported on. A duplicate names no other petition here: a comment
+        # repeats what is on its own page.
+        "ground": lambda: db.create_enum_attribute(*c, "ground", values(Ground), True),
+        "note": lambda: db.create_string_attribute(*c, "note", REPORT_NOTE_MAX + 24, False),
+        "state": lambda: db.create_enum_attribute(*c, "state", values(ReportState), True),
+        "dismissedReason": lambda: db.create_enum_attribute(*c, "dismissedReason", values(Dismissal), False),
+        "settledById": lambda: db.create_string_attribute(*c, "settledById", ID, False),
+        "settledByName": lambda: db.create_string_attribute(*c, "settledByName", 256, False),
+        "settledAt": lambda: db.create_datetime_attribute(*c, "settledAt", False),
+        "createdAt": lambda: db.create_datetime_attribute(*c, "createdAt", True),
+    }
+
+
 def adjust_status_lists() -> None:
     """Re-derived every run: today's statuses and steps, plus the ones from before Stage A, which no code writes
     again but old rows still carry."""
@@ -258,6 +304,8 @@ SIGNATURE_INDEXES = {
 VERSION_INDEXES = {"idx_petition_version": (KEY, ["petitionId", "version"])}
 REMOVAL_INDEXES = {"idx_petition_at": (KEY, ["petitionId", "at"]), "idx_ground": (KEY, ["ground"])}
 REPORT_INDEXES = {"idx_state_created": (KEY, ["state", "createdAt"]), "idx_petition_state": (KEY, ["petitionId", "state"])}
+COMMENT_INDEXES = {"idx_petition_created": (KEY, ["petitionId", "createdAt"]), "idx_commenterKey": (KEY, ["commenterKey"])}
+COMMENT_REPORT_INDEXES = {"idx_state_created": (KEY, ["state", "createdAt"]), "idx_comment_state": (KEY, ["commentId", "state"])}
 
 
 def build_schema() -> None:
@@ -267,7 +315,9 @@ def build_schema() -> None:
             (SIGNATURES, "Petition signatures", signature_attributes(), SIGNATURE_INDEXES),
             (VERSIONS, "Petition versions", version_attributes(), VERSION_INDEXES),
             (REMOVALS, "Petition removals", removal_attributes(), REMOVAL_INDEXES),
-            (REPORTS, "Petition reports", report_attributes(), REPORT_INDEXES))
+            (REPORTS, "Petition reports", report_attributes(), REPORT_INDEXES),
+            (COMMENTS, "Petition comments", comment_attributes(), COMMENT_INDEXES),
+            (COMMENT_REPORTS, "Petition comment reports", comment_report_attributes(), COMMENT_REPORT_INDEXES))
     for collection, name, creators, indexes in plan:
         ensure(f"collection {collection}", lambda collection=collection, name=name: db.create_collection(DATABASE_ID, collection, name))
         for key, create in creators.items():
@@ -285,7 +335,9 @@ def main() -> int:
     if not args.yes:
         planned = ((PETITIONS, petition_attributes(), PETITION_INDEXES), (HISTORY, history_attributes(), HISTORY_INDEXES),
                    (SIGNATURES, signature_attributes(), SIGNATURE_INDEXES), (VERSIONS, version_attributes(), VERSION_INDEXES),
-                   (REMOVALS, removal_attributes(), REMOVAL_INDEXES), (REPORTS, report_attributes(), REPORT_INDEXES))
+                   (REMOVALS, removal_attributes(), REMOVAL_INDEXES), (REPORTS, report_attributes(), REPORT_INDEXES),
+                   (COMMENTS, comment_attributes(), COMMENT_INDEXES),
+                   (COMMENT_REPORTS, comment_report_attributes(), COMMENT_REPORT_INDEXES))
         for collection, creators, indexes in planned:
             print(f"[dry run] {collection}: {len(creators)} attributes, {len(indexes)} indexes, "
                   "leaving whatever exists as it is")
