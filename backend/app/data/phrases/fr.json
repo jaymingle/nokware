@@ -83,6 +83,22 @@
     "ask.total_and_parts_only": {
       "critical": false,
       "text": "Les seuls chiffres ici sont un total et l'une de ses composantes. Un total placé à côté de ses composantes se lit comme l'une d'elles : il n'y a donc rien à représenter."
+    },
+    "speech.rest_on_screen": {
+      "critical": false,
+      "text": "Le reste de la réponse est à l'écran."
+    },
+    "speech.sources_on_screen": {
+      "critical": false,
+      "text": "Les documents dont elle provient sont listés avec la réponse."
+    },
+    "speech.nothing_found": {
+      "critical": false,
+      "text": "La page indique où chercher ailleurs et comment demander un document."
+    },
+    "speech.not_in_this_language": {
+      "critical": false,
+      "text": "La lecture à voix haute n'est pas encore disponible dans cette langue."
     }
   }
 }

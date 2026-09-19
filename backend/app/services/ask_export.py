@@ -80,17 +80,20 @@ def _cited_documents(sources: list[dict[str, Any]]) -> list[dict[str, Any]]:
 @dataclass(frozen=True)
 class Answered:
     question: str
-    answer: str
+    answer: str  # English: what the exports carry and what the safety rule is judged on
     status: str
     sources: list[dict[str, Any]]  # every retrieved passage, marked cited or not
     figures: list[dict[str, Any]]  # every live figure, marked cited or not
     chart: dict[str, Any] | None
     chart_note: str | None
+    spoken: str | None = None  # the answer as the reader was given it, when that isn't English
+    language: str = "en"
 
 
 def export_view(answered: Answered, now: datetime) -> ExportView:
     view = {
         "question": answered.question, "answered_at": now.isoformat(), "answer": answered.answer, "status": answered.status,
+        "spoken": answered.spoken, "language": answered.language,
         "sources": [ExportSource.model_validate(d).model_dump(mode="json") for d in _cited_documents(answered.sources)],
         "figures": [AskFigure.model_validate(f).model_dump(mode="json") for f in answered.figures if f["cited"]],
         "chart": AskChart.model_validate(answered.chart).model_dump(mode="json") if answered.chart else None,

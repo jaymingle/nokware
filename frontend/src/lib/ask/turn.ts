@@ -29,12 +29,13 @@ export type Turn = {
   exportView: ExportView | null;
   /** Never true for an answer about someone's safety. */
   speakable: boolean;
+  speechNote: string | null;  // why it can't be read aloud, when it can't
 };
 
 export function newTurn(id: string, question: string): Turn {
   return {
     id, question, stage: "searching", documents: [], figures: [], text: "", english: "", translated: false,
-    status: null, error: null, chart: null, chartNote: null, exportView: null, speakable: false,
+    status: null, error: null, chart: null, chartNote: null, exportView: null, speakable: false, speechNote: null,
   };
 }
 
@@ -60,6 +61,7 @@ export function applyEvent(turn: Turn, event: AskStreamEvent): Turn {
         chartNote: event.chart_note ?? null,
         exportView: event.export ?? null,
         speakable: event.speakable ?? false,
+        speechNote: event.speech_note ?? null,
       };
     case "error":
       return failTurn(turn, event.message);

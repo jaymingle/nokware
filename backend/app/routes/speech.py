@@ -31,7 +31,7 @@ def answer(request: SpeechAnswerRequest) -> Response:
     view = request.view
     if not ask_export.verified(view):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "This answer can't be read aloud: ask the question again.")
-    return _audio(read_aloud.answer_script(view.question, view.answer, view.status), request.part)
+    return _audio(read_aloud.answer_script(view.question, view.answer, view.status, view.spoken, view.language), request.part)
 
 
 @router.post("/report", dependencies=[Speech], response_class=Response,

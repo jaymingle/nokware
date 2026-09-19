@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 from app.main import app
 from app.routes import ask as ask_routes
 from app.services import ask_export, read_aloud, redis_store, report_followups, report_store
+from app.services.phrases import Language, phrase
 from app.services.rag import NO_INFO_ANSWER, SAFETY_FIGURES_ANSWER
 from app.services.read_aloud import NotReadAloud, ReadAloudUnavailable
 from app.services.voice_audio import Encoded
@@ -163,3 +164,29 @@ def test_figures_count_towards_the_opening_because_they_are_slow_to_say() -> Non
     prose = "Head Office, Public Works and Education were each given a share of the approved budget for the coming year."
     assert read_aloud._speaking_cost(amounts) > read_aloud._speaking_cost(prose) + 60 >= len(prose)
     assert len(read_aloud.parts(amounts)) > 1
+
+
+def test_an_answer_is_read_in_the_language_it_was_given_in() -> None:
+    """A French answer had no Listen button and no word about why. The sentences around it come from the catalogue,
+    never a machine, so only a language whose fixed lines are written by hand can be spoken at all."""
+    french = "La mairie a approuvé 20 270 110 cédis pour le siège en 2026."
+    script = read_aloud.answer_script("Combien pour le siège en 2026 ?", "AMA approved 20,270,110 cedis.", "answered",
+                                      spoken=french, language="fr")
+    assert script.startswith(french) and phrase("speech.sources_on_screen", Language.FRENCH) in script
+    assert "The documents it comes from" not in script  # not a word of English in a French reading
+
+
+def test_a_language_nokware_has_not_written_is_not_spoken_and_says_so() -> None:
+    with pytest.raises(NotReadAloud, match="isn't available in this language"):
+        read_aloud.answer_script("Sɛn na AMA de sika bɛyɛ adwuma?", "AMA approved 20,270,110 cedis.", "answered",
+                                 spoken="Twi words here", language="tw")
+    assert read_aloud.may_speak_language("en") and read_aloud.may_speak_language("fr")
+    assert not read_aloud.may_speak_language("tw")
+
+
+def test_the_safety_rule_reads_the_english_whatever_language_is_spoken() -> None:
+    """A translation must never be the thing that slips a safety answer past a check written in English."""
+    with pytest.raises(NotReadAloud, match="someone's safety"):
+        read_aloud.answer_script("Combien de cas de violence domestique ?",
+                                 "Nokware doesn't publish figures on reports about someone's safety.", "answered",
+                                 spoken="Nokware ne publie pas ces chiffres.", language="fr")

@@ -50,14 +50,29 @@ VOICE_NOT_AUDIO = "That recording couldn't be played. Try again, or type your qu
 
 # Plain defs (not async): the pipeline blocks on Postgres and Gemini, so FastAPI
 # runs it in its threadpool instead of stalling the event loop.
+def _spoken(result: dict[str, Any], question: str, in_english: str) -> tuple[Answered, bool, str | None]:
+    """What can be read aloud, and in which language. The reading is of the answer as the reader was given it; the
+    safety rule is judged on the English, which is the text that was checked. A language whose fixed lines Nokware
+    hasn't written by hand isn't spoken at all, and says so rather than offering nothing."""
+    language = str(result.get("language") or "en")
+    translated = bool(result.get("translated"))
+    answered = Answered(question, in_english, result["status"], list(result["sources"]), list(result["figures"]),
+                        result["chart"], result["chart_note"],
+                        spoken=result["answer"] if translated else None, language=language)
+    if not read_aloud.may_speak_answer(question, in_english):
+        return answered, False, None  # nothing is said: an answer about someone's safety isn't discussed at all
+    if not read_aloud.may_speak_language(language):
+        return answered, False, read_aloud.NOT_IN_THIS_LANGUAGE
+    return answered, True, None
+
+
 @router.post("/ask", response_model=AskResponse)
 def ask(request: AskRequest) -> AskResponse:
     result = answer_question(request.question, languages=True)
-    # The export and the reading are of the English: it is the answer that was checked, and the sources are in it.
-    answered = Answered(request.question, result["answer_english"], result["status"], list(result["sources"]),
-                        list(result["figures"]), result["chart"], result["chart_note"])
-    speakable = not result["translated"] and read_aloud.may_speak_answer(request.question, result["answer_english"])
-    return AskResponse.model_validate({**result, "export": export_view(answered, utc_now()), "speakable": speakable})
+    # The export is of the English: it is the answer that was checked, and the sources are in it.
+    answered, speakable, note = _spoken(result, request.question, result["answer_english"])
+    return AskResponse.model_validate({**result, "export": export_view(answered, utc_now()), "speakable": speakable,
+                                       "speech_note": note})
 
 
 def error_message(error: Exception) -> str:
@@ -79,9 +94,9 @@ def _signed(question: str, event: dict[str, Any], seen: dict[str, Any]) -> dict[
     cited = set(event["cited"])
     marked = {name: [{**item, "cited": item["label"] in cited} for item in seen.get(name, [])] for name in ("sources", "figures")}
     in_english = event.get("answer_english") or event["answer"]
-    answered = Answered(question, in_english, event["status"], marked["sources"], marked["figures"], event["chart"], event["chart_note"])
-    speakable = not event.get("translated") and read_aloud.may_speak_answer(question, in_english)
-    return {**event, "export": export_view(answered, utc_now()), "speakable": speakable}
+    answered, speakable, note = _spoken({**event, "sources": marked["sources"], "figures": marked["figures"]},
+                                        question, in_english)
+    return {**event, "export": export_view(answered, utc_now()), "speakable": speakable, "speech_note": note}
 
 
 def ndjson_events(question: str) -> Iterator[str]:

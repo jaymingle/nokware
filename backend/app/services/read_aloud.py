@@ -22,7 +22,8 @@ from typing import Any
 
 from app.config import get_settings
 from app.services.channel_status import headline, spoken_details
-from app.services.rag import NO_INFO_ANSWER, SAFETY_FIGURES_ANSWER
+from app.services.phrases import Language, phrase
+from app.services.rag import SAFETY_FIGURES_ANSWER
 from app.services.redis_store import get_redis, key
 from app.services.report_rules import REFERENCE_ALPHABET, suggests_danger_to_a_person
 from app.services.voice_audio import Encoded
@@ -46,9 +47,13 @@ FIGURE_COST = 60
 PART_FIGURES = 3
 FIRST_PART_FIGURES = 1  # figures are slow to say, and the first part is the one the listener waits through
 CACHE_SECONDS = 24 * 3600  # a part costs a TTS call to make and about 80 KB to keep; a day of asking is free
-REST_ON_SCREEN = "The rest of the answer is on the screen."
-SOURCES_ON_SCREEN = "The documents it comes from are listed with the answer."
-NOTHING_FOUND = "The page says where else to look, and how to request a document."
+REST_ON_SCREEN = phrase("speech.rest_on_screen")
+SOURCES_ON_SCREEN = phrase("speech.sources_on_screen")
+NOTHING_FOUND = phrase("speech.nothing_found")
+# Read aloud only in a language whose fixed lines Nokware has written by hand: the sentences around an answer are
+# never machine-translated, so a language the catalogue doesn't hold can't be spoken without inventing them.
+SPOKEN_LANGUAGES = (Language.ENGLISH, Language.FRENCH)
+NOT_IN_THIS_LANGUAGE = phrase("speech.not_in_this_language")
 KEEP_REFERENCE = "Keep your reference: it is the only way to follow your report."
 _REFERENCE = re.compile(rf"\b([{REFERENCE_ALPHABET}]{{4}})-([{REFERENCE_ALPHABET}]{{4}})\b")
 _SENTENCE_END = re.compile(r"(?<=[.!?])\s+")
@@ -72,13 +77,23 @@ def may_speak_answer(question: str, answer: str) -> bool:
     return not (suggests_danger_to_a_person(question) or suggests_danger_to_a_person(answer) or SAFETY_FIGURES_ANSWER in answer)
 
 
-def answer_script(question: str, answer: str, status: str) -> str:
+def may_speak_language(language: str) -> bool:
+    return any(language == spoken.value for spoken in SPOKEN_LANGUAGES)
+
+
+def answer_script(question: str, answer: str, status: str, spoken: str | None = None, language: str = "en") -> str:
+    """The English answer is what the safety rule is judged on, whatever language is read aloud: the check reads
+    English, and a translation must never be the thing that slips a safety answer past it."""
     if not may_speak_answer(question, answer):
         raise NotReadAloud("This answer isn't read aloud: it touches on someone's safety, and audio can be overheard.")
+    if not may_speak_language(language):
+        raise NotReadAloud(NOT_IN_THIS_LANGUAGE)
+    said = Language(language)
     if status == "no_information":
-        return f"{NO_INFO_ANSWER} {NOTHING_FOUND}"
-    text, shortened = cut(speakable(answer), READ_MAX_CHARS)
-    return " ".join([text, *([REST_ON_SCREEN] if shortened else []), SOURCES_ON_SCREEN])
+        return f"{phrase('ask.no_information', said)} {phrase('speech.nothing_found', said)}"
+    text, shortened = cut(speakable(spoken or answer), READ_MAX_CHARS)
+    rest = [phrase("speech.rest_on_screen", said)] if shortened else []
+    return " ".join([text, *rest, phrase("speech.sources_on_screen", said)])
 
 
 def _spelled(text: str) -> str:

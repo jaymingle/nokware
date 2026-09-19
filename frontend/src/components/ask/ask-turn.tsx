@@ -159,7 +159,9 @@ function Attachments({ turn, jump, testId }: { turn: Turn; jump: Jump; testId: s
 function ReplyTools({ turn, view, testId }: { turn: Turn; view: ExportView; testId: string }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b bg-paper-subtle px-4 py-2 sm:px-5">
-      {turn.speakable ? <ReadAloud load={(part) => answerAudio(view, part)} label="Listen to this answer" testId={`${testId}-listen`} /> : <span />}
+      {turn.speakable ? <ReadAloud load={(part) => answerAudio(view, part)} label="Listen to this answer" testId={`${testId}-listen`} />
+        : turn.speechNote ? <p className="text-[12.5px] text-ink-soft" data-testid={`${testId}-speech-note`}>{turn.speechNote}</p>
+        : <span />}
       <ExportMenu view={view} testId={testId} />
     </div>
   );

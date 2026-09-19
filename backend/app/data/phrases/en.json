@@ -116,6 +116,26 @@
       "critical": false,
       "text": "The only figures here are a total and one part of it. A total drawn beside its parts reads as one of them, so there's nothing to chart.",
       "note": "Replaces the old, wrong 'only one count here' when a total was left out and one part remained."
+    },
+    "speech.rest_on_screen": {
+      "critical": false,
+      "text": "The rest of the answer is on the screen.",
+      "note": "Said at the end of a reading that had to stop short of the whole answer."
+    },
+    "speech.sources_on_screen": {
+      "critical": false,
+      "text": "The documents it comes from are listed with the answer.",
+      "note": "Closes every spoken answer: the sources are on the page, not in the audio."
+    },
+    "speech.nothing_found": {
+      "critical": false,
+      "text": "The page says where else to look, and how to request a document.",
+      "note": "Closes a spoken answer the Ledger couldn't answer."
+    },
+    "speech.not_in_this_language": {
+      "critical": false,
+      "text": "Reading aloud isn't available in this language yet.",
+      "note": "Shown where the Listen button would be. Nokware reads aloud only in languages whose fixed text it has written."
     }
   }
 }

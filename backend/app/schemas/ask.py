@@ -117,6 +117,8 @@ class ExportView(BaseModel):
     figures: list[AskFigure]  # cited only
     chart: AskChart | None
     chart_note: str | None
+    spoken: str | None = None  # the answer in the language it was asked in, when that isn't English
+    language: str = "en"
     token: str
 
 
@@ -132,6 +134,7 @@ class AskResponse(BaseModel):
     chart_note: str | None = None  # why the chart isn't the kind asked for, or why there is none
     export: ExportView
     speakable: bool = False  # whether it can be read aloud: never an answer about someone's safety
+    speech_note: str | None = None  # why it can't be, when it can't
 
 
 class AskExportRequest(BaseModel):
@@ -173,6 +176,7 @@ class DoneEvent(BaseModel):
     chart_note: str | None = None
     export: ExportView | None = None  # what POST /api/ask/export takes back, signed
     speakable: bool = False
+    speech_note: str | None = None
 
 
 class ErrorEvent(BaseModel):
