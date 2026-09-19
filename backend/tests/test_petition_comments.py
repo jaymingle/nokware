@@ -17,8 +17,10 @@ from app.services import (
     channel_sessions,
     ledger_documents,
     petition_comments,
+    petition_departments,
     petition_removals,
     petition_reports,
+    petition_screen,
     petition_signatures,
     petition_versions,
     petitions,
@@ -184,12 +186,12 @@ def stored(monkeypatch: pytest.MonkeyPatch, server: fakeredis.FakeRedis) -> Fake
     monkeypatch.setattr(petition_signatures, "has_signed", lambda pid, number: False)
     monkeypatch.setattr(petition_signatures, "on_earlier_versions", lambda petition: 0)
     monkeypatch.setattr(ledger_documents, "get_documents", lambda ids: {})
-    for module in (petition_comments, petition_removals, petition_reports):
+    for module in (petition_comments, petition_departments, petition_removals, petition_reports):
         monkeypatch.setattr(module, "get_databases", lambda: database)
         monkeypatch.setattr(module, "every_record", _every_record(database))
-    # The model that reads a comment for the name of a private person is advisory and fails open; a test about
-    # that check stubs it the other way.
-    monkeypatch.setattr(petition_comments, "private_person", lambda text: None)
+    # The model that reads words written under a petition for the name of a private person is advisory and fails
+    # open; a test about that check stubs it the other way.
+    monkeypatch.setattr(petition_screen, "private_person", lambda text: None)
     return state
 
 
@@ -240,7 +242,7 @@ def test_personal_data_and_the_naming_of_a_private_person_refuse_a_comment_with_
     for text in ("Call me on 024 123 4567", "Write to ama@example.com", "My card is GHA-123456789-0"):
         with pytest.raises(InvalidPetition, match="personal data"):
             _comment(stored, text=text)
-    monkeypatch.setattr(petition_comments, "private_person", lambda text: "Auntie Esi")
+    monkeypatch.setattr(petition_screen, "private_person", lambda text: "Auntie Esi")
     with pytest.raises(InvalidPetition, match="private person"):
         _comment(stored, text="Auntie Esi at number 12 tips her rubbish in the drain.")
     assert stored.comments == []

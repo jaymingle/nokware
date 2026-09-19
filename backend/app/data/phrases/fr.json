@@ -210,6 +210,48 @@
     },
     "petition.comment.report_received": {
       "text": "Merci. Un contributeur le lira. Le commentaire reste en ligne pendant ce temps."
+    },
+    "petition.share.not_a_department": {
+      "text": "Choisissez un département dans la liste de l'Assemblée."
+    },
+    "petition.share.already_shared": {
+      "text": "Cette pétition a déjà été transmise à ce département."
+    },
+    "petition.note.not_shared": {
+      "text": "Cette pétition n'a pas été transmise à votre département : celui-ci n'a donc pas de note à y écrire."
+    },
+    "petition.note.already_written": {
+      "text": "Votre département a déjà écrit sa note sur cette pétition. Une note est publiée telle qu'elle a été écrite et vaut réponse du département."
+    },
+    "petition.note.empty": {
+      "text": "Écrivez d'abord la note de votre département."
+    },
+    "petition.note.too_long": {
+      "text": "Limitez la note à 500 caractères."
+    },
+    "petition.note.personal_data": {
+      "text": "Cette note contient des données personnelles, par exemple un numéro de téléphone, une adresse e-mail ou un numéro de Ghana Card. Elle est publiée sur la page de la pétition : retirez-les et dites-le autrement."
+    },
+    "petition.note.private_individual": {
+      "text": "Cette note semble nommer une personne privée. Elle est publiée sur la page de la pétition : dites ce que fait le département sans nommer personne."
+    },
+    "petition.reply.no_response": {
+      "text": "Aucune réponse n'a encore été publiée sur cette pétition."
+    },
+    "petition.reply.already_replied": {
+      "text": "Vous avez déjà répondu à cette réponse. Une seule réplique figure en dessous."
+    },
+    "petition.reply.empty": {
+      "text": "Écrivez d'abord votre réponse."
+    },
+    "petition.reply.too_long": {
+      "text": "Limitez votre réponse à 1 000 caractères."
+    },
+    "petition.reply.personal_data": {
+      "text": "Votre réponse contient des données personnelles, par exemple un numéro de téléphone, une adresse e-mail ou un numéro de Ghana Card. Retirez-les et dites-le autrement."
+    },
+    "petition.reply.private_individual": {
+      "text": "Votre réponse semble nommer une personne privée. Elle est publiée sous la réponse du MCE : dites-le sans nommer personne."
     }
   }
 }

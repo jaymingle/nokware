@@ -77,6 +77,7 @@ class Actor:
 
 CREATOR = Actor("creator", "", "creator")
 SYSTEM = Actor("system", "Automatic", "system")
+ACTOR_ROLES = ("creator", "contributor", "mce", "department", "system")  # everyone a line of the trail can name
 
 
 def mce_actor(principal: Principal) -> Actor:
@@ -85,6 +86,11 @@ def mce_actor(principal: Principal) -> Actor:
 
 def contributor_actor(principal: Principal) -> Actor:
     return Actor(principal.user_id, principal.name, "contributor")
+
+
+def department_actor(principal: Principal) -> Actor:
+    """A department acts as itself: the trail keeps the name of the officer who wrote, the page shows neither."""
+    return Actor(principal.user_id, principal.name, "department")
 
 
 def list_petitions(queries: list[str]) -> tuple[list[dict[str, Any]], int]:
@@ -98,6 +104,15 @@ def find(code: str) -> dict[str, Any]:
     if not found:
         raise PetitionNotFound(code)
     return found[0]
+
+
+def by_ids(petition_ids: list[str]) -> dict[str, dict[str, Any]]:
+    """The petitions behind a list of rows — reports, shares — read in one call rather than one call each."""
+    ids = list(dict.fromkeys(petition_ids))
+    if not ids:
+        return {}
+    found, _ = list_petitions([Query.equal("$id", ids), Query.limit(len(ids))])
+    return {petition["$id"]: petition for petition in found}
 
 
 def public(code: str) -> dict[str, Any]:
@@ -179,7 +194,7 @@ def submit(proof: Proof, draft: Draft, show_name: bool, name: str | None, now: d
     return petition
 
 
-def _owned(code: str, proof: Proof) -> dict[str, Any]:
+def owned(code: str, proof: Proof) -> dict[str, Any]:
     """Anyone else's petition is simply not found."""
     petition = find(code)
     if petition.get("creatorKey") != phone_key(proof.number):
@@ -191,9 +206,9 @@ def edit(code: str, proof: Proof, draft: Draft, now: datetime) -> dict[str, Any]
     """A new version of the words, kept beside the ones people have already signed."""
     draft = clean_draft(draft)
     _check_links(draft)
-    petition = _owned(code, proof)
+    petition = owned(code, proof)
     with record_lock(petition["$id"]):
-        petition = _owned(code, proof)
+        petition = owned(code, proof)
         check_editable(petition)
         changes = {**edit_fields(draft, petition, now), **_location(draft)}
         updated = update_petition(petition["$id"], changes)
@@ -208,9 +223,9 @@ def finish_fields(status: PetitionStatus, now: datetime) -> dict[str, Any]:
 
 def withdraw(code: str, proof: Proof, now: datetime) -> dict[str, Any]:
     """The creator closes their own petition. It stays public and closed, with its signatures: people signed it."""
-    petition = _owned(code, proof)
+    petition = owned(code, proof)
     with record_lock(petition["$id"]):
-        petition = _owned(code, proof)
+        petition = owned(code, proof)
         check_withdraw(petition)
         updated = update_petition(petition["$id"], finish_fields(PetitionStatus.CLOSED, now))
         record_history(updated, PetitionAction.WITHDRAWN, CREATOR, petition["status"])
@@ -219,7 +234,7 @@ def withdraw(code: str, proof: Proof, now: datetime) -> dict[str, Any]:
 
 def make_anonymous(code: str, proof: Proof) -> dict[str, Any]:
     """The name can't be put back: that would need a new choice at the start."""
-    petition = _owned(code, proof)
+    petition = owned(code, proof)
     if not petition.get("creatorName"):
         return petition
     with record_lock(petition["$id"]):
@@ -247,6 +262,8 @@ def purge_creator_numbers(now: datetime) -> int:
 # A petition titled "[TEST] …" is a fixture: filed and signed for real, and never listed or counted in public. Its
 # title shows on a card, but its signatures and its place in every count don't.
 NOT_TEST = Query.not_starts_with("title", TEST_PREFIX)
+# What every public reading of the collection is narrowed to first: a petition residents were shown, not a fixture.
+PUBLISHED = [Query.is_not_null("publishedAt"), NOT_TEST]
 
 
 def test_petition_ids() -> set[str]:
@@ -258,7 +275,7 @@ def list_public(statuses: list[PetitionStatus], topic: str | None, limit: int, o
     latest = "respondedAt" if PetitionStatus.RESPONDED in statuses else "closedAt"
     order = [Query.order_desc("signatureCount"), Query.order_desc("publishedAt")] if signing else [Query.order_desc(latest)]
     return list_petitions([
-        Query.equal("status", [s.value for s in statuses]), Query.is_not_null("publishedAt"), NOT_TEST,
+        Query.equal("status", [s.value for s in statuses]), *PUBLISHED,
         *([Query.equal("topic", topic)] if topic else []),
         Query.select(PUBLIC_FIELDS), *order, Query.limit(limit), Query.offset(offset),
     ])
@@ -271,18 +288,28 @@ def awaiting_response() -> list[dict[str, Any]]:
 
 # The four groups a published petition can be listed in, and the statuses each one gathers. The route names them in
 # its URL; the counts below use the same map, so a tab can never say a number the list underneath won't show. A
-# removed petition is in none of them: its number still opens its tombstone, but nothing lists it.
+# removed petition is in none of them: nothing here lists one, because nothing here may read one. It is counted
+# under REMOVED_GROUP and listed, as tombstones, from the removal records.
 PUBLIC_GROUPS: dict[str, list[PetitionStatus]] = {
     "open": [PetitionStatus.OPEN],
     "awaiting": [PetitionStatus.AWAITING_RESPONSE],
     "responded": [PetitionStatus.RESPONDED],
     "closed": [PetitionStatus.CLOSED],
 }
+REMOVED_GROUP = "removed"
 
 
 def public_counts() -> dict[str, int]:
-    """How many petitions stand in each group. One read of their statuses rather than a count each, which on a
-    public page would be four round trips for four small numbers."""
-    rows = every_record(PETITIONS_COLLECTION, [Query.is_not_null("publishedAt"), NOT_TEST, Query.select(["status"])])
+    """How many petitions stand in each group, and how many have been taken down. One read of their statuses
+    rather than a count each, which on a public page would be five round trips for five small numbers."""
+    rows = every_record(PETITIONS_COLLECTION, [*PUBLISHED, Query.select(["status"])])
     standing = Counter(str(row.get("status")) for row in rows)
-    return {group: sum(standing[status.value] for status in statuses) for group, statuses in PUBLIC_GROUPS.items()}
+    counted = {group: sum(standing[status.value] for status in statuses) for group, statuses in PUBLIC_GROUPS.items()}
+    return {**counted, REMOVED_GROUP: standing[PetitionStatus.REMOVED.value]}
+
+
+def removed_ids() -> set[str]:
+    """The petitions that stand removed, by id alone. Nothing of such a petition is read here — not its title, not
+    its status date — because the list that uses these ids is built from the removal records, not from them."""
+    return {row["$id"] for row in every_record(PETITIONS_COLLECTION, [
+        Query.equal("status", PetitionStatus.REMOVED.value), *PUBLISHED, Query.select(["$id"])])}

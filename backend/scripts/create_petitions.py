@@ -17,6 +17,11 @@
   together and never the number, plus what a contributor's removal leaves on
   it) and petition_comment_reports (what readers report about a comment,
   settled in the same queue as a report about a petition).
+- Stage C adds the exchange that follows a response, additively:
+  petition_shares (one row per department the MCE shared a petition with,
+  holding that department's one public note) and, on petitions, replyText and
+  replyAt — the petitioner's one reply to the response. petition_history takes
+  three more actions and "department" as an actor role.
 - Stage A takes the MCE's review gate out and adds what replaces it, all
   additively: petition_versions (every wording a petition has had),
   petition_removals (a contributor's removal, and the only thing a tombstone
@@ -47,6 +52,7 @@ from app.services.appwrite_client import DATABASE_ID, get_databases, quiet_sdk_d
 from app.services.petition_comments import COMMENT_MAX
 from app.services.petition_comments import COMMENT_REPORTS_COLLECTION as COMMENT_REPORTS
 from app.services.petition_comments import COMMENTS_COLLECTION as COMMENTS
+from app.services.petition_departments import SHARES_COLLECTION as SHARES
 from app.services.petition_grounds import Dismissal, Ground
 from app.services.petition_removals import REMOVALS_COLLECTION as REMOVALS
 from app.services.petition_reports import REPORTS_COLLECTION as REPORTS
@@ -54,11 +60,13 @@ from app.services.petition_reports import ReportState
 from app.services.petition_rules import (
     BODY_MAX,
     CODE_DIGITS,
+    DEPARTMENT_NOTE_MAX,
     LEGACY_ACTIONS,
     LEGACY_STATUSES,
     NAME_MAX,
     NOTE_MAX,
     REMOVAL_NOTE_MAX,
+    REPLY_MAX,
     REPORT_NOTE_MAX,
     RESPONSE_KINDS,
     RESPONSE_MAX,
@@ -69,6 +77,7 @@ from app.services.petition_rules import (
 )
 from app.services.petition_signatures import SIGNATURES_COLLECTION as SIGNATURES
 from app.services.petition_versions import VERSIONS_COLLECTION as VERSIONS
+from app.services.petitions import ACTOR_ROLES
 from app.services.petitions import HISTORY_COLLECTION as HISTORY
 from app.services.petitions import PETITIONS_COLLECTION as PETITIONS
 from app.services.phone_proof import Channel
@@ -140,6 +149,9 @@ def petition_response(db: Databases, c: tuple[str, str]) -> dict[str, Creator]:
         "respondedAt": lambda: db.create_datetime_attribute(*c, "respondedAt", False),
         "respondedByName": lambda: db.create_string_attribute(*c, "respondedByName", 256, False),
         "noResponseAt": lambda: db.create_datetime_attribute(*c, "noResponseAt", False),
+        # The creator's one reply to that response, kept beside it so the two are read and removed together.
+        "replyText": lambda: db.create_string_attribute(*c, "replyText", REPLY_MAX + 24, False),
+        "replyAt": lambda: db.create_datetime_attribute(*c, "replyAt", False),
     }
 
 
@@ -165,7 +177,7 @@ def history_attributes() -> dict[str, Creator]:
         "action": lambda: db.create_enum_attribute(*c, "action", actions(), True),
         "actorId": lambda: db.create_string_attribute(*c, "actorId", ID, True),
         "actorName": lambda: db.create_string_attribute(*c, "actorName", 256, False),
-        "actorRole": lambda: db.create_enum_attribute(*c, "actorRole", ["creator", "contributor", "mce", "system"], True),
+        "actorRole": lambda: db.create_enum_attribute(*c, "actorRole", list(ACTOR_ROLES), True),
         "fromStatus": lambda: db.create_string_attribute(*c, "fromStatus", STATUS, False),
         "toStatus": lambda: db.create_string_attribute(*c, "toStatus", STATUS, True),
         "reason": lambda: db.create_string_attribute(*c, "reason", TOPIC, False),
@@ -256,6 +268,24 @@ def comment_attributes() -> dict[str, Creator]:
     }
 
 
+def share_attributes() -> dict[str, Creator]:
+    """One row per department the MCE shared a petition with, carrying that department's one note."""
+    db, c = get_databases(), (DATABASE_ID, SHARES)
+    return {
+        "petitionId": lambda: db.create_string_attribute(*c, "petitionId", ID, True),
+        "code": lambda: db.create_string_attribute(*c, "code", CODE_DIGITS, True),
+        "department": lambda: db.create_string_attribute(*c, "department", TEAM, True),
+        "sharedById": lambda: db.create_string_attribute(*c, "sharedById", ID, True),
+        "sharedByName": lambda: db.create_string_attribute(*c, "sharedByName", 256, False),
+        "sharedAt": lambda: db.create_datetime_attribute(*c, "sharedAt", True),
+        # The note is public, under the department's name; the officer who wrote it is named for the record only.
+        "note": lambda: db.create_string_attribute(*c, "note", DEPARTMENT_NOTE_MAX + 24, False),
+        "noteAt": lambda: db.create_datetime_attribute(*c, "noteAt", False),
+        "notedById": lambda: db.create_string_attribute(*c, "notedById", ID, False),
+        "notedByName": lambda: db.create_string_attribute(*c, "notedByName", 256, False),
+    }
+
+
 def comment_report_attributes() -> dict[str, Creator]:
     db, c = get_databases(), (DATABASE_ID, COMMENT_REPORTS)
     return {
@@ -275,13 +305,15 @@ def comment_report_attributes() -> dict[str, Creator]:
     }
 
 
-def adjust_status_lists() -> None:
-    """Re-derived every run: today's statuses and steps, plus the ones from before Stage A, which no code writes
-    again but old rows still carry."""
+def adjust_lists() -> None:
+    """Re-derived every run, so a list that has grown since the collection was made is widened rather than left:
+    today's statuses and steps plus the ones from before Stage A, which no code writes again but old rows still
+    carry, and everyone the trail can name, a department included."""
     db = get_databases()
     db.update_enum_attribute(DATABASE_ID, PETITIONS, "status", statuses(), True, None)
     db.update_enum_attribute(DATABASE_ID, HISTORY, "action", actions(), True, None)
-    print("updated   petitions.status and petition_history.action (Stage A's, and the ones they replaced)")
+    db.update_enum_attribute(DATABASE_ID, HISTORY, "actorRole", list(ACTOR_ROLES), True, None)
+    print("updated   petitions.status, petition_history.action and petition_history.actorRole")
 
 
 PETITION_INDEXES = {
@@ -306,6 +338,7 @@ REMOVAL_INDEXES = {"idx_petition_at": (KEY, ["petitionId", "at"]), "idx_ground":
 REPORT_INDEXES = {"idx_state_created": (KEY, ["state", "createdAt"]), "idx_petition_state": (KEY, ["petitionId", "state"])}
 COMMENT_INDEXES = {"idx_petition_created": (KEY, ["petitionId", "createdAt"]), "idx_commenterKey": (KEY, ["commenterKey"])}
 COMMENT_REPORT_INDEXES = {"idx_state_created": (KEY, ["state", "createdAt"]), "idx_comment_state": (KEY, ["commentId", "state"])}
+SHARE_INDEXES = {"idx_petition_shared": (KEY, ["petitionId", "sharedAt"]), "idx_department_shared": (KEY, ["department", "sharedAt"])}
 
 
 def build_schema() -> None:
@@ -317,14 +350,15 @@ def build_schema() -> None:
             (REMOVALS, "Petition removals", removal_attributes(), REMOVAL_INDEXES),
             (REPORTS, "Petition reports", report_attributes(), REPORT_INDEXES),
             (COMMENTS, "Petition comments", comment_attributes(), COMMENT_INDEXES),
-            (COMMENT_REPORTS, "Petition comment reports", comment_report_attributes(), COMMENT_REPORT_INDEXES))
+            (COMMENT_REPORTS, "Petition comment reports", comment_report_attributes(), COMMENT_REPORT_INDEXES),
+            (SHARES, "Petition departments", share_attributes(), SHARE_INDEXES))
     for collection, name, creators, indexes in plan:
         ensure(f"collection {collection}", lambda collection=collection, name=name: db.create_collection(DATABASE_ID, collection, name))
         for key, create in creators.items():
             ensure(f"attribute {collection}.{key}", create)
         wait_for_attributes(collection, list(creators))
         ensure_indexes(collection, indexes)
-    adjust_status_lists()
+    adjust_lists()
 
 
 def main() -> int:
@@ -337,11 +371,13 @@ def main() -> int:
                    (SIGNATURES, signature_attributes(), SIGNATURE_INDEXES), (VERSIONS, version_attributes(), VERSION_INDEXES),
                    (REMOVALS, removal_attributes(), REMOVAL_INDEXES), (REPORTS, report_attributes(), REPORT_INDEXES),
                    (COMMENTS, comment_attributes(), COMMENT_INDEXES),
-                   (COMMENT_REPORTS, comment_report_attributes(), COMMENT_REPORT_INDEXES))
+                   (COMMENT_REPORTS, comment_report_attributes(), COMMENT_REPORT_INDEXES),
+                   (SHARES, share_attributes(), SHARE_INDEXES))
         for collection, creators, indexes in planned:
             print(f"[dry run] {collection}: {len(creators)} attributes, {len(indexes)} indexes, "
                   "leaving whatever exists as it is")
-        print(f"[dry run] would set petitions.status to {statuses()} and petition_history.action to {actions()}")
+        print(f"[dry run] would set petitions.status to {statuses()}, petition_history.action to {actions()} "
+              f"and petition_history.actorRole to {list(ACTOR_ROLES)}")
         return 0
     build_schema()
     print("\nPetitions are ready.")

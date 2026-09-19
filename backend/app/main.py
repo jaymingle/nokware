@@ -100,7 +100,8 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     await asyncio.to_thread(search_index.startup_check)
     # Documents publish when their clock runs out, without cron.
     task = scheduler.start(settings.deadline_job_interval_seconds, run_deadline_job, "Deadline job")
-    # Petitions the MCE leaves undecided for 72 hours publish, and open ones close after 90 days, on the same interval.
+    # A petition open for its 90 days closes, and one the MCE hasn't answered in 30 days is marked unanswered, on
+    # the same interval. Nothing publishes on a clock: a petition is published by whoever wrote it.
     clock = scheduler.start(settings.deadline_job_interval_seconds, run_petition_clock, "Petition clock")
     # Citizens' numbers and names given with voices go 30 days after their case or petition closes; spoken replies
     # Twilio never reported on go a day after they were sent.

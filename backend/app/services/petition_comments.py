@@ -30,8 +30,8 @@ from app.services.locks import record_lock
 from app.services.petition_grounds import Dismissal, Ground, in_plain_words
 from app.services.petition_reports import ReportNotFound, ReportState
 from app.services.petition_reports import clean_note as clean_report_note
-from app.services.petition_rules import InvalidPetition, PetitionError, WrongState, clean_signer_name
-from app.services.petition_screen import personal_data, private_person
+from app.services.petition_rules import PetitionError, WrongState, clean_signer_name
+from app.services.petition_screen import Refusals, screened
 from app.services.phone_proof import Proof, keyed_hash
 from app.services.phrases import Language, phrase
 
@@ -39,6 +39,8 @@ COMMENTS_COLLECTION = "petition_comments"
 COMMENT_REPORTS_COLLECTION = "petition_comment_reports"
 COMMENT_MAX = 500
 PAGE_MAX = 50
+REFUSALS = Refusals(empty="petition.comment.empty", too_long="petition.comment.too_long",
+                    personal_data="petition.comment.personal_data", private_individual="petition.comment.private_individual")
 
 
 class CommentNotFound(PetitionError):
@@ -81,23 +83,8 @@ def display_name(chosen: str | None) -> str:
 
 
 def clean_comment(text: str) -> str:
-    """The comment as it will be stored, or a refusal saying why it can't be.
-
-    The cheap checks run first, so a comment that can't be kept costs neither a model call nor a read of the
-    petition. The model's reading comes last and refuses too: a petition's creator may weigh that warning and
-    publish anyway, because they answer for their own petition, but a commenter names a private person under
-    somebody else's.
-    """
-    said = " ".join(text.split()) if text else ""
-    if not said:
-        raise InvalidPetition(phrase("petition.comment.empty"))
-    if len(said) > COMMENT_MAX:
-        raise InvalidPetition(phrase("petition.comment.too_long"))
-    if personal_data(said):
-        raise InvalidPetition(phrase("petition.comment.personal_data"))
-    if private_person(said):
-        raise InvalidPetition(phrase("petition.comment.private_individual"))
-    return said
+    """The comment as it will be stored, or a refusal saying why it can't be, in the words a commenter reads."""
+    return screened(text, COMMENT_MAX, REFUSALS)
 
 
 def removal_words(ground: Ground, language: Language = Language.ENGLISH) -> str:

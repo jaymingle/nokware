@@ -259,4 +259,4 @@ def test_both_routes_answer_publicly(monkeypatch: pytest.MonkeyPatch) -> None:
     assert len(missing["electoral-area-boundaries"]["checked"]) >= 3 and record["unpublished_about"]
     response = client.get("/api/responsiveness").json()
     assert response["waiting_days"] == 7 and department(response, "Works Department")["reports"]["received"] == 6
-    assert response["petitions"]["reached_threshold"] == 0 and len(response["petitions"]["refusals"]) == 6
+    assert response["petitions"]["reached_threshold"] == 0 and len(response["petitions"]["removals"]) == 4

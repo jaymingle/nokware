@@ -4,6 +4,10 @@ The public never sees a phone number, a contributor's internal note, or the crea
 show it. The public timeline says a petition was removed and on what ground, never by whom: a ground is a ground
 whoever names it, and naming the contributor would turn moderation into a quarrel between two residents.
 
+A department's note is public, under the department's name and never the officer's: the Assembly answers as the
+Assembly. The petitioner's reply is public too, under whatever name their petition carries — none, if they started
+it anonymously.
+
 A removed petition is not presented here at all. Its page is the tombstone, which petition_removals builds from the
 removal record, so nothing of the petition can reach a reader through this module by an oversight.
 """
@@ -14,6 +18,7 @@ from typing import Any
 from app.routes.issues import STAGES as ISSUE_STAGES
 from app.schemas.petitions import (
     AwaitingResponse,
+    DepartmentShare,
     DismissalOption,
     DocumentRef,
     GroundOption,
@@ -24,16 +29,26 @@ from app.schemas.petitions import (
     OwnPetition,
     PetitionCard,
     PetitionDetail,
+    PetitionReply,
     PetitionResponse,
     RemovalCount,
     RemovalNotice,
     Removals,
     ReportedPetition,
+    SharedPetition,
     TimelineEntry,
     Tombstone,
     VersionEntry,
 )
-from app.services import issue_voices, ledger_documents, petition_ledger, petition_signatures, petition_versions, petitions
+from app.services import (
+    issue_voices,
+    ledger_documents,
+    petition_departments,
+    petition_ledger,
+    petition_signatures,
+    petition_versions,
+    petitions,
+)
 from app.services.case_workflow import CaseStatus
 from app.services.petition_grounds import DISMISSALS, GROUNDS, Ground, dismissal_in_plain_words, in_plain_words
 from app.services.petition_images import image_links
@@ -42,6 +57,7 @@ from app.services.petition_removals import Tombstone as RemovalTombstone
 from app.services.petition_reports import Reported
 from app.services.petition_rules import (
     LEGACY_LABELS,
+    LEGACY_STATUSES,
     RESPONSE_KINDS,
     STATUS_WORDS,
     PetitionAction,
@@ -53,7 +69,7 @@ from app.services.petition_rules import (
 )
 from app.services.phrases import phrase
 from app.services.report_taxonomy import TOPICS_BY_ID
-from app.teams import RECIPIENT_NAMES
+from app.teams import DEPARTMENT_NAMES, RECIPIENT_NAMES
 from app.wards import sub_metros, wards
 
 PUBLIC_ACTIONS = {a.value for a in PetitionAction} - {PetitionAction.MADE_ANONYMOUS.value, PetitionAction.CREATOR_NOTIFIED.value}
@@ -91,14 +107,43 @@ def card(petition: dict[str, Any]) -> PetitionCard:
 
 
 def _reason_words(reason: str | None) -> str | None:
-    """A removal's ground, or — on a petition the review process ended before Stage A — what that process did."""
+    """A removal's ground, or the department a petition was shared with."""
     if reason in set(Ground):
         return in_plain_words(Ground(reason))
-    return phrase(LEGACY_LABELS[reason]) if reason in LEGACY_LABELS else None
+    return DEPARTMENT_NAMES.get(reason or "")
+
+
+# The one line scripts/migrate_petitions.py leaves on a petition that was already in the database when the review
+# process was taken out: written by the system, with the status the row carried before as its reason. Nothing else
+# records a status as a reason, which is what tells this line from a removal's or a share's.
+MOVED_TO_NEW_PROCESS = "moved_to_new_process"
+STATUS_BEFORE_THE_MOVE = {*LEGACY_STATUSES, *(status.value for status in PetitionStatus)}
+
+
+def _moved_in_the_migration(entry: dict[str, Any]) -> bool:
+    return entry.get("actorRole") == "system" and str(entry.get("reason") or "") in STATUS_BEFORE_THE_MOVE
+
+
+def _moved_entry(entry: dict[str, Any]) -> TimelineEntry:
+    """What the move did, said in words that are true of it: this petition came to the new process on this date.
+    The old process's ending is named only where the move actually closed the petition — the same line on one the
+    move published would read as a publication with a closing reason, which is nothing that happened."""
+    closed = entry["action"] == PetitionAction.CLOSED.value
+    return TimelineEntry(action=MOVED_TO_NEW_PROCESS, at=entry["at"],
+                         reason=_ended_by_the_old_process(entry["reason"]) if closed else None)
+
+
+def _ended_by_the_old_process(status_before: str) -> str | None:
+    """How the old process ended a petition, where it did. A status it simply kept has nothing to say here."""
+    return phrase(LEGACY_LABELS[status_before]) if status_before in LEGACY_LABELS else None
+
+
+def _entry(entry: dict[str, Any]) -> TimelineEntry:
+    return TimelineEntry(action=entry["action"], at=entry["at"], reason=_reason_words(entry.get("reason")))
 
 
 def timeline(entries: list[dict[str, Any]]) -> list[TimelineEntry]:
-    return [TimelineEntry(action=e["action"], at=e["at"], reason=_reason_words(e.get("reason")))
+    return [_moved_entry(e) if _moved_in_the_migration(e) else _entry(e)
             for e in entries if e["action"] in PUBLIC_ACTIONS]
 
 
@@ -124,6 +169,30 @@ def cited(document_ids: list[str] | None) -> list[DocumentRef]:
     return [DocumentRef(**describe(found[d])) for d in document_ids or [] if d in found]
 
 
+def reply(petition: dict[str, Any]) -> PetitionReply | None:
+    """Read from the petition beside the response it answers, so it is never shown without one."""
+    if not petition.get("replyAt") or not petition.get("replyText"):
+        return None
+    return PetitionReply(text=petition["replyText"], at=petition["replyAt"])
+
+
+def share(row: dict[str, Any]) -> DepartmentShare:
+    """A department stands under its own name here; the officer who wrote the note is named only in the trail."""
+    department = str(row["department"])
+    return DepartmentShare(department=DEPARTMENT_NAMES.get(department, department), shared_at=str(row["sharedAt"]),
+                           note=row.get("note"), note_at=row.get("noteAt"))
+
+
+def shares(rows: list[dict[str, Any]]) -> list[DepartmentShare]:
+    return [share(row) for row in rows]
+
+
+def shared(item: petition_departments.Shared) -> SharedPetition:
+    """For the department's own queue: the petition it was asked about, and what it has said so far."""
+    return SharedPetition(petition=card(item.petition), shared_at=str(item.share["sharedAt"]),
+                          note=item.share.get("note"), note_at=item.share.get("noteAt"))
+
+
 def response(petition: dict[str, Any]) -> PetitionResponse | None:
     kind = petition.get("responseKind")
     if kind not in RESPONSE_KINDS or not petition.get("respondedAt"):
@@ -132,7 +201,7 @@ def response(petition: dict[str, Any]) -> PetitionResponse | None:
     return PetitionResponse(kind=kind, label=RESPONSE_KINDS[kind].label, text=petition["responseText"],
                             department=RECIPIENT_NAMES.get(department, department) if department else None,
                             documents=cited(petition.get("responseDocumentIds")), responded_at=petition["respondedAt"],
-                            late=responded_late(petition), days_late=days_late(petition))
+                            late=responded_late(petition), days_late=days_late(petition), reply=reply(petition))
 
 
 def detail(petition: dict[str, Any]) -> PetitionDetail:

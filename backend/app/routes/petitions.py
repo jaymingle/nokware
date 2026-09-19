@@ -1,14 +1,15 @@
 """Petitions: public pages, the creator's own petitions (by a confirmed phone), what residents say under one, the
-contributors' queue of what has been reported, and the MCE's responses.
+contributors' queue of what has been reported, the MCE's responses, the departments they are shared with, and the
+creator's reply to the answer they were given.
 
 Nobody approves a petition here. A draft that passes the screen is published by the person who wrote it; what comes
 down, comes down on a named ground, by a contributor who neither started it nor signed it.
 """
 
 from dataclasses import asdict
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Form, Header, Query, Request, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Header, Query, Request, UploadFile
 
 from app.config import get_settings
 from app.dependencies import client_address, rate_limited, refuse_if_over, require_roles
@@ -30,11 +31,14 @@ from app.schemas.petitions import (
     MyPetitions,
     MySignature,
     NamedSignatures,
+    NoteRequest,
     OwnPetition,
+    PetitionCard,
     PetitionDetail,
     PetitionOptions,
     PetitionPage,
     RemovalRequest,
+    ReplyRequest,
     ReportedComment,
     ReportFiled,
     ReportQueue,
@@ -42,6 +46,8 @@ from app.schemas.petitions import (
     ResponseRequest,
     ScreenRequest,
     ScreenResult,
+    SharedPetition,
+    ShareRequest,
     SignRequest,
     SignResult,
     SubmitRequest,
@@ -50,6 +56,7 @@ from app.schemas.petitions import (
 )
 from app.services import (
     petition_comments,
+    petition_departments,
     petition_images,
     petition_ledger,
     petition_removals,
@@ -66,10 +73,12 @@ from app.services.auth import Principal, Role
 from app.services.ledger_documents import utc_now
 from app.services.petition_grounds import Dismissal, Ground, in_plain_words
 from app.services.petition_rules import (
+    DEPARTMENT_NOTE_MAX,
     DOCUMENTS_MAX,
     IMAGES_MAX,
     OPEN_FOR,
     REMOVAL_NOTE_MAX,
+    REPLY_MAX,
     REPORT_NOTE_MAX,
     RESPONSE_WINDOW,
     Draft,
@@ -90,8 +99,10 @@ Changes = Depends(rate_limited(rate_limit.PETITION_CHANGES))
 Signing = Depends(rate_limited(rate_limit.SIGNING))
 Mce = Annotated[Principal, Depends(require_roles(Role.MCE))]
 Contributor = Annotated[Principal, Depends(require_roles(Role.CONTRIBUTOR))]
+Department = Annotated[Principal, Depends(require_roles(Role.DEPARTMENT))]
 PAGE_MAX = 50
 GROUPS = petitions.PUBLIC_GROUPS
+REMOVED = petitions.REMOVED_GROUP
 
 
 def confirmed_phone(x_phone_proof: Annotated[str | None, Header()] = None) -> phone_proof.Proof:
@@ -122,6 +133,7 @@ def options() -> PetitionOptions:
         threshold_area=settings.petition_threshold_area, threshold_metro=settings.petition_threshold_metro,
         open_days=OPEN_FOR.days, response_days=RESPONSE_WINDOW.days, max_images=IMAGES_MAX,
         max_documents=DOCUMENTS_MAX, report_note_max=REPORT_NOTE_MAX, removal_note_max=REMOVAL_NOTE_MAX,
+        department_note_max=DEPARTMENT_NOTE_MAX, reply_max=REPLY_MAX,
         grounds=present.grounds(), dismissal_reasons=present.dismissal_reasons(),
         status_words=present.status_catalogue(),
         verification=Verification(whatsapp=phone_proof.whatsapp_available(), ussd_code=phone_proof.ussd_code(),
@@ -131,13 +143,24 @@ def options() -> PetitionOptions:
 
 @router.get("", response_model=PetitionPage)
 def published(
-    group: Literal["open", "awaiting", "responded", "closed"] = "open",
+    group: Literal["open", "awaiting", "responded", "closed", "removed"] = "open",
     topic: str | None = None,
     limit: Annotated[int, Query(ge=1, le=PAGE_MAX)] = 20,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> PetitionPage:
+    """The petitions standing in one group, or — for "removed" — the tombstones of the ones taken down, which are
+    built from the removal records and carry nothing of the petitions. `topic` doesn't narrow that group: a
+    tombstone has no topic, and reading one off the petition is the leak the tombstone exists to prevent."""
+    if group == REMOVED:
+        stones, removed_total = petition_removals.standing_tombstones(limit, offset)
+        return _page([], removed_total, [present.tombstone(stone) for stone in stones])
     found, total = petitions.list_public(GROUPS[group], topic, limit, offset)
-    return PetitionPage(petitions=[present.card(p) for p in found], total=total, counts=petitions.public_counts(),
+    return _page([present.card(p) for p in found], total)
+
+
+def _page(cards: list[PetitionCard], total: int, removed: list[Tombstone] | None = None) -> PetitionPage:
+    """Every group is handed the same counts and the same removal figures, so the tabs read alike from any of them."""
+    return PetitionPage(petitions=cards, removed=removed or [], total=total, counts=petitions.public_counts(),
                         removals=present.removals(petition_removals.removals_by_ground()),
                         topics=[Option(id=t.id, name=t.label) for t in petition_topics()])
 
@@ -145,6 +168,12 @@ def published(
 @router.get("/responses", response_model=list[AwaitingResponse])
 def responses(_: Mce) -> list[AwaitingResponse]:
     return [present.awaiting(p) for p in petitions.awaiting_response()]
+
+
+@router.get("/shared", response_model=list[SharedPetition])
+def shared(principal: Department) -> list[SharedPetition]:
+    """The petitions the MCE has shared with the caller's department, newest first."""
+    return [present.shared(item) for item in petition_departments.shared_with(principal)]
 
 
 @router.get("/reports", response_model=ReportQueue)
@@ -201,8 +230,12 @@ def draft_ledger(request: LedgerSearchRequest) -> list[LedgerMatch]:
 
 
 @router.post("", response_model=OwnPetition, status_code=201, dependencies=[Changes])
-def submit(request: Annotated[SubmitRequest, Form()], proof: Phone) -> OwnPetition:
-    """A form, so the petition's images arrive with its words. It is published by this call: nobody approves it."""
+def submit(request: Annotated[SubmitRequest, File()], proof: Phone) -> OwnPetition:
+    """A form, so the petition's images arrive with its words. It is published by this call: nobody approves it.
+
+    `File()`, not `Form()`: the form carries file parts, and only File() has FastAPI declare the multipart the
+    route actually reads. Under Form() the schema said urlencoded, which no browser can send an image in and no
+    generated client can type."""
     _stop_if_screened(request.title, request.body)
     draft = _draft(request, _stored_images(request.images))
     return present.own(petitions.submit(proof, draft, request.show_name, request.name, utc_now()))
@@ -222,9 +255,15 @@ def petition(code: str) -> PetitionDetail | Tombstone:
         standing = petitions.public(code)
     except petitions.PetitionNotFound:
         return _tombstone(code)
-    # Counted only for a petition this call has already read publicly, so a removed one carries no count, as it
-    # carries no comments.
-    return present.detail(standing).model_copy(update={"comments": petition_comments.count_on(standing)})
+    return _detail(standing)
+
+
+def _detail(standing: dict[str, Any]) -> PetitionDetail:
+    """Comments and departments are read only for a petition the caller has already read publicly, so a removed
+    one carries neither, as it carries no answer: the tombstone route never comes through here."""
+    return present.detail(standing).model_copy(update={
+        "comments": petition_comments.count_on(standing),
+        "shared_with": present.shares(petition_departments.shares_on(standing["$id"]))})
 
 
 def _tombstone(code: str) -> Tombstone:
@@ -241,7 +280,7 @@ def petition_ledger_matches(code: str) -> list[LedgerMatch]:
 
 
 @router.post("/{code}/edit", response_model=OwnPetition, dependencies=[Changes])
-def edit(code: str, request: Annotated[EditRequest, Form()], proof: Phone) -> OwnPetition:
+def edit(code: str, request: Annotated[EditRequest, File()], proof: Phone) -> OwnPetition:
     """A new version of the words, and — for a petition that was removed — its publication again."""
     _stop_if_screened(request.title, request.body)
     draft = _draft(request, _stored_images(request.images, tuple(request.keep_images)))
@@ -290,6 +329,24 @@ def respond(code: str, request: ResponseRequest, principal: Mce, tasks: Backgrou
     updated = petition_responses.respond(principal, code, answer, utc_now())
     tasks.add_task(petition_updates.notify_quietly, updated, Update.RESPONDED)
     return responses(principal)
+
+
+@router.post("/{code}/share", response_model=PetitionDetail, dependencies=[Changes])
+def share(code: str, request: ShareRequest, principal: Mce) -> PetitionDetail:
+    """The MCE asks one department of the Assembly to answer this petition. The page comes back with it on."""
+    return _detail(petition_departments.share(principal, code, request.department, utc_now()))
+
+
+@router.post("/{code}/note", response_model=SharedPetition, dependencies=[Changes])
+def note(code: str, request: NoteRequest, principal: Department) -> SharedPetition:
+    """The one note the caller's department writes on a petition shared with it, public under its name."""
+    return present.shared(petition_departments.add_note(principal, code, request.text, utc_now()))
+
+
+@router.post("/{code}/reply", response_model=PetitionDetail, dependencies=[Changes])
+def reply(code: str, request: ReplyRequest, proof: Phone) -> PetitionDetail:
+    """The creator answers the MCE's response, once, on the confirmed number they started the petition with."""
+    return _detail(petition_responses.reply(code, proof, request.text, utc_now()))
 
 
 @router.post("/{code}/signatures", response_model=SignResult, dependencies=[Signing])

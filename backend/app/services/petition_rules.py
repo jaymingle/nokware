@@ -6,6 +6,10 @@ Lifecycle:
   open for 90 days without reaching it -> closed; the creator can close it themselves until it reaches its threshold
   open, awaiting_response, responded or closed -> removed, by a verified contributor, on one of four grounds
 
+A response is not the end of the exchange, and none of what follows moves the petition anywhere: the MCE shares the
+petition with a department, which writes one note under its own name, and the petitioner replies once to the
+response. What stands on the page is a conversation, not another state.
+
 Nobody approves a petition into existence. The Assembly is usually what a petition is about, so the MCE cannot
 publish, refuse or remove one: it decides only whether to answer. What comes down comes down on a named ground,
 against a published tombstone that says which, and the creator can mend the words and publish it again.
@@ -31,6 +35,8 @@ TITLE_MIN, TITLE_MAX = 15, 150
 BODY_MIN, BODY_MAX = 50, 4000
 NAME_MAX = 80
 NOTE_MAX = 1000  # a line of the audit trail
+DEPARTMENT_NOTE_MAX = 500  # one department's answer, on the public page, to a petition the MCE shared with it
+REPLY_MAX = 1000  # the petitioner's reply to the response the MCE published
 REMOVAL_NOTE_MAX = 500  # what a contributor writes for the record when they remove a petition
 REPORT_NOTE_MAX = 300  # what a reader may add when they report one
 DOCUMENTS_MAX = 3
@@ -77,6 +83,9 @@ class PetitionAction(StrEnum):
     THRESHOLD_REACHED = "threshold_reached"
     RESPONDED = "responded"
     NO_RESPONSE = "no_response"  # 30 days after the threshold, with no response
+    SHARED = "shared"  # the MCE sent the petition to a department for its answer
+    DEPARTMENT_NOTE = "department_note"  # that department wrote its one note
+    CREATOR_REPLIED = "creator_replied"  # the petitioner answered the MCE's response
     CREATOR_NOTIFIED = "creator_notified"  # a message to the creator: never public
 
 
@@ -317,6 +326,27 @@ def response_fields(petition: dict[str, Any], response: Response, now: datetime)
     return {"status": PetitionStatus.RESPONDED.value, "respondedAt": now.isoformat(), "responseKind": response.kind,
             "responseText": text, "responseDepartment": response.department if response.kind == "referred" else None,
             "responseDocumentIds": list(documents)}
+
+
+def check_department(team: str) -> None:
+    """A petition is shared with a department of the Assembly, from the one list of them there is."""
+    if team not in DEPARTMENT_TEAMS:
+        raise InvalidPetition(phrase("petition.share.not_a_department"))
+
+
+def check_repliable(petition: dict[str, Any]) -> None:
+    """One reply answers one response. It is the response that is being replied to, so there is nothing to reply
+    to until the MCE has published one, and nothing to reply to on a removed petition, whose response is down
+    with it."""
+    if not is_public(petition) or not petition.get("respondedAt"):
+        raise WrongState(phrase("petition.reply.no_response"))
+    if petition.get("replyAt"):
+        raise WrongState(phrase("petition.reply.already_replied"))
+
+
+def reply_fields(text: str, now: datetime) -> dict[str, Any]:
+    """Kept on the petition beside the response it answers: one response, one reply, read and removed together."""
+    return {"replyText": text, "replyAt": now.isoformat()}
 
 
 def response_overdue(petition: dict[str, Any], now: datetime) -> bool:

@@ -16,6 +16,7 @@ from app.services import (
     channel_limits,
     channel_sessions,
     petition_clock,
+    petition_images,
     petition_ledger,
     petition_removals,
     petition_reports,
@@ -322,6 +323,30 @@ def test_words_the_screen_stops_never_become_a_petition(monkeypatch: pytest.Monk
     assert created == []
 
 
+def _request_body(path: str) -> dict[str, Any]:
+    return dict(app.openapi()["paths"][path]["post"]["requestBody"]["content"])
+
+
+def test_starting_and_mending_a_petition_are_declared_as_the_multipart_they_read() -> None:
+    """The web's request types are generated from this schema. Declared as urlencoded, they say an image is a
+    string, which is nothing a browser can send an image as — so the page ends up typing the call by hand."""
+    for path, model in (("/api/petitions", "SubmitRequest"), ("/api/petitions/{code}/edit", "EditRequest")):
+        content = _request_body(path)
+        assert list(content) == ["multipart/form-data"]
+        assert content["multipart/form-data"]["schema"]["$ref"].endswith(f"/{model}")
+        images = app.openapi()["components"]["schemas"][model]["properties"]["images"]
+        assert images["items"] == {"type": "string", "contentMediaType": "application/octet-stream"}  # a file part
+
+
+def test_a_petition_is_started_with_its_images_in_the_one_multipart_request(stored: Fake, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(petition_images, "store_images", lambda images, limit: [f"petitions/{len(images)}.jpg"])
+    proof = phone_proof.issue_proof(PHONE, Channel.USSD, datetime.now(UTC))
+    form = {"title": DRAFT.title, "body": DRAFT.body, "topic": "drainage", "scope": "area", "ward": "kaneshie"}
+    response = TestClient(app).post("/api/petitions", data=form, headers={"X-Phone-Proof": proof},
+                                    files=[("images", ("drain.jpg", b"a photo of the drain", "image/jpeg"))])
+    assert response.status_code == 201 and response.json()["image_ids"] == ["petitions/1.jpg"]
+
+
 def _remove(stored: Fake, ground: Ground = Ground.PRIVATE_INDIVIDUAL, duplicate: str | None = None,
             note: str | None = None) -> petition_removals.Removed:
     return petition_removals.remove(KOFI, proof_of(CONTRIBUTOR_PHONE), "482913", ground, duplicate, note, NOW)
@@ -400,6 +425,50 @@ def test_a_removed_petitions_page_is_the_tombstone_and_an_unknown_number_is_stil
     assert client.get("/api/petitions/111111").status_code == 404
 
 
+def _listing(group: str) -> dict[str, Any]:
+    return TestClient(app).get("/api/petitions", params={"group": group}).json()
+
+
+def test_the_removed_group_lists_tombstones_and_nothing_of_the_petitions_they_stand_for(
+        stored: Fake, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The rows are built from the removal records, as a tombstone is, so there is nothing of a petition in them
+    to leave out: no title, no words, no signature count, no name."""
+    _publish(stored)
+    petitions.update_petition("p1", {"signatureCount": 412, "creatorName": "Ama Mensah"})
+    _remove(stored, Ground.PRIVATE_INDIVIDUAL, note="Names the landlord at number 12.")
+    monkeypatch.setattr(petitions, "removed_ids", lambda: {"p1"})
+    monkeypatch.setattr(petitions, "every_record", lambda collection, queries: [{"status": "removed"}])
+
+    page = _listing("removed")
+    assert page["petitions"] == [] and page["total"] == 1 and page["counts"]["removed"] == 1
+    assert page["removed"] == [{"state": "removed", "code": "482913", "ground": "private_individual",
+                                "ground_words": in_plain_words(Ground.PRIVATE_INDIVIDUAL),
+                                "removed_at": NOW.isoformat(), "duplicate_of": None, "previous_removals": 0}]
+    assert all(word not in str(page) for word in (DRAFT.title, DRAFT.body, "Ama Mensah", "412", "landlord"))
+
+
+def test_the_removed_group_follows_what_stands_removed_and_shows_the_removal_it_stands_under(
+        stored: Fake, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A mended petition keeps its removal record, so the record alone can't say what is down: the group is what
+    stands removed now. Removed a second time, it is one row, under the latest removal, with the first counted."""
+    _publish(stored)
+    _remove(stored, Ground.PERSONAL_DATA)
+    petitions.edit("482913", proof_of(PHONE), DRAFT, NOW + timedelta(days=1))
+    monkeypatch.setattr(petitions, "every_record", lambda collection, queries: [{"status": "open"}])
+    monkeypatch.setattr(petitions, "removed_ids", set)
+    back_up = _listing("removed")
+    assert len(stored.removals) == 1 and back_up["removed"] == [] and back_up["total"] == 0
+
+    _remove(stored, Ground.INCITES_VIOLENCE)
+    monkeypatch.setattr(petitions, "every_record", lambda collection, queries: [{"status": "removed"}])
+    monkeypatch.setattr(petitions, "removed_ids", lambda: {"p1"})
+    monkeypatch.setattr(petition_removals, "every_record",  # newest first, as the query asks Appwrite for them
+                        lambda collection, queries: list(reversed(stored.removals)))
+    down_again = _listing("removed")
+    assert len(stored.removals) == 2 and down_again["total"] == 1
+    assert [(stone["ground"], stone["previous_removals"]) for stone in down_again["removed"]] == [("incites_violence", 1)]
+
+
 def test_a_report_hides_nothing_and_its_note_is_screened(stored: Fake) -> None:
     _publish(stored)
     filed = petition_reports.file_report("482913", Ground.PERSONAL_DATA, None, "  There is a home address in it.  ", NOW)
@@ -463,11 +532,34 @@ def test_the_public_timeline_says_what_happened_never_who_did_it() -> None:
     trail = [{"action": "published", "at": "t1"},
              {"action": "removed", "at": "t2", "reason": "private_individual", "note": "Names Kofi at number 12"},
              {"action": "republished", "at": "t3"}, {"action": "made_anonymous", "at": "t4"},
-             {"action": "closed", "at": "t5", "reason": "refused"}]
+             {"action": "closed", "at": "t5", "actorRole": "system", "reason": "refused"}]
     shown = present.timeline(trail)
-    assert [e.action for e in shown] == ["published", "removed", "republished", "closed"]
+    assert [e.action for e in shown] == ["published", "removed", "republished", "moved_to_new_process"]
     assert shown[1].reason == in_plain_words(Ground.PRIVATE_INDIVIDUAL) and "Kofi" not in str(shown)
     assert shown[3].reason == "Refused under the earlier review process"  # a petition the old process ended
+
+
+# The line scripts/migrate_petitions.py leaves behind, field for field as petitions.record_history writes it, on
+# petition 504162: it was waiting for the MCE's review when the review was taken out, so the move published it.
+MOVED = {"petitionId": "p1", "action": "published", "actorId": "system", "actorName": "Automatic",
+         "actorRole": "system", "fromStatus": "in_review", "toStatus": "open", "reason": "in_review",
+         "note": None, "at": "2026-09-19T10:00:00+00:00"}
+
+
+def test_a_migrated_petition_says_it_was_moved_and_is_never_published_with_a_reason_for_closing() -> None:
+    """"Published by the person who started it: Closed during the move" is two contradictory things about one
+    date, and neither is what happened: what happened is that the petition came to this process."""
+    published = present.timeline([MOVED])[0]
+    assert (published.action, published.at, published.reason) == ("moved_to_new_process", MOVED["at"], None)
+
+    stopped = {**MOVED, "action": "closed", "toStatus": "closed",
+               "note": "Closed during the move to the new petition process: It contains a phone number."}
+    closed = present.timeline([stopped])[0]
+    assert closed.action == "moved_to_new_process"  # the move closed this one, and says why it did
+    assert closed.reason == "Closed during the move to the new petition process"
+    assert "phone number" not in str(closed)  # the whole reason is the record's; the reader gets the label
+    kept = present.timeline([{**MOVED, "action": "closed", "fromStatus": "closed", "reason": "closed"}])[0]
+    assert kept.reason is None  # the move didn't close this one: it was closed before the move reached it
 
 
 def test_a_petition_page_is_refused_after_too_many_reports_about_it(stored: Fake) -> None:
@@ -530,4 +622,4 @@ def test_the_tabs_are_told_how_many_petitions_stand_in_each_group(monkeypatch: p
     stored = [{"status": "open"}, {"status": "open"}, {"status": "awaiting_response"}, {"status": "responded"},
               {"status": "closed"}, {"status": "removed"}]
     monkeypatch.setattr(petitions, "every_record", lambda collection, queries: stored)
-    assert petitions.public_counts() == {"open": 2, "awaiting": 1, "responded": 1, "closed": 1}
+    assert petitions.public_counts() == {"open": 2, "awaiting": 1, "responded": 1, "closed": 1, "removed": 1}

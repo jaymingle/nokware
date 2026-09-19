@@ -10,10 +10,12 @@ from app.services.ledger_documents import Provenance
 from app.services.petition_comments import COMMENT_MAX
 from app.services.petition_rules import (
     BODY_MAX,
+    DEPARTMENT_NOTE_MAX,
     DOCUMENTS_MAX,
     IMAGES_MAX,
     NAME_MAX,
     REMOVAL_NOTE_MAX,
+    REPLY_MAX,
     REPORT_NOTE_MAX,
     RESPONSE_MAX,
     TITLE_MAX,
@@ -64,6 +66,8 @@ class PetitionOptions(BaseModel):
     max_documents: int
     report_note_max: int
     removal_note_max: int
+    department_note_max: int  # a department's one note on a petition shared with it
+    reply_max: int  # the petitioner's reply to the MCE's response
     grounds: list[GroundOption]
     dismissal_reasons: list[DismissalOption]
     status_words: dict[Status, str]  # one wording for a status, wherever it is shown
@@ -118,9 +122,11 @@ class PetitionCard(BaseModel):
 
 class TimelineEntry(BaseModel):
     action: Literal["published", "edited", "republished", "removed", "withdrawn", "closed", "threshold_reached",
-                    "responded", "no_response"]
+                    "responded", "no_response", "shared", "department_note", "creator_replied",
+                    # not an action anyone took: the day a petition already in the database came to this process
+                    "moved_to_new_process"]
     at: str
-    reason: str | None  # a removal's ground, in plain words
+    reason: str | None  # a removal's ground, a shared petition's department, or how the old process ended it
 
 
 class VersionEntry(BaseModel):
@@ -130,6 +136,22 @@ class VersionEntry(BaseModel):
     at: str
     title: str
     changed: list[str]  # which of title, body, topic, scope, wardLocation, imageIds changed from the version before
+
+
+class PetitionReply(BaseModel):
+    """The petitioner's one answer to the response. Their name is the petition's own: none unless they showed it."""
+
+    text: str
+    at: str
+
+
+class DepartmentShare(BaseModel):
+    """One department the MCE sent this petition to, and the one note that department wrote back."""
+
+    department: str  # the department's name, as every page writes it
+    shared_at: str
+    note: str | None  # None until the department has written; it writes once
+    note_at: str | None
 
 
 class PetitionResponse(BaseModel):
@@ -143,6 +165,7 @@ class PetitionResponse(BaseModel):
     responded_at: str
     late: bool  # after the 30-day deadline
     days_late: int  # whole days after it, never rounded up; 0 if in time or less than a day late
+    reply: PetitionReply | None  # what the petitioner said back, under it
 
 
 class PetitionDetail(PetitionCard):
@@ -156,6 +179,7 @@ class PetitionDetail(PetitionCard):
     documents: list[DocumentRef]  # what the creator cited
     response: PetitionResponse | None
     comments: int = 0  # how many stand under it, so a page or a channel can say so; the route counts them
+    shared_with: list[DepartmentShare] = Field(default_factory=list)  # the route reads them, as it counts comments
 
 
 class Tombstone(BaseModel):
@@ -186,7 +210,11 @@ class Removals(BaseModel):
 
 
 class PetitionPage(BaseModel):
+    """One group of petitions. The removed group fills `removed` instead of `petitions`: there are no cards to
+    show, only the tombstones, which carry nothing of the petitions they stand for."""
+
     petitions: list[PetitionCard]
+    removed: list[Tombstone]  # empty in every other group, so the page never has to test for the field
     total: int
     counts: dict[str, int]  # how many stand in each group, so a tab says what it holds
     removals: Removals
@@ -426,3 +454,26 @@ class ResponseRequest(BaseModel):
     text: str = Field(max_length=RESPONSE_MAX + 500)
     department: str | None = None
     documents: list[str] = Field(default_factory=list, max_length=DOCUMENTS_MAX)
+
+
+class ShareRequest(BaseModel):
+    """The department the MCE sends the petition to, from /api/departments — the Assembly's one list of them."""
+
+    department: str = Field(max_length=64)
+
+
+class NoteRequest(BaseModel):
+    text: str = Field(max_length=DEPARTMENT_NOTE_MAX + 100)
+
+
+class SharedPetition(BaseModel):
+    """A petition as the department it was shared with meets it, with the note it has written, if it has."""
+
+    petition: PetitionCard
+    shared_at: str
+    note: str | None
+    note_at: str | None
+
+
+class ReplyRequest(BaseModel):
+    text: str = Field(max_length=REPLY_MAX + 200)

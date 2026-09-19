@@ -140,6 +140,32 @@ def tombstone(removal: dict[str, Any], language: Language = Language.ENGLISH) ->
                      previous_removals=int(removal.get("previousRemovals") or 0))
 
 
+# Everything tombstone() reads, and nothing else: the contributor's note and name stay in the database.
+TOMBSTONE_FIELDS = ["petitionId", "code", "ground", "duplicateOf", "previousRemovals", "at"]
+
+
+def standing_tombstones(limit: int, offset: int) -> tuple[list[Tombstone], int]:
+    """The tombstones of the petitions that stand removed, newest first, for the public list of them.
+
+    Built from the removal records, exactly as a single tombstone is, so a list of a hundred can say no more about
+    a petition than its own page does. A petition can be removed, mended, published again and removed a second
+    time: the latest record is the one standing, and the earlier ones are counted on it rather than listed."""
+    removed = petitions.removed_ids()
+    records = every_record(REMOVALS_COLLECTION, [Query.order_desc("at"), Query.select(TOMBSTONE_FIELDS)])
+    standing = _latest_for_each(records, removed)
+    return [tombstone(record) for record in standing[offset:offset + limit]], len(standing)
+
+
+def _latest_for_each(records: list[dict[str, Any]], removed: set[str]) -> list[dict[str, Any]]:
+    """Newest first on the way in, so the first record kept for a petition is the removal it stands under."""
+    latest: dict[str, dict[str, Any]] = {}
+    for record in records:
+        petition_id = str(record.get("petitionId"))
+        if petition_id in removed:
+            latest.setdefault(petition_id, record)
+    return list(latest.values())
+
+
 def removals_by_ground() -> dict[str, int]:
     """How many petitions have been removed on each ground, for the public page. A fixture's removal isn't a
     resident's petition coming down, so it isn't counted."""

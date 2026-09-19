@@ -23,7 +23,8 @@ from app.services.phone_proof import Channel
 NOW = datetime(2026, 9, 15, 11, 0, tzinfo=UTC)
 PHONE, OTHER = "+233241234567", "+233201234568"
 OPEN = {"$id": "p1", "code": "482913", "title": "[TEST] Desilt the Kaneshie drain", "status": "open", "threshold": 3,
-        "signatureCount": 0, "publishedAt": "2026-09-14T09:00:00+00:00", "closesAt": (NOW + timedelta(days=60)).isoformat()}
+        "signatureCount": 0, "publishedAt": "2026-09-14T09:00:00+00:00", "closesAt": (NOW + timedelta(days=60)).isoformat(),
+        "version": 1}
 
 
 @pytest.fixture
@@ -39,10 +40,11 @@ def store(monkeypatch: pytest.MonkeyPatch, server: fakeredis.FakeRedis) -> dict[
     """One petition and its signatures in dicts; the unique index is the dict key."""
     state: dict[str, Any] = {"petition": dict(OPEN), "signatures": {}, "trail": []}
 
-    def store_signature(petition_id: str, key: str, name: str | None, channel: Channel, now: datetime) -> bool:
+    def store_signature(petition_id: str, key: str, name: str | None, channel: Channel, version: int, now: datetime) -> bool:
         if key in state["signatures"]:
             return False
-        state["signatures"][key] = {"$id": key[:8], "named": name is not None, "name": name, "createdAt": now.isoformat()}
+        state["signatures"][key] = {"$id": key[:8], "named": name is not None, "name": name, "version": version,
+                                    "createdAt": now.isoformat()}
         return True
 
     monkeypatch.setattr(petitions, "public", lambda code: dict(state["petition"]))
@@ -72,7 +74,7 @@ def test_reaching_the_threshold_gives_the_mce_30_days_and_happens_once() -> None
 
 def test_signing_stays_open_after_the_threshold_until_the_90_days_end() -> None:
     check_signable({**OPEN, "status": "awaiting_response"}, NOW)
-    for closed in ({"status": "closed"}, {"status": "withdrawn"}, {"closesAt": NOW.isoformat()}, {"status": "in_review"}):
+    for closed in ({"status": "closed"}, {"status": "removed"}, {"closesAt": NOW.isoformat()}, {"status": "responded"}):
         with pytest.raises(WrongState):
             check_signable({**OPEN, **closed}, NOW)
     with pytest.raises(WrongState, match="gone to the MCE"):
@@ -87,6 +89,7 @@ def test_one_signature_per_number_and_the_one_that_reaches_the_threshold_sends_i
     third = petition_signatures.sign("482913", "+233551234569", Channel.SMS, False, None, NOW)
     assert third.petition["status"] == "awaiting_response" and store["trail"] == [(PetitionAction.THRESHOLD_REACHED, "system")]
     assert [s["named"] for s in store["signatures"].values()] == [False, True, False]
+    assert {s["version"] for s in store["signatures"].values()} == {1}  # every one on the words as they stand
 
 
 def test_a_signature_holds_no_number_and_cant_be_matched_across_petitions() -> None:

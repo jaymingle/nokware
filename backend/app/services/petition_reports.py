@@ -93,17 +93,9 @@ def open_reports() -> list[dict[str, Any]]:
     return every_record(REPORTS_COLLECTION, [Query.equal("state", ReportState.OPEN.value), Query.order_desc("createdAt")])
 
 
-def _petitions_by_id(petition_ids: list[str]) -> dict[str, dict[str, Any]]:
-    ids = list(dict.fromkeys(petition_ids))
-    if not ids:
-        return {}
-    found, _ = petitions.list_petitions([Query.equal("$id", ids), Query.limit(len(ids))])
-    return {petition["$id"]: petition for petition in found}
-
-
 def queue() -> list[Reported]:
     reports = open_reports()
-    standing = _petitions_by_id([str(report["petitionId"]) for report in reports])
+    standing = petitions.by_ids([str(report["petitionId"]) for report in reports])
     against = Counter(str(report["petitionId"]) for report in reports)
     return [Reported(report, standing[petition_id], against[petition_id])
             for report in reports if (petition_id := str(report["petitionId"])) in standing]

@@ -301,6 +301,70 @@
       "critical": false,
       "text": "Thank you. A contributor will read this. The comment stays up while they do.",
       "note": "Said to whoever reports a comment: a report never hides anything, and the wording must not suggest it did."
+    },
+    "petition.share.not_a_department": {
+      "critical": false,
+      "text": "Choose a department from the Assembly's list.",
+      "note": "The list is the Assembly's own departments, in app/teams.py; there is no second list of them."
+    },
+    "petition.share.already_shared": {
+      "critical": false,
+      "text": "This petition has already been shared with that department.",
+      "note": "Sharing it twice would ask for a second note from a department that writes one."
+    },
+    "petition.note.not_shared": {
+      "critical": false,
+      "text": "This petition wasn't shared with your department, so your department has no note to write on it.",
+      "note": "Only the department the MCE shared a petition with answers on its page."
+    },
+    "petition.note.already_written": {
+      "critical": false,
+      "text": "Your department has already written its note on this petition. A note is published as it was written and stands as the department's answer.",
+      "note": "One note per department per petition, refused rather than replaced: an answer that can be rewritten is worth nothing to the person who was answered."
+    },
+    "petition.note.empty": {
+      "critical": false,
+      "text": "Write your department's note first."
+    },
+    "petition.note.too_long": {
+      "critical": false,
+      "text": "Keep the note to 500 characters or fewer."
+    },
+    "petition.note.personal_data": {
+      "critical": false,
+      "text": "This note holds personal data, such as a phone number, an email address or a Ghana Card number. It is published on the petition's page, so take it out and say it another way.",
+      "note": "Refused, never quietly mended: the officer writing it decides how to say it instead."
+    },
+    "petition.note.private_individual": {
+      "critical": false,
+      "text": "This note seems to name a private person. It is published on the petition's page, so say what the department is doing without naming anyone."
+    },
+    "petition.reply.no_response": {
+      "critical": false,
+      "text": "There is no response on this petition to reply to yet.",
+      "note": "A reply answers the MCE's published response; until there is one, there is nothing to answer."
+    },
+    "petition.reply.already_replied": {
+      "critical": false,
+      "text": "You have already replied to this response. One reply stands under it.",
+      "note": "One response, one reply: a petition's page is a record of what was asked and what was answered, not a thread."
+    },
+    "petition.reply.empty": {
+      "critical": false,
+      "text": "Write your reply first."
+    },
+    "petition.reply.too_long": {
+      "critical": false,
+      "text": "Keep your reply to 1,000 characters or fewer."
+    },
+    "petition.reply.personal_data": {
+      "critical": false,
+      "text": "Your reply holds personal data, such as a phone number, an email address or a Ghana Card number. Take it out and say it another way.",
+      "note": "The reply is published under the MCE's response, where anyone can read it."
+    },
+    "petition.reply.private_individual": {
+      "critical": false,
+      "text": "Your reply seems to name a private person. It is published under the MCE's response, so say it without naming anyone."
     }
   }
 }
