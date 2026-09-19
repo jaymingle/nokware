@@ -15,6 +15,7 @@ import type {
   Option,
   PetitionDetail,
   PetitionDismissal,
+  PetitionGround,
   PetitionRemovalRequest,
   PetitionReportQueue,
   PetitionResponseRequest,
@@ -120,6 +121,24 @@ export function dismissPetitionReport(reportId: string, reason: PetitionDismissa
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ reason }),
+  });
+}
+
+/** Settles one report about a comment. The comment stays exactly as it is. */
+export function dismissCommentReport(reportId: string, reason: PetitionDismissal): Promise<PetitionReportQueue> {
+  return apiRequest<PetitionReportQueue>(`/api/petitions/comment-reports/${encodeURIComponent(reportId)}/dismiss`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ reason }),
+  });
+}
+
+/** Takes one comment down on a named ground. No phone proof: a comment is not a petition anyone could have signed. */
+export function removeComment(code: string, commentId: string, ground: PetitionGround): Promise<PetitionReportQueue> {
+  return apiRequest<PetitionReportQueue>(`${petitionPath(code)}/comments/${encodeURIComponent(commentId)}/removal`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ground }),
   });
 }
 

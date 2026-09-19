@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { ErrorNote } from "@/components/documents/panels";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { useDismissReport } from "@/lib/api/queries";
+import { useDismissCommentReport, useDismissReport } from "@/lib/api/queries";
 
 import type { PetitionDismissal, PetitionDismissalOption } from "@/lib/api/types";
 
@@ -27,15 +27,22 @@ function ReasonChoice({ reasons, reason, choose, id }: {
   );
 }
 
-function DismissForm({ id, reasons, onDone }: { id: string; reasons: PetitionDismissalOption[]; onDone: () => void }) {
+/** A report about a petition and one about a comment are settled on the same two reasons, by different routes. */
+type About = "petition" | "comment";
+
+function DismissForm({ id, reasons, about, onDone }: {
+  id: string; reasons: PetitionDismissalOption[]; about: About; onDone: () => void;
+}) {
   const [reason, setReason] = useState<PetitionDismissal | "">("");
-  const dismiss = useDismissReport();
+  const petitionReport = useDismissReport();
+  const commentReport = useDismissCommentReport();
+  const dismiss = about === "comment" ? commentReport : petitionReport;
   const onSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!reason) return;
     dismiss.mutate({ reportId: id, reason }, {
       onSuccess: () => {
-        toast.success("Settled. The petition stays exactly as it is.");
+        toast.success(`Settled. The ${about} stays exactly as it is.`);
         onDone();
       },
     });
@@ -52,8 +59,10 @@ function DismissForm({ id, reasons, onDone }: { id: string; reasons: PetitionDis
   );
 }
 
-/** The other half of the queue: the report is settled on a fixed reason and the petition is left alone. */
-export function DismissReportDialog({ id, reasons }: { id: string; reasons: PetitionDismissalOption[] }) {
+/** The other half of the queue: the report is settled on a fixed reason and what it named is left alone. */
+export function DismissReportDialog({ id, reasons, about = "petition" }: {
+  id: string; reasons: PetitionDismissalOption[]; about?: About;
+}) {
   const [open, setOpen] = useState(false);
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -62,13 +71,13 @@ export function DismissReportDialog({ id, reasons }: { id: string; reasons: Peti
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-[20px]">Leave this petition up?</DialogTitle>
+          <DialogTitle className="text-[20px]">Leave this {about} up?</DialogTitle>
           <DialogDescription>
-            This settles the report and takes it off the queue. The petition is untouched, and whoever reported it
+            This settles the report and takes it off the queue. The {about} is untouched, and whoever reported it
             isn&apos;t told. Anyone can report it again.
           </DialogDescription>
         </DialogHeader>
-        {open ? <DismissForm id={id} reasons={reasons} onDone={() => setOpen(false)} /> : null}
+        {open ? <DismissForm id={id} reasons={reasons} about={about} onDone={() => setOpen(false)} /> : null}
       </DialogContent>
     </Dialog>
   );

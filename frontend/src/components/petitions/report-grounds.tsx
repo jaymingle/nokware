@@ -12,12 +12,14 @@ type Props = {
   /** Distinct per thing reported: two dialogs on one page must never be one group of radios. */
   name: string;
   testIdPrefix: string;
+  /** A reader is asked why they are reporting; a contributor is asked what ground it comes down on. */
+  legend?: string;
 };
 
-export function ReportGrounds({ grounds, chosen, onChoose, name, testIdPrefix }: Props) {
+export function ReportGrounds({ grounds, chosen, onChoose, name, testIdPrefix, legend = "Why are you reporting it?" }: Props) {
   return (
     <fieldset className="flex flex-col gap-1">
-      <legend className="mb-1.5 text-[14px] font-medium">Why are you reporting it?</legend>
+      <legend className="mb-1.5 text-[14px] font-medium">{legend}</legend>
       {grounds.map((ground) => (
         <label key={ground.id} className="flex items-center gap-2.5 text-[14px]">
           <input type="radio" name={name} checked={chosen === ground.id} onChange={() => onChoose(ground.id)}

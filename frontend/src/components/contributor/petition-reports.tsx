@@ -3,6 +3,7 @@
 import Link from "next/link";
 
 import { DismissReportDialog } from "@/components/contributor/dismiss-report-dialog";
+import { RemoveCommentDialog } from "@/components/contributor/remove-comment-dialog";
 import { RemovePetitionDialog } from "@/components/contributor/remove-petition-dialog";
 import { EmptyPanel, ErrorPanel, LoadingPanel } from "@/components/documents/panels";
 import { Progress } from "@/components/petitions/petition-card";
@@ -14,7 +15,7 @@ import { petitionStatus } from "@/lib/status";
 import { joinNames, plural } from "@/lib/text";
 import { formatDateTime } from "@/lib/time";
 
-import type { PetitionGroundOption, PetitionDismissalOption, PetitionReport } from "@/lib/api/types";
+import type { PetitionGroundOption, PetitionDismissalOption, PetitionReport, ReportedComment } from "@/lib/api/types";
 
 function Reported({ report }: { report: PetitionReport }) {
   const others = report.reports_on_this_petition - 1;
@@ -79,24 +80,77 @@ function ReportCard({ report, grounds, reasons }: CardProps) {
   );
 }
 
-/** Reported petitions, newest first. Nothing here hides a petition: it stays up until it comes down on a ground. */
+function CommentCard({ report, grounds, reasons }: {
+  report: ReportedComment; grounds: PetitionGroundOption[]; reasons: PetitionDismissalOption[];
+}) {
+  const others = report.reports_on_this_comment - 1;
+  return (
+    <Card className="gap-0 py-0" data-testid={`comment-report-${report.id}`}>
+      <div className="border-l-[3px] border-gold bg-gold-tint px-5 py-3 text-[14px]">
+        <p>Reported as: <strong className="font-medium">{report.ground_words}</strong></p>
+        <p className="text-[12.5px] text-ink-soft">
+          {formatDateTime(report.reported_at)}
+          {others > 0 ? ` · ${plural(report.reports_on_this_comment, "report", "reports")} on this comment` : " · the only report on this comment"}
+        </p>
+      </div>
+      <div className="flex flex-col gap-3 p-5">
+        <p className="text-[12.5px] text-ink-soft">
+          A comment under petition{" "}
+          <Link href={`/petitions/${report.code}`} className="underline underline-offset-2"
+            data-testid={`comment-report-${report.id}-link`}>
+            {spacedCode(report.code)}
+          </Link>
+          {" "}· {report.comment.name ?? "Resident"} · {formatDateTime(report.comment.at)}
+        </p>
+        <p className="rounded-lg bg-paper-subtle px-3 py-2 text-[14px] whitespace-pre-line"
+          data-testid={`comment-report-${report.id}-text`}>
+          {report.comment.text}
+        </p>
+        {report.note ? (
+          <p className="text-[13.5px]" data-testid={`comment-report-${report.id}-note`}>
+            What the reader added: &ldquo;{report.note}&rdquo;
+          </p>
+        ) : null}
+        <div className="flex flex-wrap gap-2 pt-1">
+          <RemoveCommentDialog code={report.code} commentId={report.comment.id} grounds={grounds} />
+          <DismissReportDialog id={report.id} reasons={reasons} about="comment" />
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+/** Reported petitions and reported comments, newest first. Nothing here hides either: both stay up until they
+ * come down on a ground. */
 export function PetitionReports() {
   const { data, error, isPending, refetch } = usePetitionReports();
   if (isPending) return <LoadingPanel label="Loading reported petitions…" />;
   if (error) return <ErrorPanel message={error.message} onRetry={() => void refetch()} />;
-  if (data.reports.length === 0) {
+  if (data.reports.length === 0 && data.comments.length === 0) {
     return (
       <EmptyPanel title="Nothing has been reported">
-        When a reader reports a petition, it appears here with the ground they gave. The petition stays up while you
-        read it.
+        When a reader reports a petition or a comment under one, it appears here with the ground they gave. It stays
+        up while you read it.
       </EmptyPanel>
     );
   }
   return (
-    <section aria-label="Reported petitions" className="flex flex-col gap-4">
-      {data.reports.map((report) => (
-        <ReportCard key={report.id} report={report} grounds={data.grounds} reasons={data.dismissal_reasons} />
-      ))}
-    </section>
+    <div className="flex flex-col gap-6">
+      {data.reports.length > 0 ? (
+        <section aria-label="Reported petitions" className="flex flex-col gap-4">
+          {data.reports.map((report) => (
+            <ReportCard key={report.id} report={report} grounds={data.grounds} reasons={data.dismissal_reasons} />
+          ))}
+        </section>
+      ) : null}
+      {data.comments.length > 0 ? (
+        <section aria-label="Reported comments" className="flex flex-col gap-4">
+          <h2 className="text-[17px]">Reported comments</h2>
+          {data.comments.map((report) => (
+            <CommentCard key={report.id} report={report} grounds={data.grounds} reasons={data.dismissal_reasons} />
+          ))}
+        </section>
+      ) : null}
+    </div>
   );
 }

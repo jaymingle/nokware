@@ -93,6 +93,8 @@ export type ScreenResult = Schemas["ScreenResult"];
 /** What a reader reported, and the petition it is about: a contributor's queue, newest first. */
 export type PetitionReport = Schemas["ReportedPetition"];
 export type PetitionReportQueue = Schemas["ReportQueue"];
+/** A reported comment, as the contributor who must judge it meets it. */
+export type ReportedComment = Schemas["ReportedComment"];
 export type PetitionRemovalRequest = Schemas["RemovalRequest"];
 export type PetitionDismissalOption = Schemas["DismissalOption"];
 export type PetitionDismissal = Schemas["DismissRequest"]["reason"];

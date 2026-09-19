@@ -3,11 +3,13 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 
 import {
+  dismissCommentReport,
   dismissPetitionReport,
   getAwaitingResponses,
   getCase,
   getPetitionReports,
   openSharedLocation,
+  removeComment,
   removePetition,
   respondToPetition,
   getCaseOversight,
@@ -37,6 +39,7 @@ import type {
   DocumentOut,
   PetitionDetail,
   PetitionDismissal,
+  PetitionGround,
   PetitionRemovalRequest,
   PetitionReportQueue,
   PetitionResponseRequest,
@@ -258,6 +261,17 @@ function useSettleReport<TInput>(settle: (input: TInput) => Promise<PetitionRepo
 export function useDismissReport() {
   return useSettleReport<{ reportId: string; reason: PetitionDismissal }>(
     ({ reportId, reason }) => dismissPetitionReport(reportId, reason), false);
+}
+
+export function useDismissCommentReport() {
+  return useSettleReport<{ reportId: string; reason: PetitionDismissal }>(
+    ({ reportId, reason }) => dismissCommentReport(reportId, reason), false);
+}
+
+/** The petition stays up, so its pages are refreshed too: one of its comments has gone. */
+export function useRemoveComment() {
+  return useSettleReport<{ code: string; commentId: string; ground: PetitionGround }>(
+    ({ code, commentId, ground }) => removeComment(code, commentId, ground), true);
 }
 
 export function useRemovePetition() {
