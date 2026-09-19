@@ -1,6 +1,7 @@
 // Petitions and phone confirmation: public routes, no sign-in. A creator's own petitions need the proof a
 // confirmed phone gives this page, sent as X-Phone-Proof.
 import { postJson, publicRequest } from "@/lib/api/public";
+import { postWithProgress, type Sending } from "@/lib/api/upload";
 
 import type {
   LedgerMatch,
@@ -8,11 +9,11 @@ import type {
   MySignature,
   NamedSignatures,
   OwnPetition,
-  PetitionDetail,
-  PetitionDraft,
   PetitionOptions,
+  PetitionOrTombstone,
   PetitionPage,
-  PetitionSubmission,
+  PetitionReportFiled,
+  PetitionReportRequest,
   PhoneChallenge,
   PhoneChallengeStatus,
   ScreenResult,
@@ -20,6 +21,7 @@ import type {
   SmsCodeSent,
 } from "@/lib/api/types";
 
+/** The four groups the API lists petitions for. A removed petition is in none of them. */
 export type PetitionGroup = "open" | "awaiting" | "responded" | "closed";
 export type PetitionFilters = { group: PetitionGroup; topic: string; limit: number; offset: number };
 
@@ -36,8 +38,9 @@ export function getPetitions({ group, topic, limit, offset }: PetitionFilters): 
   return publicRequest<PetitionPage>(`/api/petitions?${params}`);
 }
 
-export function getPetition(code: string): Promise<PetitionDetail> {
-  return publicRequest<PetitionDetail>(petitionPath(code));
+/** Either the petition or, where one was removed, its tombstone. Discriminate on `state`. */
+export function getPetition(code: string): Promise<PetitionOrTombstone> {
+  return publicRequest<PetitionOrTombstone>(petitionPath(code));
 }
 
 export function getPetitionLedger(code: string): Promise<LedgerMatch[]> {
@@ -54,16 +57,60 @@ export function draftLedger(words: DraftWords & { topic: string }): Promise<Ledg
   return postJson<LedgerMatch[]>("/api/petitions/ledger", words);
 }
 
-export function submitPetition(submission: PetitionSubmission, proof: string): Promise<OwnPetition> {
-  return postJson<OwnPetition>("/api/petitions", submission, proofHeader(proof));
+/** The words a petition is made of. An edit sends them all again, so both calls take the same shape. */
+export type PetitionWords = {
+  title: string;
+  body: string;
+  topic: string;
+  scope: "metro" | "area";
+  ward: string | null;
+  issue: string | null;
+  documents: string[];
+};
+
+/**
+ * The words and the photos in one request. The API takes both as a form — a petition has no number until this
+ * call gives it one, so there is nowhere to upload a photo to beforehand.
+ */
+function petitionForm(words: PetitionWords, images: File[]): FormData {
+  const form = new FormData();
+  form.append("title", words.title);
+  form.append("body", words.body);
+  form.append("topic", words.topic);
+  form.append("scope", words.scope);
+  if (words.ward) form.append("ward", words.ward);
+  if (words.issue) form.append("issue", words.issue);
+  for (const id of words.documents) form.append("documents", id);
+  for (const image of images) form.append("images", image, image.name);
+  return form;
+}
+
+export type NewPetition = { words: PetitionWords; images: File[]; showName: boolean; name: string | null };
+
+export function submitPetition(petition: NewPetition, proof: string, onProgress: (sending: Sending) => void): Promise<OwnPetition> {
+  const form = petitionForm(petition.words, petition.images);
+  form.append("show_name", String(petition.showName));
+  if (petition.name) form.append("name", petition.name);
+  return postWithProgress<OwnPetition>("/api/petitions", form, onProgress, proofHeader(proof));
+}
+
+/** `keepImages` names the images of the version before that this one keeps; anything left out goes. */
+export type PetitionEditSend = { words: PetitionWords; images: File[]; keepImages: string[] };
+
+export function editPetition(code: string, edit: PetitionEditSend, proof: string,
+                             onProgress: (sending: Sending) => void): Promise<OwnPetition> {
+  const form = petitionForm(edit.words, edit.images);
+  for (const id of edit.keepImages) form.append("keep_images", id);
+  return postWithProgress<OwnPetition>(`${petitionPath(code)}/edit`, form, onProgress, proofHeader(proof));
 }
 
 export function getMyPetitions(proof: string): Promise<MyPetitions> {
   return publicRequest<MyPetitions>("/api/petitions/mine", { headers: proofHeader(proof) });
 }
 
-export function resubmitPetition(code: string, draft: PetitionDraft, proof: string): Promise<OwnPetition> {
-  return postJson<OwnPetition>(`${petitionPath(code)}/resubmit`, draft, proofHeader(proof));
+/** Anyone, without signing in: the petition stays up while a contributor reads it. */
+export function reportPetition(code: string, report: PetitionReportRequest): Promise<PetitionReportFiled> {
+  return postJson<PetitionReportFiled>(`${petitionPath(code)}/report`, report);
 }
 
 export type CreatorAction = "withdraw" | "anonymous";

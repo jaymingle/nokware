@@ -1,21 +1,30 @@
 "use client";
 
 import { CheckIcon, CopyIcon, MessageCircleIcon } from "lucide-react";
+import Link from "next/link";
 import { useState, type ReactNode } from "react";
 
+import { PhotoGallery } from "@/components/cases/photo-gallery";
 import { ErrorPanel, LoadingPanel } from "@/components/documents/panels";
-import { PageColumn, PageShell } from "@/components/page-shell";
+import { PageShell } from "@/components/page-shell";
 import { DocumentLine, LedgerMatches } from "@/components/petitions/ledger-matches";
 import { MceResponse } from "@/components/petitions/mce-response";
 import { Progress } from "@/components/petitions/petition-card";
+import { PetitionTombstoneView } from "@/components/petitions/petition-tombstone";
+import { PetitionVersions } from "@/components/petitions/petition-versions";
+import { ReportPetition } from "@/components/petitions/report-petition";
 import { SignPanel } from "@/components/petitions/sign-panel";
 import { Signers } from "@/components/petitions/signers";
 import { StatusMark, StatusTag } from "@/components/status-tag";
 import { Button } from "@/components/ui/button";
 import { useMounted } from "@/hooks/use-mounted";
 import { useNow } from "@/hooks/use-now";
+import { ApiError } from "@/lib/api/errors";
 import { usePetition, usePetitionLedger, usePetitionOptions } from "@/lib/api/petition-queries";
-import { closingLine, placeLine, publishedLine, responseLine, spacedCode, startedBy, timelineText, whatsappShareUrl } from "@/lib/petitions";
+import {
+  closingLine, earlierVersionsLine, placeLine, publishedLine, removedBeforeLine, responseLine, spacedCode, startedBy,
+  timelineText, whatsappShareUrl,
+} from "@/lib/petitions";
 import { issueStage, petitionEventTone, petitionStatus } from "@/lib/status";
 import { joinNames } from "@/lib/text";
 import { formatDate } from "@/lib/time";
@@ -37,12 +46,16 @@ function Standing({ petition, now }: { petition: PetitionDetail; now: number }) 
   const days = options.data?.response_days ?? 30;
   const response = responseLine(petition, now);
   const tag = petitionStatus(petition.status);
+  const earlier = earlierVersionsLine(petition.signatures_on_earlier_versions);
+  const removed = removedBeforeLine(petition.removals);
   return (
     <div className="flex flex-col gap-3 rounded-xl border bg-card p-5" data-testid="petition-standing">
       <div><StatusTag tone={tag.tone} testId="petition-status">{tag.label}</StatusTag></div>
       <Progress signatures={petition.signatures} threshold={petition.threshold} large />
+      {earlier ? <p className="text-[12.5px] text-ink-soft" data-testid="petition-earlier-versions">{earlier}</p> : null}
       {response ? <p className="rounded-lg bg-gold-tint px-3 py-2.5 text-[14px]" data-testid="petition-response-due">{response}</p> : null}
       <p className="text-[13.5px]" data-testid="petition-closing">{closingLine(petition, now)}</p>
+      {removed ? <p className="text-[13.5px] text-ink-soft" data-testid="petition-removals">{removed}</p> : null}
       {petition.status === "open" && petition.threshold ? (
         <p className="text-[13.5px] text-ink-soft">
           If it reaches {petition.threshold.toLocaleString()} signatures, it goes to the MCE, who then has {days} days to respond
@@ -125,6 +138,16 @@ function Timeline({ petition }: { petition: PetitionDetail }) {
   );
 }
 
+/** A petition edited once has a history worth a heading; one that never changed has nothing to say. */
+function History({ petition }: { petition: PetitionDetail }) {
+  if (petition.versions.length < 2 && petition.signatures_on_earlier_versions === 0) return null;
+  return (
+    <Section title="How the words have changed" testId="petition-history">
+      <PetitionVersions versions={petition.versions} onEarlier={petition.signatures_on_earlier_versions} />
+    </Section>
+  );
+}
+
 function signable(petition: PetitionDetail, now: number): boolean {
   return (petition.status === "open" || petition.status === "awaiting_response") && !!petition.closes_at && Date.parse(petition.closes_at) > now;
 }
@@ -149,21 +172,45 @@ function Petition({ petition }: { petition: PetitionDetail }) {
       <Share petition={petition} />
       <Section title="Why" testId="petition-body">
         <p className="text-[15px] whitespace-pre-line">{petition.body}</p>
+        {/* The same viewer a case's photos open in: one way of looking at a photo across Nokware. */}
+        <PhotoGallery photos={petition.images} testIdPrefix="petition-image" subject="on this petition" />
       </Section>
       <Signers code={petition.code} signatures={petition.signatures} />
       <Cited petition={petition} />
       <LedgerContext code={petition.code} />
+      <History petition={petition} />
       <Timeline petition={petition} />
+      <div className="flex"><ReportPetition code={petition.code} /></div>
+    </PageShell>
+  );
+}
+
+/** A number nobody has used. Its own heading, so this state has an h1 like every other. */
+function NotFound({ message }: { message: string }) {
+  return (
+    <PageShell eyebrow="Petitions" title="Petition not found">
+      <p className="text-[15px]" data-testid="petition-not-found">{message}</p>
+      <div>
+        <Button asChild variant="secondary"><Link href="/petitions" data-testid="petition-not-found-list">See the petitions</Link></Button>
+      </div>
     </PageShell>
   );
 }
 
 export function PetitionPage({ code }: { code: string }) {
   const petition = usePetition(code);
-  // The page's title is the petition's, so until it loads there is nothing to head the page with.
-  if (petition.isPending) return <PageColumn><LoadingPanel label="Loading the petition…" /></PageColumn>;
-  if (petition.error) {
-    return <PageColumn><ErrorPanel message={petition.error.message} onRetry={() => void petition.refetch()} /></PageColumn>;
+  // A petition's page is titled with the petition, which isn't known yet — so the heading says what the page is.
+  if (petition.isPending) {
+    return <PageShell eyebrow="Petitions" title="Petition"><LoadingPanel label="Loading the petition…" /></PageShell>;
   }
+  if (petition.error) {
+    if (petition.error instanceof ApiError && petition.error.status === 404) return <NotFound message={petition.error.message} />;
+    return (
+      <PageShell eyebrow="Petitions" title="Petition">
+        <ErrorPanel message={petition.error.message} onRetry={() => void petition.refetch()} />
+      </PageShell>
+    );
+  }
+  if (petition.data.state === "removed") return <PetitionTombstoneView stone={petition.data} />;
   return <Petition petition={petition.data} />;
 }

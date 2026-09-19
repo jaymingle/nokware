@@ -14,7 +14,14 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
  * Only ever rendered where the description is shown, so an oversight view of a personal-safety case still has no
  * photos to open.
  */
-export function PhotoGallery({ photos, testIdPrefix = "case-photo" }: { photos: string[]; testIdPrefix?: string }) {
+type GalleryProps = {
+  photos: string[];
+  testIdPrefix?: string;
+  /** Whose photos these are, for the caption and the alt text: a case's are the citizen's, a petition's its own. */
+  subject?: string;
+};
+
+export function PhotoGallery({ photos, testIdPrefix = "case-photo", subject = "from the citizen" }: GalleryProps) {
   const [open, setOpen] = useState<number | null>(null);
   const showing = open === null ? null : photos[open];
   useEffect(() => {
@@ -35,7 +42,7 @@ export function PhotoGallery({ photos, testIdPrefix = "case-photo" }: { photos: 
           <li key={url}>
             <button type="button" onClick={() => setOpen(index)} className="block w-full cursor-zoom-in rounded-md"
               aria-label={`Open photo ${index + 1} of ${photos.length}`} data-testid={`${testIdPrefix}-${index}`}>
-              <Image src={url} alt={`Photo ${index + 1} from the citizen`} width={160} height={120} unoptimized
+              <Image src={url} alt={`Photo ${index + 1} ${subject}`} width={160} height={120} unoptimized
                 className="aspect-4/3 w-full rounded-md border object-cover" />
             </button>
           </li>
@@ -44,10 +51,10 @@ export function PhotoGallery({ photos, testIdPrefix = "case-photo" }: { photos: 
       <Dialog open={open !== null} onOpenChange={(next) => setOpen(next ? open : null)}>
         <DialogContent className="max-w-[min(94vw,1100px)] gap-3 sm:max-w-[min(94vw,1100px)]" data-testid={`${testIdPrefix}-viewer`}>
           <DialogTitle className="text-[14px] font-normal text-ink-soft">
-            {open === null ? "" : `Photo ${open + 1} of ${photos.length} from the citizen`}
+            {open === null ? "" : `Photo ${open + 1} of ${photos.length} ${subject}`}
           </DialogTitle>
           {showing ? (
-            <Image src={showing} alt={`Photo ${(open ?? 0) + 1} from the citizen`} width={1400} height={1050} unoptimized
+            <Image src={showing} alt={`Photo ${(open ?? 0) + 1} ${subject}`} width={1400} height={1050} unoptimized
               className="max-h-[74vh] w-full rounded-lg object-contain" />
           ) : null}
           {photos.length > 1 ? (

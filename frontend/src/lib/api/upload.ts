@@ -19,11 +19,15 @@ function failure(status: number, body: string): ApiError {
   return new ApiError(status, `Something went wrong (${status}). Try again.`);
 }
 
-export function postWithProgress<T>(path: string, form: FormData, onProgress: (sending: Sending) => void): Promise<T> {
+export function postWithProgress<T>(path: string, form: FormData, onProgress: (sending: Sending) => void,
+                                    headers: Record<string, string> = {}): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const request = new XMLHttpRequest();
     request.open("POST", `${env.apiUrl}${path}`);
     request.timeout = UPLOAD_MS;
+    // A petition carries the proof of its creator's phone; a report carries nothing. Never Content-Type: the
+    // browser sets it, with the multipart boundary only it knows.
+    for (const [name, value] of Object.entries(headers)) request.setRequestHeader(name, value);
     request.upload.onprogress = (event) => {
       if (!event.lengthComputable) return;
       // The last byte sent is not the answer: the API still has to read the report and route it.

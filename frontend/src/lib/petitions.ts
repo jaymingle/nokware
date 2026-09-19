@@ -1,21 +1,21 @@
-import { plural } from "@/lib/text";
+import { joinNames, lowerFirst, plural } from "@/lib/text";
 import { formatDate } from "@/lib/time";
 
-import type { PetitionCard, PetitionStatus, PetitionTimelineEntry, PhoneChallenge } from "@/lib/api/types";
+import type { PetitionCard, PetitionStatus, PetitionTimelineEntry, PetitionTombstone, PhoneChallenge } from "@/lib/api/types";
+import type { Sending } from "@/lib/api/upload";
 
-// The MCE is usually a petition's target, so the page always says who published it: the MCE, or the clock when the
-// MCE didn't decide.
+// The MCE is usually a petition's target, so the MCE neither publishes nor refuses one: the person who writes a
+// petition publishes it, and only the answering below is the MCE's. What comes down comes down on a named ground.
 
 const DAY_MS = 86_400_000;
 
+/** The same words the API's `status_words` carries, so the portal and the public say one thing. */
 export const STATUS_LABELS: Record<PetitionStatus, string> = {
-  in_review: "Waiting for the MCE's review",
-  refused: "Refused by the MCE",
-  open: "Open",
-  awaiting_response: "With the MCE for a response",
-  responded: "Answered by the MCE",
+  open: "Open for signatures",
+  awaiting_response: "With the MCE",
+  responded: "Answered",
+  removed: "Removed",
   closed: "Closed",
-  withdrawn: "Withdrawn",
 };
 
 export const NAME_NOTE =
@@ -44,12 +44,8 @@ export function startedBy(name: string | null): string {
   return name ? `Started by ${name}` : "Started by a resident";
 }
 
-export function publishedLine(petition: Pick<PetitionCard, "published_at" | "published_by">): string | null {
-  if (!petition.published_at) return null;
-  const on = formatDate(petition.published_at);
-  return petition.published_by === "automatic"
-    ? `Published automatically on ${on}: the MCE didn't decide within 72 hours`
-    : `Published by the MCE on ${on}`;
+export function publishedLine(petition: Pick<PetitionCard, "published_at">): string | null {
+  return petition.published_at ? `Published on ${formatDate(petition.published_at)}` : null;
 }
 
 export function signaturesLine(signatures: number, threshold: number | null): string {
@@ -99,18 +95,16 @@ export function closingLine(petition: Pick<PetitionCard, "status" | "closes_at" 
     return `Open until ${formatDate(petition.closes_at)} (${plural(left, "day", "days")} left)`;
   }
   if (!petition.closed_at) return null;
-  if (petition.status === "withdrawn") return `Withdrawn by the person who started it on ${formatDate(petition.closed_at)}`;
   const goal = petition.threshold ? ` It didn't reach ${petition.threshold.toLocaleString()} signatures in 90 days.` : "";
   return `Closed on ${formatDate(petition.closed_at)}.${goal}`;
 }
 
 const TIMELINE: Record<PetitionTimelineEntry["action"], string> = {
-  submitted: "Sent to the MCE for review",
-  resubmitted: "Edited and sent back for review",
-  published: "Published by the MCE",
-  auto_published: "Published automatically: the MCE didn't decide within 72 hours",
-  refused: "Refused by the MCE",
-  withdrawn: "Withdrawn by the person who started it",
+  published: "Published by the person who started it",
+  edited: "Edited",
+  republished: "Edited and published again",
+  removed: "Removed",
+  withdrawn: "Closed by the person who started it",
   closed: "Closed after 90 days",
   threshold_reached: "Reached its signatures and went to the MCE for a response",
   responded: "The MCE responded",
@@ -120,6 +114,61 @@ const TIMELINE: Record<PetitionTimelineEntry["action"], string> = {
 export function timelineText(entry: PetitionTimelineEntry): string {
   return entry.reason ? `${TIMELINE[entry.action]}: ${entry.reason}` : TIMELINE[entry.action];
 }
+
+// Editing, and being removed. A petition can be mended and published again, so both are ordinary things for a
+// page to say rather than accusations: the words below state what happened and leave the judgement to the reader.
+
+/** The API names the fields it versions as it stores them, so the page says what each one is. */
+const VERSIONED: Record<string, string> = {
+  title: "the ask",
+  body: "the reasons",
+  topic: "the topic",
+  scope: "where it applies",
+  wardLocation: "the electoral area",
+  imageIds: "the photos",
+};
+
+/** What one version changed from the one before it. The first version changed nothing: it began. */
+export function versionChanges(changed: string[]): string {
+  const words = changed.map((field) => VERSIONED[field]).filter(Boolean);
+  return words.length === 0 ? "First version" : `Changed ${joinNames(words)}`;
+}
+
+/**
+ * Signatures gathered before the words were last edited. They still count — the API counts them — but a reader
+ * comparing the number with what is on the page deserves to know some of it was given for something else.
+ */
+export function earlierVersionsLine(count: number): string | null {
+  return count > 0 ? `${count.toLocaleString()} on an earlier version` : null;
+}
+
+/** A petition that came down and was mended. Said on the petition itself, so the record isn't only the tombstone's. */
+export function removedBeforeLine(removals: number): string | null {
+  if (removals < 1) return null;
+  return `This petition has been removed ${plural(removals, "time", "times")} and published again.`;
+}
+
+export function removedLine(stone: Pick<PetitionTombstone, "ground_words" | "removed_at">): string {
+  return `Removed on ${formatDate(stone.removed_at)}: ${lowerFirst(stone.ground_words)}.`;
+}
+
+/** What a tombstone says about the removals before this one. */
+export function previousRemovalsLine(previous: number): string | null {
+  if (previous < 1) return null;
+  return `It had been removed ${plural(previous, "time", "times")} before this.`;
+}
+
+/**
+ * What the button says while the photos go. On a mobile connection the upload is the wait, and a button that only
+ * says "Sending…" for two minutes reads as a page that has stopped.
+ */
+export function sendingLabel(sending: Sending | null, settling = "Publishing…"): string {
+  if (sending === null || sending === "filing") return settling;
+  return `Sending your photos… ${Math.round((sending.sent / Math.max(sending.total, 1)) * 100)}%`;
+}
+
+export const REPORT_HIDES_NOTHING =
+  "Reporting hides nothing. The petition stays up, exactly as it is, while a contributor reads what you send.";
 
 export function whatsappShareUrl(title: string, pageUrl: string): string {
   return `https://wa.me/?text=${encodeURIComponent(`Petition to the Accra Metropolitan Assembly: ${title}\n${pageUrl}`)}`;

@@ -3,29 +3,33 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { checkKey, EMPTY_DRAFT, toRequest } from "@/hooks/use-petition-draft";
 import {
   closingLine,
+  earlierVersionsLine,
   keepProof,
   nameNote,
   NO_RESPONSE,
+  previousRemovalsLine,
+  removedBeforeLine,
+  removedLine,
   responseLine,
   keptProof,
   placeLine,
   progressPercent,
   publishedLine,
+  sendingLabel,
   signaturesLine,
   spacedCode,
   startedBy,
   timelineText,
+  versionChanges,
   whatsappShareUrl,
 } from "@/lib/petitions";
 
 const NOW = Date.parse("2026-09-15T09:00:00Z");
 
 describe("how a petition reads in public", () => {
-  it("says who published it: the MCE, or the clock the MCE let run out", () => {
-    expect(publishedLine({ published_at: "2026-09-12T09:00:00Z", published_by: "mce" })).toBe("Published by the MCE on 12 Sept 2026");
-    expect(publishedLine({ published_at: "2026-09-12T09:00:00Z", published_by: "automatic" })).toBe(
-      "Published automatically on 12 Sept 2026: the MCE didn't decide within 72 hours");
-    expect(publishedLine({ published_at: null, published_by: null })).toBeNull();
+  it("says when it was published, and nothing about anyone approving it", () => {
+    expect(publishedLine({ published_at: "2026-09-12T09:00:00Z" })).toBe("Published on 12 Sept 2026");
+    expect(publishedLine({ published_at: null })).toBeNull();
   });
 
   it("names the creator only when they chose to be named", () => {
@@ -45,15 +49,46 @@ describe("how a petition reads in public", () => {
     expect(closingLine(open, NOW)).toBe("Open until 14 Dec 2026 (90 days left)");
     expect(closingLine({ ...open, status: "closed", closed_at: "2026-12-14T09:00:00Z" }, NOW)).toBe(
       "Closed on 14 Dec 2026. It didn't reach 150 signatures in 90 days.");
-    expect(closingLine({ ...open, status: "withdrawn", closed_at: "2026-10-01T09:00:00Z" }, NOW)).toBe(
-      "Withdrawn by the person who started it on 1 Oct 2026");
   });
 
-  it("gives a refusal's reason in the timeline, and shares the ask with the link", () => {
-    expect(timelineText({ action: "refused", at: "t", reason: "Names a private individual" })).toBe("Refused by the MCE: Names a private individual");
-    expect(timelineText({ action: "auto_published", at: "t", reason: null })).toContain("didn't decide within 72 hours");
+  it("gives a removal's ground in the timeline, and shares the ask with the link", () => {
+    expect(timelineText({ action: "removed", at: "t", reason: "Contains personal data" })).toBe("Removed: Contains personal data");
+    expect(timelineText({ action: "republished", at: "t", reason: null })).toBe("Edited and published again");
+    expect(timelineText({ action: "published", at: "t", reason: null })).toBe("Published by the person who started it");
     expect(decodeURIComponent(whatsappShareUrl("Desilt the drain", "https://nokware.tstitagency.com/petitions/482913"))).toContain(
       "Petition to the Accra Metropolitan Assembly: Desilt the drain\nhttps://nokware.tstitagency.com/petitions/482913");
+  });
+});
+
+describe("a petition that was edited, or taken down", () => {
+  it("says which words a version changed, in the reader's terms and not the database's", () => {
+    expect(versionChanges([])).toBe("First version");
+    expect(versionChanges(["body"])).toBe("Changed the reasons");
+    expect(versionChanges(["title", "wardLocation", "imageIds"])).toBe("Changed the ask, the electoral area and the photos");
+    // A field this build has never met is left out rather than printed as a column name.
+    expect(versionChanges(["body", "somethingNew"])).toBe("Changed the reasons");
+  });
+
+  it("counts the signatures given before the words last changed, and says nothing when there are none", () => {
+    expect(earlierVersionsLine(0)).toBeNull();
+    expect(earlierVersionsLine(1)).toBe("1 on an earlier version");
+    expect(earlierVersionsLine(1200)).toBe("1,200 on an earlier version");
+  });
+
+  it("says plainly how many times it came down, on the petition and on the tombstone", () => {
+    expect(removedBeforeLine(0)).toBeNull();
+    expect(removedBeforeLine(1)).toBe("This petition has been removed 1 time and published again.");
+    expect(removedBeforeLine(3)).toBe("This petition has been removed 3 times and published again.");
+    expect(previousRemovalsLine(0)).toBeNull();
+    expect(previousRemovalsLine(2)).toBe("It had been removed 2 times before this.");
+    expect(removedLine({ ground_words: "Contains personal data", removed_at: "2026-09-12T09:00:00Z" })).toBe(
+      "Removed on 12 Sept 2026: contains personal data.");
+  });
+
+  it("says how far the photos have gone while they are going", () => {
+    expect(sendingLabel({ sent: 512, total: 2048 })).toBe("Sending your photos… 25%");
+    expect(sendingLabel("filing")).toBe("Publishing…");
+    expect(sendingLabel(null, "Saving…")).toBe("Saving…");
   });
 });
 

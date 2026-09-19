@@ -78,15 +78,18 @@ describe("a petition", () => {
 
   it("separates what is running from what is over", () => {
     expect(petitionStatus("open").tone).toBe("active");
-    expect(petitionStatus("in_review").tone).toBe("waiting");
+    expect(petitionStatus("awaiting_response").tone).toBe("waiting");
     expect(petitionStatus("responded").tone).toBe("done");
-    expect(petitionStatus("refused").tone).toBe("ended");
-    expect(petitionStatus("withdrawn").tone).toBe("ended");
+    expect(petitionStatus("closed").tone).toBe("ended");
+  });
+
+  it("makes a removal an ending, not an alarm: it can be mended and published again", () => {
+    expect(petitionStatus("removed").tone).toBe("ended");
   });
 
   it("gives every step of its timeline a tone", () => {
-    const actions: PetitionTimelineEntry["action"][] = ["submitted", "resubmitted", "published", "auto_published",
-      "refused", "withdrawn", "closed", "threshold_reached", "responded", "no_response"];
+    const actions: PetitionTimelineEntry["action"][] = ["published", "edited", "republished", "removed",
+      "withdrawn", "closed", "threshold_reached", "responded", "no_response"];
     for (const action of actions) expect(TONES).toContain(petitionEventTone(action));
     expect(petitionEventTone("no_response")).toBe("attention");
   });

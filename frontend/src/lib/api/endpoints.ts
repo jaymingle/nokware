@@ -13,10 +13,11 @@ import type {
   FileLink,
   Me,
   Option,
-  PetitionDecision,
+  PetitionDismissal,
+  PetitionRemovalRequest,
+  PetitionReportQueue,
   PetitionResponseRequest,
   ReviewAction,
-  ReviewQueue,
 } from "@/lib/api/types";
 
 const documentPath = (id: string) => `/api/documents/${encodeURIComponent(id)}`;
@@ -105,16 +106,29 @@ export function takeCaseAction(id: string, action: CaseAction, body?: CaseAction
   });
 }
 
-/** Petitions waiting for the MCE, the one closest to publishing automatically first. */
-export function getPetitionReview(): Promise<ReviewQueue> {
-  return apiRequest<ReviewQueue>("/api/petitions/review");
+/** What readers have reported about published petitions, newest first, for a contributor to read. */
+export function getPetitionReports(): Promise<PetitionReportQueue> {
+  return apiRequest<PetitionReportQueue>("/api/petitions/reports");
 }
 
-export function decidePetition(code: string, decision: PetitionDecision): Promise<ReviewQueue> {
-  return apiRequest<ReviewQueue>(`/api/petitions/${encodeURIComponent(code)}/decision`, {
+/** Settles one report on a fixed reason and leaves the petition alone. Answers with the queue that is left. */
+export function dismissPetitionReport(reportId: string, reason: PetitionDismissal): Promise<PetitionReportQueue> {
+  return apiRequest<PetitionReportQueue>(`/api/petitions/reports/${encodeURIComponent(reportId)}/dismiss`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(decision),
+    body: JSON.stringify({ reason }),
+  });
+}
+
+/**
+ * Takes a petition down on a named ground. It needs the contributor's sign-in *and* a confirmed phone: the number
+ * is how the server can tell they neither started nor signed this petition.
+ */
+export function removePetition(code: string, removal: PetitionRemovalRequest, proof: string): Promise<PetitionReportQueue> {
+  return apiRequest<PetitionReportQueue>(`/api/petitions/${encodeURIComponent(code)}/removal`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Phone-Proof": proof },
+    body: JSON.stringify(removal),
   });
 }
 

@@ -8,6 +8,7 @@ import { PageShell } from "@/components/page-shell";
 import { DraftFields } from "@/components/petitions/draft-fields";
 import { LedgerMatches } from "@/components/petitions/ledger-matches";
 import { NameChoice } from "@/components/petitions/name-choice";
+import { PetitionImageField } from "@/components/petitions/petition-images";
 import { PhoneConfirm, PhoneConfirmed } from "@/components/petitions/phone-confirm";
 import { Button } from "@/components/ui/button";
 import { useMounted } from "@/hooks/use-mounted";
@@ -15,10 +16,11 @@ import { checkKey, toRequest, usePetitionDraft, type DraftState } from "@/hooks/
 import { usePhoneProof } from "@/hooks/use-phone-proof";
 import { ApiError } from "@/lib/api/errors";
 import { useCheckDraft, useDraftLedger, usePetitionOptions, useSubmitPetition } from "@/lib/api/petition-queries";
-import { spacedCode } from "@/lib/petitions";
-import { formatDateTime } from "@/lib/time";
+import { sendingLabel, spacedCode } from "@/lib/petitions";
 
 import type { LedgerMatch, OwnPetition, PetitionOptions, ScreenResult } from "@/lib/api/types";
+import type { Sending } from "@/lib/api/upload";
+import type { ReportPhoto } from "@/lib/report/photos";
 
 const CITE_MAX = 3;
 
@@ -101,14 +103,15 @@ function WhatHappensNext({ options }: { options: PetitionOptions }) {
   return (
     <div className="flex flex-col gap-2 rounded-lg bg-paper-subtle px-4 py-3 text-[13.5px]" data-testid="petition-next">
       <p className="font-medium">What happens next</p>
-      <p>The MCE has {options.review_hours} hours to publish your petition or refuse it, and can refuse it only for one of these reasons:</p>
-      <ul className="list-disc pl-5 text-ink-soft">
-        {options.refusal_reasons.map((r) => <li key={r.id}>{r.label}</li>)}
-      </ul>
       <p>
-        If the MCE doesn&apos;t decide within {options.review_hours} hours, it publishes automatically. Once published, it is
-        open for {options.open_days} days.
+        It publishes the moment you send it: nobody approves a petition. It is open for {options.open_days} days, and if it
+        reaches its signatures the MCE has {options.response_days} days to answer publicly on its page.
       </p>
+      <p>A contributor can take it down on one of these grounds, and only these:</p>
+      <ul className="list-disc pl-5 text-ink-soft">
+        {options.grounds.map((ground) => <li key={ground.id}>{ground.label}</li>)}
+      </ul>
+      <p>If that happens, you can mend the words and publish it again at the same number.</p>
     </div>
   );
 }
@@ -117,37 +120,50 @@ function Submitted({ petition }: { petition: OwnPetition }) {
   return (
     <div className="flex flex-col gap-4 rounded-xl border bg-card p-6" data-testid="petition-submitted">
       {/* An h2: the page's h1 is "Start a petition", which is still above it. */}
-      <h2 className="text-[24px] leading-snug">Sent to the MCE</h2>
+      <h2 className="text-[24px] leading-snug">Published</h2>
       <p className="text-[15px]">
-        Your petition is number <strong className="font-medium tabular-nums">{spacedCode(petition.code)}</strong>. The MCE can
-        publish it or refuse it for one of the stated reasons.
-        {petition.review_deadline ? ` If they haven't decided by ${formatDateTime(petition.review_deadline)}, it publishes automatically.` : ""}
+        Your petition is number <strong className="font-medium tabular-nums">{spacedCode(petition.code)}</strong>. It is open
+        for signatures now.
       </p>
-      <Button asChild className="w-fit"><Link href="/petitions/mine" data-testid="petition-submitted-mine">Follow it in your petitions</Link></Button>
+      <div className="flex flex-wrap gap-2">
+        <Button asChild><Link href={`/petitions/${petition.code}`} data-testid="petition-submitted-public">See your petition</Link></Button>
+        <Button asChild variant="secondary"><Link href="/petitions/mine" data-testid="petition-submitted-mine">Follow it in your petitions</Link></Button>
+      </div>
     </div>
   );
 }
 
-function useSubmit(draft: DraftState, named: boolean, name: string, onDone: (petition: OwnPetition) => void, onExpired: () => void) {
-  const submit = useSubmitPetition();
+type Sent = { draft: DraftState; images: File[]; named: boolean; name: string };
+
+function useSubmit(sending: Sent, onDone: (petition: OwnPetition) => void, onExpired: () => void) {
+  const [progress, setProgress] = useState<Sending | null>(null);
+  const submit = useSubmitPetition(setProgress);
   const send = async (proof: string) => {
+    setProgress({ sent: 0, total: 1 });
     try {
-      onDone(await submit.mutateAsync({ submission: { ...toRequest(draft), show_name: named, name: named ? name : null }, proof }));
+      const petition = {
+        words: toRequest(sending.draft), images: sending.images,
+        showName: sending.named, name: sending.named ? sending.name : null,
+      };
+      onDone(await submit.mutateAsync({ petition, proof }));
     } catch (failure) {
+      setProgress(null);
       if (failure instanceof ApiError && failure.status === 401) onExpired();
     }
   };
-  return { send, pending: submit.isPending, error: submit.error };
+  return { send, pending: submit.isPending, error: submit.error, progress };
 }
 
 function Send({ ready, submit, proof }: { ready: boolean; submit: ReturnType<typeof useSubmit>; proof: string | null }) {
+  const label = submit.pending ? sendingLabel(submit.progress) : "Publish this petition";
   return (
     <div className="flex flex-col gap-2">
       {submit.error ? <ErrorNote testId="petition-submit-error">{submit.error.message}</ErrorNote> : null}
       <Button className="w-fit" disabled={!ready || submit.pending} onClick={() => proof && void submit.send(proof)} data-testid="petition-submit">
-        {submit.pending ? "Sending…" : "Send to the MCE for review"}
+        {label}
       </Button>
-      {!ready ? <p className="text-[12.5px] text-ink-soft">Check your petition and confirm your phone to send it.</p> : null}
+      {submit.pending ? <p className="text-[12.5px] text-ink-soft" aria-live="polite" data-testid="petition-submit-progress">{label}</p> : null}
+      {!ready ? <p className="text-[12.5px] text-ink-soft">Check your petition and confirm your phone to publish it.</p> : null}
     </div>
   );
 }
@@ -172,9 +188,12 @@ function Form({ options, issue }: { options: PetitionOptions; issue: string | nu
   const [named, setNamed] = useState(false);
   const [name, setName] = useState("");
   const [done, setDone] = useState<OwnPetition | null>(null);
+  // Photos are files, so they are never kept in the draft this browser remembers: only the words are.
+  const [images, setImages] = useState<ReportPhoto[]>([]);
   const phone = usePhoneProof();
   const check = useDraftCheck(draft);
-  const submit = useSubmit(draft, named, name, (petition) => { clear(); setDone(petition); }, phone.forget);
+  const sending = { draft, images: images.map((image) => image.file), named, name };
+  const submit = useSubmit(sending, (petition) => { clear(); setDone(petition); }, phone.forget);
   if (done) return <Submitted petition={done} />;
   const ready = check.current !== null && !check.current.screen.stop && phone.proof !== null;
   return (
@@ -182,6 +201,7 @@ function Form({ options, issue }: { options: PetitionOptions; issue: string | nu
       {restored ? <KeptDraft onDiscard={clear} /> : null}
       <Step number={1} title="Your petition" testId="petition-step-words">
         <DraftFields draft={draft} change={change} options={options} testId="petition-draft" />
+        <PetitionImageField added={images} onAdded={setImages} max={options.max_images} />
         <Button variant="secondary" className="w-fit" onClick={() => void check.run()} disabled={check.checking || check.searching} data-testid="petition-check">
           {check.checking ? "Checking…" : check.current ? "Check again" : "Check my petition"}
         </Button>
@@ -211,8 +231,8 @@ export function NewPetitionPage({ issue }: { issue: string | null }) {
       title="Start a petition"
       lead={
         <>
-          Ask the Accra Metropolitan Assembly to do something, and gather support for it. Your draft is kept in this browser
-          until you send it.
+          Ask the Accra Metropolitan Assembly to do something, and gather support for it. It publishes as soon as you send
+          it. Your draft is kept in this browser until then.
         </>
       }
     >

@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 
 import { keepDraft, keptDraft } from "@/lib/petitions";
 
-import type { OwnPetition, PetitionDraft } from "@/lib/api/types";
+import type { PetitionWords } from "@/lib/api/petitions";
+import type { OwnPetition } from "@/lib/api/types";
 
 export type DraftState = {
   title: string;
@@ -18,7 +19,7 @@ export type DraftState = {
 
 export const EMPTY_DRAFT: DraftState = { title: "", body: "", topic: "", scope: "area", ward: "", issue: null, documents: [] };
 
-export function toRequest(draft: DraftState): PetitionDraft {
+export function toRequest(draft: DraftState): PetitionWords {
   return {
     title: draft.title, body: draft.body, topic: draft.topic, scope: draft.scope,
     ward: draft.scope === "area" ? draft.ward || null : null, issue: draft.issue, documents: draft.documents,

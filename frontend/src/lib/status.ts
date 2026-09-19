@@ -73,13 +73,13 @@ export function reportStatus(status: ReportStatus): StatusMeaning {
 }
 
 const PETITION: Record<PetitionStatus, StatusTone> = {
-  in_review: "waiting",
   awaiting_response: "waiting",
   open: "active",
   responded: "done",
-  refused: "ended",
+  // Removed is an ending, not an alarm: a petition comes down on a named ground, and can be mended and published
+  // again. The brick tone is kept for what needs someone now.
+  removed: "ended",
   closed: "ended",
-  withdrawn: "ended",
 };
 
 export function petitionStatus(status: PetitionStatus): StatusMeaning {
@@ -87,9 +87,12 @@ export function petitionStatus(status: PetitionStatus): StatusMeaning {
   return tone ? { tone, label: STATUS_LABELS[status] } : unknownStatus(status);
 }
 
-/** The four groups the public petitions list is filed under, in the same language as the petitions themselves. */
+/**
+ * The five tabs the public petitions list is filed under, in the same language as the petitions themselves. Four
+ * are groups the API lists petitions for; "removed" lists nothing, and holds the removal record instead.
+ */
 export const PETITION_GROUPS: Record<string, StatusTone> = {
-  open: "active", awaiting: "waiting", responded: "done", closed: "ended",
+  open: "active", awaiting: "waiting", responded: "done", removed: "ended", closed: "ended",
 };
 
 const LEDGER: Record<LedgerStatus, StatusMeaning> = {
@@ -206,9 +209,9 @@ export function historyTone(action: HistoryAction): StatusTone {
 }
 
 const PETITION_EVENT: Record<PetitionTimelineEntry["action"], StatusTone> = {
-  submitted: "waiting", resubmitted: "waiting", threshold_reached: "active",
-  published: "done", auto_published: "done", responded: "done",
-  no_response: "attention", refused: "ended", withdrawn: "ended", closed: "ended",
+  edited: "active", threshold_reached: "active",
+  published: "done", republished: "done", responded: "done",
+  no_response: "attention", removed: "ended", withdrawn: "ended", closed: "ended",
 };
 
 export function petitionEventTone(action: PetitionTimelineEntry["action"]): StatusTone {

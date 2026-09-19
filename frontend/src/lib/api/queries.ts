@@ -3,11 +3,12 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 
 import {
-  decidePetition,
+  dismissPetitionReport,
   getAwaitingResponses,
   getCase,
-  getPetitionReview,
+  getPetitionReports,
   openSharedLocation,
+  removePetition,
   respondToPetition,
   getCaseOversight,
   getCaseQueue,
@@ -31,10 +32,11 @@ import type {
   CaseAction,
   CaseDetail,
   DocumentOut,
-  PetitionDecision,
+  PetitionDismissal,
+  PetitionRemovalRequest,
+  PetitionReportQueue,
   PetitionResponseRequest,
   ReviewAction,
-  ReviewQueue,
   SharedLocationView,
 } from "@/lib/api/types";
 
@@ -58,7 +60,7 @@ const queryKeys = {
   case: (id: string) => ["cases", "detail", id] as const,
   categories: ["categories"] as const,
   departments: ["departments"] as const,
-  petitionReview: ["petition-review"] as const,
+  petitionReports: ["petition-reports"] as const,
   awaitingResponses: ["petition-responses"] as const,
 };
 
@@ -185,28 +187,52 @@ export function useOpenLocation() {
   });
 }
 
-const PETITION_REVIEW_REFRESH_MS = 60_000; // petitions arrive, and publish themselves, at any time
-
-export function usePetitionReview() {
-  return useQuery({ queryKey: queryKeys.petitionReview, queryFn: getPetitionReview, refetchInterval: PETITION_REVIEW_REFRESH_MS });
-}
-
-export function useDecidePetition() {
-  const queryClient = useQueryClient();
-  return useMutation<ReviewQueue, Error, { code: string; decision: PetitionDecision }>({
-    mutationFn: ({ code, decision }) => decidePetition(code, decision),
-    onSuccess: (queue) => queryClient.setQueryData(queryKeys.petitionReview, queue),
-  });
-}
+const PETITIONS_REFRESH_MS = 60_000; // petitions are published, signed and reported at any time
 
 export function useAwaitingResponses() {
-  return useQuery({ queryKey: queryKeys.awaitingResponses, queryFn: getAwaitingResponses, refetchInterval: PETITION_REVIEW_REFRESH_MS });
+  return useQuery({ queryKey: queryKeys.awaitingResponses, queryFn: getAwaitingResponses, refetchInterval: PETITIONS_REFRESH_MS });
 }
+
+/** Every public view of a petition, refreshed after a response or a removal changes one. */
+function refreshPetitions(queryClient: QueryClient): Promise<void> {
+  return queryClient.invalidateQueries({ predicate: (query) => PETITION_QUERY_ROOTS.has(String(query.queryKey[0])) });
+}
+
+const PETITION_QUERY_ROOTS = new Set(["petitions", "petition", "petition-responses"]);
 
 export function useRespondToPetition() {
   const queryClient = useQueryClient();
   return useMutation<AwaitingResponse[], Error, { code: string; response: PetitionResponseRequest }>({
     mutationFn: ({ code, response }) => respondToPetition(code, response),
-    onSuccess: (waiting) => queryClient.setQueryData(queryKeys.awaitingResponses, waiting),
+    onSuccess: (waiting) => {
+      queryClient.setQueryData(queryKeys.awaitingResponses, waiting);
+      return refreshPetitions(queryClient);
+    },
   });
+}
+
+export function usePetitionReports() {
+  return useQuery({ queryKey: queryKeys.petitionReports, queryFn: getPetitionReports, refetchInterval: PETITIONS_REFRESH_MS });
+}
+
+/** Both a dismissal and a removal answer with the queue that is left, so it replaces what is on screen. */
+function useSettleReport<TInput>(settle: (input: TInput) => Promise<PetitionReportQueue>, alsoPetitions: boolean) {
+  const queryClient = useQueryClient();
+  return useMutation<PetitionReportQueue, Error, TInput>({
+    mutationFn: settle,
+    onSuccess: (queue) => {
+      queryClient.setQueryData(queryKeys.petitionReports, queue);
+      return alsoPetitions ? refreshPetitions(queryClient) : undefined;
+    },
+  });
+}
+
+export function useDismissReport() {
+  return useSettleReport<{ reportId: string; reason: PetitionDismissal }>(
+    ({ reportId, reason }) => dismissPetitionReport(reportId, reason), false);
+}
+
+export function useRemovePetition() {
+  return useSettleReport<{ code: string; removal: PetitionRemovalRequest; proof: string }>(
+    ({ code, removal, proof }) => removePetition(code, removal, proof), true);
 }

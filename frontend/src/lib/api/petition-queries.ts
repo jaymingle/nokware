@@ -5,6 +5,7 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tansta
 import {
   checkDraft,
   draftLedger,
+  editPetition,
   getMyPetitions,
   getMySignature,
   getSignerNames,
@@ -13,18 +14,21 @@ import {
   getPetitionOptions,
   getPetitions,
   petitionCreatorAction,
-  resubmitPetition,
+  reportPetition,
   signPetition,
   submitPetition,
   takeNameOffSignature,
   type CreatorAction,
   type DraftWords,
+  type NewPetition,
+  type PetitionEditSend,
   type PetitionFilters,
   type SignChoice,
 } from "@/lib/api/petitions";
 import { getIssue } from "@/lib/api/public";
 
-import type { MySignature, OwnPetition, PetitionDraft, PetitionSubmission, SignResult } from "@/lib/api/types";
+import type { MySignature, OwnPetition, PetitionReportFiled, PetitionReportRequest, SignResult } from "@/lib/api/types";
+import type { Sending } from "@/lib/api/upload";
 
 const petitionKeys = {
   options: ["petition-options"] as const,
@@ -72,20 +76,36 @@ export function useDraftLedger() {
   return useMutation({ mutationFn: (words: DraftWords & { topic: string }) => draftLedger(words) });
 }
 
-export function useSubmitPetition() {
-  return useMutation<OwnPetition, Error, { submission: PetitionSubmission; proof: string }>({
-    mutationFn: ({ submission, proof }) => submitPetition(submission, proof),
+/** The photos are the wait on a mobile connection, so the caller is told how far they have gone. */
+export function useSubmitPetition(onProgress: (sending: Sending) => void) {
+  return useMutation<OwnPetition, Error, { petition: NewPetition; proof: string }>({
+    mutationFn: ({ petition, proof }) => submitPetition(petition, proof, onProgress),
   });
 }
 
-type ChangeInput = { code: string; proof: string } & ({ action: CreatorAction } | { draft: PetitionDraft });
+export function useEditPetition(onProgress: (sending: Sending) => void) {
+  const queryClient = useQueryClient();
+  return useMutation<OwnPetition, Error, { code: string; edit: PetitionEditSend; proof: string }>({
+    mutationFn: ({ code, edit, proof }) => editPetition(code, edit, proof, onProgress),
+    onSuccess: (_petition, { code }) => Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["my-petitions"] }),
+      queryClient.invalidateQueries({ queryKey: petitionKeys.detail(code) }),
+    ]),
+  });
+}
 
 export function useChangePetition() {
   const queryClient = useQueryClient();
-  return useMutation<OwnPetition, Error, ChangeInput>({
-    mutationFn: (input) =>
-      "draft" in input ? resubmitPetition(input.code, input.draft, input.proof) : petitionCreatorAction(input.code, input.action, input.proof),
+  return useMutation<OwnPetition, Error, { code: string; proof: string; action: CreatorAction }>({
+    mutationFn: ({ code, action, proof }) => petitionCreatorAction(code, action, proof),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["my-petitions"] }),
+  });
+}
+
+/** No sign-in, and nothing on the page changes: the petition stays up while a contributor reads the report. */
+export function useReportPetition(code: string) {
+  return useMutation<PetitionReportFiled, Error, PetitionReportRequest>({
+    mutationFn: (report) => reportPetition(code, report),
   });
 }
 
