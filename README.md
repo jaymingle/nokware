@@ -136,13 +136,13 @@ Things that work, with their edges named:
   makes, and the first chunk can't be shorter than a sentence without sounding
   cut. Hovering Listen starts the audio early, so a press usually plays at once,
   but a cold press waits. Streaming synthesis would fix it properly.
-- **A message a resident is owed is repaired, with three gaps left.** If someone
-  agreed to both SMS and WhatsApp and only one channel is unresolved, repairing it
-  would duplicate the other, so the case is left alone. A row stuck at "queued"
-  after a crash can be settled but never *learned about*: the process died before
-  the provider's message id existed, so no delivery report can say what happened.
-  And messages recorded while `SMS_PROVIDER=log` are never backfilled when a real
-  provider is configured.
+- **A message a resident is owed is repaired, with two gaps left.** Repairs are
+  per channel, so someone who agreed to both SMS and WhatsApp and was failed on
+  one is sent on that one alone. A row stuck at "queued" after a crash can be
+  settled but never *learned about*: the process died before the provider's
+  message id existed, so no delivery report can say what happened. And messages
+  recorded while `SMS_PROVIDER=log` are never backfilled when a real provider is
+  configured.
 - **Escalation photos are web only.** A resident escalating by USSD or WhatsApp
   can write, but not attach; the browser is where the shrinking and EXIF-stripping
   happen.
