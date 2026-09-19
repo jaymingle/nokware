@@ -13,7 +13,7 @@ import { Card } from "@/components/ui/card";
 import { usePetitionReports } from "@/lib/api/queries";
 import { placeLine, spacedCode, startedBy } from "@/lib/petitions";
 import { petitionStatus } from "@/lib/status";
-import { joinNames, plural } from "@/lib/text";
+import { joinNames, plural, times } from "@/lib/text";
 import { formatDateTime } from "@/lib/time";
 
 import type { PetitionGroundOption, PetitionDismissalOption, PetitionReport, ReportedComment } from "@/lib/api/types";
@@ -52,7 +52,7 @@ function Petition({ report }: { report: PetitionReport }) {
       <div className="max-w-sm"><Progress signatures={petition.signatures} threshold={petition.threshold} /></div>
       {petition.removals > 0 ? (
         <p className="text-[13px] text-ink-soft" data-testid={`report-${report.id}-removals`}>
-          Taken down {plural(petition.removals, "time", "times")} before, then mended and published again.
+          Taken down {times(petition.removals)} before, then mended and published again.
         </p>
       ) : null}
     </>
