@@ -70,9 +70,10 @@ export function usePetition(code: string) {
   return useQuery({ queryKey: petitionKeys.detail(code), queryFn: () => getPetition(code) });
 }
 
-/** The Ledger search is slow and changes rarely. */
+/** The Ledger search is slow and changes rarely. The shared policy decides retries: `retry: 1` tried a second
+ * time even after a request had waited its whole deadline, and the section spun for a minute saying "Searching". */
 export function usePetitionLedger(code: string) {
-  return useQuery({ queryKey: petitionKeys.ledger(code), queryFn: () => getPetitionLedger(code), staleTime: Infinity, retry: 1 });
+  return useQuery({ queryKey: petitionKeys.ledger(code), queryFn: () => getPetitionLedger(code), staleTime: Infinity });
 }
 
 /** Not retried: a closed issue stays closed. */
