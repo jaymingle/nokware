@@ -25,6 +25,7 @@ from app.contacts import EMERGENCY_TOPICS, short_line
 from app.services import (
     channel_intent,
     channel_limits,
+    channel_petitions,
     channel_sessions,
     petition_signatures,
     petition_updates,
@@ -41,7 +42,8 @@ from app.services.channel_status import status_text
 from app.services.citizen_reports import IntakeChannel, NotificationEvent
 from app.services.ledger_documents import utc_now
 from app.services.notifications import notify_quietly
-from app.services.petition_rules import InvalidPetition, WrongState, check_signable, clean_signer_name, normalise_code
+from app.services.petition_rules import InvalidPetition, WrongState, clean_signer_name, normalise_code
+from app.services.phrases import phrase
 from app.services.rag import AnswerLength, answer_question
 from app.services.report_contacts import ContactChoice, InvalidNumber, masked, normalise_phone, save_contact, update_contact
 from app.services.report_intake import DESCRIPTION_MIN, Receipt, ReportSubmission
@@ -70,8 +72,11 @@ WHO_MAX = 40  # longer office names give way to a count, so the receipt keeps it
 # Emergency numbers lead the menu. Nothing is filed by that option and the screen says so first — but someone in
 # an emergency should not be reading past "Ask a question" to find a number, and two taps to an ambulance is a
 # service even though Nokware does nothing with it.
-MENU = ("Nokware - Accra Assembly\n1 Emergency numbers\n2 Ask a question\n3 Report an issue\n4 Check a case\n"
-        "5 Confirm a web code\n6 Sign a petition")
+# Seven items and the heading no longer leave room for both on a corrected screen, so the correction takes the
+# heading's line and the whole list still shows: a resident who mistyped needs the options, not the name again.
+MENU_ITEMS = ("1 Emergency numbers\n2 Ask a question\n3 Report an issue\n4 Check a case\n5 Confirm a web code\n"
+              "6 Sign a petition\n7 Check a petition")
+MENU = "Nokware - Accra Assembly\n" + MENU_ITEMS
 AMBULANCE, EMERGENCY = ", ".join(ambulance_calls()), emergency_call()  # from contacts.json, as WhatsApp gives them
 POLICE, FIRE = first_calls("police-191", "fire-192")
 EMERGENCY_NUMBERS = (f"Numbers to call now. Nokware gives them; it can't send help.\nAny emergency: {EMERGENCY}\n"
@@ -87,6 +92,7 @@ MEDICAL_REPORT = (f"This sounds like a medical emergency, which Nokware can't se
                   f"or {EMERGENCY}.\n1 File it as a report anyway\n0 End")
 MEDICAL_NOT_FILED = f"Nothing was filed. Ambulance: {ambulance_calls()[0]}, or call {EMERGENCY}."
 NUMBERS_OFFER = "Send these numbers by SMS? Anyone with your phone could see them.\n1 Yes\n2 No"
+TOO_MANY_LOOKUPS = "Too many lookups this hour. Please try again later."
 CALL_LIST = "Your call list may show you dialled Nokware: delete it if that is safer."
 _filing = ThreadPoolExecutor(max_workers=8, thread_name_prefix="ussd-filing")  # a reading takes two
 
@@ -172,8 +178,10 @@ def _menu(dial: Dial, state: State, later: Later) -> tuple[Reply, State | None]:
     if choice == "5":
         return con("Enter the 6-digit code shown on the Nokware page:"), {"step": "code"}
     if choice == "6":
-        return con("Enter the petition's 6-digit number:"), {"step": "sign_code"}
-    return con("Choose 1 to 6.\n" + MENU), state
+        return con(PETITION_NUMBER), {"step": "sign_code"}
+    if choice == "7":
+        return con(PETITION_NUMBER), {"step": "petition"}
+    return con("Choose 1 to 7.\n" + MENU_ITEMS), state
 
 
 def _ask(dial: Dial, state: State, later: Later) -> tuple[Reply, State | None]:
@@ -415,7 +423,7 @@ def _check(dial: Dial, state: State, later: Later) -> tuple[Reply, State | None]
     if reference is None:
         return con("That isn't a reference. It looks like K7QM-4TXP. Try again:"), state
     if not channel_limits.LOOKUPS.allow(dial.msisdn, utc_now().timestamp()):
-        return end("Too many lookups this hour. Please try again later."), None
+        return end(TOO_MANY_LOOKUPS), None
     try:
         case = report_followups.find(reference)
     except report_followups.CaseNotFound:
@@ -440,8 +448,25 @@ def _code(dial: Dial, state: State, later: Later) -> tuple[Reply, State | None]:
 
 
 TITLE_ON_SCREEN = 70
+PETITION_NUMBER = "Enter the petition's 6-digit number:"
+SIX_DIGITS = "A petition number has 6 digits. Try again:"
 NAME_PROMPT = ("Your name will be shown on the petition: anyone can see it, including the department it concerns. "
                "Type your name, or 0 to sign anonymously:")
+
+
+def _petition(dial: Dial, state: State, later: Later) -> tuple[Reply, State | None]:
+    """What became of a petition, by the number the resident typed when they signed it. A removed one answers from
+    its removal record, so the screen carries the tombstone's words and nothing of the petition."""
+    code = normalise_code(dial.text)
+    if code is None:
+        return con(SIX_DIGITS), state
+    if not channel_limits.LOOKUPS.allow(dial.msisdn, utc_now().timestamp()):
+        return end(TOO_MANY_LOOKUPS), None
+    try:
+        found = channel_petitions.standing(code)
+    except petitions.PetitionNotFound:
+        return end(phrase("petition.channel.not_found_ussd").format(number=code)), None
+    return end(channel_petitions.standing_text(found, _site(), compact=True, limit=SCREEN_MAX)), None
 
 
 def _signed(dial: Dial, code: str, name: str | None, later: Later) -> tuple[Reply, State | None]:
@@ -460,11 +485,12 @@ def _signed(dial: Dial, code: str, name: str | None, later: Later) -> tuple[Repl
 def _sign_code(dial: Dial, state: State, later: Later) -> tuple[Reply, State | None]:
     code = normalise_code(dial.text)
     if code is None:
-        return con("A petition number has 6 digits. Try again:"), state
+        return con(SIX_DIGITS), state
     try:
-        petition = petitions.public(code)
-        check_signable(petition, utc_now())
-    except (petitions.PetitionNotFound, WrongState):
+        petition = petition_signatures.open_for_signing(code, utc_now())
+    except WrongState as refused:  # removed, or closed: each says which, and a removed one says nothing more
+        return end(str(refused)), None
+    except petitions.PetitionNotFound:
         return end("No open petition has that number. Check it and dial again."), None
     title = petition["title"] if len(petition["title"]) <= TITLE_ON_SCREEN else petition["title"][: TITLE_ON_SCREEN - 3] + "..."
     menu = f"{title}\n1 Sign, name not shown\n2 Sign with my name shown\n0 Cancel"
@@ -496,7 +522,8 @@ def _sign_name(dial: Dial, state: State, later: Later) -> tuple[Reply, State | N
 STEPS: dict[str, Callable[[Dial, State, Later], tuple[Reply, State | None]]] = {
     "menu": _menu, "ask": _ask, "describe": _describe, "medical": _medical, "help": _help, "sub_metro": _sub_metro,
     "ward": _ward, "safety_sub_metro": _safety_sub_metro, "confirm": _confirm, "updates": _updates, "call": _call,
-    "numbers_sms": _numbers_sms, "check": _check, "code": _code, "sign_code": _sign_code, "sign_choice": _sign_choice, "sign_name": _sign_name,
+    "numbers_sms": _numbers_sms, "check": _check, "code": _code, "petition": _petition, "sign_code": _sign_code,
+    "sign_choice": _sign_choice, "sign_name": _sign_name,
 }
 
 

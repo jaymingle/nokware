@@ -365,6 +365,58 @@
     "petition.reply.private_individual": {
       "critical": false,
       "text": "Your reply seems to name a private person. It is published under the MCE's response, so say it without naming anyone."
+    },
+    "petition.sign.removed": {
+      "critical": false,
+      "text": "This petition was removed, so it takes no more signatures.",
+      "note": "Refused the same way wherever a signature is offered. It says nothing of the petition, because the page behind that number is now the tombstone and says nothing of it either."
+    },
+    "petition.channel.standing": {
+      "critical": false,
+      "text": "Petition {number}: {stage}.",
+      "note": "How a petition's standing opens on a phone, on USSD and WhatsApp alike. {stage} is the status in the words petition.status.* gives it."
+    },
+    "petition.channel.signatures": {
+      "critical": false,
+      "text": "{signatures} of {threshold} signatures."
+    },
+    "petition.channel.signatures_only": {
+      "critical": false,
+      "text": "{signatures} signatures.",
+      "note": "For a petition carrying no threshold, which is one written before a threshold was fixed at publication. It still says what it has."
+    },
+    "petition.channel.closes": {
+      "critical": false,
+      "text": "Closes {day}."
+    },
+    "petition.channel.removed": {
+      "critical": false,
+      "text": "Petition {number} was removed on {day}: {ground}.",
+      "note": "Built from the removal record alone, as the tombstone it repeats is. {ground} is one of the four grounds, in the words petition.ground.* gives it."
+    },
+    "petition.channel.removed_nothing_public": {
+      "critical": false,
+      "text": "Nothing of the petition is public."
+    },
+    "petition.channel.removed_duplicate": {
+      "critical": false,
+      "text": "It duplicated petition {other}."
+    },
+    "petition.channel.removed_before_once": {
+      "critical": false,
+      "text": "It had been removed once before."
+    },
+    "petition.channel.removed_before": {
+      "critical": false,
+      "text": "It had been removed {count} times before."
+    },
+    "petition.channel.not_found_ussd": {
+      "critical": false,
+      "text": "No petition has the number {number}. Check it and dial again."
+    },
+    "petition.channel.not_found_whatsapp": {
+      "critical": false,
+      "text": "No petition has the number {number}. Check it and send it again."
     }
   }
 }

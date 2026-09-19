@@ -13,6 +13,7 @@ without leaving a readable copy of the disclosure in the chat.
 
 import base64
 import logging
+import re
 from collections.abc import Callable
 from dataclasses import asdict, dataclass, replace
 from typing import Any
@@ -21,8 +22,10 @@ from app.config import get_settings
 from app.contacts import EMERGENCY_TOPICS
 from app.services import (
     channel_limits,
+    channel_petitions,
     channel_sessions,
     notifications,
+    petitions,
     phone_proof,
     report_followups,
     report_intake,
@@ -37,6 +40,8 @@ from app.services.channel_intent import Intent, read_message
 from app.services.channel_status import status_text
 from app.services.citizen_reports import MAX_PHOTOS, IntakeChannel, NotificationChannel, NotificationEvent
 from app.services.ledger_documents import utc_now
+from app.services.petition_rules import normalise_code
+from app.services.phrases import phrase
 from app.services.rag import AnswerLength, answer_question
 from app.services.redis_store import get_redis, key, subject_key
 from app.services.report_contacts import InvalidNumber, masked
@@ -63,8 +68,12 @@ HELP = (
     "• Ask a question about the Assembly: fees, budgets, plans, services.\n"
     "• Report a problem, like a blocked drain or a broken streetlight. Send a photo too if you have one.\n"
     "• Send a case reference, like K7QM-4TXP, to see how it is going.\n"
+    "• Send petition and its 6-digit number, like petition 482913, to see where that petition stands.\n"
     "Type, or send a voice note."
 )
+TOO_MANY_LOOKUPS = "Too many lookups this hour. Please try again later."
+# "petition 482913", "Petition: 482-913". The word is asked for, so a bare six digits is still a phone code.
+_PETITION = re.compile(r"^\s*petition\b\W*(\d{3}[\s-]?\d{3})\W*$", re.IGNORECASE)
 ASK_KIND = "Is this a question for Nokware, or a problem to report to the Assembly?\nReply *1* for a question or *2* for a report."
 CANCELLED = "Cancelled: nothing was filed. If you meant to ask a question, send it again."
 
@@ -241,9 +250,29 @@ def answer(number: str, question: str, heard: Heard | None = None) -> None:
         whatsapp_voice.speak_answer(number, found, heard)
 
 
+def petition_asked(text: str) -> str | None:
+    """The number in "petition 482913", or None if the message isn't that."""
+    match = _PETITION.match(text or "")
+    return normalise_code(match.group(1)) if match else None
+
+
+def petition_standing(number: str, code: str) -> None:
+    """What became of a petition. A removed one answers from its removal record: the ground, the date, and nothing
+    of the words that came down."""
+    if not channel_limits.LOOKUPS.allow(number, utc_now().timestamp()):
+        whatsapp_reply.reply(number, TOO_MANY_LOOKUPS)
+        return
+    try:
+        found = channel_petitions.standing(code)
+    except petitions.PetitionNotFound:
+        whatsapp_reply.reply(number, phrase("petition.channel.not_found_whatsapp").format(number=code))
+        return
+    whatsapp_reply.reply(number, channel_petitions.standing_text(found, _site()))
+
+
 def status(number: str, reference: str) -> None:
     if not channel_limits.LOOKUPS.allow(number, utc_now().timestamp()):
-        whatsapp_reply.reply(number, "Too many lookups this hour. Please try again later.")
+        whatsapp_reply.reply(number, TOO_MANY_LOOKUPS)
         return
     try:
         case = report_followups.find(reference)
@@ -368,6 +397,10 @@ def _route(inbound: Inbound) -> None:
     code = None if inbound.media else phone_proof.typed_code(inbound.text)
     if code:
         _confirm_code(inbound.number, code)
+        return
+    asked = None if inbound.media else petition_asked(inbound.text)
+    if asked:
+        petition_standing(inbound.number, asked)
         return
     state = channel_sessions.load("whatsapp", inbound.number)
     step = STEPS.get(state.get("step", "")) if state else None

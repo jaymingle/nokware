@@ -30,6 +30,7 @@ from app.services.petition_rules import (
     version_of,
 )
 from app.services.phone_proof import Channel, keyed_hash
+from app.services.phrases import phrase
 
 logger = logging.getLogger(__name__)
 
@@ -77,15 +78,34 @@ def _count(petition: dict[str, Any], now: datetime) -> dict[str, Any]:
     return updated
 
 
+def _refuse_if_removed(code: str) -> None:
+    """Nothing but the status is read off a removed petition here, and nothing of it is said back."""
+    if petitions.find(code).get("status") == PetitionStatus.REMOVED:
+        raise WrongState(phrase("petition.sign.removed"))
+
+
+def open_for_signing(code: str, now: datetime) -> dict[str, Any]:
+    """The petition a signature may be added to, read through the one public gate there is.
+
+    A removed petition isn't public, so it isn't found there — but its number still opens a tombstone, and refusing
+    a signature as though no petition had that number would contradict the page in front of the reader. Every
+    channel comes through here, so all of them refuse it in the same words."""
+    try:
+        petition = petitions.public(code)
+    except petitions.PetitionNotFound:
+        _refuse_if_removed(code)
+        raise
+    check_signable(petition, now)
+    return petition
+
+
 def sign(code: str, number: str, channel: Channel, show_name: bool, name: str | None, now: datetime) -> Signed:
     shown = clean_signer_name(show_name, name)
-    petition = petitions.public(code)
-    check_signable(petition, now)
+    petition = open_for_signing(code, now)
     if not channel_limits.SIGNATURES.allow(number, now.timestamp()):
         raise WrongState("This number has signed as many petitions as it can today. Try again tomorrow.")
     with record_lock(petition["$id"]):
-        petition = petitions.public(code)
-        check_signable(petition, now)
+        petition = open_for_signing(code, now)
         added = _store(petition["$id"], signer_key(petition["$id"], number), shown, channel, version_of(petition), now)
         updated = _count(petition, now) if added else petition
     reached = petition["status"] == PetitionStatus.OPEN and updated["status"] == PetitionStatus.AWAITING_RESPONSE

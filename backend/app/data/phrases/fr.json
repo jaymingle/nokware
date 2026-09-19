@@ -252,6 +252,42 @@
     },
     "petition.reply.private_individual": {
       "text": "Votre réponse semble nommer une personne privée. Elle est publiée sous la réponse du MCE : dites-le sans nommer personne."
+    },
+    "petition.sign.removed": {
+      "text": "Cette pétition a été retirée : elle n'accepte plus de signatures."
+    },
+    "petition.channel.standing": {
+      "text": "Pétition {number} : {stage}."
+    },
+    "petition.channel.signatures": {
+      "text": "{signatures} signatures sur {threshold}."
+    },
+    "petition.channel.signatures_only": {
+      "text": "{signatures} signatures."
+    },
+    "petition.channel.closes": {
+      "text": "Clôture le {day}."
+    },
+    "petition.channel.removed": {
+      "text": "La pétition {number} a été retirée le {day} : {ground}."
+    },
+    "petition.channel.removed_nothing_public": {
+      "text": "Rien de la pétition n'est public."
+    },
+    "petition.channel.removed_duplicate": {
+      "text": "Elle faisait double emploi avec la pétition {other}."
+    },
+    "petition.channel.removed_before_once": {
+      "text": "Elle avait déjà été retirée une fois."
+    },
+    "petition.channel.removed_before": {
+      "text": "Elle avait déjà été retirée {count} fois."
+    },
+    "petition.channel.not_found_ussd": {
+      "text": "Aucune pétition ne porte le numéro {number}. Vérifiez-le et rappelez."
+    },
+    "petition.channel.not_found_whatsapp": {
+      "text": "Aucune pétition ne porte le numéro {number}. Vérifiez-le et renvoyez-le."
     }
   }
 }

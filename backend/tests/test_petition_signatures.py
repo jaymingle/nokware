@@ -144,4 +144,5 @@ def test_on_ussd_an_unknown_or_closed_petition_is_said_plainly(store: dict[str, 
         raise petitions.PetitionNotFound(code)
 
     monkeypatch.setattr(petitions, "public", missing)
+    monkeypatch.setattr(petitions, "find", missing)  # nor is there a removed petition behind the number
     assert _dial("6", "111111").message == "No open petition has that number. Check it and dial again."
