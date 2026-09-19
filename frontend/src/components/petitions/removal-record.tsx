@@ -45,11 +45,7 @@ function ByNumber() {
   );
 }
 
-/**
- * What the Removed tab holds. The API lists no removed petitions — a removal leaves a tombstone at the petition's
- * own number and nothing that indexes it — so this says how many came down and on which ground, and says plainly
- * that it can't list them rather than showing an empty list and letting the reader think nothing was removed.
- */
+/** The grounds the removed petitions below came down on, and the way in for a number a reader already has. */
 export function RemovalRecord({ removals }: { removals: PetitionRemovals }) {
   return (
     <div className="flex flex-col gap-4" data-testid="petitions-removals">
@@ -62,8 +58,8 @@ export function RemovalRecord({ removals }: { removals: PetitionRemovals }) {
         {removals.grounds.map((g) => <Ground key={g.ground} ground={g.ground} label={g.label} count={g.count} />)}
       </ul>
       <p className="text-[13px] text-ink-soft">
-        Removed petitions aren&apos;t listed here: nothing of one survives its removal but the record of it. Its number
-        still opens the page, which says when it came down and why.
+        Nothing of a removed petition survives it but this record: not its words, not its photographs, not the
+        names of the people who signed it.
       </p>
       <ByNumber />
     </div>

@@ -7,6 +7,7 @@ import { ErrorPanel, LoadingPanel } from "@/components/documents/panels";
 import { PageShell } from "@/components/page-shell";
 import { PetitionCard } from "@/components/petitions/petition-card";
 import { RemovalRecord } from "@/components/petitions/removal-record";
+import { TombstoneCard } from "@/components/petitions/tombstone-card";
 import { StatusMark } from "@/components/status-tag";
 import { Button } from "@/components/ui/button";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
@@ -20,10 +21,7 @@ import type { PetitionPage } from "@/lib/api/types";
 
 const PAGE = 20;
 
-/** The four groups the API lists, and "removed", which lists nothing and holds the removal record instead. */
-type Tab = PetitionGroup | "removed";
-
-const TABS: { id: Tab; label: string }[] = [
+const TABS: { id: PetitionGroup; label: string }[] = [
   { id: "open", label: "Open" }, { id: "awaiting", label: "With the MCE" }, { id: "responded", label: "Responded" },
   { id: "removed", label: "Removed" }, { id: "closed", label: "Closed" },
 ];
@@ -32,19 +30,16 @@ const EMPTY: Record<PetitionGroup, string> = {
   awaiting: "No petition has reached its signatures yet.",
   responded: "The MCE hasn't answered a petition yet.",
   closed: "No petitions have closed yet.",
+  removed: "No petition has been taken down.",
 };
 
-/** The Removed tab is counted from the removal record; the rest from the groups the list is filed under. */
-function countFor(tab: Tab, page: PetitionPage | undefined): number | undefined {
-  if (!page) return undefined;
-  return tab === "removed" ? page.removals.total : page.counts[tab];
-}
+type TabsProps = { tab: PetitionGroup; page: PetitionPage | undefined; onTab: (tab: PetitionGroup) => void };
 
-function Tabs({ tab, page, onTab }: { tab: Tab; page: PetitionPage | undefined; onTab: (tab: Tab) => void }) {
+function Tabs({ tab, page, onTab }: TabsProps) {
   return (
     <div role="tablist" aria-label="Petitions" className="flex max-w-full gap-1 overflow-x-auto rounded-lg bg-paper-subtle p-1">
       {TABS.map((t) => {
-        const count = countFor(t.id, page);
+        const count = page?.counts[t.id];
         return (
           <button key={t.id} type="button" role="tab" aria-selected={tab === t.id} onClick={() => onTab(t.id)}
             // The number is part of the label a screen reader reads, not a decoration beside it.
@@ -65,10 +60,16 @@ function Tabs({ tab, page, onTab }: { tab: Tab; page: PetitionPage | undefined; 
   );
 }
 
+function Empty({ group }: { group: PetitionGroup }) {
+  return <p className="py-4 text-[14px] text-ink-soft" data-testid="petitions-empty">{EMPTY[group]}</p>;
+}
+
 function Listing({ page, group, now }: { page: PetitionPage; group: PetitionGroup; now: number }) {
-  if (page.petitions.length === 0) {
-    return <p className="py-4 text-[14px] text-ink-soft" data-testid="petitions-empty">{EMPTY[group]}</p>;
+  if (group === "removed") {
+    if (page.removed.length === 0) return <Empty group={group} />;
+    return <ul data-testid="petitions-removed">{page.removed.map((s) => <TombstoneCard key={s.code} stone={s} />)}</ul>;
   }
+  if (page.petitions.length === 0) return <Empty group={group} />;
   return <ul>{page.petitions.map((p) => <PetitionCard key={p.code} petition={p} now={now} />)}</ul>;
 }
 
@@ -84,10 +85,11 @@ function Paging({ total, offset, onOffset }: { total: number; offset: number; on
 }
 
 type ToolbarProps = {
-  tab: Tab; page: PetitionPage | undefined; topic: string; onTab: (tab: Tab) => void; onTopic: (topic: string) => void;
+  tab: PetitionGroup; page: PetitionPage | undefined; topic: string;
+  onTab: (tab: PetitionGroup) => void; onTopic: (topic: string) => void;
 };
 
-/** The Removed tab is a record rather than a list, so there is nothing there for a topic to narrow. */
+/** A tombstone has no topic: reading one off the petition is what the tombstone exists to prevent. */
 function Toolbar({ tab, page, topic, onTab, onTopic }: ToolbarProps) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-3">
@@ -102,13 +104,13 @@ function Toolbar({ tab, page, topic, onTab, onTopic }: ToolbarProps) {
   );
 }
 
-type BodyProps = { page: PetitionPage; tab: Tab; group: PetitionGroup; now: number; offset: number; onOffset: (offset: number) => void };
+type BodyProps = { page: PetitionPage; group: PetitionGroup; now: number; offset: number; onOffset: (offset: number) => void };
 
-/** The Removed tab holds the removal record; the other four hold the list the API filed them under. */
-function Body({ page, tab, group, now, offset, onOffset }: BodyProps) {
-  if (tab === "removed") return <RemovalRecord removals={page.removals} />;
+/** The removed group is the grounds they came down on, and then the tombstones themselves. */
+function Body({ page, group, now, offset, onOffset }: BodyProps) {
   return (
     <>
+      {group === "removed" ? <RemovalRecord removals={page.removals} /> : null}
       <Listing page={page} group={group} now={now} />
       <Paging total={page.total} offset={offset} onOffset={onOffset} />
     </>
@@ -116,15 +118,12 @@ function Body({ page, tab, group, now, offset, onOffset }: BodyProps) {
 }
 
 export function PetitionListPage() {
-  const [tab, setTab] = useState<Tab>("open");
+  const [tab, setTab] = useState<PetitionGroup>("open");
   const [topic, setTopic] = useState("");
   const [offset, setOffset] = useState(0);
   const now = useNow();
-  // The Removed tab has no group of its own, so the list underneath it keeps loading the open one and stays out
-  // of the way: the counts and the removal record both come with every page.
-  const group: PetitionGroup = tab === "removed" ? "open" : tab;
-  const petitions = usePetitions({ group, topic, limit: PAGE, offset });
-  const choose = (next: Tab) => { setTab(next); setOffset(0); };
+  const petitions = usePetitions({ group: tab, topic: tab === "removed" ? "" : topic, limit: PAGE, offset });
+  const choose = (next: PetitionGroup) => { setTab(next); setOffset(0); };
   return (
     <PageShell
       eyebrow="Petitions"
@@ -146,7 +145,7 @@ export function PetitionListPage() {
       <section className="flex flex-col gap-3 rounded-xl border bg-card p-5" aria-label="Petitions">
         <Toolbar tab={tab} page={petitions.data} topic={topic} onTab={choose} onTopic={(next) => { setTopic(next); setOffset(0); }} />
         {petitions.isPending ? <LoadingPanel label="Loading petitions…" /> : null}
-        {petitions.data ? <Body page={petitions.data} tab={tab} group={group} now={now} offset={offset} onOffset={setOffset} /> : null}
+        {petitions.data ? <Body page={petitions.data} group={tab} now={now} offset={offset} onOffset={setOffset} /> : null}
       </section>
     </PageShell>
   );

@@ -21,8 +21,8 @@ import type {
   SmsCodeSent,
 } from "@/lib/api/types";
 
-/** The four groups the API lists petitions for. A removed petition is in none of them. */
-export type PetitionGroup = "open" | "awaiting" | "responded" | "closed";
+/** The groups the API lists under. "removed" lists tombstones, not petitions, and no topic narrows it. */
+export type PetitionGroup = "open" | "awaiting" | "responded" | "closed" | "removed";
 export type PetitionFilters = { group: PetitionGroup; topic: string; limit: number; offset: number };
 
 const petitionPath = (code: string) => `/api/petitions/${encodeURIComponent(code)}`;
