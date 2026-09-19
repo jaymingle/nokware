@@ -1,6 +1,8 @@
+import { submissionTone } from "@/lib/status";
 import { deadlineFrom } from "@/lib/time";
 
 import type { DocumentOut } from "@/lib/api/types";
+import type { StatusTone } from "@/lib/status";
 
 export function clockRunning(doc: DocumentOut, now: number): boolean {
   return !doc.held_until || deadlineFrom(doc.held_until, now).urgency !== "passed";
@@ -23,10 +25,8 @@ export function splitHeld(documents: DocumentOut[], now: number): ClockSplit {
   );
 }
 
-export type Tone = "teal" | "gold" | "brick" | "neutral";
-
 type SubmissionView = {
-  tone: Tone;
+  tone: StatusTone;
   label: string;
   detail?: string;
   /** A running clock: it publishes automatically unless this happens. */
@@ -34,9 +34,9 @@ type SubmissionView = {
 };
 
 function heldView(doc: DocumentOut, department: string, now: number): SubmissionView {
-  if (!clockRunning(doc, now)) return { tone: "gold", label: "Publishing now", detail: "No dispute came in time." };
+  if (!clockRunning(doc, now)) return { tone: submissionTone("publishing"), label: "Publishing now", detail: "No dispute came in time." };
   return {
-    tone: "gold",
+    tone: submissionTone("held"),
     label: `With ${department}`,
     detail: doc.resubmission_count > 0 ? "Resubmitted after a dispute." : undefined,
     clock: doc.held_until ? { heldUntil: doc.held_until, unless: `${department} disputes it` } : undefined,
@@ -44,10 +44,12 @@ function heldView(doc: DocumentOut, department: string, now: number): Submission
 }
 
 function disputedView(doc: DocumentOut, department: string, now: number): SubmissionView {
-  if (!doc.escalated_to_mce) return { tone: "brick", label: "Your response needed", detail: `Disputed by ${department}.` };
-  if (!clockRunning(doc, now)) return { tone: "gold", label: "Publishing now", detail: "The MCE didn't rule in time." };
+  if (!doc.escalated_to_mce) {
+    return { tone: submissionTone("response_needed"), label: "Your response needed", detail: `Disputed by ${department}.` };
+  }
+  if (!clockRunning(doc, now)) return { tone: submissionTone("publishing"), label: "Publishing now", detail: "The MCE didn't rule in time." };
   return {
-    tone: "gold",
+    tone: submissionTone("with_mce"),
     label: "With the MCE",
     clock: doc.held_until ? { heldUntil: doc.held_until, unless: "the MCE upholds the dispute" } : undefined,
   };
@@ -57,9 +59,9 @@ export function describeSubmission(doc: DocumentOut, now: number): SubmissionVie
   const department = doc.department_name ?? "the department";
   if (doc.status === "held") return heldView(doc, department, now);
   if (doc.status === "disputed") return disputedView(doc, department, now);
-  if (doc.status === "published") return { tone: "teal", label: "Published" };
+  if (doc.status === "published") return { tone: submissionTone("published"), label: "Published" };
   const why = doc.escalated_to_mce ? "The MCE upheld the dispute." : "You accepted the dispute.";
-  return { tone: "neutral", label: "Withdrawn", detail: why };
+  return { tone: submissionTone("withdrawn"), label: "Withdrawn", detail: why };
 }
 
 /** A run-out clock on a held or escalated document means the deadline job is about to publish it. */

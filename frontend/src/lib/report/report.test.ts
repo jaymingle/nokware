@@ -4,7 +4,8 @@ import { chartScale, formatCount, formatDays, monthLabel, percent, periodLabel, 
 import { reportFormData, type ReportDraft } from "@/lib/report/form";
 import { addPhotos } from "@/lib/report/photos";
 import { normaliseReference } from "@/lib/report/reference";
-import { stageOf, statusTag } from "@/lib/report/status";
+import { stageOf } from "@/lib/report/status";
+import { reportStatus } from "@/lib/status";
 
 import type { ReportStatus } from "@/lib/api/types";
 
@@ -77,12 +78,12 @@ describe("status wording", () => {
     expect(stageOf(civic({ status: "assigned" }))).toBe("received");
     expect(stageOf(civic({ status: "escalated" }))).toBe("in_progress");
     expect(stageOf(civic({ private: true, stage: "completed" }))).toBe("completed");
-    expect(statusTag(civic({ private: true, stage: "completed" })).label).toBe("Completed");
+    expect(reportStatus(civic({ private: true, stage: "completed" })).label).toBe("Completed");
   });
 
   it("names an escalation, and a resolution after it", () => {
-    expect(statusTag(civic({ status: "escalated", escalated: true }))).toEqual({ tone: "brick", label: "With the MCE's office" });
-    expect(statusTag(civic({ status: "resolved", escalated: true })).label).toBe("Resolved after review");
+    expect(reportStatus(civic({ status: "escalated", escalated: true }))).toEqual({ tone: "attention", label: "With the MCE's office" });
+    expect(reportStatus(civic({ status: "resolved", escalated: true })).label).toBe("Resolved after review");
   });
 });
 

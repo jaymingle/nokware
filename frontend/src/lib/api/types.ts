@@ -15,6 +15,7 @@ export type DocumentPage = Schemas["DocumentPage"];
 export type HistoryEntry = Schemas["HistoryEntryOut"];
 export type HistoryAction = Schemas["HistoryAction"];
 export type IngestionState = Schemas["IngestionState"];
+export type LedgerStatus = Schemas["LedgerStatus"];
 export type FileLink = Schemas["FileLink"];
 export type Option = Schemas["Option"];
 export type AskSource = Schemas["AskSource"];

@@ -5,10 +5,10 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { ContactList } from "@/components/contacts/contact-list";
-import { Tag } from "@/components/documents/tag";
 import { ReadAloud } from "@/components/read-aloud/read-aloud";
 import { PreferencesForm } from "@/components/report/preferences-form";
 import { SafetySteps } from "@/components/report/safety-steps";
+import { StatusTag } from "@/components/status-tag";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { reportAudio } from "@/lib/api/public";
@@ -81,7 +81,7 @@ export function ReportReceiptView({ receipt, safetySteps, onAnother }: ReceiptPr
     <Card className="border-teal" data-testid="report-receipt">
       <CardContent className="flex flex-col gap-5 py-2 sm:px-6 sm:py-4">
         <div>
-          <Tag tone="teal">Report filed</Tag>
+          <StatusTag tone="done">Report filed</StatusTag>
         </div>
         <Filed receipt={receipt} />
         {!receipt.private ? (

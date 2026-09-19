@@ -1,23 +1,7 @@
 import type { CaseDetail, CaseEvent, CaseSummary } from "@/lib/api/types";
-import type { Tone } from "@/lib/documents";
 
 const HOUR_MS = 3_600_000;
 const DAY_MS = 24 * HOUR_MS;
-
-const STATUS: Record<string, [Tone, string]> = {
-  submitted: ["gold", "Awaiting routing"],
-  assigned: ["gold", "New"],
-  in_progress: ["teal", "In progress"],
-  resolved: ["neutral", "Resolved"],
-  escalated: ["brick", "Escalated"],
-};
-
-/** The tag for a case, from the caller's side: their own part, if they have one. */
-export function caseStatusTag(summary: Pick<CaseSummary, "status" | "my_status">): { tone: Tone; label: string } {
-  if (summary.status === "escalated") return { tone: "brick", label: "Escalated to the MCE" };
-  const [tone, label] = STATUS[summary.my_status ?? summary.status] ?? ["neutral", summary.status];
-  return { tone, label };
-}
 
 export function caseAge(submittedAt: string, now: number): string {
   const elapsed = Math.max(0, now - Date.parse(submittedAt));
@@ -46,6 +30,7 @@ const EVENT_LABELS: Record<string, string> = {
   resolved: "Resolved",
   escalated: "Escalated to the MCE",
   reassigned: "Reassigned",
+  reopened: "The MCE sent it back to be finished",
   escalation_confirmed: "The MCE confirmed the resolution",
   reclassified: "Refiled",
   notified: "Message to the citizen",

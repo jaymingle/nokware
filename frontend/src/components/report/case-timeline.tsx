@@ -1,6 +1,8 @@
 import Image from "next/image";
 
+import { StatusMark } from "@/components/status-tag";
 import { timelineSteps } from "@/lib/report/timeline";
+import { reportEventTone } from "@/lib/status";
 
 import type { ReportTimelineEvent } from "@/lib/api/types";
 import type { TimelineStep } from "@/lib/report/timeline";
@@ -21,9 +23,9 @@ function StepPhotos({ photos }: { photos: string[] }) {
 
 function Step({ step, connected }: { step: TimelineStep; connected: boolean }) {
   return (
-    <li className="relative flex flex-col gap-1 pb-5 pl-6 last:pb-0" data-testid="status-timeline-step">
-      {connected ? <span aria-hidden className="absolute top-2 left-[3.5px] h-full w-px bg-hairline" /> : null}
-      <span aria-hidden className="absolute top-1.5 left-0 size-2 rounded-full bg-teal" />
+    <li className="relative flex flex-col gap-1 pb-5 ps-6 last:pb-0" data-testid="status-timeline-step">
+      {connected ? <span aria-hidden className="absolute top-5 left-[5.5px] h-full w-px bg-hairline" /> : null}
+      <StatusMark tone={reportEventTone(step.action)} className="absolute top-1 left-0 size-3" />
       <time dateTime={step.at} className="text-[12.5px] text-ink-soft tabular-nums">{step.when}</time>
       <p className="text-[14.5px]">{step.description}</p>
       {step.note ? (

@@ -19,7 +19,9 @@ function NavLink({ href, testId, children }: { href: string; testId: string; chi
       aria-current={active ? "page" : undefined}
       data-touch-target
       className={cn(
-        "inline-flex items-center rounded-lg px-3 py-2 text-[13.5px] whitespace-nowrap transition-colors",
+        // shrink-0: in the scrolling strip these would otherwise squeeze to the 44px touch minimum and their
+        // labels would run over each other on a phone.
+        "inline-flex shrink-0 items-center rounded-lg px-3 py-2 text-[13.5px] whitespace-nowrap transition-colors",
         active ? "font-medium text-ink" : "text-ink-soft hover:text-ink",
       )}
       data-testid={testId}
@@ -59,7 +61,7 @@ export function PublicHeader() {
           {/* Contacts is the emergency route: the number to call when nothing on this site is fast enough. It is
               marked out because in that moment nobody scans a row of equal-weight words. */}
           <Link href="/contacts" data-touch-target data-testid="public-contacts-link"
-            className="ms-1 inline-flex items-center gap-1.5 rounded-lg border border-brick/35 bg-brick-tint px-3 py-2 text-[13.5px] font-medium whitespace-nowrap text-brick transition-colors hover:border-brick">
+            className="ms-1 inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-brick/35 bg-brick-tint px-3 py-2 text-[13.5px] font-medium whitespace-nowrap text-brick transition-colors hover:border-brick">
             <PhoneIcon aria-hidden className="size-4" />
             Contacts
           </Link>

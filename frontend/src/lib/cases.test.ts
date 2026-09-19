@@ -1,16 +1,17 @@
 import { describe, expect, it } from "vitest";
 
-import { arrange, caseAge, caseEventText, caseNoteCopy, caseNoteReader, caseStatusTag, caseTrail, openForMe } from "@/lib/cases";
+import { arrange, caseAge, caseEventText, caseNoteCopy, caseNoteReader, caseTrail, openForMe } from "@/lib/cases";
+import { caseStatus } from "@/lib/status";
 
 import type { CaseDetail, CaseEvent, CaseSummary } from "@/lib/api/types";
 
 const NOW = Date.parse("2026-09-13T12:00:00Z");
 
-describe("caseStatusTag", () => {
+describe("caseStatus", () => {
   it("shows the caller's own part, and escalation above all", () => {
-    expect(caseStatusTag({ status: "in_progress", my_status: "resolved" }).label).toBe("Resolved");
-    expect(caseStatusTag({ status: "assigned", my_status: null }).label).toBe("New");
-    expect(caseStatusTag({ status: "escalated", my_status: "resolved" })).toEqual({ tone: "brick", label: "Escalated to the MCE" });
+    expect(caseStatus({ status: "in_progress", my_status: "resolved" }).label).toBe("Resolved");
+    expect(caseStatus({ status: "assigned", my_status: null }).label).toBe("New");
+    expect(caseStatus({ status: "escalated", my_status: "resolved" })).toEqual({ tone: "attention", label: "Escalated to the MCE" });
   });
 });
 

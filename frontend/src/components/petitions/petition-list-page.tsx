@@ -7,10 +7,12 @@ import { ErrorPanel, LoadingPanel } from "@/components/documents/panels";
 import { PageShell } from "@/components/page-shell";
 import { ModerationRecord } from "@/components/petitions/moderation-record";
 import { PetitionCard } from "@/components/petitions/petition-card";
+import { StatusMark } from "@/components/status-tag";
 import { Button } from "@/components/ui/button";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { useNow } from "@/hooks/use-now";
 import { usePetitions } from "@/lib/api/petition-queries";
+import { PETITION_GROUPS } from "@/lib/status";
 import { cn } from "@/lib/utils";
 
 import type { PetitionGroup } from "@/lib/api/petitions";
@@ -30,15 +32,16 @@ const EMPTY: Record<PetitionGroup, string> = {
 
 function Tabs({ group, counts, onGroup }: { group: PetitionGroup; counts?: Record<string, number>; onGroup: (group: PetitionGroup) => void }) {
   return (
-    <div role="tablist" aria-label="Petitions" className="flex gap-1 rounded-lg bg-paper-subtle p-1">
+    <div role="tablist" aria-label="Petitions" className="flex max-w-full gap-1 overflow-x-auto rounded-lg bg-paper-subtle p-1">
       {GROUPS.map((g) => {
         const count = counts?.[g.id];
         return (
           <button key={g.id} type="button" role="tab" aria-selected={group === g.id} onClick={() => onGroup(g.id)}
             // The number is part of the label a screen reader reads, not a decoration beside it.
             aria-label={count === undefined ? g.label : `${g.label}, ${count} ${count === 1 ? "petition" : "petitions"}`}
-            className={cn("flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[13.5px]", group === g.id ? "bg-card font-medium shadow-sm" : "text-ink-soft")}
+            className={cn("flex shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 text-[13.5px]", group === g.id ? "bg-card font-medium shadow-sm" : "text-ink-soft")}
             data-testid={`petitions-tab-${g.id}`}>
+            <StatusMark tone={PETITION_GROUPS[g.id]} className="size-3.5" />
             {g.label}
             {count === undefined ? null : (
               <span aria-hidden className={cn("tabular-nums", group === g.id ? "text-ink-soft" : "text-ink-soft/70")} data-testid={`petitions-count-${g.id}`}>

@@ -6,12 +6,14 @@ import { useState, type ReactNode } from "react";
 import { DeadlineLine } from "@/components/documents/deadline-notice";
 import { ErrorNote } from "@/components/documents/panels";
 import { DraftFields } from "@/components/petitions/draft-fields";
+import { StatusTag } from "@/components/status-tag";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { fromPetition, toRequest } from "@/hooks/use-petition-draft";
 import { useChangePetition, usePetitionOptions } from "@/lib/api/petition-queries";
-import { placeLine, spacedCode, STATUS_LABELS } from "@/lib/petitions";
+import { placeLine, spacedCode } from "@/lib/petitions";
+import { petitionStatus } from "@/lib/status";
 
 import type { CreatorAction } from "@/lib/api/petitions";
 import type { OwnPetition } from "@/lib/api/types";
@@ -111,12 +113,13 @@ function Actions({ petition, proof, onEdit }: Props & { onEdit: () => void }) {
 
 export function OwnPetitionCard({ petition, proof }: Props) {
   const [editing, setEditing] = useState(false);
+  const tag = petitionStatus(petition.status);
   return (
     <Card className="gap-0 py-0" data-testid={`own-${petition.code}`}>
       <div className="flex flex-col gap-3 p-5">
       <p className="text-[12.5px] text-ink-soft">No. {spacedCode(petition.code)} · {petition.topic} · {placeLine(petition)}</p>
       <h2 className="text-[18px] leading-snug">{petition.title}</h2>
-      <p className="text-[13.5px] font-medium" data-testid={`own-${petition.code}-status`}>{STATUS_LABELS[petition.status]}</p>
+      <div><StatusTag tone={tag.tone} testId={`own-${petition.code}-status`}>{tag.label}</StatusTag></div>
       {petition.status === "in_review" && petition.review_deadline ? (
         <DeadlineLine heldUntil={petition.review_deadline} unless="the MCE refuses it" testId={`own-${petition.code}-deadline`} />
       ) : null}

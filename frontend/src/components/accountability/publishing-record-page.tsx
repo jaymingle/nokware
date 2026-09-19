@@ -1,6 +1,5 @@
 "use client";
 
-import { CircleCheckIcon, CircleDashedIcon, CircleXIcon, MinusIcon, type LucideIcon } from "lucide-react";
 import { Fragment, useState } from "react";
 
 import { OtherView } from "@/components/accountability/other-view";
@@ -9,25 +8,19 @@ import { ReportingGaps } from "@/components/accountability/reporting-gaps";
 import { UnpublishedRecord } from "@/components/accountability/unpublished-data";
 import { ErrorPanel, LoadingPanel } from "@/components/documents/panels";
 import { PageShell } from "@/components/page-shell";
+import { StatusMark } from "@/components/status-tag";
 import { ASSUMPTION_NOTE, LEDGER_YEAR_NOTE, STATE_LABELS, dateLabel, periodsIn, planSpan, recordTestId, yearFromLedger, yearsOf, type RecordState } from "@/lib/accountability";
 import { usePublishingRecord } from "@/lib/api/public-queries";
+import { recordStatus } from "@/lib/status";
 import { cn } from "@/lib/utils";
 
 import type { PublishingRecord, RecordPeriod, RecordRequirement } from "@/lib/api/types";
-
-const MARKS: Record<RecordState, { icon: LucideIcon; className: string }> = {
-  held: { icon: CircleCheckIcon, className: "text-teal" },
-  related: { icon: CircleDashedIcon, className: "text-gold" },
-  missing: { icon: CircleXIcon, className: "text-brick" },
-  not_due: { icon: MinusIcon, className: "text-ink-muted" },
-};
 
 type Selected = { requirement: string; period: string } | null;
 type Select = (requirement: RecordRequirement, period: RecordPeriod) => void;
 
 function Mark({ state, small = false }: { state: RecordState; small?: boolean }) {
-  const { icon: Icon, className } = MARKS[state];
-  return <Icon aria-hidden className={cn(small ? "size-4" : "size-5", className)} />;
+  return <StatusMark tone={recordStatus(state).tone} className={small ? "size-4" : "size-5"} />;
 }
 
 function Cell({ requirement, period, selected, onSelect, short }: {

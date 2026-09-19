@@ -11,6 +11,7 @@ import {
 } from "@/components/documents/document-fields";
 import { ErrorNote } from "@/components/documents/panels";
 import { PdfField } from "@/components/documents/pdf-field";
+import { StatusTag } from "@/components/status-tag";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { usePdfForm } from "@/hooks/use-pdf-form";
@@ -24,7 +25,7 @@ function Submitted({ doc, onAnother }: { doc: DocumentOut; onAnother: () => void
   return (
     <Card className="max-w-2xl border-teal" data-testid="submit-success">
       <CardContent className="flex flex-col gap-3">
-        <p className="text-[12.5px] text-teal">Submitted to {department}</p>
+        <div><StatusTag tone="waiting">Submitted to {department}</StatusTag></div>
         <h2 className="text-[24px] leading-snug">{doc.title}</h2>
         <p className="text-sm text-ink-soft">
           It is held out of the Ledger while {department} reviews it.

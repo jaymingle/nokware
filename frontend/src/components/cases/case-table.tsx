@@ -1,8 +1,9 @@
 "use client";
 
-import { Tag } from "@/components/documents/tag";
+import { StatusTag } from "@/components/status-tag";
 import { useNow } from "@/hooks/use-now";
-import { caseAge, caseStatusTag } from "@/lib/cases";
+import { caseAge } from "@/lib/cases";
+import { caseStatus } from "@/lib/status";
 import { cn } from "@/lib/utils";
 import { voicesTally } from "@/lib/voices";
 
@@ -20,7 +21,7 @@ type CaseTableProps = {
 };
 
 function Row({ summary, selected, onSelect, showRecipients, now }: { summary: CaseSummary; selected: boolean; onSelect: (id: string) => void; showRecipients: boolean; now: number }) {
-  const tag = caseStatusTag(summary);
+  const tag = caseStatus(summary);
   return (
     <tr className={cn("transition-colors", selected ? "bg-teal-tint/60" : "hover:bg-paper-subtle")} aria-selected={selected}>
       <td className={`${TD} ${WIDE_ONLY} text-[12.5px] text-ink-soft tabular-nums`}>{summary.reference}</td>
@@ -43,7 +44,7 @@ function Row({ summary, selected, onSelect, showRecipients, now }: { summary: Ca
       </td>
       <td className={`${TD} text-[13px] tabular-nums`}>{caseAge(summary.submitted_at, now)}</td>
       <td className={TD}>
-        <Tag tone={tag.tone} testId={`case-status-${summary.case_id}`}>{tag.label}</Tag>
+        <StatusTag tone={tag.tone} testId={`case-status-${summary.case_id}`}>{tag.label}</StatusTag>
       </td>
     </tr>
   );

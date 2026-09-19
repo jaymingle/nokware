@@ -6,18 +6,19 @@ import { useState } from "react";
 
 import { ErrorNote } from "@/components/documents/panels";
 import { VoiceDialog } from "@/components/issues/voice-dialog";
+import { StatusTag } from "@/components/status-tag";
 import { Button } from "@/components/ui/button";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { useNow } from "@/hooks/use-now";
 import { useIssues } from "@/lib/api/public-queries";
 import { caseAge } from "@/lib/cases";
+import { issueStage } from "@/lib/status";
 import { joinNames } from "@/lib/text";
 import { voicedIssues, voicesLine } from "@/lib/voices";
 
 import type { Issue, IssuePage, Option } from "@/lib/api/types";
 
 const PAGE = 10;
-const STAGE_LABELS: Record<Issue["stage"], string> = { received: "Received", in_progress: "In progress", escalated: "With the MCE's office" };
 
 function IssueCard({ issue, voiced, onVoiced, now }: { issue: Issue; voiced: boolean; onVoiced: (id: string) => void; now: number }) {
   const place = [issue.ward, issue.sub_metro].filter(Boolean).join(", ");
@@ -25,8 +26,9 @@ function IssueCard({ issue, voiced, onVoiced, now }: { issue: Issue; voiced: boo
     <li className="flex flex-wrap items-center gap-4 border-b py-4 last:border-0" data-testid={`issue-${issue.public_id}`}>
       <div className="flex min-w-0 flex-1 basis-64 flex-col gap-1">
         <p className="text-[15.5px]">{issue.topic}{place ? <span className="text-ink-soft"> · {place}</span> : null}</p>
-        <p className="text-[12.5px] text-ink-soft">
-          {STAGE_LABELS[issue.stage]} · with {joinNames(issue.departments)} · reported {caseAge(issue.filed_at, now)} ago
+        <p className="flex flex-wrap items-center gap-2 text-[12.5px] text-ink-soft">
+          <StatusTag tone={issueStage(issue.stage).tone}>{issueStage(issue.stage).label}</StatusTag>
+          with {joinNames(issue.departments)} · reported {caseAge(issue.filed_at, now)} ago
         </p>
         <p className="flex items-center gap-1.5 text-[13px]" data-testid={`issue-${issue.public_id}-voices`}>
           <UsersIcon aria-hidden className="size-3.5 text-teal" />

@@ -5,6 +5,8 @@ import type { ReportTimelineEvent } from "@/lib/api/types";
 /** One step of the case as the page renders it: when it happened, what happened, and the note if there is one. */
 export type TimelineStep = {
   key: string;
+  /** The step the server named: what gives the mark beside it its tone. */
+  action: string;
   at: string;
   when: string;
   description: string;
@@ -21,6 +23,7 @@ export function timelineSteps(timeline: ReportTimelineEvent[] | undefined): Time
     .filter((event) => event.description.trim() !== "")
     .map((event, index) => ({
       key: `${index}-${event.action}-${event.at}`,
+      action: event.action,
       at: machineTime(event.at),
       when: formatDateTime(event.at),
       description: event.description.trim(),

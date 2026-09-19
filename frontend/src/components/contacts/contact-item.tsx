@@ -1,6 +1,6 @@
 import { ExternalLinkIcon, MailIcon, MessageCircleIcon, PhoneIcon } from "lucide-react";
 
-import { Tag } from "@/components/documents/tag";
+import { StatusTag } from "@/components/status-tag";
 import { numberHref, tierNote } from "@/lib/contacts";
 import { formatDate } from "@/lib/time";
 import { cn } from "@/lib/utils";
@@ -59,7 +59,7 @@ function SourceLine({ contact }: { contact: PublicContact }) {
   if (contact.tier === 1) return <p className="text-[12px] text-ink-soft">{tierNote(contact)}</p>;
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <Tag tone="gold" wrap testId={`contact-${contact.id}-unverified`}>{tierNote(contact)}</Tag>
+      <StatusTag tone="waiting" wrap testId={`contact-${contact.id}-unverified`}>{tierNote(contact)}</StatusTag>
       {contact.press_url ? (
         <a href={contact.press_url} target="_blank" rel="noopener" data-touch-target className="inline-flex items-center gap-1 text-[12px] text-teal underline underline-offset-2" data-testid={`contact-${contact.id}-press`}>
           Press report <ExternalLinkIcon aria-hidden className="size-3" />

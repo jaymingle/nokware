@@ -1,11 +1,12 @@
 import { ContactList } from "@/components/contacts/contact-list";
-import { Tag } from "@/components/documents/tag";
 import { ReadAloud } from "@/components/read-aloud/read-aloud";
 import { CaseTimeline } from "@/components/report/case-timeline";
 import { EscalateForm } from "@/components/report/escalate-form";
+import { StatusTag } from "@/components/status-tag";
 import { Card, CardContent } from "@/components/ui/card";
 import { reportAudio } from "@/lib/api/public";
-import { STAGES, stageLabels, stageOf, statusTag } from "@/lib/report/status";
+import { STAGES, stageLabels, stageOf } from "@/lib/report/status";
+import { reportStatus } from "@/lib/status";
 import { joinNames } from "@/lib/text";
 import { formatDate, formatDateTime } from "@/lib/time";
 import { cn } from "@/lib/utils";
@@ -29,13 +30,13 @@ function Steps({ status }: { status: ReportStatus }) {
 }
 
 function StatusFrame({ status, children }: { status: ReportStatus; children: ReactNode }) {
-  const tag = statusTag(status);
+  const tag = reportStatus(status);
   return (
     <Card data-testid="status-result">
       <CardContent className="flex flex-col gap-5 py-2 sm:px-6 sm:py-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="font-heading text-[30px] leading-none tracking-wide tabular-nums">{status.reference}</h2>
-          <Tag tone={tag.tone} testId="status-tag">{tag.label}</Tag>
+          <StatusTag tone={tag.tone} testId="status-tag">{tag.label}</StatusTag>
         </div>
         <Steps status={status} />
         <p className="text-[13px] text-ink-soft">Reported {formatDate(status.submitted_at)}</p>

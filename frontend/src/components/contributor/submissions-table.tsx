@@ -1,8 +1,8 @@
 "use client";
 
 import { DeadlineLine } from "@/components/documents/deadline-notice";
-import { IngestionTag, Tag } from "@/components/documents/tag";
 import { ViewPdfButton } from "@/components/documents/view-pdf-button";
+import { IngestionTag, StatusTag } from "@/components/status-tag";
 import { Card } from "@/components/ui/card";
 import { useNow } from "@/hooks/use-now";
 import { describeSubmission } from "@/lib/documents";
@@ -19,9 +19,9 @@ function ReviewCell({ doc, now }: { doc: DocumentOut; now: number }) {
   return (
     <div className="flex flex-col items-start gap-1.5">
       <div className="flex flex-wrap gap-1.5">
-        <Tag tone={view.tone} testId={`submission-status-${doc.id}`}>
+        <StatusTag tone={view.tone} testId={`submission-status-${doc.id}`}>
           {view.label}
-        </Tag>
+        </StatusTag>
         {doc.ingestion ? <IngestionTag state={doc.ingestion} /> : null}
       </div>
       {view.clock ? <DeadlineLine heldUntil={view.clock.heldUntil} unless={view.clock.unless} testId={`submission-clock-${doc.id}`} /> : null}

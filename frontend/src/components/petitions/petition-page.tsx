@@ -10,20 +10,18 @@ import { MceResponse } from "@/components/petitions/mce-response";
 import { Progress } from "@/components/petitions/petition-card";
 import { SignPanel } from "@/components/petitions/sign-panel";
 import { Signers } from "@/components/petitions/signers";
+import { StatusMark, StatusTag } from "@/components/status-tag";
 import { Button } from "@/components/ui/button";
 import { useMounted } from "@/hooks/use-mounted";
 import { useNow } from "@/hooks/use-now";
 import { usePetition, usePetitionLedger, usePetitionOptions } from "@/lib/api/petition-queries";
 import { closingLine, placeLine, publishedLine, responseLine, spacedCode, startedBy, timelineText, whatsappShareUrl } from "@/lib/petitions";
+import { issueStage, petitionEventTone, petitionStatus } from "@/lib/status";
 import { joinNames } from "@/lib/text";
 import { formatDate } from "@/lib/time";
 import { voicesLine } from "@/lib/voices";
 
-import type { LinkedIssue, PetitionDetail } from "@/lib/api/types";
-
-const ISSUE_STAGES: Record<LinkedIssue["stage"], string> = {
-  received: "Received", in_progress: "In progress", escalated: "With the MCE's office", resolved: "Resolved",
-};
+import type { PetitionDetail } from "@/lib/api/types";
 
 function Section({ title, children, testId }: { title: string; children: ReactNode; testId: string }) {
   return (
@@ -38,8 +36,10 @@ function Standing({ petition, now }: { petition: PetitionDetail; now: number }) 
   const options = usePetitionOptions();
   const days = options.data?.response_days ?? 30;
   const response = responseLine(petition, now);
+  const tag = petitionStatus(petition.status);
   return (
     <div className="flex flex-col gap-3 rounded-xl border bg-card p-5" data-testid="petition-standing">
+      <div><StatusTag tone={tag.tone} testId="petition-status">{tag.label}</StatusTag></div>
       <Progress signatures={petition.signatures} threshold={petition.threshold} large />
       {response ? <p className="rounded-lg bg-gold-tint px-3 py-2.5 text-[14px]" data-testid="petition-response-due">{response}</p> : null}
       <p className="text-[13.5px]" data-testid="petition-closing">{closingLine(petition, now)}</p>
@@ -85,7 +85,10 @@ function Cited({ petition }: { petition: PetitionDetail }) {
       {issue ? (
         <div className="rounded-lg bg-paper-subtle px-4 py-3 text-[13.5px]" data-testid="petition-issue">
           <p className="font-medium">An issue residents reported: {issue.topic}{issue.ward ? ` in ${issue.ward}` : ""}</p>
-          <p className="text-[12.5px] text-ink-soft">{ISSUE_STAGES[issue.stage]} · {voicesLine(issue.voices)}</p>
+          <p className="mt-1 flex flex-wrap items-center gap-2 text-[12.5px] text-ink-soft">
+            <StatusTag tone={issueStage(issue.stage).tone}>{issueStage(issue.stage).label}</StatusTag>
+            {voicesLine(issue.voices)}
+          </p>
         </div>
       ) : null}
       {petition.documents.map((doc) => <DocumentLine key={doc.id} doc={doc} />)}
@@ -109,8 +112,11 @@ function Timeline({ petition }: { petition: PetitionDetail }) {
     <Section title="What has happened" testId="petition-timeline">
       <ol className="flex flex-col gap-2 text-[13.5px]">
         {petition.timeline.map((entry) => (
-          <li key={`${entry.action}-${entry.at}`} className="flex flex-wrap gap-x-3">
-            <span className="w-28 shrink-0 text-ink-soft tabular-nums">{formatDate(entry.at)}</span>
+          <li key={`${entry.action}-${entry.at}`} className="flex flex-wrap items-baseline gap-x-3">
+            <span className="flex w-28 shrink-0 items-center gap-2 text-ink-soft tabular-nums">
+              <StatusMark tone={petitionEventTone(entry.action)} className="size-3.5" />
+              {formatDate(entry.at)}
+            </span>
             <span>{timelineText(entry)}</span>
           </li>
         ))}

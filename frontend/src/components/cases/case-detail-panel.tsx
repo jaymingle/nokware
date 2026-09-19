@@ -6,9 +6,10 @@ import { CaseActions } from "@/components/cases/case-actions";
 import { PhotoGallery } from "@/components/cases/photo-gallery";
 import { SharedLocation } from "@/components/cases/shared-location";
 import { ErrorNote } from "@/components/documents/panels";
-import { Tag } from "@/components/documents/tag";
+import { StatusMark, StatusTag } from "@/components/status-tag";
 import { useCase } from "@/lib/api/queries";
-import { caseEventText, caseNoteReader, caseStatusTag, caseTrail, SEVERITY_LABELS } from "@/lib/cases";
+import { caseEventText, caseNoteReader, caseTrail, SEVERITY_LABELS } from "@/lib/cases";
+import { caseEventTone, caseStatus, NEEDS_ROUTING } from "@/lib/status";
 import { formatDateTime } from "@/lib/time";
 import { voicesTally } from "@/lib/voices";
 
@@ -73,7 +74,7 @@ function Trail({ detail }: { detail: CaseDetail }) {
       <ol className="flex flex-col gap-3" data-testid={`case-trail-${detail.case_id}`}>
         {caseTrail(detail).map((step, index) => (
           <li key={`${step.event.at}-${index}`} className="grid grid-cols-[12px_minmax(0,1fr)] gap-2.5">
-            <span aria-hidden className="mt-[7px] size-[5px] rounded-full bg-teal" />
+            <StatusMark tone={caseEventTone(step.event.action)} className="mt-[3px] size-3" />
             <div>
               <p className="text-[13px] break-words">{caseEventText(step.event)}</p>
               <p className="text-[12px] text-ink-soft tabular-nums">
@@ -143,13 +144,13 @@ function Voices({ detail }: { detail: CaseDetail }) {
 }
 
 function Loaded({ detail, recipients }: { detail: CaseDetail; recipients?: Option[] }) {
-  const tag = caseStatusTag(detail);
+  const tag = caseStatus(detail);
   return (
     <div className="flex flex-col gap-4" data-testid={`case-detail-${detail.case_id}`}>
       <div className="flex flex-wrap items-center gap-2.5">
         <span className="text-[12.5px] text-ink-soft tabular-nums">{detail.reference}</span>
-        <Tag tone={tag.tone}>{tag.label}</Tag>
-        {detail.needs_routing ? <Tag tone="gold">Needs routing</Tag> : null}
+        <StatusTag tone={tag.tone}>{tag.label}</StatusTag>
+        {detail.needs_routing ? <StatusTag tone={NEEDS_ROUTING.tone}>{NEEDS_ROUTING.label}</StatusTag> : null}
       </div>
       <h2 className="text-[22px] leading-snug">{detail.topic}</h2>
       <Body detail={detail} />

@@ -1,14 +1,16 @@
 import { DeadlineNotice } from "@/components/documents/deadline-notice";
 import { DocumentSummary } from "@/components/documents/document-summary";
-import { Tag } from "@/components/documents/tag";
 import { ViewPdfButton } from "@/components/documents/view-pdf-button";
+import { StatusTag } from "@/components/status-tag";
 import { Card } from "@/components/ui/card";
+import { disputeStatus } from "@/lib/status";
 import { formatDate } from "@/lib/time";
 
 import type { DocumentOut } from "@/lib/api/types";
 
 function DisputeCard({ doc }: { doc: DocumentOut }) {
   const escalated = doc.escalated_to_mce;
+  const tag = disputeStatus(escalated);
   return (
     <Card className="gap-0 py-0" data-testid={`dispute-card-${doc.id}`}>
       {escalated && doc.held_until ? (
@@ -17,7 +19,7 @@ function DisputeCard({ doc }: { doc: DocumentOut }) {
       <div className="flex flex-col gap-3 p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <DocumentSummary doc={doc} byline={`Disputed ${doc.disputed_at ? formatDate(doc.disputed_at) : ""}`.trim()} />
-          <Tag tone={escalated ? "gold" : "neutral"}>{escalated ? "With the MCE" : "Waiting for the contributor"}</Tag>
+          <StatusTag tone={tag.tone}>{tag.label}</StatusTag>
         </div>
         <div className="flex flex-col gap-1 text-[13.5px] text-ink-soft">
           {doc.dispute_reason ? <p>Your reason: {doc.dispute_reason}</p> : null}
