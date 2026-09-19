@@ -54,6 +54,52 @@ rebuild. What is left, and why it isn't in this release:
   reference or amount in left-to-right order inside Arabic text are exactly what
   old handsets show as boxes. A reordered emergency number is dangerous.
 
+## Roadmap
+
+### Petitions, reworked
+
+Petitions today wait for the MCE to publish or refuse them. The agreed design
+removes that gate and gives the referee's part to a verified contributor, who is
+not Assembly staff and has no stake in the outcome — an institution that can
+remove petitions against itself taints every removal, however honest the reason.
+
+- **A petition publishes when its creator publishes it.** No approval gate.
+- **A verified contributor can remove a published petition**, only on fixed
+  grounds: it names a private individual, incites violence, contains personal
+  data, or duplicates an open petition — and a duplicate must cite the other
+  petition's code, shown and linked. "Not the Assembly's responsibility" is a
+  judgement on merit: it belongs in the MCE's response, never in a removal.
+- **The reason is public**, on the page where the petition was, as "Removed by a
+  verified contributor". The identity stays in the audit trail: naming the person
+  exposes them to whoever wanted the petition up.
+- **The tombstone shows the reason and the date, and nothing else** — not the
+  text, not the title, since a title can name someone just as easily.
+- **Removals are counted publicly by reason**, as document disputes are, so a
+  contributor removing too freely becomes visible. Repeat removals of the same
+  petition are counted, not capped: "removed twice for naming a private
+  individual" is itself information.
+- **The petitioner can edit and republish.** Signatures carry over, with the page
+  saying "signed before the edit of 19 September" and the edit history shown.
+- **Any reader can report a petition** on the same grounds. Removal power nobody
+  can trigger is not a remedy.
+- **The MCE responds, or shares a petition with a department**, and sees the
+  petitioner's reply. No power over whether a petition exists.
+- Each petition on its own page, with comments (named or anonymous), images, and
+  a creator who can find and edit their petitions with the code they were given.
+
+### Language switchers
+
+On WhatsApp (following the language someone writes in), on the site, and on USSD
+before the menu. See the Languages section above for what each costs and why Twi
+and Arabic wait.
+
+### A fixed vocabulary for resolution notes
+
+Staff notes on a case are free text today, screened but unconstrained. A short
+fixed vocabulary ("cleared", "repaired", "referred to a contractor", "not the
+Assembly's to act on") offered alongside the free text would make resolutions
+comparable across departments without flattening what staff can say.
+
 ## Future work: structure
 
 The code was cleaned up before submission without restructuring it. These are
