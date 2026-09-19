@@ -160,7 +160,9 @@ def test_a_removed_petition_takes_no_signature_on_ussd(store: dict[str, Any]) ->
 
 
 def test_a_removed_petition_takes_no_signature_on_the_web(store: dict[str, Any]) -> None:
-    proof = phone_proof.issue_proof(PHONE, Channel.USSD, NOW)
+    # Issued against the real clock, not the fixture's: the route opens the proof at the time the test runs, so a
+    # proof sealed at a fixed hour stops working once that hour is twelve hours past.
+    proof = phone_proof.issue_proof(PHONE, Channel.USSD, datetime.now(UTC))
     response = TestClient(app).post("/api/petitions/771204/signatures", json={"show_name": False},
                                     headers={"X-Phone-Proof": proof})
     assert response.status_code == 409
