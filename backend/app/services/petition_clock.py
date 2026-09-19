@@ -1,5 +1,9 @@
 """The petition clock: what happens to a petition when no one acts.
 
+Two things do. A petition open for its 90 days without reaching its threshold closes, and one the MCE has not
+answered 30 days after it reached its threshold is marked unanswered on its own page. Nothing here publishes
+anything: a petition is published by the person who wrote it, so there is no waiting to run out.
+
 Every change re-reads the petition under its lock first, in case someone acted a moment before.
 """
 
@@ -12,15 +16,7 @@ from appwrite.query import Query
 
 from app.services import petition_updates, petitions
 from app.services.locks import record_lock
-from app.services.petition_rules import (
-    PetitionAction,
-    PetitionStatus,
-    PublishedBy,
-    closing_due,
-    publish_fields,
-    response_overdue,
-    review_expired,
-)
+from app.services.petition_rules import PetitionAction, PetitionStatus, closing_due, response_overdue
 from app.services.petition_updates import Update
 
 logger = logging.getLogger(__name__)
@@ -46,8 +42,6 @@ def _apply(candidate: dict[str, Any], now: datetime, step: Step) -> bool:
     return True
 
 
-AUTO_PUBLISH: Step = (review_expired, lambda p, now: publish_fields(p, PublishedBy.AUTOMATIC, now, petitions.threshold_of(p)),
-                      PetitionAction.AUTO_PUBLISHED, Update.AUTO_PUBLISHED)
 CLOSE: Step = (closing_due, lambda p, now: petitions.finish_fields(PetitionStatus.CLOSED, now), PetitionAction.CLOSED, Update.CLOSED)
 NO_RESPONSE: Step = (response_overdue, lambda p, now: {"noResponseAt": now.isoformat()}, PetitionAction.NO_RESPONSE, Update.NO_RESPONSE)
 
@@ -55,7 +49,6 @@ NO_RESPONSE: Step = (response_overdue, lambda p, now: {"noResponseAt": now.isofo
 def run_clock(now: datetime) -> dict[str, list[str]]:
     at = now.isoformat()
     due = {
-        "published": (_due([Query.equal("status", PetitionStatus.IN_REVIEW.value), Query.less_than_equal("reviewDeadline", at)]), AUTO_PUBLISH),
         "closed": (_due([Query.equal("status", PetitionStatus.OPEN.value), Query.less_than_equal("closesAt", at)]), CLOSE),
         "unanswered": (_due([Query.equal("status", PetitionStatus.AWAITING_RESPONSE.value), Query.less_than_equal("responseDue", at),
                              Query.is_null("noResponseAt")]), NO_RESPONSE),

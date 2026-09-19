@@ -71,14 +71,24 @@ def require_roles(*roles: Role) -> Callable[[Principal], Principal]:
     return dependency
 
 
+def refuse_if_over(limit: RateLimit, key: str) -> None:
+    """One count against one key. Routes that limit by something other than the caller's address — a petition's
+    number, say, so one page can't be buried under reports — count with this directly."""
+    wait = limit.retry_after(key)
+    if wait is not None:
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            "Too many requests from this device. Try again in a few minutes.",
+            headers={"Retry-After": str(math.ceil(wait))},
+        )
+
+
+def client_address(request: Request) -> str:
+    return request.client.host if request.client else "unknown"
+
+
 def rate_limited(limit: RateLimit) -> Callable[[Request], None]:
     def check(request: Request) -> None:
-        wait = limit.retry_after(request.client.host if request.client else "unknown")
-        if wait is not None:
-            raise HTTPException(
-                status.HTTP_429_TOO_MANY_REQUESTS,
-                "Too many requests from this device. Try again in a few minutes.",
-                headers={"Retry-After": str(math.ceil(wait))},
-            )
+        refuse_if_over(limit, client_address(request))
 
     return check

@@ -108,6 +108,84 @@
     },
     "case.safety.closed": {
       "text": "Ce dossier est clos."
+    },
+    "petition.status.open": {
+      "text": "Ouverte aux signatures"
+    },
+    "petition.status.awaiting_response": {
+      "text": "Chez le MCE"
+    },
+    "petition.status.responded": {
+      "text": "Répondue"
+    },
+    "petition.status.closed": {
+      "text": "Close"
+    },
+    "petition.status.removed": {
+      "text": "Retirée"
+    },
+    "petition.ground.private_individual": {
+      "text": "Nomme ou attaque une personne privée"
+    },
+    "petition.ground.incites_violence": {
+      "text": "Incite à la violence"
+    },
+    "petition.ground.personal_data": {
+      "text": "Contient des données personnelles"
+    },
+    "petition.ground.duplicate": {
+      "text": "Fait double emploi avec une pétition ouverte"
+    },
+    "petition.removal.duplicate_needs_code": {
+      "text": "Indiquez le numéro de la pétition ouverte que celle-ci répète."
+    },
+    "petition.removal.duplicate_not_found": {
+      "text": "Aucune pétition publique ne porte ce numéro."
+    },
+    "petition.removal.already_removed": {
+      "text": "Cette pétition a déjà été retirée."
+    },
+    "petition.removal.own_petition": {
+      "text": "Vous avez lancé cette pétition ; vous ne pouvez donc pas la retirer. Un autre contributeur le peut."
+    },
+    "petition.removal.signed_petition": {
+      "text": "Vous avez signé cette pétition ; vous ne pouvez donc pas la retirer. Un autre contributeur le peut."
+    },
+    "petition.removal.note_personal_data": {
+      "text": "Cette note contient des données personnelles, par exemple un numéro de téléphone, une adresse e-mail ou un numéro de Ghana Card. Retirez-les : la note est conservée dans le registre de l'Assemblée."
+    },
+    "petition.removal.note_too_long": {
+      "text": "Limitez la note à 500 caractères."
+    },
+    "petition.report.note_too_long": {
+      "text": "Limitez votre ajout à 300 caractères."
+    },
+    "petition.report.note_personal_data": {
+      "text": "Votre ajout contient des données personnelles, par exemple un numéro de téléphone, une adresse e-mail ou un numéro de Ghana Card. Retirez-les et dites-le autrement."
+    },
+    "petition.report.received": {
+      "text": "Merci. Un contributeur le lira. La pétition reste en ligne pendant ce temps."
+    },
+    "petition.report.already_removed": {
+      "text": "Cette pétition a déjà été retirée."
+    },
+    "petition.dismissal.not_the_ground": {
+      "text": "Ne relève pas de ce motif"
+    },
+    "petition.dismissal.already_handled": {
+      "text": "Déjà traité"
+    },
+    "petition.edit.not_editable": {
+      "text": "Cette pétition est close ; elle ne peut plus être modifiée."
+    },
+    "petition.legacy.refused": {
+      "text": "Refusée sous l'ancienne procédure d'examen"
+    },
+    "petition.legacy.withdrawn": {
+      "text": "Retirée par la personne qui l'a lancée"
+    },
+    "petition.legacy.closed_in_move": {
+      "text": "Close lors du passage à la nouvelle procédure"
     }
   }
 }

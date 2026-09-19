@@ -151,6 +151,120 @@
       "critical": false,
       "text": "This case is closed.",
       "note": "Says nothing about the outcome: an outcome would say what the case was."
+    },
+    "petition.status.open": {
+      "critical": false,
+      "text": "Open for signatures",
+      "note": "How a petition that is taking signatures is named, on every page and in the portal alike."
+    },
+    "petition.status.awaiting_response": {
+      "critical": false,
+      "text": "With the MCE",
+      "note": "It reached its signatures; the MCE has 30 days to answer publicly."
+    },
+    "petition.status.responded": {
+      "critical": false,
+      "text": "Answered"
+    },
+    "petition.status.closed": {
+      "critical": false,
+      "text": "Closed",
+      "note": "Its 90 days ran out, or the person who started it closed it."
+    },
+    "petition.status.removed": {
+      "critical": false,
+      "text": "Removed",
+      "note": "A contributor removed it on one of the four grounds. Only the ground, the date and the number remain."
+    },
+    "petition.ground.private_individual": {
+      "critical": false,
+      "text": "Names or attacks a private individual",
+      "note": "One of the four grounds, written the same way wherever it is read: the removal form, the tombstone, the report form, USSD and WhatsApp."
+    },
+    "petition.ground.incites_violence": {
+      "critical": false,
+      "text": "Incites violence"
+    },
+    "petition.ground.personal_data": {
+      "critical": false,
+      "text": "Contains personal data"
+    },
+    "petition.ground.duplicate": {
+      "critical": false,
+      "text": "Duplicates an open petition",
+      "note": "The only ground that names another petition: its number is stored, so the tombstone can point there."
+    },
+    "petition.removal.duplicate_needs_code": {
+      "critical": false,
+      "text": "Give the number of the open petition this one duplicates."
+    },
+    "petition.removal.duplicate_not_found": {
+      "critical": false,
+      "text": "No public petition has that number."
+    },
+    "petition.removal.already_removed": {
+      "critical": false,
+      "text": "This petition has already been removed."
+    },
+    "petition.removal.own_petition": {
+      "critical": false,
+      "text": "You started this petition, so you can't remove it. Another contributor can.",
+      "note": "A removal is a judgement on someone else's words; nobody judges their own."
+    },
+    "petition.removal.signed_petition": {
+      "critical": false,
+      "text": "You signed this petition, so you can't remove it. Another contributor can."
+    },
+    "petition.removal.note_personal_data": {
+      "critical": false,
+      "text": "This note holds personal data, such as a phone number, an email address or a Ghana Card number. Take it out: the note is kept in the Assembly's record."
+    },
+    "petition.removal.note_too_long": {
+      "critical": false,
+      "text": "Keep the note to 500 characters or fewer."
+    },
+    "petition.report.note_too_long": {
+      "critical": false,
+      "text": "Keep what you add to 300 characters or fewer."
+    },
+    "petition.report.note_personal_data": {
+      "critical": false,
+      "text": "What you added holds personal data, such as a phone number, an email address or a Ghana Card number. Take it out and say it another way."
+    },
+    "petition.report.received": {
+      "critical": false,
+      "text": "Thank you. A contributor will read this. The petition stays up while they do.",
+      "note": "Said to whoever reports a petition: a report never hides anything, and the wording must not suggest it did."
+    },
+    "petition.report.already_removed": {
+      "critical": false,
+      "text": "This petition has already been removed."
+    },
+    "petition.dismissal.not_the_ground": {
+      "critical": false,
+      "text": "Doesn't meet the ground",
+      "note": "One of the two fixed reasons a contributor dismisses a report with."
+    },
+    "petition.dismissal.already_handled": {
+      "critical": false,
+      "text": "Already handled"
+    },
+    "petition.edit.not_editable": {
+      "critical": false,
+      "text": "This petition is closed, so it can't be edited."
+    },
+    "petition.legacy.refused": {
+      "critical": false,
+      "text": "Refused under the earlier review process",
+      "note": "On a petition the MCE refused before Stage A. Never shown as a contributor's removal, which would be untrue."
+    },
+    "petition.legacy.withdrawn": {
+      "critical": false,
+      "text": "Withdrawn by the person who started it"
+    },
+    "petition.legacy.closed_in_move": {
+      "critical": false,
+      "text": "Closed during the move to the new petition process"
     }
   }
 }

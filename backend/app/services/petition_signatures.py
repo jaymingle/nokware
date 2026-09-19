@@ -20,12 +20,14 @@ from app.services import channel_limits, petitions
 from app.services.appwrite_client import DATABASE_ID, as_record, get_databases
 from app.services.locks import record_lock
 from app.services.petition_rules import (
+    FIRST_VERSION,
     PetitionAction,
     PetitionStatus,
     WrongState,
     check_signable,
     clean_signer_name,
     threshold_fields,
+    version_of,
 )
 from app.services.phone_proof import Channel, keyed_hash
 
@@ -48,9 +50,9 @@ def signer_key(petition_id: str, number: str) -> str:
     return keyed_hash(f"signature:{petition_id}:{number}")
 
 
-def _store(petition_id: str, key: str, name: str | None, channel: Channel, now: datetime) -> bool:
+def _store(petition_id: str, key: str, name: str | None, channel: Channel, version: int, now: datetime) -> bool:
     data = {"petitionId": petition_id, "signerKey": key, "named": name is not None, "name": name,
-            "channel": channel.value, "createdAt": now.isoformat()}
+            "channel": channel.value, "version": version, "createdAt": now.isoformat()}
     try:
         get_databases().create_document(DATABASE_ID, SIGNATURES_COLLECTION, ID.unique(), data)
     except AppwriteException as exc:
@@ -84,10 +86,25 @@ def sign(code: str, number: str, channel: Channel, show_name: bool, name: str | 
     with record_lock(petition["$id"]):
         petition = petitions.public(code)
         check_signable(petition, now)
-        added = _store(petition["$id"], signer_key(petition["$id"], number), shown, channel, now)
+        added = _store(petition["$id"], signer_key(petition["$id"], number), shown, channel, version_of(petition), now)
         updated = _count(petition, now) if added else petition
     reached = petition["status"] == PetitionStatus.OPEN and updated["status"] == PetitionStatus.AWAITING_RESPONSE
     return Signed(updated, added, shown is not None, reached)
+
+
+def on_earlier_versions(petition: dict[str, Any]) -> int:
+    """How many of the signatures stand on words that have since been edited. Counted against the current version
+    rather than added up per version, so a signature written before versions were kept counts as an earlier one."""
+    current = version_of(petition)
+    if current == FIRST_VERSION:
+        return 0
+    listing = get_databases().list_documents(DATABASE_ID, SIGNATURES_COLLECTION, queries=[
+        Query.equal("petitionId", petition["$id"]), Query.equal("version", current), Query.limit(1)])
+    return max(0, total(petition["$id"]) - int(listing.total))
+
+
+def has_signed(petition_id: str, number: str) -> bool:
+    return _mine(petition_id, number) is not None
 
 
 def _mine(petition_id: str, number: str) -> dict[str, Any] | None:

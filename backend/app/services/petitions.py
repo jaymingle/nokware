@@ -1,11 +1,14 @@
-"""Petitions in Appwrite: submitting, the MCE's decision, the creator's changes, and the clocks.
+"""Petitions in Appwrite: publishing one, editing it, closing it, and the clocks.
 
 Every change re-reads the petition under a per-record lock and leaves an entry in petition_history, the audit
 trail. Collections are server-only.
 
+Nobody approves a petition. It is published by the person who wrote it, the moment their words pass the screen, and
+it stays up until it closes or a verified contributor removes it on a named ground.
+
 The creator is known only by a keyed hash of their verified number (creatorKey). The number itself is kept only
-for updates about their petition, and deleted 30 days after it closes, is withdrawn, or is refused and not sent
-back. A name is shown publicly only if the creator chose to show it.
+for updates about their petition, and deleted 30 days after it closes. A name is shown publicly only if the creator
+chose to show it.
 """
 
 import logging
@@ -19,7 +22,7 @@ from appwrite.id import ID
 from appwrite.query import Query
 
 from app.config import get_settings
-from app.services import channel_limits, issue_voices, ledger_documents
+from app.services import channel_limits, issue_voices, ledger_documents, petition_versions
 from app.services.appwrite_client import DATABASE_ID, as_record, every_record, get_databases
 from app.services.auth import Principal
 from app.services.ledger_documents import LedgerStatus
@@ -29,22 +32,21 @@ from app.services.petition_rules import (
     InvalidPetition,
     PetitionAction,
     PetitionStatus,
-    PublishedBy,
     Scope,
     WrongState,
-    check_resubmit,
-    check_review,
+    check_editable,
     check_withdraw,
     clean_draft,
     clean_name,
     draft_fields,
+    edit_action,
+    edit_fields,
+    is_public,
     new_code,
     normalise_code,
     publish_fields,
-    refusal_fields,
-    review_fields,
     threshold_for,
-    was_published,
+    version_of,
 )
 from app.services.phone_proof import Proof, phone_key
 from app.services.test_fixtures import TEST_PREFIX
@@ -55,12 +57,11 @@ logger = logging.getLogger(__name__)
 
 PETITIONS_COLLECTION = "petitions"
 HISTORY_COLLECTION = "petition_history"
-IN_REVIEW_PER_PHONE = 3
 RETENTION = timedelta(days=30)
 CODE_ATTEMPTS = 5
 PUBLIC_FIELDS = ["code", "title", "topic", "recipients", "scope", "wardLocation", "subMetro", "status", "publishedAt",
-                 "publishedBy", "closesAt", "closedAt", "threshold", "signatureCount", "creatorName", "thresholdReachedAt",
-                 "responseDue", "respondedAt", "responseKind", "noResponseAt"]
+                 "closesAt", "closedAt", "threshold", "signatureCount", "creatorName", "thresholdReachedAt",
+                 "responseDue", "respondedAt", "responseKind", "noResponseAt", "version", "versionedAt", "removalCount"]
 
 
 class PetitionNotFound(Exception):
@@ -71,7 +72,7 @@ class PetitionNotFound(Exception):
 class Actor:
     id: str
     name: str
-    role: str  # "creator", "mce" or "system"
+    role: str  # "creator", "contributor", "mce" or "system"
 
 
 CREATOR = Actor("creator", "", "creator")
@@ -80,6 +81,10 @@ SYSTEM = Actor("system", "Automatic", "system")
 
 def mce_actor(principal: Principal) -> Actor:
     return Actor(principal.user_id, principal.name, "mce")
+
+
+def contributor_actor(principal: Principal) -> Actor:
+    return Actor(principal.user_id, principal.name, "contributor")
 
 
 def list_petitions(queries: list[str]) -> tuple[list[dict[str, Any]], int]:
@@ -96,8 +101,10 @@ def find(code: str) -> dict[str, Any]:
 
 
 def public(code: str) -> dict[str, Any]:
+    """A removed petition is not found here, by design: everything that reads a petition for the public reads it
+    through this function, so nothing of a removed one can reach a reader by an oversight elsewhere."""
     petition = find(code)
-    if not was_published(petition):
+    if not is_public(petition):
         raise PetitionNotFound(code)
     return petition
 
@@ -147,29 +154,28 @@ def _create(fields: dict[str, Any]) -> dict[str, Any]:
     raise RuntimeError("No free petition number; try again.")
 
 
-def _in_review_by(key: str) -> int:
-    _, total = list_petitions([Query.equal("creatorKey", key), Query.equal("status", PetitionStatus.IN_REVIEW.value), Query.limit(1)])
-    return total
-
-
 def _location(draft: Draft) -> dict[str, Any]:
     return {"subMetro": wards()[draft.ward].sub_metro if draft.ward else None}
 
 
+def threshold_of(scope: Scope) -> int:
+    """Fixed on the petition when it opens, so a later change to the setting never moves a live goal."""
+    settings = get_settings()
+    return threshold_for(scope, settings.petition_threshold_area, settings.petition_threshold_metro)
+
+
 def submit(proof: Proof, draft: Draft, show_name: bool, name: str | None, now: datetime) -> dict[str, Any]:
+    """It is published here, not sent anywhere for a decision. The words were screened before this was called."""
     draft, shown_name = clean_draft(draft), clean_name(show_name, name)
     _check_links(draft)
-    key = phone_key(proof.number)
-    if _in_review_by(key) >= IN_REVIEW_PER_PHONE:
-        raise WrongState(f"You have {IN_REVIEW_PER_PHONE} petitions waiting for review. Wait for a decision on one first.")
     if not channel_limits.PETITIONS.allow(proof.number, now.timestamp()):
         raise WrongState("You've started as many petitions as can be started in a day. Try again tomorrow.")
-    petition = _create({
-        **draft_fields(draft), **_location(draft), **review_fields(now), "resubmissions": 0, "signatureCount": 0,
-        "creatorKey": key, "creatorPhone": proof.number, "creatorChannel": proof.channel.value,
-        "creatorName": shown_name, "createdAt": now.isoformat(),
-    })
-    record_history(petition, PetitionAction.SUBMITTED, CREATOR, None)
+    fields = {**draft_fields(draft), **_location(draft), **publish_fields(now, threshold_of(draft.scope)),
+              "signatureCount": 0, "creatorKey": phone_key(proof.number), "creatorPhone": proof.number,
+              "creatorChannel": proof.channel.value, "creatorName": shown_name, "createdAt": now.isoformat()}
+    petition = _create(fields)
+    petition_versions.record_version(petition["$id"], fields, version_of(petition), now)
+    record_history(petition, PetitionAction.PUBLISHED, CREATOR, None)
     return petition
 
 
@@ -181,17 +187,18 @@ def _owned(code: str, proof: Proof) -> dict[str, Any]:
     return petition
 
 
-def resubmit(code: str, proof: Proof, draft: Draft, now: datetime) -> dict[str, Any]:
+def edit(code: str, proof: Proof, draft: Draft, now: datetime) -> dict[str, Any]:
+    """A new version of the words, kept beside the ones people have already signed."""
     draft = clean_draft(draft)
     _check_links(draft)
     petition = _owned(code, proof)
     with record_lock(petition["$id"]):
         petition = _owned(code, proof)
-        check_resubmit(petition)
-        changes = {**draft_fields(draft), **_location(draft), **review_fields(now),
-                   "resubmissions": (petition.get("resubmissions") or 0) + 1, "purgeAt": None}
+        check_editable(petition)
+        changes = {**edit_fields(draft, petition, now), **_location(draft)}
         updated = update_petition(petition["$id"], changes)
-        record_history(updated, PetitionAction.RESUBMITTED, CREATOR, petition["status"])
+        petition_versions.record_version(petition["$id"], changes, version_of(updated), now)
+        record_history(updated, edit_action(petition), CREATOR, petition["status"])
     return updated
 
 
@@ -200,11 +207,12 @@ def finish_fields(status: PetitionStatus, now: datetime) -> dict[str, Any]:
 
 
 def withdraw(code: str, proof: Proof, now: datetime) -> dict[str, Any]:
+    """The creator closes their own petition. It stays public and closed, with its signatures: people signed it."""
     petition = _owned(code, proof)
     with record_lock(petition["$id"]):
         petition = _owned(code, proof)
         check_withdraw(petition)
-        updated = update_petition(petition["$id"], finish_fields(PetitionStatus.WITHDRAWN, now))
+        updated = update_petition(petition["$id"], finish_fields(PetitionStatus.CLOSED, now))
         record_history(updated, PetitionAction.WITHDRAWN, CREATOR, petition["status"])
     return updated
 
@@ -224,47 +232,6 @@ def mine(proof: Proof) -> list[dict[str, Any]]:
     return every_record(PETITIONS_COLLECTION, [Query.equal("creatorKey", phone_key(proof.number)), Query.order_desc("createdAt")])
 
 
-def review_queue() -> list[dict[str, Any]]:
-    return every_record(PETITIONS_COLLECTION, [Query.equal("status", PetitionStatus.IN_REVIEW.value), Query.order_asc("reviewDeadline")])
-
-
-def threshold_of(petition: dict[str, Any]) -> int:
-    """Fixed on the petition when it opens."""
-    settings = get_settings()
-    return threshold_for(Scope(petition["scope"]), settings.petition_threshold_area, settings.petition_threshold_metro)
-
-
-def _open_duplicate(typed: str | None, petition: dict[str, Any]) -> str:
-    try:
-        other = find(typed or "")
-    except PetitionNotFound:
-        raise InvalidPetition("No petition has that number.") from None
-    if other["status"] != PetitionStatus.OPEN or other["$id"] == petition["$id"]:
-        raise InvalidPetition("A petition can only be refused as a duplicate of another petition that is open.")
-    return other["code"]
-
-
-def _decision(petition: dict[str, Any], publish: bool, reason: str, note: str | None, duplicate_of: str | None,
-              now: datetime) -> tuple[dict[str, Any], PetitionAction]:
-    if publish:
-        return publish_fields(petition, PublishedBy.MCE, now, threshold_of(petition)), PetitionAction.PUBLISHED
-    duplicate = _open_duplicate(duplicate_of, petition) if reason == "duplicate" else None
-    changes = {**refusal_fields(reason, note, duplicate), "purgeAt": (now + RETENTION).isoformat()}
-    return changes, PetitionAction.REFUSED
-
-
-def decide(principal: Principal, code: str, publish: bool, reason: str | None, note: str | None,
-           duplicate_of: str | None, now: datetime) -> dict[str, Any]:
-    petition = find(code)
-    with record_lock(petition["$id"]):
-        petition = find(code)
-        check_review(petition, now)
-        changes, action = _decision(petition, publish, reason or "", note, duplicate_of, now)
-        updated = update_petition(petition["$id"], changes)
-        record_history(updated, action, mce_actor(principal), petition["status"], changes.get("refusalReason"), changes.get("refusalNote"))
-    return updated
-
-
 def purge_creator_numbers(now: datetime) -> int:
     """The keyed hash stays, so creators can still find their petition by confirming their number again."""
     rows = every_record(PETITIONS_COLLECTION, [Query.is_not_null("purgeAt"), Query.less_than_equal("purgeAt", now.isoformat()),
@@ -277,8 +244,8 @@ def purge_creator_numbers(now: datetime) -> int:
     return len(rows)
 
 
-# A petition titled "[TEST] …" is a fixture: filed, moderated and signed for real, and never listed or counted in
-# public. Its title shows on a card, but its signatures, the MCE's decision on it and its place in every count don't.
+# A petition titled "[TEST] …" is a fixture: filed and signed for real, and never listed or counted in public. Its
+# title shows on a card, but its signatures and its place in every count don't.
 NOT_TEST = Query.not_starts_with("title", TEST_PREFIX)
 
 
@@ -302,13 +269,14 @@ def awaiting_response() -> list[dict[str, Any]]:
                                                Query.order_asc("responseDue")])
 
 
-# The four groups a published petition can be in, and the statuses each one gathers. The route names them in its
-# URL; the counts below use the same map, so a tab can never say a number the list underneath won't show.
+# The four groups a published petition can be listed in, and the statuses each one gathers. The route names them in
+# its URL; the counts below use the same map, so a tab can never say a number the list underneath won't show. A
+# removed petition is in none of them: its number still opens its tombstone, but nothing lists it.
 PUBLIC_GROUPS: dict[str, list[PetitionStatus]] = {
     "open": [PetitionStatus.OPEN],
     "awaiting": [PetitionStatus.AWAITING_RESPONSE],
     "responded": [PetitionStatus.RESPONDED],
-    "closed": [PetitionStatus.CLOSED, PetitionStatus.WITHDRAWN],
+    "closed": [PetitionStatus.CLOSED],
 }
 
 
@@ -318,21 +286,3 @@ def public_counts() -> dict[str, int]:
     rows = every_record(PETITIONS_COLLECTION, [Query.is_not_null("publishedAt"), NOT_TEST, Query.select(["status"])])
     standing = Counter(str(row.get("status")) for row in rows)
     return {group: sum(standing[status.value] for status in statuses) for group, statuses in PUBLIC_GROUPS.items()}
-
-
-def _count(queries: list[str]) -> int:
-    _, total = list_petitions([*queries, NOT_TEST, Query.limit(1)])
-    return total
-
-
-def moderation_counts() -> dict[str, Any]:
-    tests = test_petition_ids()
-    refusals = [row for row in every_record(HISTORY_COLLECTION, [Query.equal("action", PetitionAction.REFUSED.value),
-                                                                  Query.select(["reason", "petitionId"])])
-                if row.get("petitionId") not in tests]
-    return {
-        "awaiting": _count([Query.equal("status", PetitionStatus.IN_REVIEW.value)]),
-        "published_by_mce": _count([Query.equal("publishedBy", PublishedBy.MCE.value)]),
-        "published_automatically": _count([Query.equal("publishedBy", PublishedBy.AUTOMATIC.value)]),
-        "refusals": Counter(row.get("reason") for row in refusals if row.get("reason")),
-    }

@@ -1,5 +1,7 @@
-"""Petitions P1: the rules, confirming a phone, the checks on a draft, the MCE's decision and the clock, and what the public sees."""
+"""Petitions in Stage A: the rules, confirming a phone, the checks on a draft, publishing without anyone's leave,
+a contributor's removal and the tombstone it leaves, reading a report, and what the public sees."""
 
+from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -7,6 +9,7 @@ import fakeredis
 import pytest
 from fastapi.testclient import TestClient
 
+from app.dependencies import current_principal
 from app.main import app
 from app.routes import petition_presenters as present
 from app.services import (
@@ -14,39 +17,46 @@ from app.services import (
     channel_sessions,
     petition_clock,
     petition_ledger,
+    petition_removals,
+    petition_reports,
     petition_rules,
     petition_screen,
+    petition_signatures,
+    petition_versions,
     petitions,
     phone_proof,
+    rate_limit,
     redis_store,
     ussd,
     whatsapp_conversation,
     whatsapp_reply,
 )
 from app.services.auth import Principal, Role
+from app.services.petition_grounds import Dismissal, Ground, in_plain_words
+from app.services.petition_reports import ReportState
 from app.services.petition_rules import (
     Draft,
     InvalidPetition,
+    NotAllowed,
     PetitionAction,
     PetitionStatus,
-    PublishedBy,
     Scope,
     WrongState,
-    check_resubmit,
-    check_review,
+    check_editable,
+    check_withdraw,
     clean_draft,
     clean_name,
     creator_actions,
     normalise_code,
     publish_fields,
-    refusal_fields,
 )
 from app.services.phone_proof import Channel, Claim, ProofError
 from app.services.whatsapp_conversation import Inbound
 
 NOW = datetime(2026, 9, 15, 9, 0, tzinfo=UTC)
-PHONE = "+233241234567"
+PHONE, CONTRIBUTOR_PHONE = "+233241234567", "+233207654321"
 MCE = Principal("u-m", "The MCE", "m@x.org", Role.MCE)
+KOFI = Principal("u-c", "Kofi Asante", "k@x.org", Role.CONTRIBUTOR)
 DRAFT = Draft("Desilt the Odaw drain before the rains", "The drain at Kaneshie floods every June and the market has to close.",
               "drainage", Scope.AREA, "kaneshie", None, ())
 
@@ -62,11 +72,16 @@ def server(monkeypatch: pytest.MonkeyPatch) -> fakeredis.FakeRedis:
 def _petition(**changes: Any) -> dict[str, Any]:
     base = {"$id": "p1", "code": "482913", "title": DRAFT.title, "body": DRAFT.body, "topic": "drainage",
             "recipients": ["dept-works"], "scope": "area", "wardLocation": "kaneshie", "subMetro": "okaikoi-south",
-            "status": "in_review", "submittedAt": NOW.isoformat(), "reviewDeadline": (NOW + timedelta(hours=72)).isoformat(),
-            "resubmissions": 0, "signatureCount": 0, "creatorKey": phone_proof.phone_key(PHONE), "creatorPhone": PHONE,
-            "creatorName": None, "issueId": None, "documentIds": []}
+            "status": "open", "submittedAt": NOW.isoformat(), "publishedAt": NOW.isoformat(),
+            "closesAt": (NOW + timedelta(days=90)).isoformat(), "threshold": 150, "signatureCount": 0,
+            "version": 1, "versionedAt": NOW.isoformat(), "removalCount": 0,
+            "creatorKey": phone_proof.phone_key(PHONE), "creatorPhone": PHONE, "creatorName": None,
+            "issueId": None, "documentIds": [], "imageIds": []}
     return {**base, **changes}
 
+
+def proof_of(number: str) -> phone_proof.Proof:
+    return phone_proof.Proof(number, Channel.WHATSAPP, NOW + timedelta(hours=1))
 
 
 def test_a_petition_is_about_something_the_assembly_handles_and_never_personal_safety() -> None:
@@ -80,7 +95,8 @@ def test_a_petition_is_about_something_the_assembly_handles_and_never_personal_s
 def test_a_draft_is_tidied_and_checked() -> None:
     tidy = clean_draft(Draft("  Desilt   the Odaw drain before the rains ", DRAFT.body, "drainage", Scope.METRO, "kaneshie", " ", ("d1", "d1")))
     assert (tidy.title, tidy.ward, tidy.issue, tidy.documents) == ("Desilt the Odaw drain before the rains", None, None, ("d1",))
-    for bad in ({"title": "Fix it"}, {"body": "Too short."}, {"ward": None}, {"ward": "nowhere"}, {"documents": ("a", "b", "c", "d")}):
+    for bad in ({"title": "Fix it"}, {"body": "Too short."}, {"ward": None}, {"ward": "nowhere"},
+                {"documents": ("a", "b", "c", "d")}, {"images": ("a", "b", "c", "d")}):
         with pytest.raises(InvalidPetition):
             clean_draft(Draft(**{**DRAFT.__dict__, **bad}))
 
@@ -92,32 +108,23 @@ def test_a_name_is_shown_only_when_chosen() -> None:
         clean_name(True, " ")
 
 
-def test_the_mce_decides_within_72_hours_and_then_it_publishes_itself() -> None:
-    check_review(_petition(), NOW + timedelta(hours=71))
-    with pytest.raises(WrongState, match="publishes automatically"):
-        check_review(_petition(), NOW + timedelta(hours=72))
-    with pytest.raises(WrongState):
-        check_review(_petition(status="open"), NOW)
-    opened = publish_fields(_petition(), PublishedBy.AUTOMATIC, NOW, 150)
-    assert opened["publishedBy"] == "automatic" and opened["threshold"] == 150
+def test_publishing_fixes_the_ninety_days_and_the_threshold_of_the_moment() -> None:
+    opened = publish_fields(NOW, 150)
+    assert opened["status"] == "open" and opened["threshold"] == 150 and opened["version"] == 1
     assert opened["closesAt"] == (NOW + timedelta(days=90)).isoformat()
+    assert opened["publishedAt"] == NOW.isoformat() and opened["removalCount"] == 0
 
 
-def test_a_refusal_must_give_a_fixed_reason_and_a_duplicate_names_the_petition() -> None:
-    assert refusal_fields("not_assembly", "  ", None)["refusalNote"] is None
-    for reason, duplicate in (("i_dont_like_it", None), ("duplicate", None)):
-        with pytest.raises(InvalidPetition):
-            refusal_fields(reason, None, duplicate)
-    assert refusal_fields("duplicate", None, "111111")["duplicateOf"] == "111111"
-
-
-def test_a_refused_petition_can_go_back_twice_and_the_creator_can_always_withdraw() -> None:
-    check_resubmit(_petition(status="refused", resubmissions=1))
-    with pytest.raises(WrongState):
-        check_resubmit(_petition(status="refused", resubmissions=2))
-    assert creator_actions(_petition(status="refused")) == ["withdraw", "resubmit"]
-    assert creator_actions(_petition(status="open", creatorName="Ama")) == ["withdraw", "make_anonymous"]
+def test_what_a_creator_can_do_depends_only_on_where_their_petition_stands() -> None:
+    assert creator_actions(_petition()) == ["edit", "withdraw"]
+    assert creator_actions(_petition(status="removed")) == ["edit"]
+    assert creator_actions(_petition(status="awaiting_response", creatorName="Ama")) == ["edit", "make_anonymous"]
     assert creator_actions(_petition(status="closed")) == []
+    for status in ("responded", "closed"):
+        with pytest.raises(WrongState, match="can't be edited"):
+            check_editable(_petition(status=status))
+    with pytest.raises(WrongState, match="gone to the MCE"):
+        check_withdraw(_petition(status="awaiting_response"))
 
 
 def test_a_petition_number_is_six_digits_however_it_is_typed() -> None:
@@ -126,12 +133,11 @@ def test_a_petition_number_is_six_digits_however_it_is_typed() -> None:
     assert normalise_code(petition_rules.new_code()) is not None
 
 
-
 def test_a_whatsapp_code_confirms_the_number_once_and_redis_never_holds_it(server: fakeredis.FakeRedis) -> None:
     challenge = phone_proof.new_challenge()
     assert phone_proof.state(challenge.secret).state == "waiting"
     assert phone_proof.claim(f"Nokware code {challenge.code}", PHONE, Channel.WHATSAPP, NOW) == Claim.PROVEN
-    assert phone_proof.claim(challenge.code, "+233207654321", Channel.WHATSAPP, NOW) == Claim.UNKNOWN  # used
+    assert phone_proof.claim(challenge.code, CONTRIBUTOR_PHONE, Channel.WHATSAPP, NOW) == Claim.UNKNOWN  # used
     held = phone_proof.state(challenge.secret)
     proof = phone_proof.open_proof(held.proof, NOW)
     assert (held.state, proof.number, proof.channel, proof.hint) == ("proven", PHONE, Channel.WHATSAPP, "+233…67")
@@ -188,7 +194,6 @@ def test_whatsapp_and_ussd_hand_a_code_to_the_page(server: fakeredis.FakeRedis, 
     assert reply == ussd.Reply(ussd.CODE_REPLIES[Claim.PROVEN], False) and phone_proof.state(second.secret).state == "proven"
 
 
-
 def test_danger_to_a_person_and_personal_data_stop_a_petition(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(petition_screen, "private_person", lambda text: None)
     assert petition_screen.screen("Stop the landlord who beats his wife", DRAFT.body).stop == petition_screen.SAFETY_STOP
@@ -205,68 +210,292 @@ def test_a_private_person_only_warns_and_a_missing_model_lets_it_through(monkeyp
     assert petition_screen.screen(DRAFT.title, DRAFT.body) == petition_screen.Screening(None, None)
 
 
+@dataclass
+class Fake:
+    """One petition and everything written about it, in dicts: the trail, its versions, removals and reports."""
+
+    petition: dict[str, Any] = field(default_factory=_petition)
+    trail: list[tuple[Any, ...]] = field(default_factory=list)
+    versions: list[dict[str, Any]] = field(default_factory=list)
+    removals: list[dict[str, Any]] = field(default_factory=list)
+    reports: list[dict[str, Any]] = field(default_factory=list)
+    signers: set[str] = field(default_factory=set)
+
+
+class _Written:
+    """What an Appwrite write returns, as much of it as as_record() reads."""
+
+    def __init__(self, row: dict[str, Any]) -> None:
+        self.data, self.id, self.createdat, self.updatedat = row, row["$id"], row.get("createdAt", ""), ""
+
+
+class _FakeDatabases:
+    def __init__(self, rows: dict[str, list[dict[str, Any]]]) -> None:
+        self.rows = rows
+
+    def create_document(self, _database: str, collection: str, _id: str, data: dict[str, Any]) -> _Written:
+        kept = self.rows.setdefault(collection, [])
+        row = {**data, "$id": f"{collection}-{len(kept) + 1}"}
+        kept.append(row)
+        return _Written(row)
+
+    def update_document(self, _database: str, collection: str, row_id: str, changes: dict[str, Any]) -> _Written:
+        row = next(r for r in self.rows[collection] if r["$id"] == row_id)
+        row.update(changes)
+        return _Written(row)
+
 
 @pytest.fixture
-def stored(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
-    state: dict[str, Any] = {"petition": _petition(), "trail": []}
-    monkeypatch.setattr(petitions, "find", lambda code: dict(state["petition"]))
-    monkeypatch.setattr(petitions, "update_petition", lambda pid, changes: state.update(petition={**state["petition"], **changes}) or dict(state["petition"]))
+def stored(monkeypatch: pytest.MonkeyPatch, server: fakeredis.FakeRedis) -> Fake:
+    state = Fake()
+    rows = {petition_removals.REMOVALS_COLLECTION: state.removals, petition_reports.REPORTS_COLLECTION: state.reports}
+    database = _FakeDatabases(rows)
+
+    def find(code: str) -> dict[str, Any]:
+        if code != state.petition["code"]:
+            raise petitions.PetitionNotFound(code)
+        return dict(state.petition)
+
+    def create(fields: dict[str, Any]) -> dict[str, Any]:
+        state.petition = {**fields, "$id": "p1", "code": "482913"}
+        return dict(state.petition)
+
+    monkeypatch.setattr(petitions, "find", find)
+    monkeypatch.setattr(petitions, "_create", create)
+    monkeypatch.setattr(petitions, "update_petition",
+                        lambda pid, changes: state.__setattr__("petition", {**state.petition, **changes}) or dict(state.petition))
     monkeypatch.setattr(petitions, "record_history", lambda p, action, actor, from_status, reason=None, note=None:
-                        state["trail"].append((action, actor.role, from_status, reason, note)))
+                        state.trail.append((action, actor.role, from_status, reason, note)))
+    monkeypatch.setattr(petitions, "list_petitions", lambda queries: ([dict(state.petition)], 1))
+    monkeypatch.setattr(petitions, "test_petition_ids", set)
+    monkeypatch.setattr(petition_versions, "record_version",
+                        lambda pid, fields, number, at: state.versions.append({**fields, "petitionId": pid, "version": number,
+                                                                              "at": at.isoformat()}))
+    monkeypatch.setattr(petition_versions, "versions_of", lambda pid: list(state.versions))
+    monkeypatch.setattr(petition_signatures, "has_signed", lambda pid, number: number in state.signers)
+    monkeypatch.setattr(petition_signatures, "on_earlier_versions",
+                        lambda petition: sum(1 for _ in state.signers) if (petition.get("version") or 1) > 1 else 0)
+    monkeypatch.setattr(petition_removals, "get_databases", lambda: database)
+    monkeypatch.setattr(petition_removals, "latest_removal", lambda pid: dict(state.removals[-1]) if state.removals else None)
+    monkeypatch.setattr(petition_removals, "every_record", lambda collection, queries: list(state.removals))
+    monkeypatch.setattr(petition_reports, "get_databases", lambda: database)
+    monkeypatch.setattr(petition_reports, "every_record", _reports_matching(state))
     return state
 
 
-def test_the_mce_publishes_or_refuses_and_the_trail_says_who(stored: dict[str, Any]) -> None:
-    petitions.decide(MCE, "482913", False, "not_assembly", "This is the Ghana Highway Authority's road.", None, NOW)
-    assert stored["petition"]["status"] == "refused" and stored["petition"]["purgeAt"] == (NOW + timedelta(days=30)).isoformat()
-    assert stored["trail"] == [(PetitionAction.REFUSED, "mce", "in_review", "not_assembly", "This is the Ghana Highway Authority's road.")]
-    stored["petition"] = _petition()
-    petitions.decide(MCE, "482913", True, None, None, None, NOW)
-    assert stored["petition"]["status"] == "open" and stored["petition"]["publishedBy"] == "mce"
-    assert stored["petition"]["threshold"] == 150  # an electoral area
+def _reports_matching(state: Fake) -> Any:
+    """The fake index over the reports: a query naming a row finds that row, one asking for open reports finds
+    those, and orderDesc turns them newest first, as Appwrite would."""
+
+    def matching(_collection: str, queries: list[str]) -> list[dict[str, Any]]:
+        asked = " ".join(queries)
+        found = [dict(report) for report in state.reports
+                 if report["$id"] in asked or (ReportState.OPEN.value in asked and report["state"] == ReportState.OPEN)]
+        return list(reversed(found)) if "orderDesc" in asked else found
+
+    return matching
 
 
-def test_undecided_after_72_hours_it_publishes_automatically(stored: dict[str, Any], monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(petition_clock, "_due", lambda queries: [stored["petition"]] if stored["petition"]["status"] == "in_review" and "in_review" in str(queries) else [])
+def _publish(state: Fake) -> dict[str, Any]:
+    return petitions.submit(proof_of(PHONE), DRAFT, False, None, NOW)
+
+
+def test_a_petition_is_public_the_moment_its_words_pass_the_screen(stored: Fake) -> None:
+    """Nobody publishes it but the person who wrote it: there is no queue, no reviewer and no waiting."""
+    published = _publish(stored)
+    assert published["status"] == PetitionStatus.OPEN and published["publishedAt"] == NOW.isoformat()
+    assert published["threshold"] == 150 and published["version"] == 1  # an electoral area
+    assert petitions.public("482913")["code"] == "482913"
+    assert stored.trail == [(PetitionAction.PUBLISHED, "creator", None, None, None)]
+    assert [(v["version"], v["title"]) for v in stored.versions] == [(1, DRAFT.title)]
+
+
+def test_words_the_screen_stops_never_become_a_petition(monkeypatch: pytest.MonkeyPatch) -> None:
+    created: list[dict[str, Any]] = []
+    monkeypatch.setattr(petitions, "_create", lambda fields: created.append(fields) or fields)
+    client = TestClient(app)
+    form = {"title": DRAFT.title, "body": f"{DRAFT.body} Call 0241234567.", "topic": "drainage", "scope": "metro"}
+    assert client.post("/api/petitions", data=form).status_code == 401
+    proof = phone_proof.issue_proof(PHONE, Channel.USSD, datetime.now(UTC))
+    response = client.post("/api/petitions", data=form, headers={"X-Phone-Proof": proof})
+    assert response.status_code == 422 and "phone number" in response.json()["detail"]
+    assert created == []
+
+
+def _remove(stored: Fake, ground: Ground = Ground.PRIVATE_INDIVIDUAL, duplicate: str | None = None,
+            note: str | None = None) -> petition_removals.Removed:
+    return petition_removals.remove(KOFI, proof_of(CONTRIBUTOR_PHONE), "482913", ground, duplicate, note, NOW)
+
+
+def test_a_contributor_removes_a_petition_on_a_ground_but_never_their_own_nor_one_they_signed(stored: Fake) -> None:
+    _publish(stored)
+    with pytest.raises(NotAllowed, match="You started this petition"):
+        petition_removals.remove(KOFI, proof_of(PHONE), "482913", Ground.PERSONAL_DATA, None, None, NOW)
+    stored.signers.add(CONTRIBUTOR_PHONE)
+    with pytest.raises(NotAllowed, match="You signed this petition"):
+        _remove(stored)
+    stored.signers.clear()
+    removed = _remove(stored, Ground.INCITES_VIOLENCE, note="Third paragraph names a neighbour.")
+    assert stored.petition["status"] == PetitionStatus.REMOVED and stored.petition["removalCount"] == 1
+    assert stored.petition["removedFromStatus"] == "open"  # where a republication puts it back
+    assert removed.record["ground"] == "incites_violence" and removed.record["removedByName"] == "Kofi Asante"
+    assert stored.trail[-1] == (PetitionAction.REMOVED, "contributor", "open", "incites_violence",
+                                "Third paragraph names a neighbour.")
+    with pytest.raises(WrongState, match="already been removed"):
+        _remove(stored)
+
+
+def test_the_mce_cannot_remove_a_petition_and_nor_can_a_stranger(stored: Fake, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The MCE is usually what a petition is about, so it never holds the button that takes one down."""
+    client, body = TestClient(app), {"ground": "personal_data"}
+    assert client.post("/api/petitions/482913/removal", json=body).status_code == 401
+    for principal, expected in ((MCE, 403), (KOFI, 401)):  # a contributor still has to confirm their own number
+        app.dependency_overrides[current_principal] = lambda principal=principal: principal
+        assert client.post("/api/petitions/482913/removal", json=body).status_code == expected
+        app.dependency_overrides.clear()
+
+
+def test_only_the_four_grounds_remove_a_petition_and_a_duplicate_must_name_a_public_one(stored: Fake) -> None:
+    _publish(stored)
+    assert [g.value for g in Ground] == ["private_individual", "incites_violence", "personal_data", "duplicate"]
+    with pytest.raises(ValueError, match="not a valid Ground"):
+        Ground("i_dont_like_it")
+    with pytest.raises(InvalidPetition, match="number of the open petition"):
+        _remove(stored, Ground.DUPLICATE)
+    with pytest.raises(InvalidPetition, match="No public petition"):
+        _remove(stored, Ground.DUPLICATE, "111111")
+    with pytest.raises(InvalidPetition, match="No public petition"):
+        _remove(stored, Ground.DUPLICATE, "482913")  # itself
+
+
+def test_a_note_on_a_removal_is_kept_for_the_record_and_refused_if_it_holds_personal_data(stored: Fake) -> None:
+    _publish(stored)
+    with pytest.raises(InvalidPetition, match="personal data"):
+        _remove(stored, note="Reported by Ama on 024 123 4567.")
+    assert stored.petition["status"] == PetitionStatus.OPEN  # nothing happened
+    assert petition_removals.clean_note("  ") is None
+
+
+def test_the_tombstone_carries_the_ground_the_date_and_nothing_of_the_petition(stored: Fake) -> None:
+    _publish(stored)
+    petitions.update_petition("p1", {"signatureCount": 412, "creatorName": "Ama Mensah"})
+    removed = _remove(stored, Ground.PRIVATE_INDIVIDUAL, note="Names the landlord at number 12.")
+    stone = present.tombstone(petition_removals.tombstone(removed.record)).model_dump()
+    assert stone == {"state": "removed", "code": "482913", "ground": "private_individual",
+                     "ground_words": in_plain_words(Ground.PRIVATE_INDIVIDUAL), "removed_at": NOW.isoformat(),
+                     "duplicate_of": None, "previous_removals": 0}
+    written = str(stone)
+    assert all(word not in written for word in (DRAFT.title, DRAFT.body, "Ama Mensah", "412", "landlord"))
+    with pytest.raises(petitions.PetitionNotFound):
+        petitions.public("482913")  # every public read goes through this, so nothing else can reach a reader
+
+
+def test_a_removed_petitions_page_is_the_tombstone_and_an_unknown_number_is_still_not_found(stored: Fake) -> None:
+    _publish(stored)
+    _remove(stored, Ground.PERSONAL_DATA)
+    client = TestClient(app)
+    page = client.get("/api/petitions/482913")
+    assert page.status_code == 200 and page.json()["state"] == "removed"
+    assert set(page.json()) == {"state", "code", "ground", "ground_words", "removed_at", "duplicate_of", "previous_removals"}
+    assert client.get("/api/petitions/111111").status_code == 404
+
+
+def test_a_report_hides_nothing_and_its_note_is_screened(stored: Fake) -> None:
+    _publish(stored)
+    filed = petition_reports.file_report("482913", Ground.PERSONAL_DATA, None, "  There is a home address in it.  ", NOW)
+    assert filed["state"] == ReportState.OPEN and filed["note"] == "There is a home address in it."
+    assert stored.petition["status"] == PetitionStatus.OPEN and petitions.public("482913")["title"] == DRAFT.title
+    assert present.card(petitions.public("482913")).signatures == 0  # still countable, still signable
+    with pytest.raises(InvalidPetition, match="personal data"):
+        petition_reports.file_report("482913", Ground.PERSONAL_DATA, None, "Ring the writer on 024 123 4567.", NOW)
+    with pytest.raises(InvalidPetition, match="number of the open petition"):
+        petition_reports.file_report("482913", Ground.DUPLICATE, None, None, NOW)
+
+
+def test_the_queue_gathers_what_was_reported_and_a_removal_settles_all_of_it(stored: Fake) -> None:
+    _publish(stored)
+    for ground in (Ground.PERSONAL_DATA, Ground.INCITES_VIOLENCE):
+        petition_reports.file_report("482913", ground, None, f"About {ground.value}.", NOW)
+    queue = petition_reports.queue()
+    assert [item.report["ground"] for item in queue] == ["incites_violence", "personal_data"]  # newest first
+    assert queue[0].reports_on_this_petition == 2 and queue[0].petition["code"] == "482913"
+    shown = present.reported(queue[0])
+    assert shown.ground_words == in_plain_words(Ground.INCITES_VIOLENCE) and shown.petition.title == DRAFT.title
+    petition_reports.dismiss(KOFI, queue[0].report["$id"], Dismissal.NOT_THE_GROUND, NOW)
+    assert stored.reports[1]["state"] == ReportState.DISMISSED and stored.reports[1]["dismissedReason"] == "not_the_ground"
+    with pytest.raises(petition_reports.ReportNotFound):  # settled once; a second contributor is told, not obeyed
+        petition_reports.dismiss(KOFI, queue[0].report["$id"], Dismissal.ALREADY_HANDLED, NOW)
+    _remove(stored, Ground.INCITES_VIOLENCE)
+    assert stored.reports[0]["state"] == ReportState.ACTED_ON  # the one still open was answered by the removal
+
+
+def test_a_republished_petition_is_a_new_version_that_keeps_its_signatures(stored: Fake) -> None:
+    """The signatures stand: they were given to the petition, and the page says how many were given to older words."""
+    _publish(stored)
+    petitions.update_petition("p1", {"signatureCount": 412})
+    stored.signers.update({f"+23324123456{n}" for n in range(7)})
+    _remove(stored, Ground.PERSONAL_DATA)
+    mended = Draft(**{**DRAFT.__dict__, "body": f"{DRAFT.body} The market association has written twice."})
+    republished = petitions.edit("482913", proof_of(PHONE), mended, NOW + timedelta(days=1))
+    assert republished["status"] == PetitionStatus.OPEN and republished["version"] == 2
+    assert republished["signatureCount"] == 412 and republished["removalCount"] == 1
+    assert republished["removedAt"] is None and republished["removalGround"] is None
+    assert republished["closesAt"] == _petition()["closesAt"]  # time spent down is not time won
+    assert stored.trail[-1][:3] == (PetitionAction.REPUBLISHED, "creator", "removed")
+    assert [v["version"] for v in stored.versions] == [1, 2]
+    assert present.card(republished).removals == 1
+    assert present.versions("p1")[1].changed == ["body"]
+
+
+def test_a_signature_records_the_version_it_was_given_to(stored: Fake, monkeypatch: pytest.MonkeyPatch) -> None:
+    written: list[dict[str, Any]] = []
+    monkeypatch.setattr(petitions, "public", lambda code: dict(stored.petition))
+    monkeypatch.setattr(petition_signatures, "_store",
+                        lambda pid, key, name, channel, version, now: bool(written.append({"version": version})) or True)
+    monkeypatch.setattr(petition_signatures, "total", lambda pid: 1)
+    _publish(stored)
+    petitions.update_petition("p1", {"version": 3})
+    petition_signatures.sign("482913", PHONE, Channel.USSD, False, None, NOW)
+    assert written == [{"version": 3}]
+
+
+def test_the_public_timeline_says_what_happened_never_who_did_it() -> None:
+    trail = [{"action": "published", "at": "t1"},
+             {"action": "removed", "at": "t2", "reason": "private_individual", "note": "Names Kofi at number 12"},
+             {"action": "republished", "at": "t3"}, {"action": "made_anonymous", "at": "t4"},
+             {"action": "closed", "at": "t5", "reason": "refused"}]
+    shown = present.timeline(trail)
+    assert [e.action for e in shown] == ["published", "removed", "republished", "closed"]
+    assert shown[1].reason == in_plain_words(Ground.PRIVATE_INDIVIDUAL) and "Kofi" not in str(shown)
+    assert shown[3].reason == "Refused under the earlier review process"  # a petition the old process ended
+
+
+def test_a_petition_page_is_refused_after_too_many_reports_about_it(stored: Fake) -> None:
+    """One petition can't be buried under reports, and no report ever hides it: the limit only keeps the queue readable."""
+    _publish(stored)
+    client, body = TestClient(app), {"ground": "personal_data"}
+    codes = {client.post("/api/petitions/482913/report", json=body).status_code
+             for _ in range(rate_limit.PETITION_REPORTS.limit + 1)}
+    assert codes == {201, 429}
+    assert petitions.public("482913")["status"] == PetitionStatus.OPEN
+
+
+def test_the_clock_closes_a_petition_at_ninety_days_and_publishes_nothing(stored: Fake, monkeypatch: pytest.MonkeyPatch) -> None:
+    _publish(stored)
+    monkeypatch.setattr(petition_clock, "_due", lambda queries: [dict(stored.petition)] if "open" in str(queries) else [])
     told: list[str] = []
     monkeypatch.setattr(petition_clock.petition_updates, "notify_quietly", lambda petition, update: told.append(update.value))
-    assert petition_clock.run_clock(NOW + timedelta(hours=71)) == {"published": [], "closed": [], "unanswered": []}
-    assert petition_clock.run_clock(NOW + timedelta(hours=72))["published"] == ["482913"]
-    assert stored["petition"]["publishedBy"] == "automatic" and stored["trail"][-1][:2] == (PetitionAction.AUTO_PUBLISHED, "system")
-    assert told == ["auto_published"]
-    with pytest.raises(WrongState):
-        petitions.decide(MCE, "482913", False, "not_assembly", None, None, NOW + timedelta(hours=73))
+    assert petition_clock.run_clock(NOW + timedelta(days=89)) == {"closed": [], "unanswered": []}
+    assert petition_clock.run_clock(NOW + timedelta(days=90))["closed"] == ["482913"]
+    assert stored.petition["status"] == PetitionStatus.CLOSED and told == ["closed"]
 
 
-def test_only_the_creator_can_change_their_petition(stored: dict[str, Any]) -> None:
-    creator = phone_proof.Proof(PHONE, Channel.WHATSAPP, NOW + timedelta(hours=1))
-    stranger = phone_proof.Proof("+233207654321", Channel.WHATSAPP, NOW + timedelta(hours=1))
+def test_only_the_creator_can_change_their_petition(stored: Fake) -> None:
+    _publish(stored)
     with pytest.raises(petitions.PetitionNotFound):
-        petitions.withdraw("482913", stranger, NOW)
-    assert petitions.withdraw("482913", creator, NOW)["status"] == PetitionStatus.WITHDRAWN
-
-
-
-def test_the_public_timeline_shows_the_mce_decided_never_who_nor_the_note() -> None:
-    trail = [{"action": "submitted", "at": "t1"}, {"action": "refused", "at": "t2", "reason": "private_individual", "note": "Take out Kofi"},
-             {"action": "resubmitted", "at": "t3"}, {"action": "published", "at": "t4", "actorName": "The MCE"},
-             {"action": "made_anonymous", "at": "t5"}]
-    shown = present.timeline(trail)
-    assert [e.action for e in shown] == ["submitted", "refused", "resubmitted", "published"]
-    assert shown[1].reason == "Names a private individual" and "Kofi" not in str(shown) and "The MCE" not in str(shown)
-
-
-def test_a_petition_that_was_never_published_is_not_found(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(petitions, "find", lambda code: _petition())
-    assert TestClient(app).get("/api/petitions/482913").status_code == 404
-
-
-def test_sending_a_petition_needs_a_confirmed_phone_and_is_checked_again(monkeypatch: pytest.MonkeyPatch) -> None:
-    client, body = TestClient(app), {"title": DRAFT.title, "body": DRAFT.body, "topic": "drainage", "scope": "metro"}
-    assert client.post("/api/petitions", json=body).status_code == 401
-    proof = phone_proof.issue_proof(PHONE, Channel.USSD, datetime.now(UTC))
-    response = client.post("/api/petitions", json={**body, "body": f"{DRAFT.body} Call 0241234567."}, headers={"X-Phone-Proof": proof})
-    assert response.status_code == 422 and "phone number" in response.json()["detail"]
+        petitions.withdraw("482913", proof_of(CONTRIBUTOR_PHONE), NOW)
+    closed = petitions.withdraw("482913", proof_of(PHONE), NOW)
+    assert closed["status"] == PetitionStatus.CLOSED and stored.trail[-1][0] == PetitionAction.WITHDRAWN
 
 
 def test_a_ledger_search_the_index_cannot_answer_says_so_plainly(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -286,7 +515,7 @@ def test_a_ledger_search_the_index_cannot_answer_says_so_plainly(monkeypatch: py
 def test_a_passage_from_the_ledger_reads_as_words_and_the_same_text_shows_once(monkeypatch: pytest.MonkeyPatch) -> None:
     from app.services.retrieval import Chunk
 
-    assert petition_ledger.passage("preventing \uf002ooding, signi\uf001cant, \ufb01re \uf0b7 one \ufffd") == \
+    assert petition_ledger.passage("preventing ooding, signicant, ﬁre  one �") == \
         "preventing flooding, significant, fire • one"
     plan = "FLOOD MITIGATION AND PREPAREDNESS MEASURES Identification of flood hotspots in the Accra Metropolis " * 3
     chunks = [Chunk(1, "plan", 0, plan), Chunk(2, "copy", 0, plan), Chunk(3, "budget", 4, "Desilting of drains, 2024 budget line.")]
@@ -299,6 +528,6 @@ def test_a_passage_from_the_ledger_reads_as_words_and_the_same_text_shows_once(m
 def test_the_tabs_are_told_how_many_petitions_stand_in_each_group(monkeypatch: pytest.MonkeyPatch) -> None:
     """A tab that only says "Open" leaves the reader counting cards to learn whether anything is happening."""
     stored = [{"status": "open"}, {"status": "open"}, {"status": "awaiting_response"}, {"status": "responded"},
-              {"status": "closed"}, {"status": "withdrawn"}, {"status": "in_review"}]
+              {"status": "closed"}, {"status": "removed"}]
     monkeypatch.setattr(petitions, "every_record", lambda collection, queries: stored)
-    assert petitions.public_counts() == {"open": 2, "awaiting": 1, "responded": 1, "closed": 2}
+    assert petitions.public_counts() == {"open": 2, "awaiting": 1, "responded": 1, "closed": 1}

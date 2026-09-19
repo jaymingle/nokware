@@ -103,16 +103,16 @@ def test_the_public_petition_list_never_shows_a_test_petition(monkeypatch: pytes
     assert PETITION_EXCLUDED in asked[0]
 
 
-def test_the_mce_is_never_credited_with_deciding_a_test_petition(monkeypatch: pytest.MonkeyPatch) -> None:
-    """A history row names only its petition, so a refusal of a fixture is left out by the petition it belongs to."""
-    from app.services import petitions
+def test_taking_down_a_test_petition_is_never_counted_as_a_petition_coming_down(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A removal record names only its petition, so a fixture's removal is left out by the petition it belongs to."""
+    from app.services import petition_removals
 
-    monkeypatch.setattr(petitions, "test_petition_ids", lambda: {"fixture"})
-    monkeypatch.setattr(petitions, "list_petitions", lambda queries: ([], 0))
-    monkeypatch.setattr(petitions, "every_record", lambda collection, queries: [
-        {"reason": "duplicate", "petitionId": "real"}, {"reason": "duplicate", "petitionId": "fixture"},
-        {"reason": "private_individual", "petitionId": "fixture"}])
-    assert dict(petitions.moderation_counts()["refusals"]) == {"duplicate": 1}
+    monkeypatch.setattr(petition_removals.petitions, "test_petition_ids", lambda: {"fixture"})
+    monkeypatch.setattr(petition_removals, "every_record", lambda collection, queries: [
+        {"ground": "duplicate", "petitionId": "real"}, {"ground": "duplicate", "petitionId": "fixture"},
+        {"ground": "private_individual", "petitionId": "fixture"}])
+    assert petition_removals.removals_by_ground() == {"private_individual": 0, "incites_violence": 0,
+                                                     "personal_data": 0, "duplicate": 1}
 
 
 def test_the_responsiveness_page_counts_no_test_petition(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -127,11 +127,11 @@ def test_the_responsiveness_page_counts_no_test_petition(monkeypatch: pytest.Mon
     def every_record(collection: str, queries: list[str]) -> list[dict[str, Any]]:
         asked.append(queries)
         if collection == petition_figures.HISTORY_COLLECTION:
-            return [{"action": "refused", "reason": "duplicate", "at": "2026-09-10T00:00:00+00:00", "petitionId": "fixture"},
+            return [{"action": "removed", "reason": "duplicate", "at": "2026-09-10T00:00:00+00:00", "petitionId": "fixture"},
                     {"action": "published", "reason": None, "at": "2026-09-10T00:00:00+00:00", "petitionId": "real"}]
         return []
 
     monkeypatch.setattr(petition_figures, "every_record", every_record)
     found = petition_figures.figures(datetime(2026, 1, 1, tzinfo=UTC), now)
-    assert found["refused"] == 0 and found["published_by_mce"] == 1
+    assert found["removed"] == 0 and found["published"] == 1
     assert PETITION_EXCLUDED in asked[1]  # and a test petition never counts as reaching its threshold

@@ -2,15 +2,27 @@
 
 from typing import Literal
 
+from fastapi import UploadFile
 from pydantic import BaseModel, Field
 
 from app.schemas.documents import Option
 from app.services.ledger_documents import Provenance
-from app.services.petition_rules import BODY_MAX, DOCUMENTS_MAX, NAME_MAX, NOTE_MAX, RESPONSE_MAX, TITLE_MAX
+from app.services.petition_rules import (
+    BODY_MAX,
+    DOCUMENTS_MAX,
+    IMAGES_MAX,
+    NAME_MAX,
+    REMOVAL_NOTE_MAX,
+    REPORT_NOTE_MAX,
+    RESPONSE_MAX,
+    TITLE_MAX,
+)
 
-Status = Literal["in_review", "refused", "open", "awaiting_response", "responded", "closed", "withdrawn"]
+Status = Literal["open", "awaiting_response", "responded", "removed", "closed"]
 ResponseKind = Literal["will_act", "referred", "cannot_act"]
 Scope = Literal["metro", "area"]
+Ground = Literal["private_individual", "incites_violence", "personal_data", "duplicate"]
+DismissalReason = Literal["not_the_ground", "already_handled"]
 
 
 class AreaOption(BaseModel):
@@ -19,10 +31,17 @@ class AreaOption(BaseModel):
     sub_metro: str  # the sub-metro's name
 
 
-class RefusalReason(BaseModel):
-    id: str
+class GroundOption(BaseModel):
+    """One of the four grounds, in the words every screen shows."""
+
+    id: Ground
     label: str
-    explanation: str
+    needs_petition_number: bool  # a duplicate names the petition it duplicates
+
+
+class DismissalOption(BaseModel):
+    id: DismissalReason
+    label: str
 
 
 class Verification(BaseModel):
@@ -38,10 +57,15 @@ class PetitionOptions(BaseModel):
     areas: list[AreaOption]
     threshold_area: int
     threshold_metro: int
-    review_hours: int
     open_days: int
     response_days: int
-    refusal_reasons: list[RefusalReason]
+    max_images: int
+    max_documents: int
+    report_note_max: int
+    removal_note_max: int
+    grounds: list[GroundOption]
+    dismissal_reasons: list[DismissalOption]
+    status_words: dict[Status, str]  # one wording for a status, wherever it is shown
     verification: Verification
 
 
@@ -74,8 +98,8 @@ class PetitionCard(BaseModel):
     area: str | None  # the electoral area, for an area petition
     sub_metro: str | None
     status: Status
+    status_label: str  # the status in the words every page uses
     published_at: str | None
-    published_by: Literal["mce", "automatic"] | None
     closes_at: str | None
     closed_at: str | None
     threshold: int | None
@@ -86,13 +110,25 @@ class PetitionCard(BaseModel):
     responded_at: str | None
     response_label: str | None  # "The Assembly will act", "Referred to a department", "The Assembly can't act"
     unanswered_at: str | None  # when the 30 days passed with no response, if they did
+    version: int
+    versioned_at: str | None  # when the words last changed
+    removals: int  # how many times this petition has been removed and published again
 
 
 class TimelineEntry(BaseModel):
-    action: Literal["submitted", "resubmitted", "published", "auto_published", "refused", "withdrawn", "closed", "threshold_reached",
+    action: Literal["published", "edited", "republished", "removed", "withdrawn", "closed", "threshold_reached",
                     "responded", "no_response"]
     at: str
-    reason: str | None  # a refusal's reason, as the public list counts it
+    reason: str | None  # a removal's ground, in plain words
+
+
+class VersionEntry(BaseModel):
+    """One version of the words, as an edit history reads it."""
+
+    version: int
+    at: str
+    title: str
+    changed: list[str]  # which of title, body, topic, scope, wardLocation, imageIds changed from the version before
 
 
 class PetitionResponse(BaseModel):
@@ -109,34 +145,49 @@ class PetitionResponse(BaseModel):
 
 
 class PetitionDetail(PetitionCard):
+    state: Literal["published"] = "published"
     body: str
+    images: list[str]  # short-lived links
     timeline: list[TimelineEntry]
+    versions: list[VersionEntry]
+    signatures_on_earlier_versions: int  # of `signatures`, how many were given before the words last changed
     issue: LinkedIssue | None
     documents: list[DocumentRef]  # what the creator cited
     response: PetitionResponse | None
 
 
-class RefusalCount(BaseModel):
-    reason: str
+class Tombstone(BaseModel):
+    """All that is left of a removed petition. Built from the removal record, never from the petition, so there is
+    nothing here to leave out: no title, body, image, signature count, comment or answer exists to be shown."""
+
+    state: Literal["removed"] = "removed"
+    code: str
+    ground: Ground
+    ground_words: str
+    removed_at: str
+    duplicate_of: str | None  # the open petition this one repeated
+    previous_removals: int  # how many times this petition had been removed before
+
+
+
+class RemovalCount(BaseModel):
+    ground: Ground
     label: str
     count: int
 
 
-class Moderation(BaseModel):
-    """How the MCE has handled petitions: shown exactly, since the count is of decisions, not of people."""
+class Removals(BaseModel):
+    """How many petitions have come down, and on what grounds. Shown exactly: they count petitions, not residents."""
 
-    awaiting: int
-    published_by_mce: int
-    published_automatically: int
-    refusals: list[RefusalCount]
-    refusals_total: int
+    total: int
+    grounds: list[RemovalCount]
 
 
 class PetitionPage(BaseModel):
     petitions: list[PetitionCard]
     total: int
     counts: dict[str, int]  # how many stand in each group, so a tab says what it holds
-    moderation: Moderation
+    removals: Removals
     topics: list[Option]
 
 
@@ -151,8 +202,18 @@ class DraftRequest(BaseModel):
 
 
 class SubmitRequest(DraftRequest):
+    """Sent as a form, so the images arrive with the words in one request."""
+
     show_name: bool = False
     name: str | None = Field(None, max_length=NAME_MAX + 20)
+    images: list[UploadFile] = Field(default_factory=list, max_length=IMAGES_MAX)
+
+
+class EditRequest(DraftRequest):
+    """An edit sends the words again, naming the images it keeps and attaching any new ones."""
+
+    keep_images: list[str] = Field(default_factory=list, max_length=IMAGES_MAX)
+    images: list[UploadFile] = Field(default_factory=list, max_length=IMAGES_MAX)
 
 
 class ScreenRequest(BaseModel):
@@ -169,25 +230,27 @@ class LedgerSearchRequest(ScreenRequest):
     topic: str
 
 
-class Refusal(BaseModel):
-    reason: str
+class RemovalNotice(BaseModel):
+    """What the creator is told about their petition coming down. Not the contributor's note, which is internal,
+    and not who removed it: a ground is a ground whoever names it."""
+
+    ground: Ground
     label: str
-    explanation: str
-    note: str | None  # the MCE's note to the creator: never public
+    removed_at: str
     duplicate_of: str | None
 
 
 class OwnPetition(PetitionCard):
     body: str
+    images: list[str]
     topic_id: str
     ward_id: str | None
     issue_id: str | None
     document_ids: list[str]
+    image_ids: list[str]  # so an edit can keep the images it isn't changing
     submitted_at: str | None
-    review_deadline: str | None
-    refusal: Refusal | None
-    resubmissions_left: int
-    actions: list[Literal["withdraw", "resubmit", "make_anonymous"]]
+    removal: RemovalNotice | None
+    actions: list[Literal["edit", "withdraw", "make_anonymous"]]
 
 
 class MyPetitions(BaseModel):
@@ -195,34 +258,42 @@ class MyPetitions(BaseModel):
     petitions: list[OwnPetition]
 
 
-class ReviewItem(BaseModel):
-    code: str
-    title: str
-    body: str
-    topic: str
-    departments: list[str]
-    scope: Scope
-    area: str | None
-    sub_metro: str | None
-    started_by: str | None
-    submitted_at: str
-    review_deadline: str
-    resubmissions: int
-    earlier_refusals: list[Refusal]
-    issue: LinkedIssue | None
-    documents: list[DocumentRef]
-
-
-class ReviewQueue(BaseModel):
-    petitions: list[ReviewItem]
-    refusal_reasons: list[RefusalReason]
-
-
-class DecisionRequest(BaseModel):
-    decision: Literal["publish", "refuse"]
-    reason: str | None = None
-    note: str | None = Field(None, max_length=NOTE_MAX + 100)
+class ReportRequest(BaseModel):
+    ground: Ground
     duplicate_of: str | None = Field(None, max_length=20)
+    note: str | None = Field(None, max_length=REPORT_NOTE_MAX + 100)
+
+
+class ReportFiled(BaseModel):
+    message: str  # says plainly that the petition stays up
+    reported_at: str
+
+
+class ReportedPetition(BaseModel):
+    id: str  # the report, for dismissing it
+    reported_at: str
+    ground: Ground
+    ground_words: str
+    duplicate_of: str | None
+    note: str | None  # what the reader added, as they wrote it
+    reports_on_this_petition: int
+    petition: PetitionCard
+
+
+class ReportQueue(BaseModel):
+    reports: list[ReportedPetition]
+    grounds: list[GroundOption]
+    dismissal_reasons: list[DismissalOption]
+
+
+class RemovalRequest(BaseModel):
+    ground: Ground
+    duplicate_of: str | None = Field(None, max_length=20)
+    note: str | None = Field(None, max_length=REMOVAL_NOTE_MAX + 100)  # internal: the audit trail only
+
+
+class DismissRequest(BaseModel):
+    reason: DismissalReason
 
 
 class ChallengeResult(BaseModel):
@@ -268,6 +339,7 @@ class SignResult(BaseModel):
     signatures: int
     threshold: int | None
     status: Status
+    version: int  # the version of the words this signature stands on
 
 
 class MySignature(BaseModel):
@@ -275,6 +347,7 @@ class MySignature(BaseModel):
     named: bool
     name: str | None
     signed_at: str | None
+    version: int | None  # which version of the words was signed
 
 
 class NamedSignature(BaseModel):

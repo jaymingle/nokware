@@ -144,20 +144,20 @@ class MceFigures(BaseModel):
     reports_reopened: Count
 
 
-class PetitionRefusals(BaseModel):
-    reason: str
-    label: str
+class PetitionRemovals(BaseModel):
+    ground: str
+    label: str  # the ground in the same plain words the tombstone uses
     count: int
 
 
 class PetitionFigures(BaseModel):
-    """The MCE's handling of petitions: exact counts, since they count decisions on public petitions, not residents."""
+    """What happened to petitions: exact counts, since they count public petitions, not residents. Publishing and
+    removing are residents' and contributors' doing; only the answering below is the MCE's."""
 
-    sent: int
-    published_by_mce: int
-    published_automatically: int  # the MCE let the 72 hours pass
-    refused: int
-    refusals: list[PetitionRefusals]
+    published: int
+    republished: int  # taken down, mended and published again by whoever wrote it
+    removed: int
+    removals: list[PetitionRemovals]
     reached_threshold: int  # the four below add up to this
     answered_in_time: int
     answered_late: int

@@ -1,8 +1,8 @@
 """Messages to the person who started a petition, at the moments its outcome changes.
 
-Nothing when they withdraw it: they did that themselves. Signers are never messaged: WhatsApp can't reach someone
-outside its 24-hour window without approved templates, and an SMS to every signer could cost hundreds of credits.
-The petition's page carries everything.
+Nothing when they publish, edit or close it themselves: they were there. Signers are never messaged: WhatsApp
+can't reach someone outside its 24-hour window without approved templates, and an SMS to every signer could cost
+hundreds of credits. The petition's page carries everything.
 
 The wording is neutral, as for report messages: what happened, the petition's number and link, no judgement, on
 one SMS page.
@@ -16,7 +16,8 @@ from app.config import get_settings
 from app.services import petitions
 from app.services.citizen_reports import NotificationChannel
 from app.services.notifications import CHANNEL_NAMES, provider_for
-from app.services.petition_rules import REFUSALS, PetitionAction
+from app.services.petition_grounds import Ground, in_plain_words
+from app.services.petition_rules import PetitionAction
 from app.services.report_contacts import masked
 from app.services.sms_text import pages, plain
 from app.services.whatsapp import window_open
@@ -25,9 +26,7 @@ logger = logging.getLogger(__name__)
 
 
 class Update(StrEnum):
-    REFUSED = "refused"
-    PUBLISHED = "published"
-    AUTO_PUBLISHED = "auto_published"
+    REMOVED = "removed"
     THRESHOLD_REACHED = "threshold_reached"
     RESPONDED = "responded"
     NO_RESPONSE = "no_response"
@@ -36,13 +35,8 @@ class Update(StrEnum):
 
 # The short wording is for a site address longer than the deployed one, with which every full message fits a page.
 MESSAGES: dict[Update, tuple[str, str]] = {
-    Update.REFUSED: ("Nokware: the MCE refused your petition {number}. Reason: {reason}. Edit and send it back: {mine}",
-                     "Nokware: the MCE refused your petition {number}: {reason}. See {mine}"),
-    Update.PUBLISHED: ("Nokware: the MCE published your petition {number}. It is open for signatures for 90 days: {link}",
-                       "Nokware: your petition {number} is published: {link}"),
-    Update.AUTO_PUBLISHED: ("Nokware: your petition {number} was published automatically: the MCE didn't decide in 72 hours. "
-                            "Open 90 days: {link}",
-                            "Nokware: your petition {number} was published automatically after 72 hours: {link}"),
+    Update.REMOVED: ("Nokware: petition {number} was removed: {reason}. Edit it and publish again: {mine}",
+                     "Nokware: petition {number} was removed: {reason}. See {mine}"),
     Update.THRESHOLD_REACHED: ("Nokware: your petition {number} reached {threshold} signatures and went to the MCE, who has 30 "
                                "days to respond: {link}",
                                "Nokware: your petition {number} reached {threshold} signatures. The MCE has 30 days to respond: {link}"),
@@ -61,7 +55,7 @@ def compose(update: Update, petition: dict[str, Any]) -> str:
     code = petition["code"]
     values = {
         "number": f"{code[:3]} {code[3:]}", "link": f"{site}/petitions/{code}", "mine": f"{site}/petitions/mine",
-        "reason": REFUSALS[petition["refusalReason"]].label if petition.get("refusalReason") in REFUSALS else "",
+        "reason": in_plain_words(Ground(petition["removalGround"])) if petition.get("removalGround") in set(Ground) else "",
         "threshold": f"{petition.get('threshold') or 0:,}", "signatures": f"{petition.get('signatureCount') or 0:,}",
     }
     full, short = (plain(template.format(**values)) for template in MESSAGES[update])
