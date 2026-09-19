@@ -5,13 +5,14 @@ import { useState } from "react";
 
 import { ErrorPanel, LoadingPanel } from "@/components/documents/panels";
 import { Progress } from "@/components/petitions/petition-card";
+import { TombstoneCard } from "@/components/petitions/tombstone-card";
 import { StatusMark, StatusTag } from "@/components/status-tag";
 import { Button } from "@/components/ui/button";
 import { useNow } from "@/hooks/use-now";
 import { usePetitionOptions, usePetitions } from "@/lib/api/petition-queries";
 import { closingLine, placeLine, responseLine, spacedCode, startedBy } from "@/lib/petitions";
 import {
-  emptyGroup, groupCount, groupLabel, listedGroup, petitionHref, PORTAL_GROUPS, type PortalPetitionGroup,
+  emptyGroup, groupCount, groupLabel, petitionHref, PORTAL_GROUPS, type PortalPetitionGroup,
 } from "@/lib/portal/petitions";
 import { petitionStatus, PETITION_GROUPS } from "@/lib/status";
 import { joinNames, plural } from "@/lib/text";
@@ -83,8 +84,8 @@ function RemovalRecord({ removals }: { removals: PetitionRemovals }) {
     <div className="flex flex-col gap-2 py-4" data-testid="mce-petitions-removed">
       <p className="text-[14px]">
         {removals.total === 0 ? "No petition has been removed." : `${plural(removals.total, "petition has", "petitions have")} been removed.`}{" "}
-        A removal is a contributor&apos;s, on one of the four grounds. Removed petitions aren&apos;t listed: each
-        number still opens a page giving its ground and the date, and nothing else.
+        A removal is a contributor&apos;s, on one of the four grounds. What stands below is each removal&apos;s
+        ground and date, and nothing else of the petition it stood for.
       </p>
       <ul className="flex flex-col gap-1 text-[13px] text-ink-soft">
         {removals.grounds.map((ground) => (
@@ -108,11 +109,22 @@ function Paging({ total, offset, onOffset }: { total: number; offset: number; on
   );
 }
 
+function Empty({ group }: { group: PortalPetitionGroup }) {
+  return <p className="py-4 text-[14px] text-ink-soft" data-testid="mce-petitions-empty">{emptyGroup(group)}</p>;
+}
+
 function Listing({ page, group, now }: { page: PetitionPage; group: PortalPetitionGroup; now: number }) {
-  if (group === "removed") return <RemovalRecord removals={page.removals} />;
-  if (page.petitions.length === 0) {
-    return <p className="py-4 text-[14px] text-ink-soft" data-testid="mce-petitions-empty">{emptyGroup(group)}</p>;
+  if (group === "removed") {
+    return (
+      <>
+        <RemovalRecord removals={page.removals} />
+        {page.removed.length === 0
+          ? <Empty group={group} />
+          : <ul data-testid="mce-petitions-tombstones">{page.removed.map((s) => <TombstoneCard key={s.code} stone={s} />)}</ul>}
+      </>
+    );
   }
+  if (page.petitions.length === 0) return <Empty group={group} />;
   return <ul>{newestFirst(page.petitions).map((p) => <Row key={p.code} petition={p} now={now} />)}</ul>;
 }
 
@@ -120,7 +132,7 @@ export function PetitionsQueue() {
   const [group, setGroup] = useState<PortalPetitionGroup>("awaiting");
   const [offset, setOffset] = useState(0);
   const now = useNow();
-  const petitions = usePetitions({ group: listedGroup(group), topic: "", limit: PAGE, offset });
+  const petitions = usePetitions({ group, topic: "", limit: PAGE, offset });
   const choose = (next: PortalPetitionGroup) => { setGroup(next); setOffset(0); };
   return (
     <section className="flex flex-col gap-3 rounded-xl border bg-card p-5" aria-label="Petitions">
@@ -128,7 +140,7 @@ export function PetitionsQueue() {
       {petitions.error ? <ErrorPanel message={petitions.error.message} onRetry={() => void petitions.refetch()} /> : null}
       {petitions.isPending ? <LoadingPanel label="Loading petitions…" /> : null}
       {petitions.data ? <Listing page={petitions.data} group={group} now={now} /> : null}
-      {petitions.data && group !== "removed" ? <Paging total={petitions.data.total} offset={offset} onOffset={setOffset} /> : null}
+      {petitions.data ? <Paging total={petitions.data.total} offset={offset} onOffset={setOffset} /> : null}
     </section>
   );
 }

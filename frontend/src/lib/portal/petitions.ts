@@ -19,12 +19,8 @@ export function groundById(grounds: PetitionGroundOption[], id: PetitionGround |
   return grounds.find((ground) => ground.id === id);
 }
 
-/**
- * The MCE's queue is filed under the states a petition can stand in. Four of them the API lists petitions for;
- * "removed" lists none — a removed petition is in no group, and only its number opens its notice — so that chip
- * shows the removal record instead.
- */
-export type PortalPetitionGroup = PetitionGroup | "removed";
+/** The MCE's queue is filed under the states a petition can stand in — the same five the public list uses. */
+export type PortalPetitionGroup = PetitionGroup;
 
 /** The same order, and the same five tabs, as the public petitions list. */
 export const PORTAL_GROUPS: PortalPetitionGroup[] = ["open", "awaiting", "responded", "removed", "closed"];
@@ -53,13 +49,7 @@ export function groupLabel(group: PortalPetitionGroup, words?: Record<string, st
 
 /** A removed petition is in no group, so "removed" counts the removal record rather than a list. */
 export function groupCount(group: PortalPetitionGroup, page?: PetitionPage): number | undefined {
-  if (!page) return undefined;
-  return group === "removed" ? page.removals.total : page.counts[group];
-}
-
-/** Which group the API is asked to list while a group is on screen; "removed" lists none, so it borrows "open". */
-export function listedGroup(group: PortalPetitionGroup): PetitionGroup {
-  return group === "removed" ? "open" : group;
+  return page?.counts[group];
 }
 
 const EMPTY: Record<PortalPetitionGroup, string> = {
