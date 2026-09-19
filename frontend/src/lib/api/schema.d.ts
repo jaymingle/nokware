@@ -889,6 +889,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/petitions/{code}/mine": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Petition
+         * @description One petition, read by its number and the number that started it. Anyone else's is simply not found, and a
+         *     removed one still answers here: its public page is a tombstone, but its creator has words to mend.
+         */
+        get: operations["my_petition_api_petitions__code__mine_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/petitions/check": {
         parameters: {
             query?: never;
@@ -1469,7 +1490,7 @@ export interface paths {
          * @description A spoken reply, fetched by Twilio as it sends the voice note. The link is random and lasts 10 minutes, and
          *     the audio is an answer from public documents, never anything about a report.
          */
-        get: operations["whatsapp_audio_api_channels_whatsapp_audio__name__head"];
+        get: operations["whatsapp_audio_api_channels_whatsapp_audio__name__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1479,7 +1500,7 @@ export interface paths {
          * @description A spoken reply, fetched by Twilio as it sends the voice note. The link is random and lasts 10 minutes, and
          *     the audio is an answer from public documents, never anything about a report.
          */
-        head: operations["whatsapp_audio_api_channels_whatsapp_audio__name__head"];
+        head: operations["whatsapp_audio_api_channels_whatsapp_audio__name__get"];
         patch?: never;
         trace?: never;
     };
@@ -2822,6 +2843,94 @@ export interface components {
             removal: components["schemas"]["RemovalNotice"] | null;
             /** Actions */
             actions: ("edit" | "withdraw" | "make_anonymous")[];
+        };
+        /**
+         * OwnPetitionDetail
+         * @description A petition as the person who started it reads it: everything its public page shows, and the record of a
+         *     removal besides. Read by its number and the number that started it, so it answers for a removed petition too,
+         *     whose public page is only a tombstone.
+         */
+        OwnPetitionDetail: {
+            /** Code */
+            code: string;
+            /** Title */
+            title: string;
+            /** Topic */
+            topic: string;
+            /** Departments */
+            departments: string[];
+            /**
+             * Scope
+             * @enum {string}
+             */
+            scope: "metro" | "area";
+            /** Area */
+            area: string | null;
+            /** Sub Metro */
+            sub_metro: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "open" | "awaiting_response" | "responded" | "removed" | "closed";
+            /** Status Label */
+            status_label: string;
+            /** Published At */
+            published_at: string | null;
+            /** Closes At */
+            closes_at: string | null;
+            /** Closed At */
+            closed_at: string | null;
+            /** Threshold */
+            threshold: number | null;
+            /** Signatures */
+            signatures: number;
+            /** Started By */
+            started_by: string | null;
+            /** Threshold Reached At */
+            threshold_reached_at: string | null;
+            /** Response Due */
+            response_due: string | null;
+            /** Responded At */
+            responded_at: string | null;
+            /** Response Label */
+            response_label: string | null;
+            /** Unanswered At */
+            unanswered_at: string | null;
+            /** Version */
+            version: number;
+            /** Versioned At */
+            versioned_at: string | null;
+            /** Removals */
+            removals: number;
+            /** Body */
+            body: string;
+            /** Images */
+            images: string[];
+            /** Topic Id */
+            topic_id: string;
+            /** Ward Id */
+            ward_id: string | null;
+            /** Issue Id */
+            issue_id: string | null;
+            /** Document Ids */
+            document_ids: string[];
+            /** Image Ids */
+            image_ids: string[];
+            /** Submitted At */
+            submitted_at: string | null;
+            removal: components["schemas"]["RemovalNotice"] | null;
+            /** Actions */
+            actions: ("edit" | "withdraw" | "make_anonymous")[];
+            /** Timeline */
+            timeline: components["schemas"]["TimelineEntry"][];
+            /** Versions */
+            versions: components["schemas"]["VersionEntry"][];
+            response: components["schemas"]["PetitionResponse"] | null;
+            /** Shared With */
+            shared_with: components["schemas"]["DepartmentShare"][];
+            /** Signatures On Earlier Versions */
+            signatures_on_earlier_versions: number;
         };
         /** PetitionCard */
         PetitionCard: {
@@ -5435,6 +5544,39 @@ export interface operations {
             };
         };
     };
+    my_petition_api_petitions__code__mine_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-phone-proof"?: string | null;
+            };
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnPetitionDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     check_api_petitions_check_post: {
         parameters: {
             query?: never;
@@ -6446,7 +6588,7 @@ export interface operations {
             };
         };
     };
-    whatsapp_audio_api_channels_whatsapp_audio__name__head: {
+    whatsapp_audio_api_channels_whatsapp_audio__name__get: {
         parameters: {
             query?: never;
             header?: never;
@@ -6477,7 +6619,7 @@ export interface operations {
             };
         };
     };
-    whatsapp_audio_api_channels_whatsapp_audio__name__head: {
+    whatsapp_audio_api_channels_whatsapp_audio__name__get: {
         parameters: {
             query?: never;
             header?: never;

@@ -33,6 +33,7 @@ from app.schemas.petitions import (
     NamedSignatures,
     NoteRequest,
     OwnPetition,
+    OwnPetitionDetail,
     PetitionCard,
     PetitionDetail,
     PetitionOptions,
@@ -215,6 +216,14 @@ def dismiss_comment_report(report_id: str, request: DismissRequest, principal: C
 @router.get("/mine", response_model=MyPetitions)
 def mine(proof: Phone) -> MyPetitions:
     return MyPetitions(number=proof.hint, petitions=[present.own(p) for p in petitions.mine(proof)])
+
+
+@router.get("/{code}/mine", response_model=OwnPetitionDetail)
+def my_petition(code: str, proof: Phone) -> OwnPetitionDetail:
+    """One petition, read by its number and the number that started it. Anyone else's is simply not found, and a
+    removed one still answers here: its public page is a tombstone, but its creator has words to mend."""
+    petition = petitions.owned(code, proof)
+    return present.own_detail(petition, petition_departments.shares_on(petition["$id"]))
 
 
 @router.post("/check", response_model=ScreenResult, dependencies=[Checks])

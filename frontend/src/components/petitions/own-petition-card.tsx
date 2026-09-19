@@ -5,6 +5,7 @@ import { useState, type ReactNode } from "react";
 
 import { ErrorNote } from "@/components/documents/panels";
 import { DraftFields } from "@/components/petitions/draft-fields";
+import { OwnPetitionRecord } from "@/components/petitions/own-petition-record";
 import { PetitionImageField, keptImages, type KeptImage } from "@/components/petitions/petition-images";
 import { StatusTag } from "@/components/status-tag";
 import { Button } from "@/components/ui/button";
@@ -137,6 +138,7 @@ export function OwnPetitionCard({ petition, proof }: Props) {
         <Removed petition={petition} />
         {petition.started_by ? <p className="text-[13px] text-ink-soft">Your name is shown publicly: {petition.started_by}</p> : null}
         {editing ? <Edit petition={petition} proof={proof} onDone={() => setEditing(false)} /> : <Actions petition={petition} proof={proof} onEdit={() => setEditing(true)} />}
+        {editing ? null : <OwnPetitionRecord code={petition.code} proof={proof} />}
       </div>
     </Card>
   );

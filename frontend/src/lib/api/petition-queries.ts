@@ -7,6 +7,7 @@ import {
   checkDraft,
   draftLedger,
   editPetition,
+  getMyPetition,
   getMyPetitions,
   getMySignature,
   getPetitionComments,
@@ -50,6 +51,7 @@ const petitionKeys = {
   detail: (code: string) => ["petition", code] as const,
   ledger: (code: string) => ["petition-ledger", code] as const,
   mine: (proof: string) => ["my-petitions", proof] as const,
+  mineOne: (code: string, proof: string) => ["my-petition", code, proof] as const,
   signature: (code: string, proof: string) => ["my-signature", code, proof] as const,
   names: (code: string) => ["signer-names", code] as const,
   comments: (code: string) => ["petition-comments", code] as const,
@@ -83,6 +85,11 @@ export function useLinkedIssue(publicId: string | null) {
 
 export function useMyPetitions(proof: string | null) {
   return useQuery({ queryKey: petitionKeys.mine(proof ?? ""), queryFn: () => getMyPetitions(proof ?? ""), enabled: proof !== null });
+}
+
+/** Read per card, so a creator with several petitions doesn't pay for every one's history to see a list. */
+export function useMyPetition(code: string, proof: string) {
+  return useQuery({ queryKey: petitionKeys.mineOne(code, proof), queryFn: () => getMyPetition(code, proof) });
 }
 
 export function useCheckDraft() {

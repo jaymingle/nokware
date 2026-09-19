@@ -86,6 +86,8 @@ export type LedgerMatch = Schemas["LedgerMatch"];
 export type LinkedIssue = Schemas["LinkedIssue"];
 export type AreaOption = Schemas["AreaOption"];
 export type OwnPetition = Schemas["OwnPetition"];
+/** A creator's own petition, whole: what the public page shows, and the record of a removal besides. */
+export type OwnPetitionDetail = Schemas["OwnPetitionDetail"];
 export type MyPetitions = Schemas["MyPetitions"];
 export type PetitionSubmission = Schemas["SubmitRequest"];
 export type PetitionEdit = Schemas["EditRequest"];

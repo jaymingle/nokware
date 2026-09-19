@@ -16,6 +16,7 @@ from app.services import (
     channel_limits,
     channel_sessions,
     petition_clock,
+    petition_departments,
     petition_images,
     petition_ledger,
     petition_removals,
@@ -644,3 +645,24 @@ def test_taking_a_photo_off_is_an_edit_and_the_petition_and_its_signatures_stand
     assert edited["status"] == PetitionStatus.OPEN and edited["signatureCount"] == 12
     assert edited["imageIds"] == ["petitions/a/01.jpg"] and edited["version"] == 2
     assert present.versions("p1")[1].changed == ["imageIds"]
+
+
+def test_a_creator_reads_their_own_petition_whole_and_nobody_elses(stored: Fake, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Their number is the key. A removed petition answers here too: the public page is a tombstone, but the
+    person who wrote it still has words to mend."""
+    monkeypatch.setattr(petition_departments, "shares_on", lambda petition_id: [])
+    monkeypatch.setattr(petitions, "history", lambda petition_id: [
+        {"action": a, "at": NOW.isoformat(), "reason": r} for a, r in (("published", None), ("removed", "personal_data"))])
+    monkeypatch.setattr(petition_versions, "history", lambda petition_id: [(v, []) for v in stored.versions])
+    _publish(stored)
+    _remove(stored, Ground.PERSONAL_DATA)
+    client = TestClient(app)
+    token = phone_proof.issue_proof(PHONE, Channel.WHATSAPP, datetime.now(UTC))
+    mine = client.get("/api/petitions/482913/mine", headers={"X-Phone-Proof": token})
+    assert mine.status_code == 200
+    body = mine.json()
+    assert body["status"] == PetitionStatus.REMOVED and body["body"] == DRAFT.body
+    assert [e["action"] for e in body["timeline"]] == ["published", "removed"]
+    assert [v["version"] for v in body["versions"]] == [1] and body["shared_with"] == []
+    stranger = phone_proof.issue_proof("+233209999999", Channel.WHATSAPP, datetime.now(UTC))
+    assert client.get("/api/petitions/482913/mine", headers={"X-Phone-Proof": stranger}).status_code == 404

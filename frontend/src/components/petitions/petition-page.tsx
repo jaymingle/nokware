@@ -12,24 +12,23 @@ import { DocumentLine, LedgerMatches } from "@/components/petitions/ledger-match
 import { MceResponse } from "@/components/petitions/mce-response";
 import { Progress } from "@/components/petitions/petition-card";
 import { PetitionComments } from "@/components/petitions/petition-comments";
+import { PetitionTimeline } from "@/components/petitions/petition-timeline";
 import { PetitionTombstoneView } from "@/components/petitions/petition-tombstone";
 import { PetitionVersions } from "@/components/petitions/petition-versions";
 import { ReportPetition } from "@/components/petitions/report-petition";
 import { SignPanel } from "@/components/petitions/sign-panel";
 import { Signers } from "@/components/petitions/signers";
-import { StatusMark, StatusTag } from "@/components/status-tag";
+import { StatusTag } from "@/components/status-tag";
 import { Button } from "@/components/ui/button";
 import { useMounted } from "@/hooks/use-mounted";
 import { useNow } from "@/hooks/use-now";
 import { ApiError } from "@/lib/api/errors";
 import { usePetition, usePetitionLedger, usePetitionOptions } from "@/lib/api/petition-queries";
 import {
-  closingLine, earlierVersionsLine, placeLine, publishedLine, removedBeforeLine, responseLine, spacedCode, startedBy,
-  timelineText, whatsappShareUrl,
+  closingLine, earlierVersionsLine, placeLine, publishedLine, removedBeforeLine, responseLine, spacedCode, startedBy, whatsappShareUrl,
 } from "@/lib/petitions";
-import { issueStage, petitionEventTone, petitionStatus } from "@/lib/status";
+import { issueStage, petitionStatus } from "@/lib/status";
 import { joinNames } from "@/lib/text";
-import { formatDate } from "@/lib/time";
 import { voicesLine } from "@/lib/voices";
 
 import type { PetitionDetail } from "@/lib/api/types";
@@ -125,17 +124,7 @@ function LedgerContext({ code }: { code: string }) {
 function Timeline({ petition }: { petition: PetitionDetail }) {
   return (
     <Section title="What has happened" testId="petition-timeline">
-      <ol className="flex flex-col gap-2 text-[13.5px]">
-        {petition.timeline.map((entry) => (
-          <li key={`${entry.action}-${entry.at}`} className="flex flex-wrap items-baseline gap-x-3">
-            <span className="flex w-28 shrink-0 items-center gap-2 text-ink-soft tabular-nums">
-              <StatusMark tone={petitionEventTone(entry.action)} className="size-3.5" />
-              {formatDate(entry.at)}
-            </span>
-            <span>{timelineText(entry)}</span>
-          </li>
-        ))}
-      </ol>
+      <PetitionTimeline entries={petition.timeline} />
     </Section>
   );
 }

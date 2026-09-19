@@ -9,6 +9,7 @@ import type {
   MySignature,
   NamedSignatures,
   OwnPetition,
+  OwnPetitionDetail,
   PetitionComment,
   PetitionCommentPage,
   PetitionCommentReportRequest,
@@ -110,6 +111,11 @@ export function editPetition(code: string, edit: PetitionEditSend, proof: string
 
 export function getMyPetitions(proof: string): Promise<MyPetitions> {
   return publicRequest<MyPetitions>("/api/petitions/mine", { headers: proofHeader(proof) });
+}
+
+/** One of them, whole: its history, its versions, the MCE's response and the departments asked to answer. */
+export function getMyPetition(code: string, proof: string): Promise<OwnPetitionDetail> {
+  return publicRequest<OwnPetitionDetail>(`${petitionPath(code)}/mine`, { headers: proofHeader(proof) });
 }
 
 /** Anyone, without signing in: the petition stays up while a contributor reads it. */

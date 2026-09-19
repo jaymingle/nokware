@@ -27,6 +27,7 @@ from app.schemas.petitions import (
     MySignature,
     NamedSignature,
     OwnPetition,
+    OwnPetitionDetail,
     PetitionCard,
     PetitionDetail,
     PetitionReply,
@@ -237,12 +238,27 @@ def _removal_notice(petition: dict[str, Any]) -> RemovalNotice | None:
                          duplicate_of=petition.get("removalDuplicateOf"))
 
 
-def own(petition: dict[str, Any]) -> OwnPetition:
-    return OwnPetition(
+def asdict_own(petition: dict[str, Any]) -> dict[str, Any]:
+    """What every creator's reading of a petition carries, whether or not the fuller record is read with it."""
+    return dict(
         **_card_fields(petition), body=petition["body"], images=image_links(petition.get("imageIds")),
         topic_id=petition["topic"], ward_id=petition.get("wardLocation"), issue_id=petition.get("issueId"),
         document_ids=petition.get("documentIds") or [], image_ids=petition.get("imageIds") or [],
         submitted_at=petition.get("submittedAt"), removal=_removal_notice(petition), actions=creator_actions(petition),
+    )
+
+
+def own(petition: dict[str, Any]) -> OwnPetition:
+    return OwnPetition(**asdict_own(petition))
+
+
+def own_detail(petition: dict[str, Any], shares: list[dict[str, Any]]) -> OwnPetitionDetail:
+    """The creator's own reading of their petition. Built from the petition itself rather than from `public()`,
+    because a removed one is still theirs to read and mend."""
+    return OwnPetitionDetail(
+        **asdict_own(petition), timeline=timeline(petitions.history(petition["$id"])), versions=versions(petition["$id"]),
+        response=response(petition), shared_with=[share(row) for row in shares],
+        signatures_on_earlier_versions=petition_signatures.on_earlier_versions(petition),
     )
 
 

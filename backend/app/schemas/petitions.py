@@ -286,6 +286,18 @@ class OwnPetition(PetitionCard):
     actions: list[Literal["edit", "withdraw", "make_anonymous"]]
 
 
+class OwnPetitionDetail(OwnPetition):
+    """A petition as the person who started it reads it: everything its public page shows, and the record of a
+    removal besides. Read by its number and the number that started it, so it answers for a removed petition too,
+    whose public page is only a tombstone."""
+
+    timeline: list[TimelineEntry]
+    versions: list[VersionEntry]
+    response: PetitionResponse | None
+    shared_with: list[DepartmentShare]
+    signatures_on_earlier_versions: int
+
+
 class MyPetitions(BaseModel):
     number: str  # masked, e.g. +233…73
     petitions: list[OwnPetition]
