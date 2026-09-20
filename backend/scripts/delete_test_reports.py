@@ -28,6 +28,9 @@ from app.services.storage import get_minio
 from app.services.test_fixtures import TEST_PREFIX
 
 PAGE = 100
+# Every collection keyed by caseId, so a fixture leaves nothing orphaned behind it and anything else that takes a
+# case apart has one list to follow rather than its own.
+RELATED = (ASSIGNMENTS_COLLECTION, HISTORY, NOTIFICATIONS_COLLECTION, CONTACTS_COLLECTION, VOICES_COLLECTION)
 
 
 def documents(collection: str, queries: list[str]) -> list[Any]:
@@ -52,13 +55,7 @@ def photo_objects() -> dict[str, list[str]]:
 
 def related(case_id: str) -> dict[str, list[Any]]:
     by_case = [Query.equal("caseId", case_id)]
-    return {
-        ASSIGNMENTS_COLLECTION: documents(ASSIGNMENTS_COLLECTION, by_case),
-        HISTORY: documents(HISTORY, by_case),
-        NOTIFICATIONS_COLLECTION: documents(NOTIFICATIONS_COLLECTION, by_case),
-        CONTACTS_COLLECTION: documents(CONTACTS_COLLECTION, by_case),
-        VOICES_COLLECTION: documents(VOICES_COLLECTION, by_case),
-    }
+    return {collection: documents(collection, by_case) for collection in RELATED}
 
 
 def delete_case(case: Any, rows: dict[str, list[Any]], photos: list[str]) -> None:
