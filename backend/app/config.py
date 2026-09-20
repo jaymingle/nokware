@@ -75,7 +75,9 @@ class Settings(BaseSettings):
     read_aloud_daily_limit: int = 300
     # Empty: USSD isn't offered for confirming a phone number.
     ussd_service_code: str = ""
-    public_site_url: str = "http://localhost:3000"
+    # No default: this address goes into the messages residents are sent, and a default would put a developer's
+    # own machine into an SMS the Assembly paid for. A deploy that forgets it doesn't start.
+    public_site_url: str
 
     # Fixed on each petition when it opens, so changing these never moves a live goal.
     petition_threshold_area: int = 150

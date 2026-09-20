@@ -92,9 +92,20 @@ class RedactChannelSecrets(logging.Filter):
 logging.getLogger("uvicorn.access").addFilter(RedactChannelSecrets())
 
 
+def check_cors_is_meant_for_here() -> None:
+    """CORS_ORIGIN_REGEX's default lets a browser on any localhost port call the API, which is what a developer
+    needs and a deployed site never does. Serving a public site with it still on means it wasn't set: say so."""
+    if settings.public_site_url.startswith("https://") and "localhost" in settings.cors_origin_regex:
+        logging.getLogger(__name__).warning(
+            "CORS_ORIGIN_REGEX still allows localhost while the site is %s. Set CORS_ORIGIN_REGEX= (empty).",
+            settings.public_site_url,
+        )
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     notifications.check_providers()
+    check_cors_is_meant_for_here()
     # Postgres comes through a tunnel on a local port that something else can take: say so now, plainly, rather
     # than 30 seconds into a resident's first question. The API starts either way.
     await asyncio.to_thread(search_index.startup_check)
