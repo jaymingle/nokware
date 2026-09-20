@@ -25,7 +25,7 @@ from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 from app.config import get_settings
-from app.services import channel_limits
+from app.services import channel_limits, notifications
 from app.services.ledger_documents import parse_datetime
 from app.services.redis_store import get_redis, key
 from app.services.report_contacts import InvalidNumber, masked, normalise_phone
@@ -211,7 +211,12 @@ def _sms_code_hash(secret: str, code: str) -> str:
 
 
 def sms_available() -> bool:
-    return get_settings().sms_verification_codes
+    """Confirming by SMS needs both the switch and a provider that actually delivers.
+
+    Under SMS_PROVIDER=log a code is written to the log and nowhere else, so offering the choice would leave a
+    resident waiting for a message no one sent, with WhatsApp and USSD right there and working.
+    """
+    return get_settings().sms_verification_codes and notifications.sms_is_charged()
 
 
 def send_sms_code(secret: str, raw_number: str, now: datetime) -> str:

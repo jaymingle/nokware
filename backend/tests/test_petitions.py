@@ -170,12 +170,28 @@ def test_the_code_is_read_from_a_whatsapp_message() -> None:
         "482173", "482173", "482173", None, None, None]
 
 
+def _codes_on(monkeypatch: pytest.MonkeyPatch, *, delivered: bool) -> None:
+    """The switch on, and a provider that either delivers or only writes to the log."""
+    settings = phone_proof.get_settings().model_copy(update={"sms_verification_codes": True})
+    monkeypatch.setattr(phone_proof, "get_settings", lambda: settings)
+    monkeypatch.setattr(phone_proof.notifications, "sms_is_charged", lambda: delivered)
+
+
+def test_sms_codes_stay_off_while_no_one_would_deliver_them(server: fakeredis.FakeRedis,
+                                                            monkeypatch: pytest.MonkeyPatch) -> None:
+    """A code written to the log is a resident waiting for a message nobody sent."""
+    challenge = phone_proof.new_challenge()
+    _codes_on(monkeypatch, delivered=False)
+    assert phone_proof.sms_available() is False
+    with pytest.raises(phone_proof.SmsUnavailable):
+        phone_proof.send_sms_code(challenge.secret, PHONE, NOW)
+
+
 def test_sms_codes_stay_off_until_switched_on(server: fakeredis.FakeRedis, monkeypatch: pytest.MonkeyPatch) -> None:
     challenge = phone_proof.new_challenge()
     with pytest.raises(phone_proof.SmsUnavailable):
         phone_proof.send_sms_code(challenge.secret, PHONE, NOW)
-    settings = phone_proof.get_settings().model_copy(update={"sms_verification_codes": True})
-    monkeypatch.setattr(phone_proof, "get_settings", lambda: settings)
+    _codes_on(monkeypatch, delivered=True)
     texted: list[str] = []
     monkeypatch.setattr(phone_proof, "_text_code", lambda number, code: texted.append(code))
     assert phone_proof.send_sms_code(challenge.secret, "024 123 4567", NOW) == "+233…67"
