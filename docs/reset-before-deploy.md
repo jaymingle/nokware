@@ -96,3 +96,39 @@ The Ledger (documents, files, chunks, embeddings, the search index), budget rows
 `backend/app/data/budget_lines.json` in git, not a database, so no reset can reach them — publishing-record data,
 contacts, teams, departments, taxonomy, phrases, statutory-document rules, every Appwrite user and team membership,
 and every schema.
+
+## What the run actually did, 20 September 2026
+
+Two runs, because the first left a gap worth recording rather than hiding.
+
+**First run.** Deleted all 108 — every Delete count went to 0 and every Keep count was unchanged. But its own
+summary said **11**, because attachments were counted by asking each collection how many rows it held *after* the
+cases and petitions had already taken them: finished work reported a nil return. The data was right and the report
+was wrong, which is the more dangerous way round. Fixed, and the fix's first attempt then double-counted on a dry
+run, where nothing goes and the sweep meets the same rows again; a row a parent has claimed is now noted so the
+sweep counts only what no parent claimed. Dry run and real run agree on both an empty and a full database.
+
+**Restoring the backup, to prove it could be.** It stopped at `petition_history`: a row holds an action of
+`submitted`, which the petitions rework dropped from the collection's enum without migrating the rows still using
+it. Appwrite validates on write, not on read, so the row was fine where it sat and could never have been written
+back. Nine collections were restored before it stopped and eight were not. The restore now collects refusals and
+names them at the end instead of abandoning the other 257 rows over one.
+
+**Second run.** Cleared the partial restore: 80 records and objects, reported as 80 on both the dry run and the
+real one.
+
+**Final state.** All 15 Delete collections at 0. The photos bucket holds 0 objects. Every Keep identical to the
+baseline: 164 ledger documents, 164 ledger files, 7,537 chunks over 154 documents, all four Postgres indexes,
+24 Appwrite users.
+
+### Verified afterwards
+
+| Check | Result |
+|---|---|
+| Ask | "The Accra Metropolitan Assembly's approved budget for 2026 is GH¢ 124,760,805 [B1]." — figure B1 from *2026 AMA Budget*, coverage 96% |
+| Ledger search | the department library lists every document, each marked *Answerable in Ask* |
+| Dashboard | zeros throughout, no error state, and 164 documents across 13 departments |
+| `/petitions` | every tab 0, "No petitions are open yet.", no errors |
+| `/report/status` | an unknown reference answers "No report has that reference. Check it and try again." |
+| Portal sign-in | department (Budget & Rating), MCE (Oversight) and contributor all render their own portal |
+| USSD | the seven-item menu loads, and a case lookup answers "No case has the reference …" |
