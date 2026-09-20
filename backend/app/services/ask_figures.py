@@ -1,22 +1,15 @@
 """Ask's live figures: counts of citizen reports, through tools the model can call.
 
-When a question looks like it wants figures, a quick planning call offers the
-model two tools. CountReports asks for one count (by topic, area, department,
-status and period, optionally broken down); PersonalSafetyFigures is what it
-calls when a resident asks for figures on reports about someone's safety, which
-Nokware does not publish. The counting is stats.py's, so its rules hold here:
-personal safety is never counted, and 1 to 4 reads "fewer than 5".
-
-Each count becomes a source under an R label ([R1], [R2], ...) beside the
-documents' S labels, so an answer says which figures are live report data and
-which come from a document.
+The counting is stats.py's, so its rules hold here: personal safety is never counted, and 1 to 4 reads "fewer
+than 5". Each count is cited under an R label beside the documents' S labels, so an answer says which figures are
+live report data and which come from a document.
 """
 
 import logging
 import re
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Any, Literal
+from dataclasses import dataclass, field, replace
+from datetime import UTC, datetime
+from typing import Any, Literal, TypeVar
 
 from langchain_core.prompts import ChatPromptTemplate
 from pydantic import BaseModel, Field, ValidationError
@@ -33,18 +26,22 @@ from app.wards import find_ward, sub_metros
 logger = logging.getLogger(__name__)
 
 SAFETY_FIGURES_ANSWER = phrase("ask.safety_figures")
-# The refusal covers Nokware's own counts, not AMA's published documents: those are public, and anyone can download
-# them from the Ledger. Saying so plainly matters either way, so nobody is left thinking figures are being withheld.
+# The refusal covers Nokware's own counts, not AMA's published documents, which are public: saying so plainly
+# means nobody is left thinking figures are being withheld.
 SAFETY_IN_DOCUMENTS = phrase("ask.safety_in_documents")
 NO_SAFETY_DOCUMENTS = phrase("ask.no_safety_documents")
 FIGURE_LABEL_PREFIX = "R"
 MAX_FIGURES = 4
 # Only a question that might want figures pays for the planning call. A comparison often names no count at all
 # ("compare the approved budget for Public Works in 2022 and 2026"), so the budget words stand beside the counting ones.
+# How a resident asks about money, written once: both the gate below and the budget check further down read it,
+# and when they were written out twice they drifted — neither knew the word "expenses".
+_MONEY_TERMS = (r"budgets?|budget(ed|ing)?|approv(e|es|ed|al)|allocat(e|es|ed|ion)|spend(ing)?|spent|expenses?|"
+                r"expenditures?|cost(s|ing)?|cedis|GH¢|GHS")
 FIGURE_WORDS = re.compile(
     r"\b(how many|how much|number of|count|figures?|statistics|stats|totals?|most|reports?|reported|cases?|"
     r"complaints?|open|resolved|escalated|filed|pending|outstanding|charts?|graphs?|plot|"
-    r"budgets?|budget(ed|ing)?|approv(e|es|ed|al)|allocat(e|es|ed|ion)|spend(ing)?|spent|cedis|GH¢|GHS|"
+    rf"{_MONEY_TERMS}|"
     r"compare|comparison|against|versus|vs)\b",
     re.IGNORECASE,
 )
@@ -108,8 +105,6 @@ _PLAN_PROMPT = ChatPromptTemplate.from_messages(
 
 @dataclass(frozen=True)
 class Figure:
-    """One count as a citable source: what was counted, the result as it may be shown, and when."""
-
     label: str
     description: str
     value: str
@@ -145,7 +140,6 @@ _PERIOD_WORDS = {
 
 
 def _describe(call: CountReports, ward_name: str | None) -> str:
-    """What was counted, in words: "Open reports · Solid waste and dumping · Ablekuma South sub-metro · this month"."""
     parts = [_STATUS_WORDS[call.status]]
     if call.topic:
         parts.append(stats.topic_label(call.topic))
@@ -174,7 +168,7 @@ def _filter(call: CountReports, ward: str | None) -> ReportFilter:
 
 
 def _rows(cases: list[dict[str, Any]], call: CountReports, wanted: ReportFilter, now: datetime) -> list[tuple[str, str]]:
-    """The breakdown, shown counts first and the "fewer than 5" ones after by name, so their order says nothing."""
+    """The "fewer than 5" rows go last, by name, so their order says nothing about their size."""
     if call.group_by == "none":
         return []
     if call.group_by == "month":  # in time order, which says nothing about size
@@ -186,7 +180,6 @@ def _rows(cases: list[dict[str, Any]], call: CountReports, wanted: ReportFilter,
 
 
 def count_figure(call: CountReports, label: str, cases: list[dict[str, Any]], now: datetime, counted_at: str) -> Figure:
-    """Run one CountReports call against the shared case list."""
     ward = find_ward(call.electoral_area) if call.electoral_area else None
     if call.electoral_area and ward is None:
         return Figure(label, f"Reports in \"{call.electoral_area}\"", "no electoral area by that name in Nokware's list", [], counted_at)
@@ -203,8 +196,28 @@ def _tool_calls(question: str, now: datetime) -> list[dict[str, Any]]:
     return list(getattr(message, "tool_calls", []) or [])
 
 
+Asked = TypeVar("Asked", bound=BaseModel)
+
+
+def _asked_for(calls: list[dict[str, Any]], tool: type[Asked]) -> list[Asked]:
+    """The calls to one tool that make sense of their arguments.
+
+    A model can hand back a value outside the set it was given — `group_by: "department"` — and one such call must
+    cost its own figure and nothing else. Validating the whole list at once cost the answer instead.
+    """
+    wanted: list[Asked] = []
+    for call in calls:
+        if call["name"] != tool.__name__:
+            continue
+        try:
+            wanted.append(tool.model_validate(call["args"]))
+        except ValidationError as error:
+            logger.warning("A figure the model asked for made no sense and was dropped: %s", error)
+    return wanted
+
+
 def plan(question: str, now: datetime) -> FigurePlan:
-    """The live figures a question needs, counted. A planning failure means no figures, never a failed answer."""
+    """A planning failure means no figures, never a failed answer."""
     if not wants_figures(question):
         return NO_FIGURES
     try:
@@ -213,18 +226,19 @@ def plan(question: str, now: datetime) -> FigurePlan:
         logger.exception("Planning Ask's live figures failed; answering from documents only")
         return NO_FIGURES
     safety = any(c["name"] == PersonalSafetyFigures.__name__ for c in calls)
-    counts = [CountReports.model_validate(c["args"]) for c in calls if c["name"] == CountReports.__name__][:MAX_FIGURES]
-    budget, missing = _budget_figures([c for c in calls if c["name"] == BudgetFigures.__name__][:MAX_FIGURES])
+    counts = _asked_for(calls, CountReports)[:MAX_FIGURES]
+    budget, missing = _budget_figures(_asked_for(calls, BudgetFigures)[:MAX_FIGURES])
     missing = _only_the_specific(list(dict.fromkeys(missing + _years_not_held(question))))
+    budget = budget or _nearest_held(missing)
     if not counts:
         return FigurePlan([], safety, budget, missing)
     cases = stats.public_cases()
-    at = datetime.fromtimestamp(stats.counted_at(), tz=timezone.utc).isoformat()
+    at = datetime.fromtimestamp(stats.counted_at(), tz=UTC).isoformat()
     figures = [count_figure(call, f"{FIGURE_LABEL_PREFIX}{i}", cases, now, at) for i, call in enumerate(counts, 1)]
     return FigurePlan(figures, safety, budget, missing)
 
 
-BUDGET_WORDS = re.compile(r"\b(budgets?|budget(ed|ing)?|approv(e|es|ed|al)|allocat(e|es|ed|ion)|spend(ing)?|spent|cedis|GH¢|GHS)\b", re.IGNORECASE)
+BUDGET_WORDS = re.compile(rf"\b({_MONEY_TERMS})\b", re.IGNORECASE)
 _YEAR_ASKED = re.compile(r"\b(20[0-3]\d)\b")
 
 
@@ -234,22 +248,37 @@ def _only_the_specific(missing: list[str]) -> list[str]:
 
 
 def _years_not_held(question: str) -> list[str]:
-    """Budget years the resident named that Nokware doesn't hold. Found here rather than asked of the model: a gap
-    the answer never mentions reads as though the figures were withheld."""
+    """Found in code rather than asked of the model: a gap the answer never mentions reads as though the figures
+    were withheld."""
     if not BUDGET_WORDS.search(question):
         return []
     held = set(budget_figures.years())
     return [f"Approved budget · {year}" for year in sorted({int(y) for y in _YEAR_ASKED.findall(question)} - held)]
 
 
-def _budget_figures(calls: list[dict[str, Any]]) -> tuple[list[BudgetFigure], list[str]]:
-    """The budget figures asked for, and what was asked for that Nokware doesn't hold: a gap is said, not filled."""
+def _nearest_held(missing: list[str]) -> list[BudgetFigure]:
+    """The years Nokware does hold, when the ones asked for it doesn't.
+
+    A gap said on its own — "no figures for 2023" — leaves a resident with nothing, when the same document set
+    answers the question next to the one they asked. So where a budget figure was wanted and none was found, every
+    year that is held is read and offered, cited like any other figure and never presented as the year asked for.
+    """
+    if not missing:
+        return []
+    offered = []
+    for index, year in enumerate(budget_figures.years(), 1):
+        found = budget_figures.figure(BudgetFigures(year=year), f"{budget_figures.LABEL_PREFIX}{index}")
+        if found:
+            # Named for what it is. Offered beside a gap, a bare "Approved budget · 2026" can be read as the
+            # department or the year that was asked for; this one can only be read as the Assembly's whole budget.
+            offered.append(replace(found, description=f"{found.description} · the Assembly's whole budget"))
+    return offered
+
+
+def _budget_figures(wanted_figures: list[BudgetFigures]) -> tuple[list[BudgetFigure], list[str]]:
+    """A gap is said, not filled."""
     found, missing = [], []
-    for index, call in enumerate(calls, 1):
-        try:
-            wanted = BudgetFigures.model_validate(call["args"])
-        except ValidationError:
-            continue
+    for index, wanted in enumerate(wanted_figures, 1):
         figure = budget_figures.figure(wanted, f"{budget_figures.LABEL_PREFIX}{index}")
         if figure:
             found.append(figure)
@@ -258,17 +287,16 @@ def _budget_figures(calls: list[dict[str, Any]]) -> tuple[list[BudgetFigure], li
     return found, missing
 
 
-def _when(iso: str) -> str:
-    """"14 September 2026, 02:30 GMT" (Accra keeps GMT all year)."""
+def when(iso: str) -> str:
+    """Accra keeps GMT all year."""
     moment = datetime.fromisoformat(iso)
     return f"{moment.day} {moment:%B %Y, %H:%M} GMT"
 
 
 def figure_context(figure: Figure) -> str:
-    """One figure as the answering model sees it."""
     breakdown = "; ".join(f"{name}: {value}" for name, value in figure.rows)
     lines = [
-        f"[{figure.label}] Live report data (reports residents filed with Nokware, counted {_when(figure.counted_at)}): "
+        f"[{figure.label}] Live report data (reports residents filed with Nokware, counted {when(figure.counted_at)}): "
         f"{figure.description}",
         f"Result: {figure.value}",
         *([f"Breakdown: {breakdown}"] if breakdown else []),

@@ -3,7 +3,7 @@ import { FileTextIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ledgerFileUrl } from "@/lib/api/public";
 
-/** Opens a published document's PDF; the API redirects to a fresh short-lived link. */
+/** The API redirects to a fresh short-lived link. */
 export function LedgerPdfLink({ documentId, testId }: { documentId: string; testId: string }) {
   return (
     <Button variant="secondary" size="sm" asChild>

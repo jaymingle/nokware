@@ -1,9 +1,9 @@
 import { DocumentLine } from "@/components/petitions/ledger-matches";
+import { ReplyGiven, ReplyToResponse } from "@/components/petitions/petition-reply";
 import { respondedLine } from "@/lib/petitions";
 
 import type { PetitionDetail } from "@/lib/api/types";
 
-/** The MCE's public response, as given: what it is, the statement, anything cited, and when (and how late). */
 export function MceResponse({ petition }: { petition: PetitionDetail }) {
   const response = petition.response;
   if (!response) return null;
@@ -21,6 +21,10 @@ export function MceResponse({ petition }: { petition: PetitionDetail }) {
         </div>
       ) : null}
       <p className="text-[13px] text-ink-soft" data-testid="petition-response-when">{respondedLine({ responded_at: response.responded_at, response_due: petition.response_due })}</p>
+      {/* The answer to the answer, in the same place the public reads the response itself. */}
+      {response.reply
+        ? <ReplyGiven reply={response.reply} name={petition.started_by} />
+        : <ReplyToResponse petition={petition} />}
     </section>
   );
 }

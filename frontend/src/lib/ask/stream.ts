@@ -26,14 +26,11 @@ async function read(reader: ReadableStreamDefaultReader<Uint8Array>, signal: Abo
     return await reader.read();
   } catch (error) {
     if (signal.aborted) throw error;
-    throw new AskError(CUT_OFF_MESSAGE); // the connection dropped mid-answer
+    throw new AskError(CUT_OFF_MESSAGE);
   }
 }
 
-/**
- * Asks the Ledger and reports each event as it arrives. Resolves once the
- * stream ends; throws AskError if it can't start or ends without an answer.
- */
+/** Throws AskError if the stream can't start or ends without an answer. */
 export async function streamAsk(question: string, onEvent: (event: AskStreamEvent) => void, signal: AbortSignal): Promise<void> {
   const reader = (await open(question, signal)).getReader();
   const decoder = new TextDecoder();

@@ -1,7 +1,7 @@
 """What fonts leave in extracted PDF text, mended at ingestion: known letters restored, nothing guessed."""
 
 from app.services import ingestion
-from app.services.pdf_text import mend, needs_mending
+from app.services.pdf_text import mend
 
 
 def test_ligatures_become_their_letters_so_search_finds_the_word() -> None:
@@ -18,6 +18,5 @@ def test_a_lost_character_becomes_a_space_never_a_guess() -> None:
     assert mend("reacts to them\ufffd We will") == "reacts to them  We will"
 
 
-def test_ingestion_mends_and_says_what_still_needs_it() -> None:
+def test_ingestion_mends() -> None:
     assert ingestion.clean_text("\uf002ood\x00 risk\x07") == "flood risk "
-    assert needs_mending("\uf002ood") and not needs_mending("flood • risk")

@@ -1,14 +1,7 @@
 """Turn a published ledger document into searchable chunks.
 
-ingest_document() is the single entry point for every publish path: agency
-upload, department accept, MCE overrule, the held-document timer, and the AMA
-bulk import. It downloads the PDF from MinIO, extracts its text, splits it into
-overlapping chunks, embeds them with gemini-embedding-2 (768 dims) and
-atomically replaces the document's rows in document_chunks. Re-running it for
-the same document is safe: chunks are replaced, never duplicated.
-
-Image-only PDFs (scanned pages without a text layer) stay published but are
-marked not searchable: chunkCount=0 with an ingestionError saying why.
+ingest_document() is the single entry point for every publish path. Image-only PDFs stay published but are marked
+not searchable, with an ingestionError saying why.
 """
 
 import io
@@ -54,12 +47,10 @@ class IngestionResult:
 
 
 def clean_text(text: str) -> str:
-    """Make extracted PDF text safe for Postgres and useful for embeddings, with what fonts left behind mended."""
     return mend(_SPACE_CHARS.sub(" ", _DROP_CHARS.sub("", text)))
 
 
 def extract_pdf_pages(pdf_bytes: bytes) -> list[str]:
-    """Return the cleaned, stripped text of each page (empty for image-only pages)."""
     reader = PdfReader(io.BytesIO(pdf_bytes))
     return [clean_text(page.extract_text() or "").strip() for page in reader.pages]
 
@@ -74,7 +65,6 @@ def _is_transient(exc: Exception) -> bool:
 
 
 def _embed_batch(batch: list[str], title: str) -> list[list[float]]:
-    """Embed one batch in document mode, backing off on rate limits and 5xx errors."""
     for attempt in range(1, EMBED_MAX_ATTEMPTS + 1):
         try:
             return get_embeddings().embed_documents(batch, batch_size=EMBED_BATCH_SIZE, titles=[title] * len(batch))
@@ -88,7 +78,7 @@ def _embed_batch(batch: list[str], title: str) -> list[list[float]]:
 
 
 def embed_chunks(chunks: list[str], title: str) -> list[list[float]]:
-    """Embed chunks batch by batch, so a retry only repeats the failed batch."""
+    """Batch by batch, so a retry only repeats the failed batch."""
     vectors: list[list[float]] = []
     for start in range(0, len(chunks), EMBED_BATCH_SIZE):
         vectors.extend(_embed_batch(chunks[start : start + EMBED_BATCH_SIZE], title))
@@ -109,11 +99,7 @@ def _ingest(document_id: str, document: dict) -> IngestionResult:
 
 
 def ingest_document(document_id: str) -> IngestionResult:
-    """Chunk, embed and store one published document. Safe to call repeatedly.
-
-    Raises IngestionRefused unless the document is published. Any other failure
-    is recorded on the document (ingestionError, ingestedAt cleared) and re-raised.
-    """
+    """Safe to call repeatedly. Any failure other than IngestionRefused is recorded on the document and re-raised."""
     document = ledger_documents.get_document(document_id)
     if document.get("status") != LedgerStatus.PUBLISHED:
         raise IngestionRefused(f"{document_id} is {document.get('status')!r}; only published documents are ingested")

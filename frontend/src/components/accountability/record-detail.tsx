@@ -1,9 +1,11 @@
 import { FileTextIcon, ScaleIcon } from "lucide-react";
 import Link from "next/link";
 
+import { StatusTag } from "@/components/status-tag";
 import { Button } from "@/components/ui/button";
+import { ASSUMPTION_NOTE, LEDGER_YEAR_NOTE, dateLabel, gapSentence, recordTestId, rtiHref } from "@/lib/accountability";
 import { ledgerFileUrl } from "@/lib/api/public";
-import { ASSUMPTION_NOTE, LEDGER_YEAR_NOTE, STATE_LABELS, dateLabel, gapSentence, rtiHref } from "@/lib/accountability";
+import { recordStatus } from "@/lib/status";
 
 import type { RecordDocument, RecordPeriod, RecordRequirement } from "@/lib/api/types";
 
@@ -96,14 +98,13 @@ function Explanation({ requirement, period, checked, testId }: { requirement: Re
   );
 }
 
-/** One cell of the record, opened: what is held, what isn't, and what to do about it. */
 export function RecordDetail({ requirement, period, checked }: { requirement: RecordRequirement; period: RecordPeriod; checked: string }) {
-  const testId = `record-${requirement.id}-${period.label.replace(/\W+/g, "-")}`;
+  const testId = recordTestId(requirement, period);
   return (
     <section aria-live="polite" className="flex flex-col gap-3 rounded-xl border bg-card p-4 sm:p-5" data-testid={`${testId}-detail`}>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h3 className="text-[18px]">{requirement.name}, {period.label}</h3>
-        <span className="text-[12.5px] text-ink-soft">{STATE_LABELS[period.state]}</span>
+        <StatusTag tone={recordStatus(period.state).tone}>{recordStatus(period.state).label}</StatusTag>
       </div>
       {requirement.issued_by ? <p className="text-[13px] text-ink-soft">Issued by {requirement.issued_by}, not by the Assembly.</p> : null}
       <Explanation requirement={requirement} period={period} checked={checked} testId={testId} />

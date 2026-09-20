@@ -1,17 +1,11 @@
 """A precise location a personal-safety reporter chose to share so that help can come.
 
-This is the one exception to the coarse-location rule (a sub-metro at most), and
-only on the citizen's explicit opt-in (PLACE, after filing). The location is kept
-with the citizen's numbers in report_contacts, encrypted at rest, and deleted with
-them 30 days after the case closes, or at once when the citizen replies REMOVE,
-which is confirmed back only after re-reading that it is gone. It is never held
-in Redis on the way.
+The one exception to the coarse-location rule (a sub-metro at most), on the citizen's explicit opt-in only. It is
+kept with the citizen's numbers, encrypted at rest, deleted with them or at once when the citizen asks, and never
+held in Redis on the way.
 
-Only a Police or Social Welfare account that is an active recipient of that
-personal-safety case can open it, one deliberate view at a time. Each view goes
-to the case's audit trail (who and when, never the location) and to the
-citizen's status page: "Your location was viewed by Ghana Police Service on ...".
-It never reaches the MCE, another department (even after a reassignment), a
+Only a Police or Social Welfare account actively handling the case can open it, one deliberate view at a time, and
+each view is shown to the citizen. It never reaches the MCE, another department (even after a reassignment), a
 list, a message, the outbox, the logs, Ask or the dashboard.
 """
 
@@ -45,7 +39,6 @@ class SharedLocation:
 
 
 def _is_responder_case(principal: Principal, case: dict[str, Any], assignments: list[dict[str, Any]]) -> bool:
-    """A Police or Social Welfare account, actively handling this personal-safety case."""
     team = principal.recipient
     if case.get("category") != Category.PERSONAL_SAFETY or principal.role not in (Role.DEPARTMENT, Role.AGENCY):
         return False
@@ -53,7 +46,7 @@ def _is_responder_case(principal: Principal, case: dict[str, Any], assignments: 
 
 
 def share(case_id: str, address: str | None, latitude: float | None, longitude: float | None, now: datetime) -> None:
-    """Keep the location the citizen chose to give, and note in the trail that one was shared (not what)."""
+    """The trail notes that a location was shared, never what."""
     text = (address or "").strip()[:ADDRESS_MAX] or None
     if text is None and (latitude is None or longitude is None):
         raise ValueError("A location needs an address or a pin.")
@@ -64,7 +57,7 @@ def share(case_id: str, address: str | None, latitude: float | None, longitude: 
 
 
 def remove(case_id: str) -> bool:
-    """Delete the location at the citizen's word. True only once a fresh read shows it is gone."""
+    """True only once a fresh read shows it is gone."""
     update_contact(case_id, {"exactLocation": None, "exactLocationAt": None})
     gone = not (contact_for(case_id) or {}).get("exactLocation")
     if gone:
@@ -73,14 +66,12 @@ def remove(case_id: str) -> bool:
 
 
 def shared_at(principal: Principal, case: dict[str, Any], assignments: list[dict[str, Any]]) -> str | None:
-    """When a location was shared, for an account that may open it; None for everyone else."""
     if not _is_responder_case(principal, case, assignments):
         return None
     return (contact_for(case["$id"]) or {}).get("exactLocationAt")
 
 
 def open_location(principal: Principal, case: dict[str, Any], assignments: list[dict[str, Any]]) -> SharedLocation:
-    """One deliberate view by a responder: recorded in the trail, and shown to the citizen."""
     if not _is_responder_case(principal, case, assignments):
         raise NotAllowed("Only the Police or Social Welfare handling this case can see a shared location.")
     contact = contact_for(case["$id"]) or {}
@@ -95,7 +86,7 @@ def open_location(principal: Principal, case: dict[str, Any], assignments: list[
 
 
 def views(case_id: str) -> list[dict[str, str]]:
-    """Each time a service opened the location: the service, never the person, and when."""
+    """The service, never the person."""
     return [
         {"by": RECIPIENT_NAMES.get(entry.get("toDept") or "", "A responding service"), "at": entry["timestamp"]}
         for entry in case_history.entries_for(case_id)

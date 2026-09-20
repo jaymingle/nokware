@@ -5,6 +5,14 @@
   place: new attributes are added and two existing ones adjusted (status gains
   "escalated"; assignedDepartment becomes optional, since recipients now live in
   case_assignments). Nothing is deleted.
+- Later additions, all additive, all re-derived from the Python enums so a
+  re-run writes the same set again: case_history gains staffNote (what staff
+  wrote for the resident at a stage) and the "reopened" action; notifications
+  gains the "reassigned" and "reopened" events; citizen_reports gains
+  reassignedAt / reassignedFrom / reassignedTo and reopenedAt, with an index on
+  each date so the missed-message sweep can find a case by them, and
+  escalationPhotoIds (the photos a resident attaches when escalating, kept
+  apart from the photoIds sent when the report was filed).
 - New collections: case_assignments, report_contacts (numbers encrypted at
   rest) and notifications (the outbox).
 
@@ -23,13 +31,22 @@ from appwrite.exception import AppwriteException
 from appwrite.query import Query
 
 from app.services.appwrite_client import DATABASE_ID, get_databases, get_teams, quiet_sdk_deprecation_warnings
-from app.services.case_history import COLLECTION_ID as HISTORY, NOTE_MAX, ActorRole, CaseHistoryAction
+from app.services.case_history import COLLECTION_ID as HISTORY
+from app.services.case_history import NOTE_MAX, STAFF_NOTE_MAX, ActorRole, CaseHistoryAction
 from app.services.case_workflow import AssignmentStatus, CaseStatus
 from app.services.citizen_reports import (
     ASSIGNMENTS_COLLECTION as ASSIGNMENTS,
+)
+from app.services.citizen_reports import (
     CONTACTS_COLLECTION as CONTACTS,
+)
+from app.services.citizen_reports import (
     NOTIFICATIONS_COLLECTION as NOTIFICATIONS,
+)
+from app.services.citizen_reports import (
     REPORTS_COLLECTION as REPORTS,
+)
+from app.services.citizen_reports import (
     IntakeChannel,
     NotificationChannel,
     NotificationEvent,
@@ -45,6 +62,8 @@ ATTRIBUTE_WAIT_SECONDS = 300  # a collection of ~30 attributes can take minutes 
 LISTING = [Query.limit(500)]
 ID = 36  # a UUID
 TEAM = 64
+HASH = 64  # a sha256 hex digest
+OBJECT_NAME = 256  # a photo's name in MinIO: "reports/<case id>/01-<hex>.jpg" is 64, with room to spare
 ENCRYPTED_MIN = 150  # Appwrite's minimum size for an encrypted string; a phone number needs far less
 Creator = Callable[[], object]
 
@@ -77,11 +96,21 @@ def report_attributes() -> dict[str, Creator]:
         "resolvedAt": lambda: db.create_datetime_attribute(*c, "resolvedAt", False),
         "escalatedAt": lambda: db.create_datetime_attribute(*c, "escalatedAt", False),
         "escalationNote": lambda: db.create_string_attribute(*c, "escalationNote", NOTE_MAX, False),
+        # The photos sent with an escalation, in their own attribute rather than mixed into photoIds: a photo's
+        # stage is then a fact about where it is stored, not something to be read back out of a file name, and
+        # every case filed before today is already correct with the attribute empty.
+        "escalationPhotoIds": lambda: db.create_string_attribute(*c, "escalationPhotoIds", OBJECT_NAME, False,
+                                                                 array=True),
+        # The last move and the last reopening, stamped on the case itself. The message about either is composed
+        # from the case alone, which is what lets the missed-message sweep send it again if the first send was lost.
+        "reassignedAt": lambda: db.create_datetime_attribute(*c, "reassignedAt", False),
+        "reassignedFrom": lambda: db.create_string_attribute(*c, "reassignedFrom", TEAM, False),
+        "reassignedTo": lambda: db.create_string_attribute(*c, "reassignedTo", TEAM, False),
+        "reopenedAt": lambda: db.create_datetime_attribute(*c, "reopenedAt", False),
     }
 
 
 def adjust_reports() -> None:
-    """The two Stage A attributes that no longer fit, changed without deleting anything."""
     db, c = get_databases(), (DATABASE_ID, REPORTS)
     db.update_enum_attribute(*c, "status", values(CaseStatus), False, None)
     db.update_string_attribute(*c, "assignedDepartment", False, None)
@@ -96,22 +125,30 @@ def history_attributes() -> dict[str, Creator]:
         "fromStatus": lambda: db.create_enum_attribute(*c, "fromStatus", values(CaseStatus), False),
         "toStatus": lambda: db.create_enum_attribute(*c, "toStatus", values(CaseStatus), False),
         "note": lambda: db.create_string_attribute(*c, "note", NOTE_MAX, False),
+        # What a member of staff wrote at this stage, for the resident: kept apart from the server's own line, so it
+        # can be shown, trimmed or withheld on its own.
+        "staffNote": lambda: db.create_string_attribute(*c, "staffNote", STAFF_NOTE_MAX, False),
         "channel": lambda: db.create_enum_attribute(*c, "channel", values(NotificationChannel), False),
     }
 
 
 def adjust_history() -> None:
     get_databases().update_enum_attribute(DATABASE_ID, HISTORY, "action", values(CaseHistoryAction), True, None)
-    print("updated   case_history.action (the full set of case steps)")
+    print("updated   case_history.action (the full set of case steps, now including reopened)")
 
 
 def adjust_notifications() -> None:
-    """The outbox's status gains "not_sent" (recorded while no provider is wired in)."""
+    """The outbox's enums, re-derived from the Python ones: status gained "not_sent" (recorded while no provider is
+    wired in) and event gained "started" (a recipient began work), then "reassigned" (the case moved to another
+    office) and "reopened" (the MCE sent it back). Re-running writes the same set again."""
     db = get_databases()
     existing = {a.key for a in db.list_attributes(DATABASE_ID, NOTIFICATIONS, queries=LISTING).attributes}
     if "status" in existing:
         db.update_enum_attribute(DATABASE_ID, NOTIFICATIONS, "status", values(NotificationStatus), True, None)
         print("updated   notifications.status (the full set of outcomes)")
+    if "event" in existing:
+        db.update_enum_attribute(DATABASE_ID, NOTIFICATIONS, "event", values(NotificationEvent), True, None)
+        print("updated   notifications.event (the full set of moments a citizen hears about)")
 
 
 def assignment_attributes() -> dict[str, Creator]:
@@ -141,7 +178,7 @@ def contact_attributes() -> dict[str, Creator]:
         "purgeAt": lambda: db.create_datetime_attribute(*c, "purgeAt", False),
         # A one-time token (stored hashed) that lets the confirmation page ask
         # again about messages when the classifier filed a report as personal safety.
-        "preferencesTokenHash": lambda: db.create_string_attribute(*c, "preferencesTokenHash", 64, False),
+        "preferencesTokenHash": lambda: db.create_string_attribute(*c, "preferencesTokenHash", HASH, False),
         "preferencesExpiresAt": lambda: db.create_datetime_attribute(*c, "preferencesExpiresAt", False),
     }
 
@@ -169,11 +206,20 @@ INDEXES: dict[str, dict[str, tuple[DatabasesIndexType, list[str]]]] = {
         "uniq_reference": (UNIQUE, ["reference"]),
         "idx_category_created": (KEY, ["category", "createdAt"]),
         "idx_subMetro": (KEY, ["subMetro"]),
+        # The missed-message sweep looks for cases by when each moment happened: filed, resolved, escalated.
+        # idx_category_created can't serve those — its first column is the category, not the date.
+        "idx_createdAt": (KEY, ["createdAt"]),
+        "idx_resolvedAt": (KEY, ["resolvedAt"]),
+        "idx_escalatedAt": (KEY, ["escalatedAt"]),
+        "idx_reassignedAt": (KEY, ["reassignedAt"]),
+        "idx_reopenedAt": (KEY, ["reopenedAt"]),
     },
     HISTORY: {"idx_case_timestamp": (KEY, ["caseId", "timestamp"])},
     ASSIGNMENTS: {
         "idx_recipient_active_status": (KEY, ["recipient", "active", "status"]),
         "idx_caseId": (KEY, ["caseId"]),
+        # The missed-message sweep looks for work started lately, and only the assignment records when that was.
+        "idx_acknowledgedAt": (KEY, ["acknowledgedAt"]),
     },
     CONTACTS: {"uniq_caseId": (UNIQUE, ["caseId"]), "idx_purgeAt": (KEY, ["purgeAt"])},
     NOTIFICATIONS: {"idx_caseId": (KEY, ["caseId"]), "idx_status": (KEY, ["status"])},

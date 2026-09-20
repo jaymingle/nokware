@@ -1,6 +1,6 @@
 import { ExternalLinkIcon, MailIcon, MessageCircleIcon, PhoneIcon } from "lucide-react";
 
-import { Tag } from "@/components/documents/tag";
+import { StatusTag } from "@/components/status-tag";
 import { numberHref, tierNote } from "@/lib/contacts";
 import { formatDate } from "@/lib/time";
 import { cn } from "@/lib/utils";
@@ -30,7 +30,7 @@ function NumberLink({ number, testId, marked = false }: { number: ContactNumber;
   );
 }
 
-/** Numbers given to Nokware that differ from the cited page: shown, with why they aren't current. */
+/** Numbers given to Nokware that differ from the cited page. */
 function EarlierNumbers({ contactId, numbers }: { contactId: string; numbers: ContactNumber[] }) {
   return (
     <ul className="flex flex-col gap-1.5">
@@ -44,8 +44,7 @@ function EarlierNumbers({ contactId, numbers }: { contactId: string; numbers: Co
   );
 }
 
-/** Where the number comes from, beside it: the emergency-line label, the cited page, or an unverified warning. */
-export function SourceLine({ contact }: { contact: PublicContact }) {
+function SourceLine({ contact }: { contact: PublicContact }) {
   if (contact.tier === 2 && contact.source) {
     return (
       <p className="text-[12px] text-ink-soft">
@@ -60,7 +59,7 @@ export function SourceLine({ contact }: { contact: PublicContact }) {
   if (contact.tier === 1) return <p className="text-[12px] text-ink-soft">{tierNote(contact)}</p>;
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <Tag tone="gold" wrap testId={`contact-${contact.id}-unverified`}>{tierNote(contact)}</Tag>
+      <StatusTag tone="waiting" wrap testId={`contact-${contact.id}-unverified`}>{tierNote(contact)}</StatusTag>
       {contact.press_url ? (
         <a href={contact.press_url} target="_blank" rel="noopener" data-touch-target className="inline-flex items-center gap-1 text-[12px] text-teal underline underline-offset-2" data-testid={`contact-${contact.id}-press`}>
           Press report <ExternalLinkIcon aria-hidden className="size-3" />
@@ -70,7 +69,6 @@ export function SourceLine({ contact }: { contact: PublicContact }) {
   );
 }
 
-/** One office or line: its name, what it's for, its numbers, and where they come from. */
 export function ContactItem({ contact }: { contact: PublicContact }) {
   const current = contact.numbers.filter((n) => n.current);
   const earlier = contact.numbers.filter((n) => !n.current);

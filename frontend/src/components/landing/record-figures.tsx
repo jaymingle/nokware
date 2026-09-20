@@ -4,17 +4,6 @@ import Link from "next/link";
 
 import { useDashboard, usePublishingRecord } from "@/lib/api/public-queries";
 
-/**
- * What the record actually holds, on the page that makes claims about it.
- *
- * The landing page asserted four things about Nokware and showed no evidence
- * for any of them. These are the live figures, the same ones the dashboard and
- * the publishing record show, so the claims can be checked in one glance — the
- * gap included, which is the figure the Assembly would rather not lead with.
- *
- * Every figure is a link to where it comes from. If either call fails the panel
- * simply isn't there: a landing page must not break because a count didn't load.
- */
 type Figure = { value: string; label: string; href: string; testId: string };
 
 function figures(documents?: number, departments?: number, missing?: number, due?: number): Figure[] {
@@ -23,7 +12,7 @@ function figures(documents?: number, departments?: number, missing?: number, due
     found.push({
       value: documents.toLocaleString(),
       label: departments ? `documents held, from ${departments} departments` : "documents held",
-      href: "/accountability/documents",
+      href: "/accountability",
       testId: "landing-figure-documents",
     });
   }
@@ -32,13 +21,17 @@ function figures(documents?: number, departments?: number, missing?: number, due
       value: missing.toLocaleString(),
       // "we would expect", as the record itself says it: the list of required documents is Nokware's own.
       label: `of the ${due} documents we would expect are not there`,
-      href: "/accountability/documents",
+      href: "/accountability",
       testId: "landing-figure-missing",
     });
   }
   return found;
 }
 
+/**
+ * The landing page makes claims about the record, so it shows the live figures behind them, the gap included.
+ * If either call fails the panel isn't there: a landing page must not break because a count didn't load.
+ */
 export function RecordFigures() {
   const dashboard = useDashboard();
   const record = usePublishingRecord();
@@ -64,7 +57,7 @@ export function RecordFigures() {
       </ul>
       <p className="border-t pt-3 text-[12.5px] text-ink-soft">
         Counted from the Ledger against what the Assembly is required to publish.{" "}
-        <Link href="/accountability/documents" className="text-teal underline underline-offset-2" data-testid="landing-figures-record">
+        <Link href="/accountability" className="text-teal underline underline-offset-2" data-testid="landing-figures-record">
           See the record
         </Link>
       </p>

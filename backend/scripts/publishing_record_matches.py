@@ -14,10 +14,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.services.appwrite_client import quiet_sdk_deprecation_warnings  # noqa: E402
-from app.services.ledger_documents import utc_now  # noqa: E402
-from app.services.publishing_record import build, published_documents  # noqa: E402
-from app.services.vectorstore import first_chunks  # noqa: E402
+from app.services.appwrite_client import quiet_sdk_deprecation_warnings
+from app.services.ledger_documents import utc_now
+from app.services.publishing_record import build, published_documents
+from app.services.vectorstore import first_chunks
 
 
 def main() -> None:

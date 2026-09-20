@@ -1,7 +1,4 @@
-"""The public contact directory: who to call, grouped by service, each number with its source. No sign-in.
-
-    GET /api/contacts
-"""
+"""The public contact directory: who to call, grouped by service, each number with its source. No sign-in."""
 
 from fastapi import APIRouter
 

@@ -1,16 +1,10 @@
 """An Ask answer as CSV: one file, a row per thing, and every live figure as rows a spreadsheet can use.
 
-A `section` column says what each row is: notice, question, answer, note,
-source, figure. A figure is a row for its total and a row for each line of its
-breakdown (`category`), with the count or amount in `value` as a number. "Fewer than 5"
-leaves `value` empty and says so in `shown_as`, so a spreadsheet can't add it up
-as if it were a number. A budget figure's amounts are rows too: they are read from
-the Assembly's budgets and each block of them proved against its stated total
-(budget_extract.py). Numbers quoted from other documents stay in the answer's text.
+"Fewer than 5" leaves `value` empty and says so in `shown_as`, so a spreadsheet can't add it up as if it were a
+number. Numbers quoted from documents other than budgets stay in the answer's text.
 
-Written as UTF-8 with a byte-order mark, so Excel shows GH¢ and ₵. A cell that
-would start a formula (=, +, -, @) is prefixed with an apostrophe: the question is
-the resident's own words.
+Written with a byte-order mark, so Excel shows GH¢ and ₵. A cell that would start a formula is prefixed with an
+apostrophe: the question is the resident's own words.
 """
 
 import csv
@@ -25,7 +19,7 @@ COLUMNS = ["section", "number", "item", "category", "value", "shown_as", "detail
 _FORMULA = ("=", "+", "-", "@", "\t", "\r")
 
 
-def _safe(value: object) -> object:
+def safe_cell(value: object) -> object:
     return f"'{value}" if isinstance(value, str) and value.startswith(_FORMULA) else value
 
 
@@ -33,10 +27,7 @@ _AMOUNT = re.compile(r"^(?:GH¢|GHS|₵)?\s*(\d[\d,]*(?:\.\d+)?)$")
 
 
 def figure_value(shown: str) -> int | float | str:
-    """A figure as a number a spreadsheet can use: a count, or an amount with its currency left in "shown as".
-
-    "Fewer than 5" is never a number — the cell stays empty, so a column can't be totalled to reveal it. A budget
-    amount, "GH¢ 20,270,110", was an empty cell too, because only bare digits were read."""
+    """An amount's currency stays in "shown as". "Fewer than 5" is never a number: the cell stays empty."""
     if shown == "none":
         return 0
     found = _AMOUNT.match(shown.strip())
@@ -76,5 +67,5 @@ def csv_bytes(content: Content) -> bytes:
     writer = csv.DictWriter(out, fieldnames=COLUMNS, extrasaction="ignore", lineterminator="\r\n")
     writer.writeheader()
     for row in rows:
-        writer.writerow({key: _safe(value) for key, value in row.items() if value is not None})
+        writer.writerow({key: safe_cell(value) for key, value in row.items() if value is not None})
     return out.getvalue().encode("utf-8-sig")

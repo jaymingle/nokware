@@ -2,7 +2,7 @@
 
 import json
 from collections.abc import Iterator
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
@@ -71,7 +71,7 @@ def test_stream_sends_progress_then_the_checked_answer(pipeline) -> None:
 
 
 def test_the_model_is_told_todays_date_so_this_year_means_this_year(pipeline, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(rag, "utc_now", lambda: datetime(2026, 9, 14, 3, 0, tzinfo=timezone.utc))
+    monkeypatch.setattr(rag, "utc_now", lambda: datetime(2026, 9, 14, 3, 0, tzinfo=UTC))
     chain = pipeline([retrieved("ama-1", IMPORTED)], ["Fees [S1]."])
     list(rag.stream_answer("How many cases this year?"))
     assert chain.inputs[-1]["today"] == "Monday 14 September 2026"

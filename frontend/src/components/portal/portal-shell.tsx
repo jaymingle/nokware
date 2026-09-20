@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { useEffect, type ReactNode } from "react";
 
 import { PortalHeader } from "@/components/portal/portal-header";
 import { StatusScreen } from "@/components/portal/status-screen";
@@ -44,7 +44,6 @@ function Unavailable({ message, onRetry }: { message: string; onRetry: () => voi
   );
 }
 
-/** Shows the portal only to a signed-in user with a role; handles every other state. */
 export function PortalShell({ children }: { children: ReactNode }) {
   const { status, error, signOut, retry } = useAuth();
   if (status === "loading") return <StatusScreen title="Opening the portal…" />;
@@ -55,7 +54,8 @@ export function PortalShell({ children }: { children: ReactNode }) {
     <div className="relative flex flex-1 flex-col">
       <SkipLink />
       <PortalHeader />
-      <main id="main" className="mx-auto w-full max-w-[1360px] flex-1 px-7 pt-9 pb-16">{children}</main>
+      {/* The gutter lines up with the header's; the page shell inside spends the vertical space. */}
+      <main id="main" className="mx-auto w-full max-w-[1360px] flex-1 px-7">{children}</main>
     </div>
   );
 }

@@ -7,7 +7,6 @@ export function areaKey(text: string): string {
   return text.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
-/** The areas whose name or any other spelling contains what was typed; every area when nothing is. */
 export function matchAreas(query: string, subMetros: SubMetroRepresentation[]): AreaMatch[] {
   const key = areaKey(query);
   const matches: AreaMatch[] = [];

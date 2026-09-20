@@ -2,14 +2,13 @@ import type { ContactNumber, PublicContact } from "@/lib/api/types";
 
 const GHANA = "233";
 
-/** A number as a link: tel: for a call (short codes like 112 stay as they are), wa.me for WhatsApp. */
+/** Short codes like 112 stay as they are. */
 export function numberHref(number: ContactNumber): string {
   const digits = number.number.replace(/\D/g, "");
   if (number.kind === "whatsapp") return `https://wa.me/${digits.startsWith("0") ? GHANA + digits.slice(1) : digits}`;
   return `tel:${digits}`;
 }
 
-/** How far a number can be trusted, in words: said beside every number. */
 export function tierNote(contact: PublicContact): string {
   if (contact.tier === 1) return "National emergency line";
   if (contact.tier === 2) return "Official source";

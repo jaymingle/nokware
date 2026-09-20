@@ -1,23 +1,18 @@
 import Link from "next/link";
 
+import { rtiRequestHref } from "@/lib/accountability";
 import { formatDate } from "@/lib/time";
 
 import type { UnpublishedData } from "@/lib/api/types";
 
-/** Where to ask the Assembly for it, with the wording already filled in. */
-function rtiHref(finding: UnpublishedData): string {
-  return `/rti?${new URLSearchParams({ document: finding.rti_document, period: finding.rti_period })}`;
-}
-
 function Finding({ finding }: { finding: UnpublishedData }) {
   const testId = `unpublished-${finding.id}`;
-  // Not the warm gold of "Figures that stop": that is a figure that has aged,
-  // this is an absence, and the record already marks an absence in brick. Side
-  // by side, the two read as one undifferentiated block of warm boxes.
+  // Brick, not the gold of "Figures that stop": that is a figure that has aged, this is an absence. Side by side,
+  // two golds read as one undifferentiated block.
   return (
     <article className="flex flex-col gap-2.5 rounded-xl border border-s-[3px] border-brick/25 border-s-brick bg-card p-4 sm:p-5" data-testid={testId}>
       <div>
-        {/* The finding's own sentence, as written: nothing here is composed out of a label. */}
+        {/* The finding's own sentence: never composed out of a label. */}
         <h3 className="text-[18px] leading-snug" data-testid={`${testId}-headline`}>{finding.headline}</h3>
         <p className="mt-1 text-[13.5px] text-ink-soft">{finding.matters}</p>
       </div>
@@ -39,7 +34,7 @@ function Finding({ finding }: { finding: UnpublishedData }) {
       </div>
       <p className="text-[12.5px] text-ink-soft">{finding.instead} Checked {formatDate(finding.checked_on)}.</p>
       <div className="border-t pt-2.5">
-        <Link href={rtiHref(finding)} data-touch-target className="inline-flex items-center text-[13px] text-teal underline underline-offset-2" data-testid={`${testId}-rti`}>
+        <Link href={rtiRequestHref(finding.rti_document, finding.rti_period)} data-touch-target className="inline-flex items-center text-[13px] text-teal underline underline-offset-2" data-testid={`${testId}-rti`}>
           Request it from the Assembly under the RTI Act
         </Link>
       </div>
@@ -48,12 +43,8 @@ function Finding({ finding }: { finding: UnpublishedData }) {
 }
 
 /**
- * Things the public record would need that nobody publishes at all.
- *
- * The publishing record asks whether a document exists; "Figures that stop" asks
- * whether a figure is still being given. This asks whether the thing was ever
- * published by anyone — the question Accra's electoral-area boundaries failed,
- * which is why the dashboard draws those areas as tiles and not as shapes.
+ * Whether the thing was ever published by anyone: the question Accra's electoral-area boundaries failed, which is
+ * why the dashboard draws those areas as tiles and not as shapes.
  */
 export function UnpublishedRecord({ findings, about }: { findings?: UnpublishedData[]; about?: string }) {
   // Optional on purpose, like the reporting gaps: an API that predates these findings must not blank the record.

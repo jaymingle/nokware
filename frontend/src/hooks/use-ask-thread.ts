@@ -8,7 +8,6 @@ import { applyEvent, failTurn, newTurn, type Turn } from "@/lib/ask/turn";
 
 type SetTurns = Dispatch<SetStateAction<Turn[]>>;
 
-/** Streams one answer into its turn, cancelling any answer still in progress. */
 function useAnswerRunner(setTurns: SetTurns) {
   const controller = useRef<AbortController | null>(null);
   useEffect(() => () => controller.current?.abort(), []);
@@ -30,11 +29,7 @@ function useAnswerRunner(setTurns: SetTurns) {
   );
 }
 
-/**
- * The page's questions and answers. Each question is answered on its own (the
- * API keeps no conversation), one at a time; leaving the page cancels the
- * answer in progress.
- */
+/** The API keeps no conversation: each question is answered on its own, one at a time. */
 export function useAskThread() {
   const [turns, setTurns] = useState<Turn[]>([]);
   const counter = useRef(0);
@@ -59,6 +54,6 @@ export function useAskThread() {
     [run],
   );
 
-  const busy = turns.some((turn) => turn.stage === "searching" || turn.stage === "writing");
+  const busy = turns.some((turn) => turn.stage !== "done" && turn.stage !== "error");
   return { turns, ask, retry, busy };
 }

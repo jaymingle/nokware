@@ -1,43 +1,38 @@
 "use client";
 
-import type { FormEvent, ReactNode } from "react";
-
 import { CaseDialogFooter, useCaseDialog } from "@/components/cases/case-dialog";
+import { CaseNoteField, useCaseNote } from "@/components/cases/case-note-field";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 
-import type { CaseAction } from "@/lib/api/types";
+import type { CaseAction, CaseDetail } from "@/lib/api/types";
+import type { FormEvent, ReactNode } from "react";
 
-const NOTE_MAX = 2000;
-
-export type CaseNoteDialogProps = {
-  caseId: string;
-  action: Extract<CaseAction, "resolve" | "reopen" | "confirm-resolution">;
+type CaseNoteDialogProps = {
+  detail: CaseDetail;
+  action: Exclude<CaseAction, "reassign">;
   triggerLabel: string;
   title: string;
   description: ReactNode;
-  noteLabel: string;
-  hint: string;
+  /** Resolving can't be sent without a note; the other stages offer one. */
+  noteRequired: boolean;
   confirmLabel: string;
   success: string;
   tone?: "primary" | "secondary";
 };
 
-/** A case action that needs a note: resolving, reopening or confirming a resolution. */
-export function CaseNoteDialog({ caseId, action, tone = "primary", ...copy }: CaseNoteDialogProps) {
+export function CaseNoteDialog({ detail, action, tone = "primary", noteRequired, ...copy }: CaseNoteDialogProps) {
   const dialog = useCaseDialog(copy.success);
-  const testId = `case-${action}-${caseId}`;
+  const { note, setNote, onOpenChange, missing } = useCaseNote(dialog.onOpenChange);
+  const testId = `case-${action}-${detail.case_id}`;
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const note = String(new FormData(event.currentTarget).get("note") ?? "").trim();
-    void dialog.run({ id: caseId, action, body: { note } });
+    void dialog.run({ id: detail.case_id, action, body: { note: note.trim() } });
   }
 
   return (
-    <Dialog open={dialog.open} onOpenChange={dialog.onOpenChange}>
+    <Dialog open={dialog.open} onOpenChange={onOpenChange}>
       <DialogTrigger asChild>
         <Button variant={tone === "primary" ? "default" : "secondary"} data-testid={testId}>
           {copy.triggerLabel}
@@ -49,12 +44,14 @@ export function CaseNoteDialog({ caseId, action, tone = "primary", ...copy }: Ca
           <DialogDescription>{copy.description}</DialogDescription>
         </DialogHeader>
         <form onSubmit={onSubmit} className="flex flex-col gap-4">
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor={`${testId}-note`}>{copy.noteLabel}</Label>
-            <Textarea id={`${testId}-note`} name="note" required maxLength={NOTE_MAX} rows={4} data-testid={`${testId}-note`} />
-            <p className="text-[12.5px] text-ink-soft">{copy.hint}</p>
-          </div>
-          <CaseDialogFooter pending={dialog.pending} error={dialog.error} confirmLabel={copy.confirmLabel} testId={testId} />
+          <CaseNoteField testId={`${testId}-note`} name="note" value={note} onChange={setNote} internal={detail.private} required={noteRequired} />
+          <CaseDialogFooter
+            pending={dialog.pending}
+            error={dialog.error}
+            confirmLabel={copy.confirmLabel}
+            testId={testId}
+            disabled={noteRequired && missing}
+          />
         </form>
       </DialogContent>
     </Dialog>

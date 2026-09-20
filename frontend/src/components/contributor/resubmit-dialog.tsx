@@ -20,10 +20,9 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { usePdfForm } from "@/hooks/use-pdf-form";
 import { useRefreshDocuments, useResubmit } from "@/lib/api/queries";
+import { NOTE_MAX } from "@/lib/limits";
 
 import type { DocumentOut } from "@/lib/api/types";
-
-const NOTE_MAX = 2000;
 
 type ResubmitFormProps = { doc: DocumentOut; resubmit: ReturnType<typeof useResubmit>; onDone: () => void };
 
@@ -58,7 +57,6 @@ function ResubmitForm({ doc, resubmit, onDone }: ResubmitFormProps) {
   );
 }
 
-/** Send a corrected PDF back to the department after a dispute. Allowed once per document. */
 export function ResubmitDialog({ doc }: { doc: DocumentOut }) {
   const [open, setOpen] = useState(false);
   const resubmit = useResubmit();

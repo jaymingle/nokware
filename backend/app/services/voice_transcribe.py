@@ -1,22 +1,15 @@
 """A recording in words: what was said, in the language it was said in, and in English. One path for a WhatsApp
 voice note and a question spoken on the web's Ask page.
 
-Gemini 2.5 Flash listens to the recording itself (no separate speech service),
-at temperature 0, told the Assembly's place names so "Kaneshie" isn't heard as
-"Canashy", its common terms ("market stall", not "market store"), and how a
-case reference is spelled. It also says whether the speech
-was clear enough to act on, and whether it is about harm to a person: such a
-note never gets a spoken reply, which could play aloud near the person it is about.
+Gemini is told the Assembly's place names so "Kaneshie" isn't heard as "Canashy". A recording about harm to a person
+never gets a spoken reply, which could play aloud near the person it is about.
 
-Any language is accepted. What Nokware acts on is the English, and the citizen
-sees it ("I understood: …") before anything is filed or asked, so a bad
-transcription or translation is caught by the person who said it. Only English
-has been checked; Twi, Ga, Ewe and other Ghanaian languages are untested.
+The citizen sees the English ("I understood: …") before anything is filed or asked, so a bad transcription or
+translation is caught by the person who said it. Only English has been checked; Twi, Ga, Ewe and other Ghanaian
+languages are untested.
 
-listen() is what both channels call: it refuses a recording that is too long, and
-takes as unheard a transcript with more words than anyone could say in the
-recording's length (on a very short note Gemini can invent a whole sentence) or
-one that repeats these instructions back.
+On a very short note Gemini can invent a whole sentence, so a transcript with more words than anyone could say in the
+time counts as unheard.
 """
 
 from dataclasses import dataclass
@@ -106,7 +99,7 @@ def _readable(data: bytes, content_type: str) -> tuple[bytes, str]:
 
 
 def transcribe(data: bytes, content_type: str) -> Heard:
-    """The voice note's words. Raises TranscriptionFailed, or AudioRejected for a file that isn't audio."""
+    """Raises TranscriptionFailed, or AudioRejected for a file that isn't audio."""
     audio, kind = _readable(data, content_type)
     config = types.GenerateContentConfig(
         temperature=0.0, thinking_config=types.ThinkingConfig(thinking_budget=0),
@@ -123,7 +116,7 @@ def transcribe(data: bytes, content_type: str) -> Heard:
 
 
 def listen(data: bytes, content_type: str, max_seconds: float) -> Heard | Unusable:
-    """A recording's words, or why they can't be used. Raises TranscriptionFailed, or AudioRejected if it isn't audio."""
+    """Raises TranscriptionFailed, or AudioRejected if it isn't audio."""
     length = seconds(data)
     if length > max_seconds:
         return Unusable.TOO_LONG
@@ -134,6 +127,5 @@ def listen(data: bytes, content_type: str, max_seconds: float) -> Heard | Unusab
 
 
 def understood(english: str, language: str) -> str:
-    """How a recording's words are shown back, so the citizen can catch a mistake."""
     translated = "" if language.strip().lower() == "english" else f" (from {language}, translated by machine)"
     return f'I understood: "{english}"{translated}'

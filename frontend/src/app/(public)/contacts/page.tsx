@@ -1,6 +1,6 @@
-import type { Metadata } from "next";
-
 import { DirectoryPage } from "@/components/contacts/directory-page";
+
+import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Who to call",

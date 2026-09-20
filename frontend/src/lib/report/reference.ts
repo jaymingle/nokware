@@ -1,4 +1,5 @@
 // Mirrors the API's reference format ("K7QM-4TXP"): no 0/O, 1/I/L, so it reads out clearly.
+// Copied on purpose, for a check before any request: mirrors REFERENCE_ALPHABET in backend/app/services/report_rules.py.
 const ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
 const LENGTH = 8;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

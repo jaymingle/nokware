@@ -17,6 +17,9 @@ PHOTOS_BUCKET = "nokware-report-photos"
 
 DESCRIPTION_MAX = 8192
 MAX_PHOTOS = 10
+# What a resident may attach when escalating a resolved case: fewer than when filing, because an escalation is
+# "here is what is still wrong", not the whole report again.
+MAX_ESCALATION_PHOTOS = 5
 VOICE_NAME_MAX = 80
 
 
@@ -28,8 +31,11 @@ class IntakeChannel(StrEnum):
 
 class NotificationEvent(StrEnum):
     SUBMITTED = "submitted"
+    STARTED = "started"  # the first recipient started work; the others starting is not news to the citizen
     RESOLVED = "resolved"
     ESCALATED = "escalated"
+    REASSIGNED = "reassigned"  # the case moved to another office; never sent about a personal-safety case
+    REOPENED = "reopened"  # the MCE sent it back to be finished
 
 
 class NotificationChannel(StrEnum):

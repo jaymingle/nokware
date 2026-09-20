@@ -30,7 +30,7 @@ def _digits(raw: str) -> str:
 
 
 def normalise_phone(raw: str) -> str:
-    """A Ghanaian mobile number for SMS, as +233XXXXXXXXX. Accepts 024…, 233… or +233…."""
+    """Accepts 024…, 233… or +233…; returns +233XXXXXXXXX."""
     number = _digits(raw)
     if number.startswith("0") and len(number) == 10:
         number = f"+{GHANA_CODE}{number[1:]}"
@@ -42,7 +42,7 @@ def normalise_phone(raw: str) -> str:
 
 
 def normalise_whatsapp(raw: str) -> str:
-    """A WhatsApp number: a Ghanaian mobile, or any international number written with its + code."""
+    """WhatsApp also takes any international number written with its + code."""
     number = _digits(raw)
     if not number.startswith("+"):
         return normalise_phone(number)
@@ -64,10 +64,6 @@ class ContactChoice:
     whatsapp: str | None
     notify: bool  # send the submitted / resolved / escalated messages
     callback_consent: bool  # recipients may call the citizen about this case
-
-    @property
-    def given(self) -> bool:
-        return bool(self.phone or self.whatsapp)
 
 
 def save_contact(case_id: str, choice: ContactChoice) -> None:
@@ -104,5 +100,4 @@ def contacts_due_for_deletion(now: datetime, limit: int = 100) -> list[dict[str,
 
 
 def delete_contact(case_id: str) -> None:
-    """Deletes the citizen's numbers for good: the retention period is over."""
     get_databases().delete_document(DATABASE_ID, CONTACTS_COLLECTION, case_id)

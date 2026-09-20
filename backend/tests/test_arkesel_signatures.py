@@ -2,7 +2,7 @@
 
 import hashlib
 import hmac
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
@@ -99,7 +99,7 @@ def test_a_report_sets_the_outbox_rows_delivery_status(monkeypatch: pytest.Monke
     db = notifications.get_databases()
     monkeypatch.setattr(db, "list_documents", lambda *args, queries: Listing([Row()] if '"m-1"' in str(queries) else []))
     monkeypatch.setattr(db, "update_document", lambda *args: updates.append(args[3]))
-    at = datetime(2026, 9, 14, 12, 0, tzinfo=timezone.utc)
+    at = datetime(2026, 9, 14, 12, 0, tzinfo=UTC)
     assert notifications.record_delivery("m-1", "delivered", at)
     assert notifications.record_delivery("m-1", "<b>Failed</b>", at)  # only letters survive
     assert updates == [{"deliveryStatus": "DELIVERED", "deliveredAt": at.isoformat()}, {"deliveryStatus": "BFAILEDB"}]

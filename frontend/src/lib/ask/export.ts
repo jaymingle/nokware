@@ -10,9 +10,8 @@ export const EXPORT_FORMATS: { format: ExportFormat; label: string }[] = [
 ];
 
 /**
- * Excel is offered for an answer with figures a sheet can hold: counts of residents' reports, or budget figures read
- * from the Assembly's budgets and proved against their totals. Numbers quoted from other documents stay in the
- * answer's text: those come out of the PDFs as loose numbers, and a sheet would invite sums they can't support.
+ * Only report counts and budget figures proved against their totals go in a sheet. Numbers quoted from other documents
+ * come out of the PDFs loose, and a sheet would invite sums they can't support.
  */
 export const NO_SPREADSHEET = "A spreadsheet needs report counts or budget figures. This answer's figures are quoted from documents, which aren't read into rows.";
 
@@ -29,7 +28,6 @@ export const EXPORT_OFFLINE = "Nokware can't be reached. Check your connection a
 
 export class ExportError extends Error {}
 
-/** The file name the API gave in Content-Disposition, or a plain one. */
 export function filenameFrom(disposition: string | null, format: ExportFormat): string {
   const match = disposition?.match(/filename="([^"]+)"/);
   return match?.[1] ?? `nokware-answer.${format}`;
@@ -47,7 +45,7 @@ async function fetchExport(view: ExportView, format: ExportFormat): Promise<Resp
   }
 }
 
-/** Asks the API for the answer as a file (it renders only answers it signed), then saves it. */
+/** The API renders only answers it signed. */
 export async function downloadAnswer(view: ExportView, format: ExportFormat): Promise<void> {
   const response = await fetchExport(view, format);
   if (!response.ok) throw new ExportError(MESSAGES[response.status] ?? EXPORT_FAILED);

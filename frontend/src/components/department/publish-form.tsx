@@ -5,12 +5,14 @@ import Link from "next/link";
 import { CategoryField, SourceUrlField, TitleField, YearField } from "@/components/documents/document-fields";
 import { ErrorNote } from "@/components/documents/panels";
 import { PdfField } from "@/components/documents/pdf-field";
+import { StatusTag } from "@/components/status-tag";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { usePdfForm } from "@/hooks/use-pdf-form";
-import { useMe } from "@/lib/auth/auth-context";
 import { useUploadDocument } from "@/lib/api/queries";
+import { useMe } from "@/lib/auth/auth-context";
 import { roleLabel } from "@/lib/portal/navigation";
+import { ledgerStatus } from "@/lib/status";
 
 import type { DocumentOut } from "@/lib/api/types";
 
@@ -18,7 +20,7 @@ function Published({ doc, onAnother }: { doc: DocumentOut; onAnother: () => void
   return (
     <Card className="max-w-2xl border-teal" data-testid="publish-success">
       <CardContent className="flex flex-col gap-3">
-        <p className="text-[12.5px] text-teal">Published</p>
+        <div><StatusTag tone={ledgerStatus("published").tone}>{ledgerStatus("published").label}</StatusTag></div>
         <h2 className="text-[24px] leading-snug">{doc.title}</h2>
         <p className="text-sm text-ink-soft">
           It is in the public Ledger now, under {doc.department_name}&apos;s name, and will be answerable in Ask within

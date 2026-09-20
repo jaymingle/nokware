@@ -105,7 +105,7 @@ def test_a_whatsapp_or_sms_budget_answer_shows_no_raw_citation_and_is_not_called
     chat = channel_answers.for_chat(_chat_answer(), SITE)  # type: ignore[arg-type]
     assert not RAW.search(chat) and channel_answers.BUDGET_DATA_NOTE in chat and channel_answers.LIVE_DATA_NOTE not in chat
     sms = channel_answers.for_sms(_chat_answer(), SITE)  # type: ignore[arg-type]
-    assert not RAW.search(sms)
+    assert not RAW.search(" ".join(sms)) and "2026 AMA Budget" in sms[-1]  # the budget it was read from, named
 
 
 def test_a_spoken_budget_answer_never_reads_a_citation_aloud() -> None:

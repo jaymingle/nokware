@@ -1,10 +1,10 @@
 """Which published documents the deadline job re-ingests."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from app.services.portal_actions import INGESTION_GRACE, INGESTION_RETRY_AFTER, needs_ingestion
 
-NOW = datetime(2026, 9, 13, 12, 0, tzinfo=timezone.utc)
+NOW = datetime(2026, 9, 13, 12, 0, tzinfo=UTC)
 
 
 def record(**fields: object) -> dict[str, object]:

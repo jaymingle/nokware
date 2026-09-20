@@ -1,22 +1,11 @@
 """How each Assembly department responds: to residents' reports, and to documents contributors send it.
 
-The platform publishing evidence about the institution's own behaviour, with the
-same rules as every public figure (stats.py): personal safety is left out
-entirely (not counted, and not in which departments appear), a count from 1 to 4
-reads "fewer than 5" (None here), a median needs five cases, and nothing about a
-case's content appears. Where two counts add up to one that is shown (resolved and
-still open make up received), hiding one hides the other, or subtraction would
-reveal it. Over the last twelve months, as the dashboard.
+The same rules as every public figure (stats.py): personal safety is left out entirely, even from which departments
+appear; 1 to 4 reads "fewer than 5" (None here); a median needs five cases; no case content appears.
 
-Reports are counted per department: a report sent to two departments counts for
-both, and one the MCE moved counts for the department that has it now. Reports
-don't expire, so the nearest measure of "unactioned" is still waiting to be
-started 7 days after it arrived: the measure chosen here, not a statutory
-deadline. What does expire is a review clock: a contributor's document the
-department doesn't review within 72 hours publishes automatically, and so does an
-escalated dispute the MCE doesn't rule on in time. Departments are listed by
-name, never ranked. Police and GNFS are national agencies, not Assembly
-departments, so they are not held to this scorecard.
+Reports don't expire, so "unactioned" is measured as not started 7 days after arrival: a chosen measure, not a
+statutory deadline. Departments are listed by name, never ranked. Police and GNFS are national agencies, not
+Assembly departments, so they are not held to this scorecard.
 """
 
 import statistics
@@ -27,12 +16,14 @@ from typing import Any
 
 from appwrite.query import Query
 
-from app.services.appwrite_client import every_record
-from app.services.case_history import COLLECTION_ID as CASE_HISTORY, CaseHistoryAction
-from app.services.citizen_reports import ASSIGNMENTS_COLLECTION
-from app.services.document_history import COLLECTION_ID as DOCUMENT_HISTORY, HistoryAction
-from app.services.ledger_documents import LedgerStatus, parse_datetime
 from app.services import petition_figures
+from app.services.appwrite_client import every_record
+from app.services.case_history import COLLECTION_ID as CASE_HISTORY
+from app.services.case_history import CaseHistoryAction
+from app.services.citizen_reports import ASSIGNMENTS_COLLECTION
+from app.services.document_history import COLLECTION_ID as DOCUMENT_HISTORY
+from app.services.document_history import HistoryAction
+from app.services.ledger_documents import LedgerStatus, parse_datetime
 from app.services.report_dashboard import MEDIAN_MIN, _Cache, period_start
 from app.services.stats import is_public, public_cases, shown
 from app.teams import DEPARTMENT_NAMES
@@ -45,14 +36,11 @@ RULINGS = (HistoryAction.UPHELD.value, HistoryAction.OVERRULED.value, HistoryAct
 
 
 def median(values: list[float], unit: float) -> float | None:
-    """A median in days or hours, to one decimal; None below five cases."""
     return round(statistics.median(values) / unit, 1) if len(values) >= MEDIAN_MIN else None
 
 
 @dataclass(frozen=True)
 class _Part:
-    """One department's part in one public report."""
-
     assigned: datetime
     started: datetime | None  # work started, or resolved without a separate start
     resolved: datetime | None
@@ -72,7 +60,6 @@ def _parts(cases: dict[str, dict[str, Any]], assignments: list[dict[str, Any]]) 
 
 
 def _disputes(history: list[dict[str, Any]], cases: set[str]) -> dict[str, dict[str, int]]:
-    """Per case, whether residents disputed its resolution and how the MCE ruled: confirmed, or reopened."""
     found: dict[str, dict[str, int]] = defaultdict(lambda: {"disputed": 0, "confirmed": 0, "reopened": 0})
     for entry in history:
         if entry["caseId"] not in cases:
@@ -82,7 +69,10 @@ def _disputes(history: list[dict[str, Any]], cases: set[str]) -> dict[str, dict[
             found[entry["caseId"]]["disputed"] += 1
         elif action == CaseHistoryAction.ESCALATION_CONFIRMED:
             found[entry["caseId"]]["confirmed"] += 1
-        elif action == CaseHistoryAction.REASSIGNED and entry.get("fromStatus") == "escalated" and not entry.get("fromDept"):
+        elif action == CaseHistoryAction.REOPENED or (
+            # Before `reopened` was an action of its own, reopening was written as a move with nowhere to move from.
+            action == CaseHistoryAction.REASSIGNED and entry.get("fromStatus") == "escalated" and not entry.get("fromDept")
+        ):
             found[entry["caseId"]]["reopened"] += 1  # reopen() sends the case back to the same departments
     return found
 
@@ -114,8 +104,7 @@ def _reports(parts: list[_Part], disputes: dict[str, dict[str, int]], now: datet
 
 
 def _outcomes(history: list[dict[str, Any]], opened: tuple[str, ...], closing: tuple[str, ...], from_status: str) -> list[tuple[str, str, float]]:
-    """Each review, in order per document: (department, how it ended, hours taken). A clock that ran out ends
-    it as auto_published; hours are kept only for a decision someone made."""
+    """(department, how it ended, hours taken) per review. A clock that ran out ends it as auto_published."""
     by_document: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for entry in history:
         by_document[entry["documentId"]].append(entry)
@@ -175,10 +164,9 @@ def _history(collection: str, actions: list[str]) -> list[dict[str, Any]]:
 
 
 def responsiveness(now: datetime) -> dict[str, Any]:
-    """The figures, at most a minute old."""
-
     def make() -> dict[str, Any]:
-        case_actions = [CaseHistoryAction.ESCALATED.value, CaseHistoryAction.ESCALATION_CONFIRMED.value, CaseHistoryAction.REASSIGNED.value]
+        case_actions = [CaseHistoryAction.ESCALATED.value, CaseHistoryAction.ESCALATION_CONFIRMED.value,
+                        CaseHistoryAction.REASSIGNED.value, CaseHistoryAction.REOPENED.value]
         document_actions = [a.value for a in HistoryAction]
         figures = build(public_cases(), every_record(ASSIGNMENTS_COLLECTION, [Query.equal("active", True)]),
                         _history(CASE_HISTORY, case_actions), _history(DOCUMENT_HISTORY, document_actions), now)

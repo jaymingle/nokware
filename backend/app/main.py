@@ -26,23 +26,34 @@ from app.routes import (
     ledger,
     me,
     options,
-    petitions as petition_routes,
     phone,
-    speech,
     queues,
     reports,
     representatives,
+    speech,
 )
-from app.services import bms_deliveries, notifications, petition_clock, petitions, scheduler, search_index, whatsapp_voice
+from app.routes import (
+    petitions as petition_routes,
+)
+from app.services import (
+    bms_deliveries,
+    notification_sweep,
+    notifications,
+    petition_clock,
+    petitions,
+    scheduler,
+    search_index,
+    whatsapp_voice,
+)
 from app.services.appwrite_client import quiet_sdk_deprecation_warnings
 from app.services.issue_voices import InvalidVoice, IssueNotFound, purge_expired_voice_names
 from app.services.ledger_documents import utc_now
 from app.services.petition_rules import PetitionError
 from app.services.phone_proof import ProofError
-from app.services.read_aloud import NotReadAloud, ReadAloudUnavailable
-from app.services.redis_store import RedisUnavailable
 from app.services.portal_actions import run_deadline_job
 from app.services.portal_queries import DocumentNotFound
+from app.services.read_aloud import NotReadAloud, ReadAloudUnavailable
+from app.services.redis_store import RedisUnavailable
 from app.services.report_contacts import InvalidNumber
 from app.services.report_followups import CaseNotFound, purge_expired_contacts
 from app.services.report_photos import PhotoRejected
@@ -54,11 +65,7 @@ settings = get_settings()
 
 
 def show_app_logs() -> None:
-    """Send the app's own INFO logs (e.g. what the deadline job published) to the console.
-
-    Uvicorn configures only its own loggers, so without this the app's messages
-    below WARNING are dropped.
-    """
+    """Uvicorn configures only its own loggers, so without this the app's messages below WARNING are dropped."""
     app_logger = logging.getLogger("app")
     if not app_logger.handlers:
         handler = logging.StreamHandler()
@@ -85,25 +92,36 @@ class RedactChannelSecrets(logging.Filter):
 logging.getLogger("uvicorn.access").addFilter(RedactChannelSecrets())
 
 
+def check_cors_is_meant_for_here() -> None:
+    """CORS_ORIGIN_REGEX's default lets a browser on any localhost port call the API, which is what a developer
+    needs and a deployed site never does. Serving a public site with it still on means it wasn't set: say so."""
+    if settings.public_site_url.startswith("https://") and "localhost" in settings.cors_origin_regex:
+        logging.getLogger(__name__).warning(
+            "CORS_ORIGIN_REGEX still allows localhost while the site is %s. Set CORS_ORIGIN_REGEX= (empty).",
+            settings.public_site_url,
+        )
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
-    # A messaging provider that is named but missing its settings stops the API here.
     notifications.check_providers()
+    check_cors_is_meant_for_here()
     # Postgres comes through a tunnel on a local port that something else can take: say so now, plainly, rather
     # than 30 seconds into a resident's first question. The API starts either way.
     await asyncio.to_thread(search_index.startup_check)
-    # Documents publish when their clock runs out, without cron: the deadline
-    # job runs in this process every DEADLINE_JOB_INTERVAL_SECONDS.
+    # Documents publish when their clock runs out, without cron.
     task = scheduler.start(settings.deadline_job_interval_seconds, run_deadline_job, "Deadline job")
-    # Petitions the MCE leaves undecided for 72 hours publish, and open ones close after 90 days, on the same interval.
+    # A petition open for its 90 days closes, and one the MCE hasn't answered in 30 days is marked unanswered, on
+    # the same interval. Nothing publishes on a clock: a petition is published by whoever wrote it.
     clock = scheduler.start(settings.deadline_job_interval_seconds, run_petition_clock, "Petition clock")
-    # Citizens' numbers, and names given with voices, are deleted 30 days after their case closes (a petition
-    # creator's, 30 days after the petition closes); spoken
-    # replies Twilio never reported on are deleted from Twilio a day after they were sent.
+    # Citizens' numbers and names given with voices go 30 days after their case or petition closes; spoken replies
+    # Twilio never reported on go a day after they were sent.
     purge = scheduler.start(settings.contact_purge_interval_seconds, run_contact_purge, "Contact purge")
-    # BMS sends no delivery reports: what became of each SMS it carried is asked of it on this interval.
+    # BMS sends no delivery reports, so they are asked for.
     polling = settings.bms_delivery_poll_seconds if settings.sms_provider == "bms" else 0
     deliveries = scheduler.start(polling, run_bms_delivery_poll, "BMS delivery check")
+    # A message a resident is owed — received, resolved, escalation received — is sent late rather than never.
+    missed = scheduler.start(settings.missed_message_sweep_interval_seconds, run_missed_message_sweep, "Missed-message sweep")
     # The MCP server at /mcp answers only while its session manager runs, and its own app's lifespan never does here.
     async with stats_mcp.SERVER.session_manager.run():
         yield
@@ -111,10 +129,15 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     await scheduler.stop(clock)
     await scheduler.stop(purge)
     await scheduler.stop(deliveries)
+    await scheduler.stop(missed)
 
 
 def run_petition_clock() -> None:
     petition_clock.run_clock(utc_now())
+
+
+def run_missed_message_sweep() -> None:
+    notification_sweep.run_sweep(utc_now())
 
 
 def run_bms_delivery_poll() -> None:
@@ -188,7 +211,6 @@ def redis_unavailable(_: Request, __: RedisUnavailable) -> JSONResponse:
 @app.exception_handler(psycopg.OperationalError)
 @app.exception_handler(SearchIndexUnreachable)  # the same failure, through the vector store's SQLAlchemy engine
 def ledger_search_unavailable(_: Request, exc: Exception) -> JSONResponse:
-    # The Ledger's search index (Postgres, through a tunnel) can't be reached: logged, and said plainly to the reader.
     logging.getLogger("app").error("The Ledger's search index can't be reached: %s", type(exc).__name__)
     return JSONResponse({"detail": "The Ledger can't be searched right now. Try again shortly."}, status_code=503)
 

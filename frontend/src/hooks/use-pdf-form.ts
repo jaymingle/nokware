@@ -2,11 +2,6 @@
 
 import { useState, type FormEvent } from "react";
 
-/**
- * State for a form that sends one PDF plus its fields as multipart: the chosen
- * file, a "no file yet" flag, and the result once sent. Errors stay on the
- * caller's mutation, which `send` wraps.
- */
 export function usePdfForm<T>(send: (form: FormData) => Promise<T>) {
   const [file, setFile] = useState<File | null>(null);
   const [fileMissing, setFileMissing] = useState(false);

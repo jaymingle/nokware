@@ -23,13 +23,12 @@ function signInMessage(error: unknown): string {
   return error.message;
 }
 
-/** End the current Appwrite session (if any) and forget its JWT. */
 export async function endSession(): Promise<void> {
   clearJwt();
   await account.deleteSession({ sessionId: "current" }).catch(() => undefined);
 }
 
-/** Start a session, replacing one left over in this browser. Throws SignInError. */
+/** Replaces a session left over in this browser. Throws SignInError. */
 export async function startSession(email: string, password: string): Promise<void> {
   const attempt = () => account.createEmailPasswordSession({ email, password });
   try {

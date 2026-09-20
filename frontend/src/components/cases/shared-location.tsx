@@ -28,7 +28,7 @@ function Place({ location, testId }: { location: SharedLocationView; testId: str
   );
 }
 
-/** A precise location a safety reporter chose to share so help can come: opened on purpose, recorded, and told to them. */
+/** Opened only on purpose: the view is recorded and the reporter is told. */
 export function SharedLocation({ detail }: { detail: CaseDetail }) {
   const open = useOpenLocation();
   if (!detail.location_shared_at) return null;

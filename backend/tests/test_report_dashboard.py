@@ -1,6 +1,6 @@
 """The public dashboard's figures: personal safety counted nowhere, medians only from five cases."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
@@ -10,7 +10,7 @@ from app.main import app
 from app.services import report_dashboard
 from app.services.report_dashboard import aggregate, month_keys, period_start
 
-NOW = datetime(2026, 9, 13, 12, 0, tzinfo=timezone.utc)
+NOW = datetime(2026, 9, 13, 12, 0, tzinfo=UTC)
 
 
 def case(topic: str = "drainage", *, days_ago: float = 10, resolved_after: float | None = None, **fields: Any) -> dict[str, Any]:
@@ -27,9 +27,9 @@ SAFETY = case("abuse", category="personal_safety", isSensitive=True, subMetro="a
 
 
 def test_the_period_is_twelve_calendar_months_ending_this_one() -> None:
-    assert period_start(NOW) == datetime(2025, 10, 1, tzinfo=timezone.utc)
+    assert period_start(NOW) == datetime(2025, 10, 1, tzinfo=UTC)
     assert month_keys(NOW)[0] == "2025-10" and month_keys(NOW)[-1] == "2026-09" and len(month_keys(NOW)) == 12
-    assert month_keys(datetime(2026, 1, 5, tzinfo=timezone.utc))[0] == "2025-02"
+    assert month_keys(datetime(2026, 1, 5, tzinfo=UTC))[0] == "2025-02"
 
 
 def test_personal_safety_is_in_no_figure_not_even_the_totals() -> None:

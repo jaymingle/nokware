@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 
 import { keepDraft, keptDraft } from "@/lib/petitions";
 
-import type { OwnPetition, PetitionDraft } from "@/lib/api/types";
+import type { PetitionWords } from "@/lib/api/petitions";
+import type { OwnPetition } from "@/lib/api/types";
 
 export type DraftState = {
   title: string;
@@ -18,32 +19,39 @@ export type DraftState = {
 
 export const EMPTY_DRAFT: DraftState = { title: "", body: "", topic: "", scope: "area", ward: "", issue: null, documents: [] };
 
-/** The draft as the API takes it. */
-export function toRequest(draft: DraftState): PetitionDraft {
+export function toRequest(draft: DraftState): PetitionWords {
   return {
     title: draft.title, body: draft.body, topic: draft.topic, scope: draft.scope,
     ward: draft.scope === "area" ? draft.ward || null : null, issue: draft.issue, documents: draft.documents,
   };
 }
 
-/** A refused petition, back in the form for editing. */
 export function fromPetition(petition: OwnPetition): DraftState {
   return { title: petition.title, body: petition.body, topic: petition.topic_id, scope: petition.scope, ward: petition.ward_id ?? "",
     issue: petition.issue_id, documents: petition.document_ids };
 }
 
-/** What a check was run on: when the words or topic change, the draft is checked again. */
 export function checkKey(draft: DraftState): string {
   return JSON.stringify([draft.title.trim(), draft.body.trim(), draft.topic]);
 }
 
-/**
- * The new petition being written, kept in this browser as it changes (so confirming a phone on WhatsApp, or a
- * reload, loses nothing). An issue linked from the issue list starts it off.
- */
-export function usePetitionDraft(issue: string | null): [DraftState, (change: Partial<DraftState>) => void, () => void] {
+export function isWritten(draft: Partial<DraftState> | null): boolean {
+  return Boolean(draft && (draft.title?.trim() || draft.body?.trim()));
+}
+
+export type Draft = {
+  draft: DraftState;
+  change: (change: Partial<DraftState>) => void;
+  clear: () => void;
+  restored: boolean;  // written before, in this browser: the page says so rather than looking like a bug
+};
+
+/** Kept in this browser as it changes, so confirming a phone on WhatsApp, or a reload, loses nothing. */
+export function usePetitionDraft(issue: string | null): Draft {
+  const [restored, setRestored] = useState(false);
   const [draft, setDraft] = useState<DraftState>(() => {
     const kept = typeof window === "undefined" ? null : keptDraft<DraftState>();
+    if (isWritten(kept)) setRestored(true);
     return { ...EMPTY_DRAFT, ...kept, ...(issue ? { issue } : {}) };
   });
   useEffect(() => keepDraft(draft), [draft]);
@@ -51,6 +59,7 @@ export function usePetitionDraft(issue: string | null): [DraftState, (change: Pa
   const clear = () => {
     keepDraft(null);
     setDraft(EMPTY_DRAFT);
+    setRestored(false);
   };
-  return [draft, change, clear];
+  return { draft, change, clear, restored };
 }

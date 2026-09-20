@@ -3,7 +3,6 @@
 import { isFigureLabel, labelNumber } from "@/lib/ask/figures";
 import { cn } from "@/lib/utils";
 
-/** A citation in the answer, numbered like its card; tapping it jumps there. Live figures ([R1]) look different from documents. */
 export function CitationTag({ label, title, onCite, testId }: { label: string; title?: string; onCite: (label: string) => void; testId: string }) {
   const number = labelNumber(label);
   const figure = isFigureLabel(label);

@@ -29,8 +29,7 @@ function Recording({ seconds, onStop, onCancel }: { seconds: number; onStop: () 
   );
 }
 
-/** The microphone beside the question box: record a question instead of typing it. Hidden where recording can't work.
- * While recording, it takes the box's place (the composer hides the box), so it fits a phone. */
+/** While recording, this takes the question box's place (the composer hides the box), so it fits a phone. */
 export function VoiceControl({ state, onStart, onStop, onCancel }: ControlProps) {
   const mounted = useMounted();
   if (!mounted || !canRecord()) return null;

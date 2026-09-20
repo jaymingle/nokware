@@ -1,20 +1,9 @@
 """Figures the Assembly's documents once reported and haven't since.
 
-The publishing record asks whether a required document exists. This asks a
-different question: the document exists, it carries a figure the public needs,
-and nothing published since gives that figure again. Accra's most recent
-published domestic violence figures are from 2018, in the 2020 Voluntary Local
-Review; Ask found them, and found nothing newer.
-
-The findings are in app/data/reporting_gaps.json, each with the passage it comes
-from, what was searched for and when, so a reader can check it rather than take
-it on trust. Each writes its own headline, with {years} for the only part that
-changes with time; a sentence is never composed out of a label, which is how
-"domestic violence cases in Accra" once became "…domestic violence cases in
-accra figures are 8 years old". They are Nokware's own reading, not a statutory list: a gap says
-what the newest published figure is, never that the Assembly broke a duty. A gap
-is shown only while its document is still published in the Ledger, so the
-quotation always has a document behind it.
+Each finding in app/data/reporting_gaps.json carries its passage and what was searched for and when, so a reader
+can check it rather than take it on trust. Each writes its own headline: a sentence composed out of a label once
+read "domestic violence cases in accra figures are 8 years old". They are Nokware's own reading, not a statutory
+list: a gap says what the newest published figure is, never that the Assembly broke a duty.
 """
 
 import json
@@ -58,7 +47,6 @@ def about() -> str:
 
 
 def _headline(entry: dict[str, Any], years: int) -> str:
-    """The finding's own sentence, with the one part that changes with time filled in."""
     return str(entry["headline"]).replace(YEARS, f"{years} years" if years != 1 else "a year")
 
 
@@ -84,6 +72,5 @@ def _gap(entry: dict[str, Any], now: datetime) -> Gap | None:
 
 
 def gaps(now: datetime) -> list[Gap]:
-    """Each finding whose document is still published, oldest figures first."""
     found = [gap for entry in _data()["gaps"] if (gap := _gap(entry, now))]
     return sorted(found, key=lambda gap: gap.latest_year)

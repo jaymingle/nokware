@@ -8,8 +8,10 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import appwrite.client as sdk_client_module
 import pytest
 import requests
+from appwrite.models import Document
 
 from app.services import appwrite_client  # installs the pool
+from app.services.appwrite_client import as_record
 
 
 class _SetsACookie(BaseHTTPRequestHandler):
@@ -87,3 +89,41 @@ def test_a_connection_closed_at_appwrites_end_is_not_the_end_of_the_call(closing
     pooled._last_call -= appwrite_client.IDLE_RESET_SECONDS + 1
     assert pooled.request("post", closing_url, data="x").status_code == 200  # after a quiet spell, kept ones are dropped
     assert _ClosesUnannounced.seen == ["GET", "GET (hung up)", "GET", "POST (hung up)", "POST"]
+
+
+def test_a_document_from_the_sdk_becomes_a_record() -> None:
+    """A stray @lru_cache once landed on as_record: SDK documents are unhashable, so every Appwrite write failed."""
+    document = Document.with_data({"$id": "c1", "$sequence": "1", "$collectionId": "reports", "$databaseId": "db",
+                                   "$createdAt": "2026-09-17T00:00:00Z", "$updatedAt": "2026-09-17T00:00:01Z",
+                                   "$permissions": [], "caseId": "c1"})
+    assert as_record(document) == {"caseId": "c1", "$id": "c1", "$createdAt": "2026-09-17T00:00:00Z",
+                                   "$updatedAt": "2026-09-17T00:00:01Z"}
+
+
+def test_every_appwrite_call_is_given_a_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The SDK sends none of its own, so a stalled connection once held the request — and the resident — forever."""
+    sent: list[object] = []
+
+    class _Stub:
+        def request(self, *args: object, **kwargs: object) -> object:
+            sent.append(kwargs.get("timeout"))
+            return "response"
+
+    pooled = sdk_client_module.requests
+    monkeypatch.setattr(pooled, "_session", _Stub())
+    pooled.request("POST", "https://appwrite.example/v1/databases")
+    pooled.request("GET", "https://appwrite.example/v1/health", timeout=(1, 2))
+    assert sent == [appwrite_client.TIMEOUT, (1, 2)]
+    connect, read = appwrite_client.TIMEOUT
+    assert 0 < connect <= 10 and 0 < read <= 60
+
+
+def test_a_photo_upload_cannot_hang_for_minutes(monkeypatch: pytest.MonkeyPatch) -> None:
+    """MinIO's default read timeout is five minutes; a stalled upload would freeze the filing that long."""
+    from app.services import storage
+
+    storage.get_minio.cache_clear()
+    client = storage.get_minio()
+    timeout = client._http.connection_pool_kw["timeout"]  # type: ignore[attr-defined]
+    assert (timeout.connect_timeout, timeout.read_timeout) == (5, 30)
+    storage.get_minio.cache_clear()

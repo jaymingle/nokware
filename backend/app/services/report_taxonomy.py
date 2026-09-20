@@ -1,9 +1,6 @@
 """What a citizen report is about, and who receives it.
 
-The classifier (or, for personal safety, the citizen) chooses one topic from
-this fixed list; it never chooses a recipient. Each topic's recipients are set
-in TOPICS below, one table the Assembly can read and change in one place.
-
+The classifier chooses a topic, never a recipient, so routing stays in one table the Assembly can read and change.
 This routing is a first draft for AMA to review, not AMA policy.
 """
 
@@ -113,7 +110,6 @@ def recipients_for(topic_id: str) -> tuple[str, ...]:
 
 
 def _check_routing() -> None:
-    """Fail at import if a topic routes to an unknown team or breaks the safety rules."""
     for topic in TOPICS:
         unknown = [r for r in topic.recipients if r not in RECIPIENT_NAMES]
         if unknown or not topic.recipients:

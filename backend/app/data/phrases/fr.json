@@ -67,6 +67,234 @@
     },
     "safety.medical": {
       "text": "Nokware ne peut pas enregistrer ceci : cela ne relève pas de l'Assemblée. Ambulance : 193, 0501 614 877, 0505 982 870. Ou appelez le 112."
+    },
+    "ask.no_figures_to_chart": {
+      "critical": false,
+      "text": "Cette réponse ne contient aucun chiffre à représenter."
+    },
+    "ask.no_answer_to_chart": {
+      "critical": false,
+      "text": "Il n'y a rien à représenter : le Registre ne contient pas encore de réponse à cette question."
+    },
+    "ask.no_safety_chart": {
+      "critical": false,
+      "text": "Pas de graphique non plus : ces chiffres ne sont pas publiés du tout."
+    },
+    "ask.total_and_parts_only": {
+      "critical": false,
+      "text": "Les seuls chiffres ici sont un total et l'une de ses composantes. Un total placé à côté de ses composantes se lit comme l'une d'elles : il n'y a donc rien à représenter."
+    },
+    "speech.rest_on_screen": {
+      "critical": false,
+      "text": "Le reste de la réponse est à l'écran."
+    },
+    "speech.sources_on_screen": {
+      "critical": false,
+      "text": "Les documents dont elle provient sont listés avec la réponse."
+    },
+    "speech.nothing_found": {
+      "critical": false,
+      "text": "La page indique où chercher ailleurs et comment demander un document."
+    },
+    "speech.not_in_this_language": {
+      "critical": false,
+      "text": "La lecture à voix haute n'est pas encore disponible dans cette langue."
+    },
+    "case.safety.received": {
+      "text": "Votre référence a bien été reçue."
+    },
+    "case.safety.in_progress": {
+      "text": "Votre référence est en cours de traitement."
+    },
+    "case.safety.closed": {
+      "text": "Ce dossier est clos."
+    },
+    "petition.status.open": {
+      "text": "Ouverte aux signatures"
+    },
+    "petition.status.awaiting_response": {
+      "text": "Chez le MCE"
+    },
+    "petition.status.responded": {
+      "text": "Répondue"
+    },
+    "petition.status.closed": {
+      "text": "Close"
+    },
+    "petition.status.removed": {
+      "text": "Retirée"
+    },
+    "petition.ground.private_individual": {
+      "text": "Nomme ou attaque une personne privée"
+    },
+    "petition.ground.incites_violence": {
+      "text": "Incite à la violence"
+    },
+    "petition.ground.personal_data": {
+      "text": "Contient des données personnelles"
+    },
+    "petition.ground.duplicate": {
+      "text": "Fait double emploi avec une pétition ouverte"
+    },
+    "petition.ground.duplicate_comment": {
+      "text": "Répète un autre commentaire"
+    },
+    "petition.removal.duplicate_needs_code": {
+      "text": "Indiquez le numéro de la pétition ouverte que celle-ci répète."
+    },
+    "petition.removal.duplicate_not_found": {
+      "text": "Aucune pétition publique ne porte ce numéro."
+    },
+    "petition.removal.already_removed": {
+      "text": "Cette pétition a déjà été retirée."
+    },
+    "petition.removal.own_petition": {
+      "text": "Vous avez lancé cette pétition ; vous ne pouvez donc pas la retirer. Un autre contributeur le peut."
+    },
+    "petition.removal.signed_petition": {
+      "text": "Vous avez signé cette pétition ; vous ne pouvez donc pas la retirer. Un autre contributeur le peut."
+    },
+    "petition.removal.note_personal_data": {
+      "text": "Cette note contient des données personnelles, par exemple un numéro de téléphone, une adresse e-mail ou un numéro de Ghana Card. Retirez-les : la note est conservée dans le registre de l'Assemblée."
+    },
+    "petition.removal.note_too_long": {
+      "text": "Limitez la note à 500 caractères."
+    },
+    "petition.report.note_too_long": {
+      "text": "Limitez votre ajout à 300 caractères."
+    },
+    "petition.report.note_personal_data": {
+      "text": "Votre ajout contient des données personnelles, par exemple un numéro de téléphone, une adresse e-mail ou un numéro de Ghana Card. Retirez-les et dites-le autrement."
+    },
+    "petition.report.received": {
+      "text": "Merci. Un contributeur le lira. La pétition reste en ligne pendant ce temps."
+    },
+    "petition.report.already_removed": {
+      "text": "Cette pétition a déjà été retirée."
+    },
+    "petition.dismissal.not_the_ground": {
+      "text": "Ne relève pas de ce motif"
+    },
+    "petition.dismissal.already_handled": {
+      "text": "Déjà traité"
+    },
+    "petition.edit.not_editable": {
+      "text": "Cette pétition est close ; elle ne peut plus être modifiée."
+    },
+    "petition.legacy.refused": {
+      "text": "Refusée sous l'ancienne procédure d'examen"
+    },
+    "petition.legacy.withdrawn": {
+      "text": "Retirée par la personne qui l'a lancée"
+    },
+    "petition.legacy.closed_in_move": {
+      "text": "Close lors du passage à la nouvelle procédure"
+    },
+    "petition.comment.default_name": {
+      "text": "Résident"
+    },
+    "petition.comment.empty": {
+      "text": "Écrivez d'abord votre commentaire."
+    },
+    "petition.comment.too_long": {
+      "text": "Limitez votre commentaire à 500 caractères."
+    },
+    "petition.comment.personal_data": {
+      "text": "Votre commentaire contient des données personnelles, par exemple un numéro de téléphone, une adresse e-mail ou un numéro de Ghana Card. Retirez-les et dites-le autrement."
+    },
+    "petition.comment.private_individual": {
+      "text": "Votre commentaire semble nommer une personne privée. Les commentaires d'une pétition sont publics : dites-le sans nommer personne."
+    },
+    "petition.comment.removed": {
+      "text": "Commentaire retiré par un contributeur vérifié : {ground}"
+    },
+    "petition.comment.already_removed": {
+      "text": "Ce commentaire a déjà été retiré."
+    },
+    "petition.comment.report_received": {
+      "text": "Merci. Un contributeur le lira. Le commentaire reste en ligne pendant ce temps."
+    },
+    "petition.share.not_a_department": {
+      "text": "Choisissez un département dans la liste de l'Assemblée."
+    },
+    "petition.share.already_shared": {
+      "text": "Cette pétition a déjà été transmise à ce département."
+    },
+    "petition.note.not_shared": {
+      "text": "Cette pétition n'a pas été transmise à votre département : celui-ci n'a donc pas de note à y écrire."
+    },
+    "petition.note.already_written": {
+      "text": "Votre département a déjà écrit sa note sur cette pétition. Une note est publiée telle qu'elle a été écrite et vaut réponse du département."
+    },
+    "petition.note.empty": {
+      "text": "Écrivez d'abord la note de votre département."
+    },
+    "petition.note.too_long": {
+      "text": "Limitez la note à 500 caractères."
+    },
+    "petition.note.personal_data": {
+      "text": "Cette note contient des données personnelles, par exemple un numéro de téléphone, une adresse e-mail ou un numéro de Ghana Card. Elle est publiée sur la page de la pétition : retirez-les et dites-le autrement."
+    },
+    "petition.note.private_individual": {
+      "text": "Cette note semble nommer une personne privée. Elle est publiée sur la page de la pétition : dites ce que fait le département sans nommer personne."
+    },
+    "petition.reply.no_response": {
+      "text": "Aucune réponse n'a encore été publiée sur cette pétition."
+    },
+    "petition.reply.already_replied": {
+      "text": "Vous avez déjà répondu à cette réponse. Une seule réplique figure en dessous."
+    },
+    "petition.reply.empty": {
+      "text": "Écrivez d'abord votre réponse."
+    },
+    "petition.reply.too_long": {
+      "text": "Limitez votre réponse à 1 000 caractères."
+    },
+    "petition.reply.personal_data": {
+      "text": "Votre réponse contient des données personnelles, par exemple un numéro de téléphone, une adresse e-mail ou un numéro de Ghana Card. Retirez-les et dites-le autrement."
+    },
+    "petition.reply.private_individual": {
+      "text": "Votre réponse semble nommer une personne privée. Elle est publiée sous la réponse du MCE : dites-le sans nommer personne."
+    },
+    "petition.sign.removed": {
+      "text": "Cette pétition a été retirée : elle n'accepte plus de signatures."
+    },
+    "petition.channel.standing": {
+      "text": "Pétition {number} : {stage}."
+    },
+    "petition.channel.signatures": {
+      "text": "{signatures} signatures sur {threshold}."
+    },
+    "petition.channel.signatures_only": {
+      "text": "{signatures} signatures."
+    },
+    "petition.channel.closes": {
+      "text": "Clôture le {day}."
+    },
+    "petition.channel.removed": {
+      "text": "La pétition {number} a été retirée le {day} : {ground}."
+    },
+    "petition.channel.removed_nothing_public": {
+      "text": "Rien de la pétition n'est public."
+    },
+    "petition.channel.removed_duplicate": {
+      "text": "Elle faisait double emploi avec la pétition {other}."
+    },
+    "petition.channel.removed_before_once": {
+      "text": "Elle avait déjà été retirée une fois."
+    },
+    "petition.channel.removed_before": {
+      "text": "Elle avait déjà été retirée {count} fois."
+    },
+    "petition.channel.not_found_ussd": {
+      "text": "Aucune pétition ne porte le numéro {number}. Vérifiez-le et rappelez."
+    },
+    "petition.channel.not_found_whatsapp": {
+      "text": "Aucune pétition ne porte le numéro {number}. Vérifiez-le et renvoyez-le."
+    },
+    "petition.image.not_a_ground": {
+      "critical": false,
+      "text": "Une photographie ne peut pas dupliquer une pétition. Choisissez le motif qui s'applique."
     }
   }
 }

@@ -1,32 +1,26 @@
 "use client";
 
-import { CircleCheckIcon, CircleDashedIcon, CircleXIcon, MinusIcon, type LucideIcon } from "lucide-react";
 import { Fragment, useState } from "react";
 
+import { OtherView } from "@/components/accountability/other-view";
 import { RecordDetail } from "@/components/accountability/record-detail";
 import { ReportingGaps } from "@/components/accountability/reporting-gaps";
 import { UnpublishedRecord } from "@/components/accountability/unpublished-data";
 import { ErrorPanel, LoadingPanel } from "@/components/documents/panels";
-import { PageIntro } from "@/components/portal/page-intro";
+import { PageShell } from "@/components/page-shell";
+import { StatusMark } from "@/components/status-tag";
+import { ASSUMPTION_NOTE, LEDGER_YEAR_NOTE, STATE_LABELS, dateLabel, periodsIn, planSpan, recordTestId, yearFromLedger, yearsOf, type RecordState } from "@/lib/accountability";
 import { usePublishingRecord } from "@/lib/api/public-queries";
-import { ASSUMPTION_NOTE, LEDGER_YEAR_NOTE, STATE_LABELS, dateLabel, periodsIn, planSpan, yearFromLedger, yearsOf, type RecordState } from "@/lib/accountability";
+import { recordStatus } from "@/lib/status";
 import { cn } from "@/lib/utils";
 
 import type { PublishingRecord, RecordPeriod, RecordRequirement } from "@/lib/api/types";
-
-const MARKS: Record<RecordState, { icon: LucideIcon; className: string }> = {
-  held: { icon: CircleCheckIcon, className: "text-teal" },
-  related: { icon: CircleDashedIcon, className: "text-gold" },
-  missing: { icon: CircleXIcon, className: "text-brick" },
-  not_due: { icon: MinusIcon, className: "text-ink-muted" },
-};
 
 type Selected = { requirement: string; period: string } | null;
 type Select = (requirement: RecordRequirement, period: RecordPeriod) => void;
 
 function Mark({ state, small = false }: { state: RecordState; small?: boolean }) {
-  const { icon: Icon, className } = MARKS[state];
-  return <Icon aria-hidden className={cn(small ? "size-4" : "size-5", className)} />;
+  return <StatusMark tone={recordStatus(state).tone} className={small ? "size-4" : "size-5"} />;
 }
 
 function Cell({ requirement, period, selected, onSelect, short }: {
@@ -39,7 +33,7 @@ function Cell({ requirement, period, selected, onSelect, short }: {
       aria-pressed={selected}
       aria-label={`${requirement.name}, ${period.label}: ${STATE_LABELS[period.state]}${yearFromLedger(period) ? ` (${LEDGER_YEAR_NOTE})` : ""}`}
       className={cn("inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[11.5px] text-ink-soft hover:bg-paper-subtle", selected && "bg-teal-tint ring-1 ring-teal")}
-      data-testid={`record-${requirement.id}-${period.label.replace(/\W+/g, "-")}`}
+      data-testid={recordTestId(requirement, period)}
     >
       <Mark state={period.state} small={Boolean(short)} />
       {short}
@@ -98,10 +92,9 @@ function Row({ requirement, years, selected, onSelect }: { requirement: RecordRe
 }
 
 /**
- * How a group stands, beside its name. Four tables of identical marks look
- * alike at a glance, so a group that is almost entirely "not found" read the
- * same as one that is almost entirely held — and that contrast is the argument
- * the page exists to make.
+ * Four tables of identical marks look alike at a glance, so a group almost
+ * entirely "not found" read the same as one almost entirely held, and that
+ * contrast is the argument the page exists to make.
  */
 function GroupTally({ group }: { group: PublishingRecord["groups"][number] }) {
   const periods = group.requirements.flatMap((requirement) => requirement.periods);
@@ -175,11 +168,9 @@ function HowToRead({ record }: { record: PublishingRecord }) {
 }
 
 /**
- * The finding of the whole page, at the size of a finding.
- *
- * It read as a sentence of body text, which is the wrong weight for the one
- * number a reader should leave with. Each count keeps its mark and its words,
- * so nothing here is carried by colour alone.
+ * Large, because as body text it was the wrong weight for the one number a
+ * reader should leave with. Each count keeps its mark and its words, so nothing
+ * is carried by colour alone.
  */
 function Summary({ record }: { record: PublishingRecord }) {
   const { due, held, related, missing } = record.summary;
@@ -209,17 +200,21 @@ function Summary({ record }: { record: PublishingRecord }) {
   );
 }
 
-/** What the Assembly is required to publish, against what The Ledger holds, by year. */
 export function PublishingRecordPage() {
   const record = usePublishingRecord();
   const [selected, setSelected] = useState<Selected>(null);
   const onSelect: Select = (requirement, period) =>
     setSelected((current) => (current?.requirement === requirement.id && current.period === period.label ? null : { requirement: requirement.id, period: period.label }));
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-7">
-      <PageIntro eyebrow="Accountability" title="What the Assembly publishes">
-        The documents the Accra Metropolitan Assembly is required to publish, against what The Ledger holds, year by year. It shows the gaps, not just the contents.
-      </PageIntro>
+    <PageShell
+      width="data"
+      eyebrow="Accountability"
+      title="What the Assembly publishes"
+      lead="The documents the Accra Metropolitan Assembly is required to publish, against what The Ledger holds, year by year. It shows the gaps, not just the contents."
+    >
+      <OtherView href="/accountability/departments" title="How departments respond" testId="record-to-responsiveness">
+        The same Assembly measured by what it does with what residents report.
+      </OtherView>
       {record.isPending ? <LoadingPanel label="Checking the record…" /> : null}
       {record.error ? <ErrorPanel message={record.error.message} onRetry={() => record.refetch()} /> : null}
       {record.data ? (
@@ -236,6 +231,6 @@ export function PublishingRecordPage() {
           ))}
         </>
       ) : null}
-    </div>
+    </PageShell>
   );
 }

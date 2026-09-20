@@ -1,11 +1,8 @@
 """Read aloud: an Ask answer, or a report's confirmation and status, spoken as audio. No sign-in.
 
-    POST /api/speech/answer   an Ask answer, sent back as its signed export view
-    POST /api/speech/report   a report's status, by its reference (in the body, never the address)
-
-Both answer with one part of the reading (MP3), "part" counting from 0, and say in X-Speech-Parts how many parts
-there are: the page plays each while it fetches the next. Only what the server produced is spoken, never anything
-about someone's safety (read_aloud.py).
+A report's reference travels in the body, never the address. Each call returns one part of the reading, with
+X-Speech-Parts giving how many, so the page plays each while it fetches the next. Only what the server produced is
+spoken, never anything about someone's safety (read_aloud.py).
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
@@ -34,7 +31,7 @@ def answer(request: SpeechAnswerRequest) -> Response:
     view = request.view
     if not ask_export.verified(view):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "This answer can't be read aloud: ask the question again.")
-    return _audio(read_aloud.answer_script(view.question, view.answer, view.status), request.part)
+    return _audio(read_aloud.answer_script(view.question, view.answer, view.status, view.spoken, view.language), request.part)
 
 
 @router.post("/report", dependencies=[Speech], response_class=Response,

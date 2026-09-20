@@ -1,9 +1,4 @@
-"""Add your voice: open civic issues, and residents saying one affects them too. No sign-in.
-
-    GET  /api/issues                        open civic issues, most supported first (?sub_metro, ?topic)
-    GET  /api/issues/{public_id}            one open civic issue, as the list shows it
-    POST /api/issues/{public_id}/voices     add a voice, anonymous unless a name is given
-"""
+"""Add your voice: open civic issues, and residents saying one affects them too. No sign-in."""
 
 from typing import Annotated, Any
 

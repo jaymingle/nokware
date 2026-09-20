@@ -1,5 +1,3 @@
-"""Request and response models for citizen reports (public routes)."""
-
 from pydantic import BaseModel, Field
 
 from app.schemas.contacts import PublicContact
@@ -23,6 +21,7 @@ class ReportOptions(BaseModel):
     sub_metros: list[SubMetroOption]
     safety_types: list[SafetyType]
     max_photos: int
+    max_escalation_photos: int  # fewer than when filing: an escalation shows what is still wrong, not the whole report
     max_photo_bytes: int
     description_min: int
     description_max: int
@@ -52,6 +51,18 @@ class LocationViewNote(BaseModel):
     at: str
 
 
+class TimelineEvent(BaseModel):
+    """One step of the case, as the resident reads it. Departments only: never the name of a member of staff."""
+
+    action: str  # filed | routed | started | reassigned | resolved | escalated | mce_response | reopened | closed
+    at: str  # ISO 8601, UTC; the web renders it in Africa/Accra
+    description: str
+    note: str | None = None  # what staff wrote at this step; never set on a personal-safety case
+    # Short-lived links to the photos the resident sent at this step: the escalation only, and never on a
+    # personal-safety case, whose status page shows no photo at all.
+    photos: list[str] = Field(default_factory=list)
+
+
 class ReportStatus(BaseModel):
     """A case's status. For personal safety, only the stage: no category, service, place or note."""
 
@@ -73,10 +84,8 @@ class ReportStatus(BaseModel):
     voices: int | None = None  # civic reports only: other residents who said it affects them too
     # Personal safety only: each time a service opened the location the citizen shared (the service, never a person).
     location_views: list[LocationViewNote] = Field(default_factory=list)
-
-
-class EscalationRequest(BaseModel):
-    note: str = Field(max_length=2000)
+    # The whole trail, oldest first. Fixed neutral lines only for personal safety.
+    timeline: list[TimelineEvent] = Field(default_factory=list)
 
 
 class PreferencesRequest(BaseModel):

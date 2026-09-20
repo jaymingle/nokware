@@ -3,8 +3,8 @@
 import { ClockIcon } from "lucide-react";
 
 import { useNow } from "@/hooks/use-now";
-import { cn } from "@/lib/utils";
 import { deadlineFrom, formatDateTime } from "@/lib/time";
+import { cn } from "@/lib/utils";
 
 const TONE = {
   normal: "border-gold bg-gold-tint",
@@ -12,7 +12,6 @@ const TONE = {
   passed: "border-hairline bg-paper-subtle",
 } as const;
 
-/** The same clock as one line of text, for tables and compact rows. */
 export function DeadlineLine({ heldUntil, unless, testId }: { heldUntil: string; unless: string; testId?: string }) {
   const { label, urgency } = deadlineFrom(heldUntil, useNow());
   if (urgency === "passed") return null;
@@ -38,11 +37,7 @@ type DeadlineNoticeProps = {
   testId?: string;
 };
 
-/**
- * The automatic-publication clock, stated as a consequence: "Publishes
- * automatically in 47h 12m unless you dispute it." Silence means publication,
- * so this is the most prominent thing on any document it applies to.
- */
+/** Silence means publication, so this is the most prominent thing on any document it applies to. */
 export function DeadlineNotice({ heldUntil, unless, size = "lg", passed, testId }: DeadlineNoticeProps) {
   const { label, urgency } = deadlineFrom(heldUntil, useNow());
   const large = size === "lg";

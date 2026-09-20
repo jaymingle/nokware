@@ -1,10 +1,7 @@
 """An Ask chart as a PNG for the PDF and Word exports, drawn with Pillow in the site's colours.
 
-ask_charts decided the kind, the values and the axis; this only draws them. An
-exact count is a bar from zero, or a point on a line. "Fewer than 5" is never a
-value: on a bar it is a hatched block from 1 to 4 with a dashed edge, on a line
-a dashed span from 1 to 4 where the line breaks. Pies and donuts are only ever
-asked to draw exact counts. Drawn at twice the size it is shown, so print is sharp.
+ask_charts decided the kind, the values and the axis; this only draws them. "Fewer than 5" is never drawn as a
+value: it is a hatched block or a dashed span from 1 to 4. Drawn at twice the size it is shown, so print is sharp.
 """
 
 import io
@@ -74,8 +71,6 @@ def _hatched(image: Image.Image, box: Box, fill: tuple[int, int, int]) -> None:
 
 @dataclass(frozen=True)
 class _Axis:
-    """The value axis: where a count sits, along the chart's length."""
-
     start: float  # the pixel for zero
     end: float  # the pixel for axis_max
     top: int
@@ -85,7 +80,7 @@ class _Axis:
 
 
 def _legend(draw: ImageDraw.ImageDraw, chart: AskChart, y: float) -> float:
-    """One swatch per series, in a row; how tall it was."""
+    """Returns the height it took."""
     if len(chart.series) < 2:
         return 0
     x = PAD_L
@@ -108,7 +103,6 @@ def _wrapped(text: str, width: float) -> list[str]:
 
 
 def _bar(image: Image.Image, box: Box, value: ChartValue, fill: tuple[int, int, int]) -> None:
-    """An exact bar filled; a "fewer than 5" one hatched over its range (box spans low to high)."""
     if value.low == value.high:
         ImageDraw.Draw(image).rectangle(box, fill=fill)
     else:
@@ -163,7 +157,6 @@ def _flat_bars(image: Image.Image, chart: AskChart, top: float, label_width: flo
 
 
 def _value_grid(draw: ImageDraw.ImageDraw, chart: AskChart, axis: _Axis, vertical: bool, across: tuple[float, float] = (0, 0)) -> None:
-    """Hairlines at each tick, with its number."""
     for tick in chart.ticks:
         at = axis.at(tick)
         if vertical:
@@ -175,7 +168,6 @@ def _value_grid(draw: ImageDraw.ImageDraw, chart: AskChart, axis: _Axis, vertica
 
 
 def _line(image: Image.Image, chart: AskChart, top: float) -> None:
-    """Each series a line through its exact counts; it breaks at a "fewer than 5" month, drawn as a dashed span."""
     draw = ImageDraw.Draw(image)
     bottom = image.height - 110
     axis = _Axis(bottom, top, chart.axis_max)
@@ -203,7 +195,7 @@ def _line(image: Image.Image, chart: AskChart, top: float) -> None:
 
 
 def _pie(image: Image.Image, chart: AskChart, top: float) -> None:
-    """Slices of exact counts only (ask_charts never sends a pie a range), each named with its count and share."""
+    """ask_charts never sends a pie a range."""
     draw = ImageDraw.Draw(image)
     values = [v.high for v in chart.series[0].values]
     total = sum(values) or 1
@@ -226,7 +218,6 @@ def _pie(image: Image.Image, chart: AskChart, top: float) -> None:
 
 
 def png(chart: AskChart) -> bytes:
-    """The chart as a PNG, WIDTH pixels wide."""
     legend = 48 if len(chart.series) > 1 else 0
     if chart.kind in ("pie", "donut"):
         height = PAD_T + max(560, 44 * len(chart.categories) + 40)

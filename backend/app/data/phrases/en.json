@@ -96,6 +96,336 @@
       "critical": true,
       "text": "Nokware can't file this: it isn't an Assembly matter. Ambulance: 193, 0501 614 877, 0505 982 870. Or call 112.",
       "note": "The numbers are digits from the contacts data and are never translated; only the words around them are."
+    },
+    "ask.no_figures_to_chart": {
+      "critical": false,
+      "text": "There are no figures in this answer to chart.",
+      "note": "A chart was asked for, but the answer holds no figures at all — said instead of leaving the request unanswered."
+    },
+    "ask.no_answer_to_chart": {
+      "critical": false,
+      "text": "There's nothing to chart: the Ledger doesn't hold an answer to this yet.",
+      "note": "A chart was asked for on a question the Ledger can't answer."
+    },
+    "ask.no_safety_chart": {
+      "critical": false,
+      "text": "No chart either: these figures aren't published at all.",
+      "note": "A chart was asked for alongside figures about someone's safety, which Nokware never publishes."
+    },
+    "ask.total_and_parts_only": {
+      "critical": false,
+      "text": "The only figures here are a total and one part of it. A total drawn beside its parts reads as one of them, so there's nothing to chart.",
+      "note": "Replaces the old, wrong 'only one count here' when a total was left out and one part remained."
+    },
+    "speech.rest_on_screen": {
+      "critical": false,
+      "text": "The rest of the answer is on the screen.",
+      "note": "Said at the end of a reading that had to stop short of the whole answer."
+    },
+    "speech.sources_on_screen": {
+      "critical": false,
+      "text": "The documents it comes from are listed with the answer.",
+      "note": "Closes every spoken answer: the sources are on the page, not in the audio."
+    },
+    "speech.nothing_found": {
+      "critical": false,
+      "text": "The page says where else to look, and how to request a document.",
+      "note": "Closes a spoken answer the Ledger couldn't answer."
+    },
+    "speech.not_in_this_language": {
+      "critical": false,
+      "text": "Reading aloud isn't available in this language yet.",
+      "note": "Shown where the Listen button would be. Nokware reads aloud only in languages whose fixed text it has written."
+    },
+    "case.safety.received": {
+      "critical": false,
+      "text": "Your reference has been received.",
+      "note": "A personal-safety case's status page and nothing else. Whoever holds the reference may not be the person who filed it, so the line says how far along the case is and never what it is about."
+    },
+    "case.safety.in_progress": {
+      "critical": false,
+      "text": "Your reference is being worked on.",
+      "note": "The same neutral wording the SMS about a personal-safety case uses."
+    },
+    "case.safety.closed": {
+      "critical": false,
+      "text": "This case is closed.",
+      "note": "Says nothing about the outcome: an outcome would say what the case was."
+    },
+    "petition.status.open": {
+      "critical": false,
+      "text": "Open for signatures",
+      "note": "How a petition that is taking signatures is named, on every page and in the portal alike."
+    },
+    "petition.status.awaiting_response": {
+      "critical": false,
+      "text": "With the MCE",
+      "note": "It reached its signatures; the MCE has 30 days to answer publicly."
+    },
+    "petition.status.responded": {
+      "critical": false,
+      "text": "Answered"
+    },
+    "petition.status.closed": {
+      "critical": false,
+      "text": "Closed",
+      "note": "Its 90 days ran out, or the person who started it closed it."
+    },
+    "petition.status.removed": {
+      "critical": false,
+      "text": "Removed",
+      "note": "A contributor removed it on one of the four grounds. Only the ground, the date and the number remain."
+    },
+    "petition.ground.private_individual": {
+      "critical": false,
+      "text": "Names or attacks a private individual",
+      "note": "One of the four grounds, written the same way wherever it is read: the removal form, the tombstone, the report form, USSD and WhatsApp."
+    },
+    "petition.ground.incites_violence": {
+      "critical": false,
+      "text": "Incites violence"
+    },
+    "petition.ground.personal_data": {
+      "critical": false,
+      "text": "Contains personal data"
+    },
+    "petition.ground.duplicate": {
+      "critical": false,
+      "text": "Duplicates an open petition",
+      "note": "The only ground that names another petition: its number is stored, so the tombstone can point there."
+    },
+    "petition.ground.duplicate_comment": {
+      "critical": false,
+      "text": "Repeats another comment",
+      "note": "The same stored ground as petition.ground.duplicate, read about a comment: a comment repeats what is already on its own page and names no petition, so no number is asked for or stored."
+    },
+    "petition.removal.duplicate_needs_code": {
+      "critical": false,
+      "text": "Give the number of the open petition this one duplicates."
+    },
+    "petition.removal.duplicate_not_found": {
+      "critical": false,
+      "text": "No public petition has that number."
+    },
+    "petition.removal.already_removed": {
+      "critical": false,
+      "text": "This petition has already been removed."
+    },
+    "petition.removal.own_petition": {
+      "critical": false,
+      "text": "You started this petition, so you can't remove it. Another contributor can.",
+      "note": "A removal is a judgement on someone else's words; nobody judges their own."
+    },
+    "petition.removal.signed_petition": {
+      "critical": false,
+      "text": "You signed this petition, so you can't remove it. Another contributor can."
+    },
+    "petition.removal.note_personal_data": {
+      "critical": false,
+      "text": "This note holds personal data, such as a phone number, an email address or a Ghana Card number. Take it out: the note is kept in the Assembly's record."
+    },
+    "petition.removal.note_too_long": {
+      "critical": false,
+      "text": "Keep the note to 500 characters or fewer."
+    },
+    "petition.report.note_too_long": {
+      "critical": false,
+      "text": "Keep what you add to 300 characters or fewer."
+    },
+    "petition.report.note_personal_data": {
+      "critical": false,
+      "text": "What you added holds personal data, such as a phone number, an email address or a Ghana Card number. Take it out and say it another way."
+    },
+    "petition.report.received": {
+      "critical": false,
+      "text": "Thank you. A contributor will read this. The petition stays up while they do.",
+      "note": "Said to whoever reports a petition: a report never hides anything, and the wording must not suggest it did."
+    },
+    "petition.report.already_removed": {
+      "critical": false,
+      "text": "This petition has already been removed."
+    },
+    "petition.dismissal.not_the_ground": {
+      "critical": false,
+      "text": "Doesn't meet the ground",
+      "note": "One of the two fixed reasons a contributor dismisses a report with."
+    },
+    "petition.dismissal.already_handled": {
+      "critical": false,
+      "text": "Already handled"
+    },
+    "petition.edit.not_editable": {
+      "critical": false,
+      "text": "This petition is closed, so it can't be edited."
+    },
+    "petition.legacy.refused": {
+      "critical": false,
+      "text": "Refused under the earlier review process",
+      "note": "On a petition the MCE refused before Stage A. Never shown as a contributor's removal, which would be untrue."
+    },
+    "petition.legacy.withdrawn": {
+      "critical": false,
+      "text": "Withdrawn by the person who started it"
+    },
+    "petition.legacy.closed_in_move": {
+      "critical": false,
+      "text": "Closed during the move to the new petition process"
+    },
+    "petition.comment.default_name": {
+      "critical": false,
+      "text": "Resident",
+      "note": "The name over a comment whose writer chose none. A comment never shows a number, so it shows this."
+    },
+    "petition.comment.empty": {
+      "critical": false,
+      "text": "Write your comment first."
+    },
+    "petition.comment.too_long": {
+      "critical": false,
+      "text": "Keep your comment to 500 characters or fewer."
+    },
+    "petition.comment.personal_data": {
+      "critical": false,
+      "text": "Your comment holds personal data, such as a phone number, an email address or a Ghana Card number. Take it out and say it another way.",
+      "note": "Refused, never quietly mended: the person writing it decides how to say it instead."
+    },
+    "petition.comment.private_individual": {
+      "critical": false,
+      "text": "Your comment seems to name a private person. Comments on a petition are public, so say it without naming anyone."
+    },
+    "petition.comment.removed": {
+      "critical": false,
+      "text": "Comment removed by a verified contributor: {ground}",
+      "note": "What stands where a removed comment's words were. {ground} is one of the four grounds in the words a comment is judged by, which is petition.ground.duplicate_comment for a duplicate and petition.ground.* for the rest; a translation may put it wherever that language wants it."
+    },
+    "petition.comment.already_removed": {
+      "critical": false,
+      "text": "This comment has already been removed."
+    },
+    "petition.comment.report_received": {
+      "critical": false,
+      "text": "Thank you. A contributor will read this. The comment stays up while they do.",
+      "note": "Said to whoever reports a comment: a report never hides anything, and the wording must not suggest it did."
+    },
+    "petition.share.not_a_department": {
+      "critical": false,
+      "text": "Choose a department from the Assembly's list.",
+      "note": "The list is the Assembly's own departments, in app/teams.py; there is no second list of them."
+    },
+    "petition.share.already_shared": {
+      "critical": false,
+      "text": "This petition has already been shared with that department.",
+      "note": "Sharing it twice would ask for a second note from a department that writes one."
+    },
+    "petition.note.not_shared": {
+      "critical": false,
+      "text": "This petition wasn't shared with your department, so your department has no note to write on it.",
+      "note": "Only the department the MCE shared a petition with answers on its page."
+    },
+    "petition.note.already_written": {
+      "critical": false,
+      "text": "Your department has already written its note on this petition. A note is published as it was written and stands as the department's answer.",
+      "note": "One note per department per petition, refused rather than replaced: an answer that can be rewritten is worth nothing to the person who was answered."
+    },
+    "petition.note.empty": {
+      "critical": false,
+      "text": "Write your department's note first."
+    },
+    "petition.note.too_long": {
+      "critical": false,
+      "text": "Keep the note to 500 characters or fewer."
+    },
+    "petition.note.personal_data": {
+      "critical": false,
+      "text": "This note holds personal data, such as a phone number, an email address or a Ghana Card number. It is published on the petition's page, so take it out and say it another way.",
+      "note": "Refused, never quietly mended: the officer writing it decides how to say it instead."
+    },
+    "petition.note.private_individual": {
+      "critical": false,
+      "text": "This note seems to name a private person. It is published on the petition's page, so say what the department is doing without naming anyone."
+    },
+    "petition.reply.no_response": {
+      "critical": false,
+      "text": "There is no response on this petition to reply to yet.",
+      "note": "A reply answers the MCE's published response; until there is one, there is nothing to answer."
+    },
+    "petition.reply.already_replied": {
+      "critical": false,
+      "text": "You have already replied to this response. One reply stands under it.",
+      "note": "One response, one reply: a petition's page is a record of what was asked and what was answered, not a thread."
+    },
+    "petition.reply.empty": {
+      "critical": false,
+      "text": "Write your reply first."
+    },
+    "petition.reply.too_long": {
+      "critical": false,
+      "text": "Keep your reply to 1,000 characters or fewer."
+    },
+    "petition.reply.personal_data": {
+      "critical": false,
+      "text": "Your reply holds personal data, such as a phone number, an email address or a Ghana Card number. Take it out and say it another way.",
+      "note": "The reply is published under the MCE's response, where anyone can read it."
+    },
+    "petition.reply.private_individual": {
+      "critical": false,
+      "text": "Your reply seems to name a private person. It is published under the MCE's response, so say it without naming anyone."
+    },
+    "petition.sign.removed": {
+      "critical": false,
+      "text": "This petition was removed, so it takes no more signatures.",
+      "note": "Refused the same way wherever a signature is offered. It says nothing of the petition, because the page behind that number is now the tombstone and says nothing of it either."
+    },
+    "petition.channel.standing": {
+      "critical": false,
+      "text": "Petition {number}: {stage}.",
+      "note": "How a petition's standing opens on a phone, on USSD and WhatsApp alike. {stage} is the status in the words petition.status.* gives it."
+    },
+    "petition.channel.signatures": {
+      "critical": false,
+      "text": "{signatures} of {threshold} signatures."
+    },
+    "petition.channel.signatures_only": {
+      "critical": false,
+      "text": "{signatures} signatures.",
+      "note": "For a petition carrying no threshold, which is one written before a threshold was fixed at publication. It still says what it has."
+    },
+    "petition.channel.closes": {
+      "critical": false,
+      "text": "Closes {day}."
+    },
+    "petition.channel.removed": {
+      "critical": false,
+      "text": "Petition {number} was removed on {day}: {ground}.",
+      "note": "Built from the removal record alone, as the tombstone it repeats is. {ground} is one of the four grounds, in the words petition.ground.* gives it."
+    },
+    "petition.channel.removed_nothing_public": {
+      "critical": false,
+      "text": "Nothing of the petition is public."
+    },
+    "petition.channel.removed_duplicate": {
+      "critical": false,
+      "text": "It duplicated petition {other}."
+    },
+    "petition.channel.removed_before_once": {
+      "critical": false,
+      "text": "It had been removed once before."
+    },
+    "petition.channel.removed_before": {
+      "critical": false,
+      "text": "It had been removed {count} times before."
+    },
+    "petition.channel.not_found_ussd": {
+      "critical": false,
+      "text": "No petition has the number {number}. Check it and dial again."
+    },
+    "petition.channel.not_found_whatsapp": {
+      "critical": false,
+      "text": "No petition has the number {number}. Check it and send it again."
+    },
+    "petition.image.not_a_ground": {
+      "critical": false,
+      "text": "A photograph can't duplicate a petition. Choose the ground it actually comes down on."
     }
   }
 }

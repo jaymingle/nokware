@@ -12,7 +12,7 @@ const NOT_A_REFERENCE = "That doesn't look like a reference. It has eight letter
 
 type StatusLookupProps = { busy: boolean; showing: boolean; onLookup: (reference: string) => void; onClear: () => void };
 
-/** The reference box. Nothing is looked up until it reads as a reference; nothing goes in the address bar. */
+/** Nothing is looked up until it reads as a reference, and nothing goes in the address bar. */
 export function StatusLookup({ busy, showing, onLookup, onClear }: StatusLookupProps) {
   const [typed, setTyped] = useState("");
   const [problem, setProblem] = useState<string | null>(null);

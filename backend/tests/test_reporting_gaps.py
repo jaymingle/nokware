@@ -1,6 +1,6 @@
 """Figures the Assembly's documents once reported and haven't since: shown with their evidence, or not at all."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
@@ -8,7 +8,7 @@ import pytest
 from app.services import reporting_gaps
 from app.services.ledger_documents import LedgerStatus
 
-NOW = datetime(2026, 9, 16, 12, 0, tzinfo=timezone.utc)
+NOW = datetime(2026, 9, 16, 12, 0, tzinfo=UTC)
 VLR = {"title": "The City of Accra 2020 Voluntary Local Review", "status": LedgerStatus.PUBLISHED}
 
 

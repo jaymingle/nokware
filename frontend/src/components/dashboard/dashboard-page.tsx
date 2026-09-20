@@ -5,6 +5,7 @@ import { AskPrompt, Panel, RecentDocuments, SubMetroTable, TopicShares } from "@
 import { TrendChart } from "@/components/dashboard/trend-chart";
 import { ErrorPanel, LoadingPanel } from "@/components/documents/panels";
 import { IssueList } from "@/components/issues/issue-list";
+import { PageShell } from "@/components/page-shell";
 import { useDashboard } from "@/lib/api/public-queries";
 import { formatCount, formatDays, percent, periodLabel } from "@/lib/report/dashboard";
 import { formatDateTime } from "@/lib/time";
@@ -58,6 +59,14 @@ function Figures({ figures }: { figures: Dashboard }) {
   return (
     <div className="flex flex-col gap-5">
       <StatCards figures={figures} />
+      {/* On the totals rather than in the page's opening paragraph: a reader who takes in the four numbers and
+          nothing else would otherwise never learn what is missing from them, and a total that quietly excludes
+          a category is the kind of figure this project exists to argue against. */}
+      <p className="max-w-[80ch] text-[13px] text-ink-soft" data-testid="dashboard-safety-excluded">
+        Reports about someone&apos;s safety are in none of these figures, including the totals. Counting them
+        anywhere — even inside a total — would let the number be worked out by subtraction, and a person&apos;s
+        safety is not a statistic to be reverse-engineered. They go privately to the services that protect people.
+      </p>
       <div className="flex flex-wrap items-start gap-5">
         <Panel title="Reports received and resolved" lead={`Monthly, ${periodLabel(figures.months)}. Bars: received. Line: resolved in the month. Dashed: fewer than 5.`} className="flex-[1_1_520px]">
           <TrendChart months={figures.months} />
@@ -88,26 +97,28 @@ function Figures({ figures }: { figures: Dashboard }) {
   );
 }
 
-/** The public dashboard: counts and trends only. Personal-safety reports are in none of them. */
+/** Personal-safety reports are in none of these counts. */
 export function DashboardPage() {
   const dashboard = useDashboard();
   return (
-    <div className="mx-auto flex w-full max-w-[1120px] flex-col gap-8">
-      <div className="flex max-w-[62ch] flex-col gap-3">
-        <p className="text-[12.5px] text-ink-soft">
-          Public record{dashboard.data ? ` · updated ${formatDateTime(dashboard.data.generated_at)}` : ""}
-        </p>
-        <h1 className="text-[34px] leading-tight sm:text-[46px]">The city, in the aggregate</h1>
-        <p className="text-base text-ink-soft">
+    <PageShell
+      width="data"
+      eyebrow={`Public record${dashboard.data ? ` · updated ${formatDateTime(dashboard.data.generated_at)}` : ""}`}
+      title="The city, in the aggregate"
+      lead={
+        <>
           What Accra&apos;s residents reported over the last twelve months, and what the Assembly resolved. Counts and
           trends only: no individual case, address or reporter appears here, and a count from 1 to 4 reads
-          &ldquo;fewer than 5&rdquo;. Reports about a person&apos;s safety are handled privately and are not counted here at all.
-        </p>
+          &ldquo;fewer than 5&rdquo;.
+        </>
+      }
+    >
+      <div className="flex flex-col gap-8">
+        {dashboard.isPending ? <LoadingPanel label="Loading the figures…" /> : null}
+        {dashboard.error ? <ErrorPanel message={dashboard.error.message} onRetry={() => dashboard.refetch()} /> : null}
+        {dashboard.data ? <Figures figures={dashboard.data} /> : null}
+        <IssueList />
       </div>
-      {dashboard.isPending ? <LoadingPanel label="Loading the figures…" /> : null}
-      {dashboard.error ? <ErrorPanel message={dashboard.error.message} onRetry={() => dashboard.refetch()} /> : null}
-      {dashboard.data ? <Figures figures={dashboard.data} /> : null}
-      <IssueList />
-    </div>
+    </PageShell>
   );
 }

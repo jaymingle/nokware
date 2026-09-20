@@ -1,9 +1,7 @@
 """Who is calling: verify an Appwrite JWT and resolve the caller's Nokware role.
 
-The browser signs in with Appwrite and sends a short-lived JWT (from
-account.createJWT) as a Bearer token. The JWT proves identity only. The role is
-always resolved here, from the user's confirmed team memberships read with the
-server key, so a client can never claim a role or department it doesn't have.
+The JWT proves identity only. The role is always resolved here, from confirmed team memberships read with the server
+key, so a client can never claim a role or department it doesn't have.
 """
 
 from collections.abc import Iterable
@@ -38,7 +36,6 @@ class Principal:
 
     @property
     def recipient(self) -> str | None:
-        """The team citizen reports reach this user through: their department or agency."""
         return self.department or self.agency
 
 
@@ -51,11 +48,7 @@ class NoRoleError(Exception):
 
 
 def resolve_role(team_ids: Iterable[str]) -> tuple[Role, str | None]:
-    """Map confirmed team memberships to (role, department or agency team, or None).
-
-    Exactly one Nokware team is required: an account in none has no access, and
-    an account in several would make "your own department" ambiguous.
-    """
+    """Exactly one Nokware team is required: an account in several would make "your own department" ambiguous."""
     teams = sorted(set(team_ids) & set(ALL_TEAMS))
     if len(teams) != 1:
         raise NoRoleError(f"expected exactly one Nokware team, found {teams or 'none'}")
@@ -70,7 +63,7 @@ def resolve_role(team_ids: Iterable[str]) -> tuple[Role, str | None]:
 
 
 def _user_client(jwt: str) -> Client:
-    """A client acting as the JWT's user. Built per request and never cached."""
+    """Built per request and never cached."""
     settings = get_settings()
     client = Client()
     client.set_endpoint(settings.appwrite_endpoint)
@@ -94,7 +87,6 @@ def confirmed_team_ids(user_id: str) -> list[str]:
 
 
 def authenticate(jwt: str) -> Principal:
-    """Verify the JWT with Appwrite, then resolve the role from team membership."""
     user = verify_jwt(jwt)
     role, team = resolve_role(confirmed_team_ids(user.id))
     return Principal(

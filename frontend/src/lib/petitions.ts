@@ -1,26 +1,26 @@
+import { joinNames, lowerFirst, plural, times } from "@/lib/text";
 import { formatDate } from "@/lib/time";
 
-import type { PetitionCard, PetitionStatus, PetitionTimelineEntry, PhoneChallenge } from "@/lib/api/types";
+import type { PetitionCard, PetitionStatus, PetitionTimelineEntry, PetitionTombstone, PhoneChallenge } from "@/lib/api/types";
+import type { Sending } from "@/lib/api/upload";
 
-// How a petition reads in public, and what this browser keeps while someone starts one. The MCE is usually a
-// petition's target, so the page always says who published it: the MCE, or the clock when the MCE didn't decide.
+// The MCE is usually a petition's target, so the MCE neither publishes nor refuses one: the person who writes a
+// petition publishes it, and only the answering below is the MCE's. What comes down comes down on a named ground.
 
 const DAY_MS = 86_400_000;
 
+/** The same words the API's `status_words` carries, so the portal and the public say one thing. */
 export const STATUS_LABELS: Record<PetitionStatus, string> = {
-  in_review: "Waiting for the MCE's review",
-  refused: "Refused by the MCE",
-  open: "Open",
-  awaiting_response: "With the MCE for a response",
-  responded: "Answered by the MCE",
+  open: "Open for signatures",
+  awaiting_response: "With the MCE",
+  responded: "Answered",
+  removed: "Removed",
   closed: "Closed",
-  withdrawn: "Withdrawn",
 };
 
 export const NAME_NOTE =
   "If you show your name, anyone can see it on the petition, including the department it concerns. If you stay anonymous, you still count; only your name is withheld. You can take your name off later.";
 
-/** The same, naming the department when it is known: who exactly can see a public name. */
 export function nameNote(concerns: string | null): string {
   return concerns ? NAME_NOTE.replace("the department it concerns", `${concerns}, which it concerns`) : NAME_NOTE;
 }
@@ -30,7 +30,7 @@ export const NO_RESPONSE = "No response 30 days after the petition reached its t
 export const LEDGER_NOTE =
   "Found by searching the Assembly's published documents for this petition's words. A match means a document touches the subject, not that it commits to what the petition asks, and the search can miss documents.";
 
-/** A petition number or a code in two threes, "482 913": easier to read aloud and type on a keypad. */
+/** "482 913": easier to read aloud and type on a keypad. */
 export function spacedCode(code: string): string {
   return `${code.slice(0, 3)} ${code.slice(3)}`;
 }
@@ -44,13 +44,8 @@ export function startedBy(name: string | null): string {
   return name ? `Started by ${name}` : "Started by a resident";
 }
 
-/** Who published it: the MCE, or the 72-hour clock the MCE let run out. */
-export function publishedLine(petition: Pick<PetitionCard, "published_at" | "published_by">): string | null {
-  if (!petition.published_at) return null;
-  const on = formatDate(petition.published_at);
-  return petition.published_by === "automatic"
-    ? `Published automatically on ${on}: the MCE didn't decide within 72 hours`
-    : `Published by the MCE on ${on}`;
+export function publishedLine(petition: Pick<PetitionCard, "published_at">): string | null {
+  return petition.published_at ? `Published on ${formatDate(petition.published_at)}` : null;
 }
 
 export function signaturesLine(signatures: number, threshold: number | null): string {
@@ -68,31 +63,28 @@ export function daysLeft(iso: string, now: number): number {
 
 type Standing = Pick<PetitionCard, "status" | "threshold" | "threshold_reached_at" | "response_due" | "responded_at" | "unanswered_at">;
 
-/** How late, in whole days never rounded up: ", 2 days after the 30-day deadline", or "less than a day"; "" if in time. */
+// Whole days, never rounded up: a day late is only said once a full day has passed.
 function lateness(respondedAt: string, due: string | null): string {
   const lateMs = due ? Date.parse(respondedAt) - Date.parse(due) : 0;
   if (lateMs <= 0) return "";
   const days = Math.floor(lateMs / DAY_MS);
-  return days >= 1 ? `, ${days} ${days === 1 ? "day" : "days"} after the 30-day deadline` : ", less than a day after the 30-day deadline";
+  return days >= 1 ? `, ${plural(days, "day", "days")} after the 30-day deadline` : ", less than a day after the 30-day deadline";
 }
 
-/** When, and how late, the MCE responded. */
 export function respondedLine(petition: Pick<PetitionCard, "responded_at" | "response_due">): string | null {
   if (!petition.responded_at) return null;
   return `The MCE responded on ${formatDate(petition.responded_at)}${lateness(petition.responded_at, petition.response_due)}.`;
 }
 
-/** Once it reached its threshold: when, and the MCE's 30 days to respond, counted down, then said plainly if they pass. */
 export function responseLine(petition: Standing, now: number, where = "on this page"): string | null {
   if (petition.status === "responded") return respondedLine(petition);
   if (petition.status !== "awaiting_response" || !petition.threshold_reached_at || !petition.response_due) return null;
   const reached = `Reached ${petition.threshold?.toLocaleString()} signatures on ${formatDate(petition.threshold_reached_at)}.`;
   const left = daysLeft(petition.response_due, now);
   if (left === 0 || petition.unanswered_at) return `${reached} ${NO_RESPONSE}`;
-  return `${reached} The MCE has until ${formatDate(petition.response_due)} to respond publicly ${where}: ${left} ${left === 1 ? "day" : "days"} left.`;
+  return `${reached} The MCE has until ${formatDate(petition.response_due)} to respond publicly ${where}: ${plural(left, "day", "days")} left.`;
 }
 
-/** Where the petition stands in time: open until when, or when and why it closed. */
 export function closingLine(petition: Pick<PetitionCard, "status" | "closes_at" | "closed_at" | "threshold">, now: number): string | null {
   if (petition.status === "responded") return "It takes no more signatures: the MCE has responded.";
   if (petition.status === "awaiting_response" && petition.closes_at) {
@@ -100,38 +92,99 @@ export function closingLine(petition: Pick<PetitionCard, "status" | "closes_at" 
   }
   if (petition.status === "open" && petition.closes_at) {
     const left = daysLeft(petition.closes_at, now);
-    return `Open until ${formatDate(petition.closes_at)} (${left} ${left === 1 ? "day" : "days"} left)`;
+    return `Open until ${formatDate(petition.closes_at)} (${plural(left, "day", "days")} left)`;
   }
   if (!petition.closed_at) return null;
-  if (petition.status === "withdrawn") return `Withdrawn by the person who started it on ${formatDate(petition.closed_at)}`;
   const goal = petition.threshold ? ` It didn't reach ${petition.threshold.toLocaleString()} signatures in 90 days.` : "";
   return `Closed on ${formatDate(petition.closed_at)}.${goal}`;
 }
 
-const TIMELINE: Record<PetitionTimelineEntry["action"], string> = {
-  submitted: "Sent to the MCE for review",
-  resubmitted: "Edited and sent back for review",
-  published: "Published by the MCE",
-  auto_published: "Published automatically: the MCE didn't decide within 72 hours",
-  refused: "Refused by the MCE",
-  withdrawn: "Withdrawn by the person who started it",
+export const TIMELINE_WORDS: Record<PetitionTimelineEntry["action"], string> = {
+  published: "Published by the person who started it",
+  edited: "Edited",
+  republished: "Edited and published again",
+  removed: "Removed",
+  withdrawn: "Closed by the person who started it",
   closed: "Closed after 90 days",
   threshold_reached: "Reached its signatures and went to the MCE for a response",
   responded: "The MCE responded",
   no_response: "No response 30 days after the petition reached its threshold",
+  shared: "Sent to a department for its answer",
+  department_note: "A department answered",
+  creator_replied: "The person who started it replied",
+  image_removed: "A photo was taken down by a verified contributor",
+  moved_to_new_process: "Moved to the new petition process",
+};
+
+/** Two steps are about a named department, and read as English rather than as a label with a value after it. */
+const NAMES_A_DEPARTMENT: Partial<Record<PetitionTimelineEntry["action"], (department: string) => string>> = {
+  shared: (department) => `Sent to ${department} for its answer`,
+  department_note: (department) => `${department} answered`,
 };
 
 export function timelineText(entry: PetitionTimelineEntry): string {
-  return entry.reason ? `${TIMELINE[entry.action]}: ${entry.reason}` : TIMELINE[entry.action];
+  if (!entry.reason) return TIMELINE_WORDS[entry.action];
+  const named = NAMES_A_DEPARTMENT[entry.action];
+  return named ? named(entry.reason) : `${TIMELINE_WORDS[entry.action]}: ${entry.reason}`;
 }
 
-/** A WhatsApp share link carrying the ask and the page's address. */
+// Editing, and being removed. A petition can be mended and published again, so both are ordinary things for a
+// page to say rather than accusations: the words below state what happened and leave the judgement to the reader.
+
+/** The API names the fields it versions as it stores them, so the page says what each one is. */
+const VERSIONED: Record<string, string> = {
+  title: "the ask",
+  body: "the reasons",
+  topic: "the topic",
+  scope: "where it applies",
+  wardLocation: "the electoral area",
+  imageIds: "the photos",
+};
+
+/** What one version changed from the one before it. The first version changed nothing: it began. */
+export function versionChanges(changed: string[]): string {
+  const words = changed.map((field) => VERSIONED[field]).filter(Boolean);
+  return words.length === 0 ? "First version" : `Changed ${joinNames(words)}`;
+}
+
+/**
+ * Signatures gathered before the words were last edited. They still count — the API counts them — but a reader
+ * comparing the number with what is on the page deserves to know some of it was given for something else.
+ */
+export function earlierVersionsLine(count: number): string | null {
+  return count > 0 ? `${count.toLocaleString()} on an earlier version` : null;
+}
+
+/** A petition that came down and was mended. Said on the petition itself, so the record isn't only the tombstone's. */
+export function removedBeforeLine(removals: number): string | null {
+  if (removals < 1) return null;
+  return `This petition has been removed ${times(removals)} and published again.`;
+}
+
+export function removedLine(stone: Pick<PetitionTombstone, "ground_words" | "removed_at">): string {
+  return `Removed on ${formatDate(stone.removed_at)}: ${lowerFirst(stone.ground_words)}.`;
+}
+
+/** What a tombstone says about the removals before this one. */
+export function previousRemovalsLine(previous: number): string | null {
+  if (previous < 1) return null;
+  return `It had been removed ${times(previous)} before this.`;
+}
+
+/**
+ * What the button says while the photos go. On a mobile connection the upload is the wait, and a button that only
+ * says "Sending…" for two minutes reads as a page that has stopped.
+ */
+export function sendingLabel(sending: Sending | null, settling = "Publishing…"): string {
+  if (sending === null || sending === "filing") return settling;
+  return `Sending your photos… ${Math.round((sending.sent / Math.max(sending.total, 1)) * 100)}%`;
+}
+
 export function whatsappShareUrl(title: string, pageUrl: string): string {
   return `https://wa.me/?text=${encodeURIComponent(`Petition to the Accra Metropolitan Assembly: ${title}\n${pageUrl}`)}`;
 }
 
-// What this browser keeps. The proof of a confirmed phone lives in this tab only (sessionStorage), so a shared
-// computer forgets it when the tab closes; the server refuses it after 12 hours anyway. The draft is kept so
+// The phone proof is kept in sessionStorage so a shared computer forgets it when the tab closes. The draft is kept so
 // switching to WhatsApp to confirm, or reloading, loses nothing.
 
 const PROOF_KEY = "nokware-phone-proof";

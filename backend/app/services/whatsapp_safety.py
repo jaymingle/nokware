@@ -1,15 +1,10 @@
-"""After a personal-safety report is filed on WhatsApp: who has it, and the choices it offers for an hour.
+"""After a personal-safety report is filed on WhatsApp: the choices it offers for an hour, each separate and explicit.
 
-The receipt says who has the report and offers, each a separate explicit choice:
-- CALL: the Police or Social Welfare may phone the citizen on this number (apart from updates);
-- PLACE: say exactly where they are, so help can come (report_locations: the one exception to
-  the coarse-location rule, only on this opt-in). The message that carried it is then deleted
-  from Twilio's log, and it never passes through Redis;
-- REMOVE: delete that location again, confirmed only once it is gone;
-- YES: updates here, which never say what the report is about.
-Anything else is a new message. The choices last an hour, like the updates choice on the web.
+PLACE is the one exception to the coarse-location rule, only on this opt-in: the message that carried the location is
+deleted from Twilio's log, and it never passes through Redis. REMOVE is confirmed only once the location is gone.
 """
 
+import contextlib
 from typing import Any
 
 from app.services import channel_sessions, report_followups, report_locations, whatsapp_reply
@@ -45,7 +40,6 @@ def receipt_text(receipt: Receipt) -> str:
 
 
 def after_filing(number: str, receipt: Receipt) -> None:
-    """Keep the hour's choices, and send the receipt."""
     state = {"step": "after", "reference": receipt.case["reference"], "case_id": receipt.case["$id"],
              "recipients": receipt.case["recipients"], "token": receipt.preferences_token}
     channel_sessions.save("whatsapp", number, state, AFTER_SECONDS)
@@ -80,7 +74,7 @@ def _remove(number: str, state: State) -> None:
 
 
 def after_step(inbound: Any, state: State) -> bool:
-    """One of the hour's choices; anything else is handled as a new message."""
+    """Anything but one of the hour's choices is handled as a new message."""
     choice = inbound.text.strip().lower()
     if choice in ("yes", "y", "no", "n"):
         _updates(inbound.number, state, choice in ("yes", "y"))
@@ -98,15 +92,11 @@ def after_step(inbound: Any, state: State) -> bool:
 
 
 def _forget_message(message_sid: str) -> None:
-    """The message that carried the location leaves Twilio's log too."""
-    try:
+    with contextlib.suppress(WhatsAppNotConfigured):
         twilio().delete_message(message_sid)
-    except WhatsAppNotConfigured:
-        pass
 
 
 def place_step(inbound: Any, state: State) -> bool:
-    """The location itself: a pin from the location button, or a typed address. 0 leaves it."""
     text = inbound.text.strip()
     back = {**state, "step": "after"}
     if text == "0":

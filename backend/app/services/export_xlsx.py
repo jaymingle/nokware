@@ -1,23 +1,11 @@
 """An Ask answer as an Excel workbook: the live report figures as a sheet you can work with, and its chart.
 
-Three sheets. **Answer** carries the notice, the question, the answer and the
-documents it cites. **Figures** is the working sheet: one block per live figure,
-its total and each line of its breakdown, the count in its own column as a
-number. **Chart** holds an Excel chart of the same cells — a real chart tied to
-the data, not a picture of one, so changing a cell moves the bar.
+The chart is a real Excel chart over the Figures cells, not a picture, so changing a cell moves the bar.
 
-Two rules keep a spreadsheet from saying more than Nokware knows:
-
-- "Fewer than 5" is never a number. Its count cell stays empty and the text goes
-  in "Shown as", so nobody can total a column and reveal a suppressed count. The
-  same for a figure that is a range.
-- Live report figures and budget figures become cells. A budget figure is read
-  from the Assembly's budget documents and each block of it proved against its
-  stated total (budget_extract.py), so its rows can be worked with like counts.
-  Numbers quoted from other documents stay in the answer's text: what an answer
-  sets out from those is a few passages, not a whole table, and a sheet invites
-  sums across rows the Ledger can't support. A chart of those can be drawn where
-  every bar is proved (ask_document_charts.py), and is, in the PDF and Word.
+- "Fewer than 5" is never a number. Its count cell stays empty and the text goes in "Shown as", so nobody can total
+  a column and reveal a suppressed count. The same for a figure that is a range.
+- Only live report figures and budget figures (each block proved against its stated total) become cells. Numbers
+  quoted from other documents stay in the answer's text: a sheet invites sums across rows the Ledger can't support.
 
 A cell that would start a formula (=, +, -, @) is prefixed with an apostrophe:
 the question is the resident's own words.
@@ -34,7 +22,7 @@ from openpyxl.worksheet.worksheet import Worksheet
 
 from app.schemas.ask import AskChart, AskFigure
 from app.services.ask_export import HEADER_NOTICE, Content, chart_footnote, figure_footnote, figures_heading, figures_notes
-from app.services.export_csv import answer_text, figure_value
+from app.services.export_csv import answer_text, figure_value, safe_cell
 
 INK = "FF17242B"
 TEAL = "FF1F6F5C"
@@ -43,17 +31,12 @@ WHITE_HEADING = Font(bold=True, color="FFFFFFFF")
 SMALL = Font(size=9, color="FF4A5A5F")
 FILL = PatternFill("solid", fgColor=TEAL)
 WRAP = Alignment(wrap_text=True, vertical="top")
-_FORMULA = ("=", "+", "-", "@", "\t", "\r")
 MAX_ROWS_CHARTED = 24  # a chart of more categories than this is unreadable; the cells still hold every row
-
-
-def _safe(value: object) -> object:
-    return f"'{value}" if isinstance(value, str) and str(value).startswith(_FORMULA) else value
 
 
 def _write(sheet: Worksheet, row: int, values: list[object], font: Font | None = None) -> int:
     for column, value in enumerate(values, start=1):
-        cell = sheet.cell(row=row, column=column, value=_safe(value))
+        cell = sheet.cell(row=row, column=column, value=safe_cell(value))
         if font:
             cell.font = font
     return row + 1
@@ -72,7 +55,7 @@ def _answer_sheet(sheet: Worksheet, content: Content) -> None:
     row = _write(sheet, row, ["Answered", content.answered])
     row += 1
     sheet.cell(row=row, column=1, value="Answer").font = HEADING
-    answer = sheet.cell(row=row, column=2, value=_safe(answer_text(content)))
+    answer = sheet.cell(row=row, column=2, value=safe_cell(answer_text(content)))
     answer.alignment = WRAP
     sheet.row_dimensions[row].height = 220
     row += 2
@@ -90,7 +73,7 @@ def _answer_sheet(sheet: Worksheet, content: Content) -> None:
 
 
 def _figure_block(sheet: Worksheet, row: int, number: int, figure: AskFigure) -> tuple[int, tuple[int, int] | None]:
-    """One figure: its heading, a header row, its total and its breakdown. Returns the next row and the rows charted."""
+    """Returns the next row and the rows charted."""
     row = _write(sheet, row, [f"F{number}", figure.description], HEADING)
     row = _write(sheet, row, ["Source", figure_footnote(figure)], SMALL)
     header = row
@@ -106,7 +89,7 @@ def _figure_block(sheet: Worksheet, row: int, number: int, figure: AskFigure) ->
 
 
 def _figures_sheet(sheet: Worksheet, content: Content) -> dict[str, tuple[int, int]]:
-    """The working sheet. Returns each figure's breakdown rows, by label, for the chart to point at."""
+    """Returns each figure's breakdown rows, by label, for the chart to point at."""
     sheet.freeze_panes = "A2"
     _widths(sheet, [44, 12, 18])
     row = _write(sheet, 1, [figures_heading(content.figures)], HEADING)
@@ -122,7 +105,7 @@ def _figures_sheet(sheet: Worksheet, content: Content) -> dict[str, tuple[int, i
 
 
 def _chart(chart: AskChart) -> BarChart | LineChart | PieChart:
-    """An Excel chart of the kind Nokware drew, so the workbook says what the page said."""
+    """The kind Nokware drew, so the workbook says what the page said."""
     if chart.kind == "line":
         return LineChart()
     if chart.kind in ("pie", "donut"):
@@ -135,7 +118,6 @@ def _chart(chart: AskChart) -> BarChart | LineChart | PieChart:
 
 
 def _chart_sheet(sheet: Worksheet, figures: Worksheet, chart: AskChart, charted: list[tuple[int, int]]) -> None:
-    """The chart Nokware drew, over the cells on the Figures sheet: a real chart, not a picture of one."""
     # The bars the page drew and no more, so the workbook's chart matches the note beside it ("the 20 largest of 42").
     drawn_rows = min(len(chart.categories), MAX_ROWS_CHARTED)
     first, last = charted[0][0], min(charted[0][1], charted[0][0] + drawn_rows - 1)
@@ -152,7 +134,7 @@ def _chart_sheet(sheet: Worksheet, figures: Worksheet, chart: AskChart, charted:
 
 
 def xlsx(content: Content) -> bytes:
-    """The answer as an Excel workbook. Only an answer with live figures is worth one (see the module docstring)."""
+    """Only an answer with live figures is worth one."""
     book = Workbook()
     book.properties.creator = "Nokware (not an official AMA document)"
     book.properties.title = content.question[:255]

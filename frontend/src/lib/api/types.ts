@@ -24,6 +24,7 @@ export type AnswerStatus = Schemas["DoneEvent"]["status"];
 export type Provenance = Schemas["Provenance"];
 export type CaseSummary = Schemas["CaseSummary"];
 export type CaseDetail = Schemas["CaseDetail"];
+export type CaseEvent = Schemas["CaseEvent"];
 export type SharedLocationView = Schemas["SharedLocationView"];
 export type CaseOversight = Schemas["CaseOversight"];
 export type CaseAction = Schemas["CaseAction"];
@@ -33,6 +34,7 @@ export type SubMetroOption = Schemas["SubMetroOption"];
 export type ReportReceipt = Schemas["ReportReceipt"];
 export type ReportStatus = Schemas["ReportStatus"];
 export type LocationViewNote = Schemas["LocationViewNote"];
+export type ReportTimelineEvent = Schemas["TimelineEvent"];
 export type ReportPreferences = Schemas["PreferencesRequest"];
 export type PreferencesResult = Schemas["PreferencesResult"];
 export type Dashboard = Schemas["Dashboard"];
@@ -52,7 +54,6 @@ export type AskChart = Schemas["AskChart"];
 export type PublishingRecord = Schemas["PublishingRecord"];
 export type ReportingGap = Schemas["ReportingGap"];
 export type UnpublishedData = Schemas["UnpublishedData"];
-export type CheckedSource = Schemas["CheckedSource"];
 export type RecordRequirement = Schemas["Requirement"];
 export type RecordPeriod = Schemas["RecordPeriod"];
 export type RecordDocument = Schemas["RecordDocument"];
@@ -71,21 +72,48 @@ export type PetitionDetail = Schemas["PetitionDetail"];
 export type PetitionPage = Schemas["PetitionPage"];
 export type PetitionStatus = Schemas["PetitionCard"]["status"];
 export type PetitionTimelineEntry = Schemas["TimelineEntry"];
-export type PetitionModeration = Schemas["Moderation"];
+export type PetitionVersion = Schemas["VersionEntry"];
+/** A removed petition's page: the removal record, and nothing of the petition. Tell them apart on `state`. */
+export type PetitionTombstone = Schemas["Tombstone"];
+export type PetitionOrTombstone = PetitionDetail | PetitionTombstone;
+export type PetitionRemovals = Schemas["Removals"];
+export type PetitionGround = Schemas["GroundOption"]["id"];
+export type PetitionGroundOption = Schemas["GroundOption"];
+export type PetitionReportRequest = Schemas["ReportRequest"];
+export type PetitionReportFiled = Schemas["ReportFiled"];
 export type PetitionDocument = Schemas["DocumentRef"];
 export type LedgerMatch = Schemas["LedgerMatch"];
 export type LinkedIssue = Schemas["LinkedIssue"];
 export type AreaOption = Schemas["AreaOption"];
-export type RefusalReason = Schemas["RefusalReason"];
-export type PetitionRefusal = Schemas["Refusal"];
 export type OwnPetition = Schemas["OwnPetition"];
+/** A creator's own petition, whole: what the public page shows, and the record of a removal besides. */
+export type OwnPetitionDetail = Schemas["OwnPetitionDetail"];
 export type MyPetitions = Schemas["MyPetitions"];
-export type PetitionDraft = Schemas["DraftRequest"];
 export type PetitionSubmission = Schemas["SubmitRequest"];
+export type PetitionEdit = Schemas["EditRequest"];
 export type ScreenResult = Schemas["ScreenResult"];
-export type ReviewItem = Schemas["ReviewItem"];
-export type ReviewQueue = Schemas["ReviewQueue"];
-export type PetitionDecision = Schemas["DecisionRequest"];
+/** What a reader reported, and the petition it is about: a contributor's queue, newest first. */
+export type PetitionReport = Schemas["ReportedPetition"];
+/** A petition's photograph as a contributor meets it: a link to look at, and the name that takes it down. */
+export type PetitionImage = Schemas["PetitionImage"];
+export type PetitionReportQueue = Schemas["ReportQueue"];
+/** A reported comment, as the contributor who must judge it meets it. */
+export type ReportedComment = Schemas["ReportedComment"];
+export type PetitionRemovalRequest = Schemas["RemovalRequest"];
+export type PetitionDismissalOption = Schemas["DismissalOption"];
+export type PetitionDismissal = Schemas["DismissRequest"]["reason"];
+export type PetitionRemovalNotice = Schemas["RemovalNotice"];
+export type PetitionResponseOut = Schemas["PetitionResponse"];
+/** The creator's one answer to the response, under it. Null until they give it. */
+export type PetitionReplyOut = Schemas["PetitionReply"];
+/** One comment as a reader meets it: somebody's words, or the notice standing where a removed one's were. */
+export type PetitionComment = Schemas["Comment"];
+export type PetitionCommentPage = Schemas["CommentPage"];
+export type PetitionCommentReportRequest = Schemas["CommentReportRequest"];
+/** One department the MCE asked to answer a petition, under the department's name, and the note it wrote back. */
+export type PetitionDepartmentShare = Schemas["DepartmentShare"];
+/** A petition as the department it was shared with meets it, with its own note if it has written one. */
+export type SharedPetition = Schemas["SharedPetition"];
 export type PhoneChallenge = Schemas["ChallengeResult"];
 export type PhoneChallengeStatus = Schemas["ChallengeStatus"];
 export type SmsCodeSent = Schemas["SmsCodeSent"];
@@ -93,7 +121,6 @@ export type SignResult = Schemas["SignResult"];
 export type MySignature = Schemas["MySignature"];
 export type NamedSignatures = Schemas["NamedSignatures"];
 export type AwaitingResponse = Schemas["AwaitingResponse"];
-export type PetitionResponse = Schemas["PetitionResponse"];
 export type ResponseKind = Schemas["ResponseRequest"]["kind"];
 export type PetitionResponseRequest = Schemas["ResponseRequest"];
 export type PetitionFigures = Schemas["PetitionFigures"];

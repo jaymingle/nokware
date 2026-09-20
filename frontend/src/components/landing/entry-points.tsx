@@ -1,5 +1,5 @@
+import { ArrowRightIcon, KeyRoundIcon, MegaphoneIcon, MessageCircleQuestionIcon, ShieldIcon, TicketIcon } from "lucide-react";
 import Link from "next/link";
-import { ArrowRightIcon, KeyRoundIcon, MegaphoneIcon, MessageCircleQuestionIcon } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
@@ -30,6 +30,22 @@ const ENTRIES: Entry[] = [
     action: "Report an issue",
     href: "/report",
     testId: "landing-report",
+  },
+  {
+    icon: ShieldIcon,
+    title: "Report abuse or a safety matter",
+    body: "If someone is being hurt, threatened or is in danger, it goes privately to the Ghana Police Service and Social Welfare. It is never counted on the dashboard and never shown to anyone else.",
+    action: "Report privately",
+    href: "/report",
+    testId: "landing-safety",
+  },
+  {
+    icon: TicketIcon,
+    title: "Check a case",
+    body: "Enter the reference you were given when you reported. It shows how far along the case is and, once it is resolved, what was done.",
+    action: "Check with a reference",
+    href: "/report/status",
+    testId: "landing-status",
   },
   {
     icon: KeyRoundIcon,
@@ -67,21 +83,18 @@ function EntryCard({ entry, lead = false }: { entry: Entry; lead?: boolean }) {
   );
 }
 
-/**
- * The ways in, weighted by who they are for. Ask is what almost everyone comes
- * for; the portal is for about twenty members of staff, and it had the same
- * size and prominence as Ask, which told a first-time reader the wrong thing
- * about what this is.
- */
+// Weighted by who they are for: almost everyone comes for Ask, while the portal serves about twenty staff. Equal
+// prominence told a first-time reader the wrong thing about what this is. Ask leads two columns of the first row;
+// the other four fill the third column and the row beneath, so no card is left stranded on a line of its own.
 export function EntryPoints() {
   const [ask, ...rest] = ENTRIES;
   return (
-    <ul className="grid gap-4 md:grid-cols-3">
-      <li className="md:col-span-2">
+    <ul className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
+      <li className="sm:col-span-2">
         <EntryCard entry={ask} lead />
       </li>
       {rest.map((entry) => (
-        <li key={entry.testId} className="md:col-span-1 md:last:col-span-3">
+        <li key={entry.testId}>
           <EntryCard entry={entry} />
         </li>
       ))}

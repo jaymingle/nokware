@@ -1,8 +1,6 @@
 """FastAPI dependencies: sign-in and roles for portal routes, rate limits for public ones.
 
-Use ``CurrentPrincipal`` for any signed-in user, or ``require_roles(...)`` to
-restrict a route to particular roles. Both are plain (sync) dependencies, so
-the Appwrite round trips run in FastAPI's threadpool.
+They are plain (sync) dependencies so the Appwrite round trips run in FastAPI's threadpool.
 """
 
 import hmac
@@ -54,7 +52,7 @@ def authorize_job(
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
     x_job_token: Annotated[str | None, Header()] = None,
 ) -> str:
-    """Admit a scheduler holding JOB_TOKEN, or a signed-in MCE. Returns who called."""
+    """Returns who called."""
     expected = get_settings().job_token
     if expected and x_job_token and hmac.compare_digest(x_job_token.encode(), expected.encode()):
         return "job-token"
@@ -65,8 +63,6 @@ def authorize_job(
 
 
 def require_roles(*roles: Role) -> Callable[[Principal], Principal]:
-    """A dependency that admits only the given roles (403 for anyone else)."""
-
     def dependency(principal: CurrentPrincipal) -> Principal:
         if principal.role not in roles:
             raise HTTPException(status.HTTP_403_FORBIDDEN, "Your role cannot do this.")
@@ -75,16 +71,24 @@ def require_roles(*roles: Role) -> Callable[[Principal], Principal]:
     return dependency
 
 
-def rate_limited(limit: RateLimit) -> Callable[[Request], None]:
-    """A dependency that refuses a client over the limit with 429 and a Retry-After."""
+def refuse_if_over(limit: RateLimit, key: str) -> None:
+    """One count against one key. Routes that limit by something other than the caller's address — a petition's
+    number, say, so one page can't be buried under reports — count with this directly."""
+    wait = limit.retry_after(key)
+    if wait is not None:
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            "Too many requests from this device. Try again in a few minutes.",
+            headers={"Retry-After": str(math.ceil(wait))},
+        )
 
+
+def client_address(request: Request) -> str:
+    return request.client.host if request.client else "unknown"
+
+
+def rate_limited(limit: RateLimit) -> Callable[[Request], None]:
     def check(request: Request) -> None:
-        wait = limit.retry_after(request.client.host if request.client else "unknown")
-        if wait is not None:
-            raise HTTPException(
-                status.HTTP_429_TOO_MANY_REQUESTS,
-                "Too many requests from this device. Try again in a few minutes.",
-                headers={"Retry-After": str(math.ceil(wait))},
-            )
+        refuse_if_over(limit, client_address(request))
 
     return check

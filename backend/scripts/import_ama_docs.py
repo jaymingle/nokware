@@ -29,6 +29,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from ama_departments import ama_department
 from pydantic import ValidationError
 
 from app.categories import categories_by_id
@@ -48,7 +49,6 @@ from app.services.ledger_documents import (
 )
 from app.services.storage import ledger_file_exists, upload_ledger_file
 from app.teams import DEPARTMENT_TEAMS
-from ama_departments import ama_department
 
 SCRIPTS_DIR = Path(__file__).resolve().parent
 DEFAULT_DOCS_DIR = Path.home() / "nokware-docs"
@@ -206,7 +206,6 @@ def build_entries(docs_dir: Path) -> tuple[list[Entry], list[tuple[str, str]]]:
 
 
 def resolve_uploaders(teams: set[str]) -> dict[str, str]:
-    """Map each department team to its seeded user's ID; fail if any team has none."""
     uploaders, missing = {}, []
     for team in sorted(teams):
         memberships = get_teams().list_memberships(team).memberships
@@ -220,7 +219,7 @@ def resolve_uploaders(teams: set[str]) -> dict[str, str]:
 
 
 def refresh_metadata(entry: Entry, document: dict[str, Any], dry_run: bool) -> str | None:
-    """Bring an existing record's manifest fields up to date. Never touches status or ingestion."""
+    """Never touches status or ingestion."""
     changes = {key: value for key, value in entry.metadata().items() if document.get(key) != value}
     if not changes:
         return None
@@ -230,7 +229,6 @@ def refresh_metadata(entry: Entry, document: dict[str, Any], dry_run: bool) -> s
 
 
 def import_entry(entry: Entry, uploaded_by: str, options: Options) -> tuple[str, str]:
-    """Run every step not already done. Returns (outcome, detail)."""
     steps = []
     if not ledger_file_exists(entry.object_name):
         if not options.dry_run:

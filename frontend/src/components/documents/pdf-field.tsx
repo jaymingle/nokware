@@ -1,11 +1,11 @@
 "use client";
 
-import { useRef, useState, type DragEvent } from "react";
 import { FileTextIcon } from "lucide-react";
+import { useRef, useState, type DragEvent } from "react";
 
 import { Button } from "@/components/ui/button";
+import { MAX_PDF_BYTES, formatBytes, limitLabel, pdfProblem } from "@/lib/uploads";
 import { cn } from "@/lib/utils";
-import { formatBytes, pdfProblem } from "@/lib/uploads";
 
 type PdfFieldProps = {
   file: File | null;
@@ -50,7 +50,7 @@ function DropZone({ onFile, onChoose, testId }: { onFile: (file?: File) => void;
       className={cn("rounded-xl border border-dashed px-5 py-6 text-center", dragging && "border-teal bg-teal-tint")}
     >
       <p className="text-[15px]">Drop a PDF here</p>
-      <p className="mt-1 mb-3.5 text-[12.5px] text-ink-soft">or choose a file · up to 50 MB</p>
+      <p className="mt-1 mb-3.5 text-[12.5px] text-ink-soft">or choose a file · up to {limitLabel(MAX_PDF_BYTES)}</p>
       <Button type="button" onClick={onChoose} data-testid={`${testId}-choose`}>
         Choose file
       </Button>
@@ -58,7 +58,7 @@ function DropZone({ onFile, onChoose, testId }: { onFile: (file?: File) => void;
   );
 }
 
-/** Drop or choose one PDF. Rejected files never reach the form's state. */
+/** Rejected files never reach the form's state. */
 export function PdfField({ file, onChange, testId }: PdfFieldProps) {
   const input = useRef<HTMLInputElement>(null);
   const [problem, setProblem] = useState<string | null>(null);

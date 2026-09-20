@@ -9,7 +9,7 @@ import type { PhoneChallengeStatus } from "@/lib/api/types";
 
 const POLL_MS = 3_000;
 
-export type PhoneChallengeState = {
+type PhoneChallengeState = {
   challenge: KeptChallenge | null;
   starting: boolean;
   error: string | null;
@@ -18,7 +18,6 @@ export type PhoneChallengeState = {
   settle: (status: PhoneChallengeStatus) => void;
 };
 
-/** Ask about the challenge every few seconds until it is confirmed or has expired. */
 function usePolling(challenge: KeptChallenge | null, onStatus: (status: PhoneChallengeStatus) => void) {
   useEffect(() => {
     if (!challenge) return;
@@ -33,10 +32,7 @@ function usePolling(challenge: KeptChallenge | null, onStatus: (status: PhoneCha
   }, [challenge, onStatus]);
 }
 
-/**
- * A code for this page to have confirmed, kept in the tab (so switching to WhatsApp and back, or reloading,
- * keeps it) until WhatsApp, USSD or an SMS code confirms it.
- */
+/** Kept in the tab so switching to WhatsApp and back, or reloading, doesn't lose the code. */
 export function usePhoneChallenge(onConfirmed: (proof: KeptProof) => void): PhoneChallengeState {
   const [challenge, setChallenge] = useState<KeptChallenge | null>(() => (typeof window === "undefined" ? null : keptChallenge(Date.now())));
   const [starting, setStarting] = useState(false);

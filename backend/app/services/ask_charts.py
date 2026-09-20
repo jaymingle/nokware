@@ -1,21 +1,12 @@
-"""Charts in Ask: asked for in the question, drawn from the answer's figures, never with a false value.
+"""Charts in Ask, drawn from the answer's figures, never with a false value.
 
-"Give me a pie chart of reports by topic" or "show this as a graph" asks for one.
-Ask's live report figures are exact counts and chart directly. A document's
-figures chart only when each one can be tied to its label in a cited passage
-(ask_document_charts.py checks that in code): pypdf flattens a table's columns,
-so a value can lose its row, and a chart inside a PDF comes through as its axis
-ticks. Where that check doesn't pass, the answer gets DOCUMENT_CHART_REFUSAL, a
-plain sentence saying why, and the figures stay in the text.
+A document's figures chart only when each is tied to its label in a cited passage: pypdf flattens a table's columns,
+so a value can lose its row.
 
-The kind is the one the question names, unless that kind can't show the data
-honestly: then the nearest honest kind, with one line saying why. Unnamed, it is
-a line for change over time, and bars otherwise (horizontal when labels are
-long; several counts side by side). "Fewer than 5" is a range, 1 to 4, never a
-value: bars draw it hatched across the range, a line as a dashed span. So a pie
-or donut (a slice needs a size) and a stacked bar (an unknown segment moves every
-segment above it) are never drawn with one in the set. This module decides; the
-web (answer-chart.tsx) and the exports (export_chart.py) only draw.
+The kind is the one the question names unless it can't show the data honestly; then the nearest honest kind, with
+one line saying why. "Fewer than 5" is a range, 1 to 4, never a value, so a pie or donut (a slice needs a size) and a
+stacked bar (an unknown segment moves every segment above it) are never drawn with one in the set. This module
+decides; the web and the exports only draw.
 """
 
 import math
@@ -31,9 +22,12 @@ from app.services.stats import FEWER_THAN_SMALL, SMALL
 DOCUMENT_CHART_REFUSAL = phrase("ask.document_chart_refusal")
 SPREADSHEET_REFUSAL = phrase("ask.spreadsheet_refusal")
 ASKS_FOR_SPREADSHEET = re.compile(r"\b(spread ?sheets?|excel|xlsx?|workbook|csv|\.xls)\b", re.IGNORECASE)
+# Anyone who plainly means "I want to see this" is asking for a chart. A request that can't be drawn is answered
+# with the reason, so a matcher that reaches too far costs a sentence; one that reaches too short says nothing at all.
 ASKS_FOR_CHART = re.compile(
-    r"\b(charts?|graphs?|plot(ted)?|visuali[sz](e|ation)|diagram|pie|donut|doughnut|histogram|infographic|stacked|"
-    r"(bar|line|column)s? (chart|graph|diagram))\b", re.IGNORECASE)
+    r"\b(charts?|graphs?|graphical(ly)?|graphics?|plot(s|ted|ting)?|visuali[sz](e|ed|ing|ation|ations)|visually|"
+    r"visual|diagrams?|pie|donut|doughnut|histograms?|infographics?|stacked|pictorial|pictures?|"
+    r"illustrat(e|ed|ion|ions)|draw(n|ing)?|show me|(bar|line|column)s? (chart|graph|diagram))\b", re.IGNORECASE)
 # The kinds a question can name, most specific first. Anything else charted is drawn as the nearest of these.
 NAMED = (
     ("stacked_bar", re.compile(r"\bstack(ed)?\b", re.IGNORECASE)),
@@ -53,6 +47,7 @@ MANY_CATEGORIES = "Only the {shown} largest of {total} are drawn; they are all i
 ONE_COUNT = phrase("ask.one_count")
 ONE_MONTH = phrase("ask.one_month")
 ALL_ZERO = phrase("ask.all_zero")
+TOTAL_AND_PARTS = phrase("ask.total_and_parts_only")
 ChartDict = dict[str, Any]
 
 
@@ -85,7 +80,6 @@ def _named(question: str) -> str | None:
 
 
 def _value(shown: str) -> tuple[str, float, float] | None:
-    """A figure as shown, with the range it stands for: "fewer than 5" is 1 to 4, "none" is 0, an amount itself."""
     if shown == FEWER_THAN_SMALL:
         return shown, 1, SMALL - 1
     if shown == "none":
@@ -98,7 +92,6 @@ def _value(shown: str) -> tuple[str, float, float] | None:
 
 
 def _names(descriptions: list[str]) -> tuple[str, list[str]]:
-    """What the counts share (the title) and what tells them apart (each one's name)."""
     parts = [description.split(" · ") for description in descriptions]
     common = [part for part in parts[0] if all(part in other for other in parts)]
     names = [" · ".join(p for p in these if p not in common) or "Reports" for these in parts]
@@ -113,7 +106,6 @@ def _months_in_order(categories: list[str]) -> list[str]:
 
 
 def _breakdown(figures: list[dict[str, Any]]) -> _Data | None:
-    """Counts broken down the same way (by topic, sub-metro or month): categories, one series per count."""
     grouped = [f for f in figures if f["rows"]]
     if not grouped:
         return None
@@ -130,11 +122,8 @@ def _breakdown(figures: list[dict[str, Any]]) -> _Data | None:
 
 
 def _without_totals(figures: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    """The figures that are parts, and those that are the total of another figure in the answer.
-
-    Told apart by what each describes rather than by guessing at words: "Approved budget · 2026" is the total of
-    "Approved budget · 2026 · Public Works", because the second narrows the first. Two figures neither of which
-    narrows the other — the same department in 2022 and 2026 — are peers, and both are drawn."""
+    """(parts, totals). Told apart by description rather than by guessing at words: "Approved budget · 2026" is the
+    total of "Approved budget · 2026 · Public Works" because the second narrows the first."""
     descriptions = [str(f["description"]) for f in figures]
     def narrowed(description: str) -> bool:
         return any(other.startswith(f"{description} · ") for other in descriptions)
@@ -142,7 +131,6 @@ def _without_totals(figures: list[dict[str, Any]]) -> tuple[list[dict[str, Any]]
 
 
 def _separate(figures: list[dict[str, Any]]) -> _Data | None:
-    """Two or more single counts, compared: each is a category of one series."""
     counted = [(f, _value(f["value"])) for f in figures]
     usable = [(f, v) for f, v in counted if v is not None]
     if len(usable) < 2:
@@ -153,8 +141,8 @@ def _separate(figures: list[dict[str, Any]]) -> _Data | None:
 
 
 def _largest(data: _Data) -> tuple[_Data, str | None]:
-    """Too many bars can't be read: keep the largest, and say so rather than quietly dropping the rest. A series
-    over time is never cut — a line with months missing from the middle would be a different claim."""
+    """Says so rather than quietly dropping the rest. A series over time is never cut: a line with months missing
+    from the middle would be a different claim."""
     if data.over_time or len(data.categories) <= MAX_CATEGORIES:
         return data, None
     order = sorted(range(len(data.categories)), key=lambda i: -max(values[i][2] for _, values in data.series))
@@ -169,7 +157,6 @@ def _default(data: _Data) -> str:
 
 
 def _honest(kind: str, data: _Data) -> tuple[str, str | None]:
-    """The kind to draw and, when it isn't the one asked for, why, in one line."""
     fallback = _default(data)
     if kind in ("pie", "donut"):
         if len(data.series) > 1:
@@ -194,7 +181,6 @@ def _honest(kind: str, data: _Data) -> tuple[str, str | None]:
 
 
 def _scale(kind: str, data: _Data) -> tuple[float, list[float]]:
-    """A round top for the value axis (above the tallest stack, for a stacked bar), and its ticks."""
     columns = [[values[i][2] for _, values in data.series] for i in range(len(data.categories))]
     top = max((sum(c) if kind == "stacked_bar" else max(c) for c in columns), default=0)
     step = 1
@@ -223,9 +209,7 @@ def _as_dict(kind: str, horizontal: bool, data: _Data, note: str | None) -> Char
 
 
 def chart_for(question: str, figures: list[dict[str, Any]]) -> tuple[ChartDict | None, str | None]:
-    """The chart a question asks for, from the answer's cited figures — live counts or budget amounts read from a
-    document — and any note about it. (None, None) when no chart was asked for; (None, note) when one was but
-    can't be drawn from these figures."""
+    """(None, None) when no chart was asked for; (None, note) when one was but can't be drawn from these figures."""
     if not asks_for_chart(question) or not figures:
         return None, None
     data = _breakdown(figures)
@@ -234,6 +218,8 @@ def chart_for(question: str, figures: list[dict[str, Any]]) -> tuple[ChartDict |
         parts, totals = _without_totals(figures)
         data = _separate(parts)
     if data is None or sum(len(values) for _, values in data.series) < 2:  # one count, or one month so far
+        if totals:  # a total was set aside and too little of its breakdown was left: say that, not "one count"
+            return None, TOTAL_AND_PARTS
         return None, ONE_MONTH if data is not None and data.over_time else ONE_COUNT
     if all(high == 0 for _, values in data.series for _, _, high in values):
         return None, ALL_ZERO
@@ -262,7 +248,6 @@ _DOCUMENT_NOTES = {
 
 
 def document_chart(question: str, plotted: Plotted) -> ChartDict:
-    """A bar chart of figures read from the documents. Every pair is already proved against a cited passage."""
     categories = [label for label, _, _ in plotted.pairs]
     values = [(shown, value, value) for _, shown, value in plotted.pairs]
     data = _Data(plotted.title, categories, [("Figures", values)], False, False, [], None, source="documents")

@@ -20,13 +20,7 @@ _LOST = re.compile("[\ue000-\uf8ff\ufffd]+")  # anything else private, and chara
 
 
 def mend(text: str) -> str:
-    """Ligatures spelled out, font bullets as bullets, and any run of lost characters as one space."""
     for private, letters in _PRIVATE_LIGATURES.items():
         text = text.replace(private, letters)
     text = _PRESENTATION_LIGATURES.sub(lambda m: unicodedata.normalize("NFKC", m[0]), text)
     return _LOST.sub(" ", _FONT_BULLETS.sub("•", text))
-
-
-def needs_mending(text: str) -> bool:
-    """Whether stored text still carries what mend() replaces: the chunks the re-index script looks for."""
-    return mend(text) != text

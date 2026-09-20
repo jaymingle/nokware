@@ -1,9 +1,4 @@
-"""MinIO object storage client and typed helpers.
-
-Wraps a cached ``minio.Minio`` client. Ledger files and report photos live in
-separate buckets (configured via settings). Object names are prefixed with a
-random UUID to avoid collisions while preserving the original filename.
-"""
+"""MinIO object storage. Ledger files and report photos live in separate buckets."""
 
 import io
 import mimetypes
@@ -11,12 +6,12 @@ from datetime import timedelta
 from functools import lru_cache
 from uuid import uuid4
 
+import urllib3
 from minio import Minio
 from minio.error import S3Error
 
 from app.config import get_settings
 
-MAX_PHOTOS = 10
 DEFAULT_URL_EXPIRY_SECONDS = 3600
 # Set explicitly so the client never auto-detects it: detection needs
 # s3:GetBucketLocation, which our access key's policy does not grant (every
@@ -25,16 +20,16 @@ MINIO_REGION = "us-east-1"
 
 
 def _parse_endpoint(raw: str) -> tuple[str, bool]:
-    """Split an endpoint into (host[:port], secure) as minio.Minio expects.
-
-    Accepts a bare hostname ("s3.example.com", HTTPS on 443) or a URL with an
-    http:// or https:// scheme. Bare hostnames default to secure=True.
-    """
+    """A bare hostname ("s3.example.com") means HTTPS."""
     if raw.startswith("https://"):
         return raw[len("https://"):].rstrip("/"), True
     if raw.startswith("http://"):
         return raw[len("http://"):].rstrip("/"), False
     return raw.rstrip("/"), True
+
+
+# A photo upload with no timeout would hold the resident's request until the SDK's own five-minute default.
+TIMEOUT = urllib3.Timeout(connect=5, read=30)
 
 
 @lru_cache
@@ -47,6 +42,7 @@ def get_minio() -> Minio:
         secret_key=settings.minio_secret_key,
         secure=secure,
         region=MINIO_REGION,
+        http_client=urllib3.PoolManager(timeout=TIMEOUT, retries=urllib3.Retry(total=1, connect=1, read=0, redirect=0)),
     )
 
 
@@ -71,13 +67,9 @@ def _upload(bucket: str, file_bytes: bytes, filename: str, object_name: str | No
 
 
 def upload_ledger_file(file_bytes: bytes, filename: str, object_name: str | None = None) -> str:
-    """Upload a ledger document; returns its object id (name in the bucket).
-
-    Pass object_name for a stable name (e.g. derived from a content hash) so
-    repeated uploads of the same file land on the same object.
-    """
-    settings = get_settings()
-    return _upload(settings.minio_ledger_bucket, file_bytes, filename, object_name)
+    """Returns the object name. Pass a stable object_name (e.g. a content hash) so repeated uploads of the same file
+    land on the same object."""
+    return _upload(get_settings().minio_ledger_bucket, file_bytes, filename, object_name)
 
 
 def download_ledger_file(file_id: str) -> bytes:
@@ -99,26 +91,9 @@ def ledger_file_exists(file_id: str) -> bool:
     return True
 
 
-def upload_report_photos(files: list[bytes], filenames: list[str]) -> list[str]:
-    """Upload up to ``MAX_PHOTOS`` report photos; returns their object ids."""
-    if len(files) != len(filenames):
-        raise ValueError("files and filenames must be the same length")
-    if len(files) > MAX_PHOTOS:
-        raise ValueError(f"at most {MAX_PHOTOS} photos may be uploaded at once")
-    settings = get_settings()
-    return [
-        _upload(settings.minio_photos_bucket, data, name)
-        for data, name in zip(files, filenames)
-    ]
-
-
-def get_ledger_file_url(
-    file_id: str, expires: int = DEFAULT_URL_EXPIRY_SECONDS
-) -> str:
-    """Return a presigned GET URL for a ledger file, valid ``expires`` seconds."""
-    settings = get_settings()
+def get_ledger_file_url(file_id: str, expires: int = DEFAULT_URL_EXPIRY_SECONDS) -> str:
     return get_minio().presigned_get_object(
-        bucket_name=settings.minio_ledger_bucket,
+        bucket_name=get_settings().minio_ledger_bucket,
         object_name=file_id,
         expires=timedelta(seconds=expires),
     )

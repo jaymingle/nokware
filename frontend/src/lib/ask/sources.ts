@@ -1,6 +1,5 @@
 import type { AskSource, Provenance } from "@/lib/api/types";
 
-/** One cited document: the answer's [S#] label and everything shown on its card. */
 export type SourceDocument = {
   label: string;
   documentId: string;
@@ -39,13 +38,12 @@ export function groupSources(sources: AskSource[]): SourceDocument[] {
   return [...documents.values()];
 }
 
-/** Marks the documents the final answer cites. */
 export function markCited(documents: SourceDocument[], cited: string[]): SourceDocument[] {
   const labels = new Set(cited);
   return documents.map((doc) => ({ ...doc, cited: labels.has(doc.label) }));
 }
 
-export function hostOf(url: string): string {
+function hostOf(url: string): string {
   try {
     return new URL(url).host.replace(/^www\./, "");
   } catch {
@@ -54,13 +52,8 @@ export function hostOf(url: string): string {
 }
 
 /** A provenance statement with an optional link after it, e.g. "Published by Finance on" + "ama.gov.gh". */
-export type ProvenanceView = { text: string; link: { text: string; href: string } | null; joiner: string };
+type ProvenanceView = { text: string; link: { text: string; href: string } | null; joiner: string };
 
-/**
- * Where the document came from, stated precisely for each way into the Ledger:
- * imported from ama.gov.gh, submitted through the portal by a department, or
- * from a verified contributor. Returns null when the record doesn't say.
- */
 export function describeProvenance(doc: Pick<SourceDocument, "provenance" | "departmentName" | "sourceUrl">): ProvenanceView | null {
   const department = doc.departmentName ?? "the Assembly";
   const url = doc.sourceUrl;
@@ -80,13 +73,11 @@ export function describeProvenance(doc: Pick<SourceDocument, "provenance" | "dep
   return null;
 }
 
-// S: a document; R: a live report count; B: an amount read from a budget. B was
-// missing here while budget figures were being cited, so every budget answer
-// showed "[B1]" as bare text where its citation should have been.
+// S: a document; R: a live report count; B: an amount read from a budget. Leaving
+// one out here shows its citations as bare "[B1]" text.
 const CITATION = /\[([SRB]\d+)\]/g;
 export const CITATION_HREF_PREFIX = "#cite-";
 
-/** Turns each [S1], [R1] or [B1] into a markdown link the renderer shows as a citation tag. */
 export function linkCitations(markdown: string): string {
   return markdown.replace(CITATION, (_, label: string) => `[${label}](${CITATION_HREF_PREFIX}${label})`);
 }

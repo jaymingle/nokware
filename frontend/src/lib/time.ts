@@ -3,14 +3,12 @@ const TIME_ZONE = "Africa/Accra";
 const MINUTE_MS = 60_000;
 const HOUR_MS = 60 * MINUTE_MS;
 
-/** A clock with this little left is shown as urgent. */
 export const URGENT_WITHIN_MS = 12 * HOUR_MS;
 
-export type Urgency = "normal" | "urgent" | "passed";
+type Urgency = "normal" | "urgent" | "passed";
 
-export type Deadline = { remainingMs: number; label: string; urgency: Urgency };
+type Deadline = { remainingMs: number; label: string; urgency: Urgency };
 
-/** Time left as "47h 12m", "42m" or "under a minute"; "0m" once it has passed. */
 export function formatRemaining(remainingMs: number): string {
   if (remainingMs <= 0) return "0m";
   if (remainingMs < MINUTE_MS) return "under a minute";
@@ -44,12 +42,16 @@ const dateFormat = new Intl.DateTimeFormat("en-GB", {
   year: "numeric",
 });
 
-/** e.g. "Tue 15 Mar, 14:05 GMT" */
 export function formatDateTime(iso: string): string {
   return `${dateTimeFormat.format(new Date(iso))} GMT`;
 }
 
-/** e.g. "15 Mar 2026" */
 export function formatDate(iso: string): string {
   return dateFormat.format(new Date(iso));
+}
+
+/** The machine-readable instant for a <time> element. Unreadable timestamps are passed through. */
+export function machineTime(iso: string): string {
+  const parsed = new Date(iso);
+  return Number.isNaN(parsed.getTime()) ? iso : parsed.toISOString();
 }

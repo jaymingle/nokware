@@ -50,8 +50,9 @@ function useSigning(petition: PetitionDetail, phone: PhoneProof) {
   };
   const [missingName, setMissingName] = useState(false);
   const start = () => {
-    setMissingName(named && !name.trim()); // asked before the number is confirmed, not after
-    if (named && !name.trim()) return;
+    const missing = named && !name.trim();
+    setMissingName(missing); // asked before the number is confirmed, not after
+    if (missing) return;
     if (phone.proof) send(phone.proof.token);
     else setConfirming(true);
   };
@@ -78,7 +79,6 @@ function Unsigned({ petition, phone }: { petition: PetitionDetail; phone: PhoneP
   );
 }
 
-/** Sign the petition with a confirmed number: anonymous unless the signer chooses to show a name. */
 export function SignPanel({ petition }: { petition: PetitionDetail }) {
   const phone = usePhoneProof();
   const mine = useMySignature(petition.code, phone.proof?.token ?? null);

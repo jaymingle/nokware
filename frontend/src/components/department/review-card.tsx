@@ -59,7 +59,6 @@ function ReviewActions({ doc }: { doc: DocumentOut }) {
   );
 }
 
-/** A contributor's document awaiting this department's review, led by its clock. */
 export function ReviewCard({ doc }: { doc: DocumentOut }) {
   const now = useNow();
   const open = clockRunning(doc, now);

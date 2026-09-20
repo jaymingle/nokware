@@ -1,19 +1,14 @@
-import { formatBytes } from "@/lib/uploads";
+import { formatBytes, limitLabel } from "@/lib/uploads";
 
 // The API re-encodes each photo from its pixels alone; these are the formats it reads.
 export const PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
 export type PhotoLimits = { maxPhotos: number; maxBytes: number };
 
-/** An attached photo and its preview address (an object URL, revoked when the photo is removed). */
+/** url is an object URL, revoked when the photo is removed. */
 export type ReportPhoto = { file: File; url: string };
 
-/** A size limit as people say it: "10 MB". */
-export function limitLabel(bytes: number): string {
-  return `${Math.round(bytes / (1024 * 1024))} MB`;
-}
-
-export type PhotoPick = { photos: File[]; problem: string | null };
+type PhotoPick = { photos: File[]; problem: string | null };
 
 function photoProblem(file: Pick<File, "name" | "type" | "size">, limits: PhotoLimits): string | null {
   if (!PHOTO_TYPES.includes(file.type)) return `${file.name} isn't a JPEG, PNG or WebP photo.`;
@@ -22,7 +17,6 @@ function photoProblem(file: Pick<File, "name" | "type" | "size">, limits: PhotoL
   return null;
 }
 
-/** Adds the chosen photos to those already attached, keeping only those the API will take. */
 export function addPhotos(current: File[], chosen: File[], limits: PhotoLimits): PhotoPick {
   const problems: string[] = [];
   const photos = [...current];

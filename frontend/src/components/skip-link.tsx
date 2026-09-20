@@ -1,8 +1,3 @@
-/**
- * The first thing a keyboard reaches on any page: a way past the header's
- * links straight to the page's own content. It is invisible until it takes
- * focus, and then it sits over the top-left corner where it can be read.
- */
 export function SkipLink() {
   return (
     <a

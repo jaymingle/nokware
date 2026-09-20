@@ -4,14 +4,14 @@ import Link from "next/link";
 import { useEffect } from "react";
 
 import { EmptyPanel, ErrorPanel, LoadingPanel } from "@/components/documents/panels";
+import { PageShell } from "@/components/page-shell";
 import { OwnPetitionCard } from "@/components/petitions/own-petition-card";
 import { PhoneConfirm, PhoneConfirmed } from "@/components/petitions/phone-confirm";
-import { PageIntro } from "@/components/portal/page-intro";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { usePhoneProof, type PhoneProof } from "@/hooks/use-phone-proof";
-import { useMyPetitions } from "@/lib/api/petition-queries";
 import { ApiError } from "@/lib/api/errors";
+import { useMyPetitions } from "@/lib/api/petition-queries";
 
 import type { KeptProof } from "@/lib/petitions";
 
@@ -46,18 +46,22 @@ function Confirm({ phone }: { phone: PhoneProof }) {
   );
 }
 
-/** The petitions a confirmed number started: where each stands, and what its creator can still do. */
 export function MyPetitionsPage() {
   const phone = usePhoneProof();
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-5">
-      <PageIntro eyebrow="Petitions" title="Your petitions">
-        The petitions you started, with any decision the MCE made and what you can still do. No account: your phone number
-        is how Nokware knows they are yours.
-      </PageIntro>
+    <PageShell
+      eyebrow="Petitions"
+      title="Your petitions"
+      lead={
+        <>
+          The petitions you started, with any decision the MCE made and what you can still do. No account: your phone number
+          is how Nokware knows they are yours.
+        </>
+      }
+    >
       {!phone.ready ? <LoadingPanel label="Loading…" /> : null}
       {phone.ready && phone.proof ? <Mine proof={phone.proof} forget={phone.forget} /> : null}
       {phone.ready && !phone.proof ? <Confirm phone={phone} /> : null}
-    </div>
+    </PageShell>
   );
 }

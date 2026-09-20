@@ -1,20 +1,12 @@
 """Hybrid retrieval for Ask.
 
-1. Query expansion: gemini-2.5-flash rewrites the question into a few search
-   queries in the wording official documents use ("revenue realised" rather
-   than "money collected"). The original question is always searched too.
-2. Two ranked lists per query: vector similarity (PGVectorStore over the HNSW
-   index) and BM25 keyword ranking over the chunk_tsv full-text column. Vector
-   search alone misses a fact buried in a multi-topic chunk; keyword search
-   alone misses paraphrases. Together they catch both.
-3. Reciprocal rank fusion merges every list into one ranking. Each keyword
-   search's top hit is pinned into the final set, so a precise match cannot be
-   crowded out by a document that merely appears in more lists.
-4. Selection: only published documents. Where a document comes in annual
-   editions, the newest is preferred, unless the question names a year, in
-   which case that year's edition is (so history stays retrievable). Near-
-   duplicate chunks, e.g. the same paragraph in several editions, collapse to
-   the preferred one so they cannot crowd out other content.
+Questions are expanded into the wording official documents use ("revenue realised" rather than "money collected").
+Vector search alone misses a fact buried in a multi-topic chunk; keyword search alone misses paraphrases, so both
+run and are fused. Each keyword search's top hit is pinned, so a precise match can't be crowded out by a document
+that merely appears in more lists.
+
+The newest annual edition is preferred unless the question names a year, so history stays retrievable. Near-duplicate
+chunks (the same paragraph in several editions) collapse so they can't crowd out other content.
 """
 
 import logging
@@ -138,7 +130,7 @@ def _clean_query_line(line: str) -> str:
 
 
 def expand_query(question: str) -> list[str]:
-    """The question plus up to QUERY_EXPANSIONS rewrites; just the question on failure."""
+    """Just the question on failure."""
     if not EXPANSION_ENABLED:
         return [question]
     chain = _EXPANSION_PROMPT | get_chat_model(0.0, thinking_budget=0) | StrOutputParser()
@@ -166,7 +158,6 @@ def keyword_search(query: str) -> list[Chunk]:
 
 
 def ranked_lists(queries: list[str]) -> tuple[list[list[Chunk]], list[list[Chunk]]]:
-    """(vector lists, keyword lists): one of each per query, built in parallel."""
     vectors = get_embeddings().embed_documents(queries, task_type="RETRIEVAL_QUERY")
     with ThreadPoolExecutor(max_workers=2 * len(queries)) as pool:
         vector_lists = pool.map(vector_search, vectors)
@@ -175,7 +166,6 @@ def ranked_lists(queries: list[str]) -> tuple[list[list[Chunk]], list[list[Chunk
 
 
 def fuse(ranked_lists: Iterable[list[Chunk]]) -> list[tuple[Chunk, float]]:
-    """Reciprocal rank fusion: each list adds 1 / (RRF_K + rank) to a chunk's score."""
     scores: dict[int, float] = defaultdict(float)
     chunks: dict[int, Chunk] = {}
     for ranked in ranked_lists:
@@ -211,7 +201,6 @@ def _edition_weight(year: int | None, known_years: set[int], asked_years: set[in
 
 
 def apply_edition_preference(candidates: list[RetrievedChunk], asked_years: set[int]) -> list[RetrievedChunk]:
-    """Re-weight chunks from documents that come in several yearly editions."""
     editions: dict[str, dict[str, int | None]] = defaultdict(dict)
     for candidate in candidates:
         key = series_key(candidate.document.get("title") or "")
@@ -237,7 +226,6 @@ def _similarity(a: frozenset[tuple[str, ...]], b: frozenset[tuple[str, ...]]) ->
 
 
 def collapse_near_duplicates(candidates: list[RetrievedChunk]) -> list[RetrievedChunk]:
-    """Keep the best-scored chunk of each group of near-identical chunks."""
     kept: list[tuple[RetrievedChunk, frozenset[tuple[str, ...]]]] = []
     for candidate in candidates:
         shingles = _shingles(candidate.chunk.text)
@@ -247,13 +235,9 @@ def collapse_near_duplicates(candidates: list[RetrievedChunk]) -> list[Retrieved
 
 
 def select_final(ranked: list[RetrievedChunk], pinned_ids: set[int]) -> list[RetrievedChunk]:
-    """The top FINAL_K chunks plus any pinned chunk outside them, in ranking order.
-
-    Pinned chunks are each keyword search's top hit. A precise keyword match can
-    lose the fused ranking to a document that appears in many lists; pinning it
-    keeps a second source (for example one whose figures disagree) in view. Pins
-    are added on top of the top FINAL_K rather than displacing them, so the
-    best-supported chunks are never traded away (at most one extra per query).
+    """Pinning each keyword search's top hit keeps a second source (for example one whose figures disagree) in
+    view. Pins are added on top of FINAL_K rather than displacing them, so the best-supported chunks are never traded
+    away.
     """
     chosen = {c.chunk.chunk_id for c in ranked[:FINAL_K]} | pinned_ids
     return [c for c in ranked if c.chunk.chunk_id in chosen]

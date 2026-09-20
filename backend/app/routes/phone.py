@@ -1,9 +1,4 @@
-"""Confirming a phone number from a web page, by WhatsApp, USSD or (once switched on) SMS. No sign-in.
-
-    POST /api/phone/challenges              a code to send or type, and the secret the page keeps
-    POST /api/phone/challenges/status       still waiting, or confirmed with the proof to keep
-    POST /api/phone/challenges/sms          text a code to the number typed (only while SMS codes are on)
-    POST /api/phone/challenges/sms/confirm  the code from that SMS
+"""Confirming a phone number from a web page. No sign-in.
 
 The secret travels in the body, never the address, so it stays out of access logs.
 """

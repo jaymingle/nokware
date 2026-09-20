@@ -21,10 +21,6 @@ function Contact() {
   );
 }
 
-/**
- * How to request what the Assembly hasn't published, with the contact cited
- * to the manual it comes from, like any other source.
- */
 export function RtiPanel({ testId, heading: Heading = "h3" }: { testId: string; heading?: "h2" | "h3" }) {
   return (
     <div className="flex flex-col gap-3" data-testid={testId}>

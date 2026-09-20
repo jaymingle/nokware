@@ -1,16 +1,9 @@
 """Appwrite team IDs: the source of truth for roles in Nokware.
 
-Team membership decides what a user can see and do. Department staff act on
-documents for their own department, contributors submit documents for review,
-and the MCE team (the MCE and admin accounts) rules on escalated disputes.
+The departments are AMA's own list (ama.gov.gh/departments), under AMA's own names, plus Press for assembly-wide
+publications. Environmental Health Services sits under Metro Public Health on AMA's site; it is not a department.
 
-The departments are AMA's own list (ama.gov.gh/departments), under AMA's own
-names, plus Press for assembly-wide publications. Environmental Health
-Services sits under Metro Public Health on AMA's site; it is not a department.
-
-Agencies are services outside the Assembly that receive citizen reports about
-safety. They are not AMA departments, so they never appear in department lists
-and have no part in the Ledger; they see only the cases routed to them.
+Agencies are outside the Assembly, so they never appear in department lists and have no part in the Ledger.
 """
 
 DEPARTMENT_NAMES = {
@@ -40,10 +33,7 @@ AGENCY_NAMES = {
     "agency-gnfs": "Ghana National Fire Service",
 }
 AGENCY_TEAMS = tuple(AGENCY_NAMES)
-# Everyone a citizen report can be routed to.
 RECIPIENT_NAMES = {**DEPARTMENT_NAMES, **AGENCY_NAMES}
-# Plainer names for pages that list recipients to someone reporting a danger to
-# a person; the full name is used everywhere else.
 SHORT_NAMES = {"dept-social-welfare": "Social Welfare"}
 CONTRIBUTOR_TEAM = "contributor"
 MCE_TEAM = "mce"
@@ -51,5 +41,5 @@ ALL_TEAMS = (*DEPARTMENT_TEAMS, *AGENCY_TEAMS, CONTRIBUTOR_TEAM, MCE_TEAM)
 
 
 def short_name(team: str) -> str:
-    """A recipient's name as a citizen in distress reads it: "Social Welfare", not the full departmental title."""
+    """For someone reporting a danger to a person: "Social Welfare", not the full departmental title."""
     return SHORT_NAMES.get(team) or RECIPIENT_NAMES.get(team, team)

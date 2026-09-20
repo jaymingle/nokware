@@ -1,7 +1,7 @@
 "use client";
 
-import { useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { ArrowUpIcon } from "lucide-react";
+import { useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 
 import { VoiceCheck, VoiceControl } from "@/components/ask/voice-question";
 import { Button } from "@/components/ui/button";
@@ -9,17 +9,16 @@ import { Textarea } from "@/components/ui/textarea";
 import { useVoiceQuestion } from "@/hooks/use-voice-question";
 import { cn } from "@/lib/utils";
 
-export const MAX_QUESTION = 1000;
-export const QUESTION_INPUT_ID = "ask-question";
+const MAX_QUESTION = 1000;
+const QUESTION_INPUT_ID = "ask-question";
 const COUNT_FROM = 900; // show the character count only near the limit
 
 function ComposerHint({ busy, panel, length }: { busy: boolean; panel: boolean; length: number }) {
-  // A chat suggests memory; Ask has none, so the box says so. In the panel there is room for the short form only.
-  // Nobody discovers a language they aren't told about, and this is where a question is typed.
-  const memory = panel
+  // A chat suggests memory, and Ask has none. Nobody discovers a language they aren't told about.
+  const idle = panel
     ? "Ask in English, French or Twi. Each question is answered on its own."
     : "Ask in English, French or Twi, and the answer comes back in the language you asked. Each question is answered on its own: Nokware doesn't remember earlier ones.";
-  const hint = busy ? "Answering your question…" : memory;
+  const hint = busy ? "Answering your question…" : idle;
   return (
     <div className={cn("mt-1.5 justify-between gap-3 text-[12px] text-ink-muted", length >= COUNT_FROM ? "flex" : "hidden sm:flex")}>
       <span>{hint}</span>
@@ -34,7 +33,6 @@ function ComposerHint({ busy, panel, length }: { busy: boolean; panel: boolean; 
 
 type AskComposerProps = { busy: boolean; onAsk: (question: string) => void; started: boolean; panel: boolean };
 
-/** The question box: Enter asks, Shift+Enter adds a line. One question at a time. */
 function useQuestion(busy: boolean, onAsk: (question: string) => void) {
   const [value, setValue] = useState("");
   const question = value.trim();
@@ -53,7 +51,6 @@ function useQuestion(busy: boolean, onAsk: (question: string) => void) {
   return { value, setValue, canAsk: Boolean(question) && !busy, submit, onKeyDown };
 }
 
-/** A spoken question, checked first: asked as heard, or put in the box to correct. */
 function useSpokenQuestion(onAsk: (question: string) => void, setValue: (value: string) => void) {
   const voice = useVoiceQuestion();
   const input = useRef<HTMLTextAreaElement>(null);
@@ -69,7 +66,6 @@ function useSpokenQuestion(onAsk: (question: string) => void, setValue: (value: 
   return { voice, input, askHeard, editHeard };
 }
 
-/** The question box, fixed at the bottom of the conversation: docked to the window on the page, the panel's foot in a panel. */
 export function AskComposer({ busy, onAsk, started, panel }: AskComposerProps) {
   const { value, setValue, canAsk, submit, onKeyDown } = useQuestion(busy, onAsk);
   const { voice, input, askHeard, editHeard } = useSpokenQuestion(onAsk, setValue);

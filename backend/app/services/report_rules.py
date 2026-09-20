@@ -1,18 +1,15 @@
-"""The rules a citizen report is filed by: pure functions, unit-tested.
+"""The rules a citizen report is filed by.
 
-Classification: the citizen or the model chooses a topic; routing follows from
-the topic. Every doubt resolves toward privacy. A report is personal safety if
-the citizen says so, if the model says so, or if the model returned nothing
-useful and the words of the report suggest danger to a person. Moving a report
-out of personal safety is left to a person, never done here.
-
-Location: a personal-safety report keeps no ward, only a sub-metro at most.
+Every doubt resolves toward privacy: a report is personal safety if the citizen or the model says so, or if the
+model gave nothing usable and the words suggest danger to a person. Moving a report out of personal safety is left
+to a person, never done here. A personal-safety report keeps no ward, only a sub-metro at most.
 """
 
 import re
 import secrets
 from dataclasses import dataclass
 from enum import StrEnum
+from typing import Any
 
 from app.services.report_taxonomy import (
     DEFAULT_SAFETY_TOPIC,
@@ -75,6 +72,22 @@ class Classification:
         return self.category == Category.PERSONAL_SAFETY
 
 
+def saved_classification(filed: Classification) -> dict[str, Any]:
+    """A classification as a channel conversation keeps it in its session state, under "filed"."""
+    return {"category": filed.category.value, "topic": filed.topic, "severity": filed.severity,
+            "recipients": list(filed.recipients), "method": filed.method.value}
+
+
+def restored_classification(state: dict[str, Any]) -> Classification:
+    saved = state["filed"]
+    return Classification(Category(saved["category"]), saved["topic"], saved["severity"], tuple(saved["recipients"]),
+                          ClassificationMethod(saved["method"]))
+
+
+def filed_privately(state: dict[str, Any]) -> bool:
+    return bool(state.get("filed")) and state["filed"]["category"] == Category.PERSONAL_SAFETY
+
+
 class InvalidReport(ValueError):
     """The submission can't be filed as given (an unknown topic, ward or sub-metro)."""
 
@@ -93,7 +106,6 @@ def _filed(topic_id: str, method: ClassificationMethod, severity: int | None = N
 
 
 def _usable(verdict: ModelVerdict) -> bool:
-    """A verdict naming a real topic in the category it claims."""
     topic = TOPICS_BY_ID.get(verdict.topic)
     return topic is not None and topic.category == verdict.category
 
@@ -111,7 +123,7 @@ def _declared(topic_id: str) -> Classification:
 
 
 def classify(description: str, declared_safety_topic: str | None, verdict: ModelVerdict | None) -> Classification:
-    """File a report. declared_safety_topic is the citizen's own choice; verdict is None when the model wasn't asked or failed."""
+    """verdict is None when the model wasn't asked or failed."""
     if declared_safety_topic is not None:
         return _declared(declared_safety_topic)
     if verdict is not None and _model_says_personal_safety(verdict):
@@ -131,12 +143,18 @@ class Location:
     sub_metro: str | None
 
 
-def locate(category: Category, ward_id: str | None, sub_metro_id: str | None) -> Location:
-    """Where the report is filed. Personal safety: the sub-metro at most (the ward, if given, is dropped)."""
+def check_places(ward_id: str | None, sub_metro_id: str | None) -> None:
+    """The half of locate() that doesn't need to know the category, so a place that isn't on the list can be
+    refused before the classifier is asked to read anything. Whether a missing ward matters depends on the
+    category, which only the classifier can give, so that check stays in locate()."""
     if ward_id is not None and ward_id not in wards():
         raise InvalidReport("Choose an electoral area from the list.")
     if sub_metro_id is not None and sub_metro_id not in sub_metros():
         raise InvalidReport("Choose a sub-metro from the list.")
+
+
+def locate(category: Category, ward_id: str | None, sub_metro_id: str | None) -> Location:
+    check_places(ward_id, sub_metro_id)
     if category == Category.PERSONAL_SAFETY:
         return Location(ward=None, sub_metro=sub_metro_id or (sub_metro_of(ward_id) if ward_id else None))
     if ward_id is None:
@@ -145,7 +163,7 @@ def locate(category: Category, ward_id: str | None, sub_metro_id: str | None) ->
 
 
 def new_reference() -> str:
-    """A short, random case reference for SMS and USSD, e.g. "K7QM-4TXP". Carries no personal information."""
+    """Carries no personal information."""
     code = "".join(secrets.choice(REFERENCE_ALPHABET) for _ in range(REFERENCE_LENGTH))
     return f"{code[:4]}-{code[4:]}"
 
@@ -154,13 +172,11 @@ PUBLIC_ID_LENGTH = 10
 
 
 def new_public_id() -> str:
-    """A civic issue's public ID, e.g. "k7qm4txp2a": for the public issue list. Unlike the reference or the
-    case ID, it opens no status page, so it can be shown to anyone."""
+    """Unlike the reference or the case ID, it opens no status page, so it can be shown to anyone."""
     return "".join(secrets.choice(REFERENCE_ALPHABET.lower()) for _ in range(PUBLIC_ID_LENGTH))
 
 
 def normalise_reference(typed: str) -> str | None:
-    """A reference as a citizen might type it ("k7qm 4txp"), in canonical form; None if it can't be one."""
     code = re.sub(r"[\s-]", "", typed).upper()
     if len(code) != REFERENCE_LENGTH or any(char not in REFERENCE_ALPHABET for char in code):
         return None

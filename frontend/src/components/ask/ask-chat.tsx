@@ -1,28 +1,24 @@
 "use client";
 
-import { useCallback, useId } from "react";
+import { useCallback } from "react";
 
 import { AskComposer } from "@/components/ask/ask-composer";
-import { AskTurn } from "@/components/ask/ask-turn";
 import { useThread } from "@/components/ask/ask-thread-provider";
+import { AskTurn } from "@/components/ask/ask-turn";
 import { AskWelcome } from "@/components/ask/ask-welcome";
+import { useSvgId } from "@/hooks/use-svg-id";
 import { cn } from "@/lib/utils";
 
-export type AskChatMode = "page" | "panel";
+type AskChatMode = "page" | "panel";
 
 // The newest exchange is at least a screen tall, so asking scrolls its question to the top and the answer grows
 // below it, rather than the page following every word. On the page, a screen less the docked question box.
 const LAST_TURN = { page: "min-h-[calc(100dvh-10rem)]", panel: "min-h-full" } as const;
 
-/**
- * Ask as a conversation: each question as the person's message, each answer as Nokware's, with its sources and chart
- * attached, and the question box fixed at the bottom. One component for the /ask page (which scrolls with the window)
- * and the panel opened from any public page (which scrolls inside itself), over one conversation for the tab
- * (ask-thread-provider). Each answer still stands alone: the API keeps no conversation, and the box says so.
- */
+/** One component for the /ask page, which scrolls with the window, and the panel, which scrolls inside itself. */
 export function AskChat({ mode }: { mode: AskChatMode }) {
   const { turns, ask, retry, busy } = useThread();
-  const scope = `ask-${useId().replace(/[^a-zA-Z0-9-]/g, "")}`;
+  const scope = useSvgId("ask");
   const panel = mode === "panel";
   const onAsk = useCallback(
     (question: string) => {

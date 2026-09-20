@@ -1,57 +1,58 @@
-"""WhatsApp conversations: a question gets a cited answer, a report is drafted, confirmed and filed, a reference gets its status.
+"""WhatsApp conversations: questions, reports and status lookups, over the same services as the web.
 
-The same services as the web: report_intake.submit() and rag.answer_question().
-A message is read by channel_intent. A report becomes a draft (in Redis, for 15
-quiet minutes): it needs a description and an electoral area, may gather
-photos, and is filed only when the citizen replies 1, so a question the router
-misread is never filed. An unclear message gets "question or report?".
+A report is filed only when the citizen replies 1, so a question the router misread is never filed. An emergency gets
+every number to try in the first reply, before any other question. A personal-safety report is asked only for its
+sub-metro, never its electoral area.
 
-A report is read (report_intake.read_report) as soon as it is described. An
-emergency (a danger to a person, a fire, a flood, a crime) gets every number
-to try in that first reply, before any other question, and a danger to a
-person also what to do right now (safety_steps). A personal-safety
-report is asked only for its sub-metro, which it may skip, never its
-electoral area; an area it names is kept only as its sub-metro.
+Photos are cleaned of metadata, kept only as long as the draft, and deleted from Twilio straight away. The chat reply
+is the receipt, so no separate "received" message is sent.
 
-Photos are fetched from Twilio once, cleaned (no metadata), kept only as long
-as the draft, and deleted from Twilio straight away. A personal-safety report
-gets its reference and updates only if the citizen replies YES within the
-hour. The chat reply is the receipt, so no separate "received" message is sent.
-
-A voice note is heard by whatsapp_voice and then handled as if its English had
-been typed. Its words are shown back ("I understood: …") with a question's
-answer and before an everyday report is filed. A personal-safety report is never
-shown back in its own words: only what it was understood as, so a mishearing is
-still caught without leaving a readable copy of the disclosure in the chat. Only
-a question's answer is also spoken.
-
-"Nokware code 482173" confirms the number to the web page that showed the code
-(phone_proof), whatever step the chat is at, and is answered once.
+A personal-safety report from a voice note is never shown back in its own words, so a mishearing is still caught
+without leaving a readable copy of the disclosure in the chat.
 """
 
 import base64
 import logging
+import re
 from collections.abc import Callable
 from dataclasses import asdict, dataclass, replace
 from typing import Any
 
 from app.config import get_settings
-from app.services import channel_limits, channel_sessions, report_followups, report_intake, report_store
 from app.contacts import EMERGENCY_TOPICS
+from app.services import (
+    channel_limits,
+    channel_petitions,
+    channel_sessions,
+    notifications,
+    petitions,
+    phone_proof,
+    report_followups,
+    report_intake,
+    report_store,
+    whatsapp_reply,
+    whatsapp_safety,
+    whatsapp_voice,
+)
 from app.services.channel_answers import for_chat
 from app.services.channel_contacts import medical_text, numbers_text, steps_text
 from app.services.channel_intent import Intent, read_message
 from app.services.channel_status import status_text
-from app.services.citizen_reports import MAX_PHOTOS, IntakeChannel
+from app.services.citizen_reports import MAX_PHOTOS, IntakeChannel, NotificationChannel, NotificationEvent
 from app.services.ledger_documents import utc_now
+from app.services.petition_rules import normalise_code
+from app.services.phrases import phrase
 from app.services.rag import AnswerLength, answer_question
 from app.services.redis_store import get_redis, key, subject_key
 from app.services.report_contacts import InvalidNumber, masked
 from app.services.report_intake import DESCRIPTION_MIN, Receipt, ReportSubmission
 from app.services.report_photos import PhotoRejected, clean_photo
-from app.services.report_rules import Classification, ClassificationMethod, InvalidReport
-from app.services.report_taxonomy import Category
-from app.services import phone_proof, whatsapp_reply, whatsapp_safety, whatsapp_voice
+from app.services.report_rules import (
+    InvalidReport,
+    filed_privately,
+    restored_classification,
+    saved_classification,
+)
 from app.services.voice_transcribe import Heard, understood
 from app.services.whatsapp import WhatsAppError, WhatsAppNotConfigured, first_delivery, open_window, twilio
 from app.teams import short_name
@@ -67,8 +68,12 @@ HELP = (
     "• Ask a question about the Assembly: fees, budgets, plans, services.\n"
     "• Report a problem, like a blocked drain or a broken streetlight. Send a photo too if you have one.\n"
     "• Send a case reference, like K7QM-4TXP, to see how it is going.\n"
+    "• Send petition and its 6-digit number, like petition 482913, to see where that petition stands.\n"
     "Type, or send a voice note."
 )
+TOO_MANY_LOOKUPS = "Too many lookups this hour. Please try again later."
+# "petition 482913", "Petition: 482-913". The word is asked for, so a bare six digits is still a phone code.
+_PETITION = re.compile(r"^\s*petition\b\W*(\d{3}[\s-]?\d{3})\W*$", re.IGNORECASE)
 ASK_KIND = "Is this a question for Nokware, or a problem to report to the Assembly?\nReply *1* for a question or *2* for a report."
 CANCELLED = "Cancelled: nothing was filed. If you meant to ask a question, send it again."
 
@@ -112,7 +117,6 @@ def _drop_draft(number: str) -> None:
 
 
 def _keep_photo(number: str, media: Media) -> str | None:
-    """Fetch, clean and hold a photo for the draft, and delete it from Twilio. A reason if it can't be used."""
     held = get_redis().llen(_photos_key(number))
     if held >= MAX_PHOTOS:
         return f"A report can have up to {MAX_PHOTOS} photos."
@@ -133,21 +137,6 @@ def _keep_photo(number: str, media: Media) -> str | None:
     return None
 
 
-def _saved(filed: Classification) -> dict[str, Any]:
-    return {"category": filed.category.value, "topic": filed.topic, "severity": filed.severity,
-            "recipients": list(filed.recipients), "method": filed.method.value}
-
-
-def _classification(state: State) -> Classification:
-    saved = state["filed"]
-    return Classification(Category(saved["category"]), saved["topic"], saved["severity"], tuple(saved["recipients"]),
-                          ClassificationMethod(saved["method"]))
-
-
-def _private(state: State) -> bool:
-    return bool(state.get("filed")) and state["filed"]["category"] == Category.PERSONAL_SAFETY
-
-
 def _sub_metro_question() -> str:
     names = ", ".join(f"*{n}* {sub.name}" for n, sub in enumerate(sub_metros().values(), 1))
     return f"Which sub-metro are you in? It helps reach the nearest Social Welfare desk.\nReply {names}, or *0* to skip."
@@ -157,12 +146,10 @@ def _confirm_question(number: str, state: State) -> str:
     photos = get_redis().llen(_photos_key(number))
     with_photos = f" with {photos} photo{'s' if photos != 1 else ''}" if photos else ""
     spoken = state.get("spoken_language")
-    if _private(state):
+    if filed_privately(state):
         who = " and ".join(short_name(r) for r in state["filed"]["recipients"])
         if spoken:
-            # Never the words back. "I understood: 'my husband beats me every night'" leaves a readable, searchable
-            # copy of the disclosure in a chat on a phone he may pick up — the harm the neutral SMS exists to
-            # prevent. Naming what it was understood AS still lets someone who was misheard catch it.
+            # Never the words back: they'd leave a readable copy of the disclosure on a phone the abuser may pick up.
             return ("I understood this as a report about someone's safety. You can send photos first: "
                     f"only they will see them.\nReply *1* to send it to {who}, or *2* to cancel and type it instead.")
         return (f"Ready to send your report{with_photos} to {who}. You can send photos first: only they will see them.\n"
@@ -173,32 +160,27 @@ def _confirm_question(number: str, state: State) -> str:
 
 
 def _next(number: str, state: State) -> tuple[State, str]:
-    """What the draft still needs: a description; then for personal safety the sub-metro (optional, never the
-    electoral area), or for anything else the electoral area; then a yes."""
     if not state.get("description"):
         return {**state, "step": "describe"}, "Describe the problem and where it is, in a sentence or two."
-    if _private(state) and "sub_metro" not in state:
+    if filed_privately(state) and "sub_metro" not in state:
         return {**state, "step": "sub_metro"}, _sub_metro_question()
-    if not _private(state) and not state.get("ward"):
+    if not filed_privately(state) and not state.get("ward"):
         return {**state, "step": "area"}, "Which electoral area is it in? Reply with its name, for example Kaneshie or Bubiashie."
     return {**state, "step": "confirm"}, _confirm_question(number, state)
 
 
 def _prompt(number: str, state: State) -> None:
-    """Ask the next question. An emergency's numbers come first, in the first reply after it is described."""
     state, question = _next(number, state)
     numbers = ""
     if state.get("filed") and not state.get("numbers_sent"):
         numbers, state = numbers_text(state["filed"]["topic"], state.get("sub_metro")), {**state, "numbers_sent": True}
-        numbers = "\n\n".join(part for part in (numbers, steps_text() if _private(state) else "") if part)
+        numbers = "\n\n".join(part for part in (numbers, steps_text() if filed_privately(state) else "") if part)
     channel_sessions.save("whatsapp", number, state, DRAFT_SECONDS)
     get_redis().expire(_photos_key(number), DRAFT_SECONDS)
     whatsapp_reply.reply(number, "\n\n".join(part for part in (numbers, question) if part))
 
 
 def _with_description(state: State, text: str, heard: Heard | None) -> State:
-    """The description, how it will be filed, and any place it names: for personal safety only the sub-metro.
-    From a voice note, its language too, so the confirm can show what was understood."""
     filed = report_intake.read_report(text)
     ward = ward_mentioned(text)
     if filed.private:
@@ -207,7 +189,7 @@ def _with_description(state: State, text: str, heard: Heard | None) -> State:
         place = {"ward": state.get("ward") or (ward.id if ward else None)}
     kept = {k: v for k, v in state.items() if k not in ("ward", "spoken_language")}
     spoken = {"spoken_language": heard.language} if heard else {}
-    return {**kept, "description": text, "filed": _saved(filed), **place, **spoken}
+    return {**kept, "description": text, "filed": saved_classification(filed), **place, **spoken}
 
 
 def start_report(inbound: Inbound) -> None:
@@ -228,7 +210,7 @@ def _receipt_text(receipt: Receipt) -> str:
 
 
 def _file(number: str, state: State) -> None:
-    private = _private(state)
+    private = filed_privately(state)
     # Someone in danger is never turned away by the hourly report limit (the message cap still holds).
     if not private and not channel_limits.REPORTS.allow(number, utc_now().timestamp()):
         _drop_draft(number)
@@ -241,19 +223,23 @@ def _file(number: str, state: State) -> None:
         spoken=state.get("spoken_language"),
     )
     try:
-        receipt = report_intake.submit(submission, draft_photos(number), utc_now(), _classification(state))
+        receipt = report_intake.submit(submission, draft_photos(number), utc_now(), restored_classification(state))
     except (InvalidReport, InvalidNumber, PhotoRejected) as error:
         whatsapp_reply.reply(number, f"{error} Reply *2* to cancel.")
         return
     _drop_draft(number)
     if receipt.case["isSensitive"]:
-        whatsapp_safety.after_filing(number, receipt)  # who has it, and CALL, PLACE and YES for an hour
+        whatsapp_safety.after_filing(number, receipt)
     else:
-        whatsapp_reply.reply(number, _receipt_text(receipt))
+        text = _receipt_text(receipt)
+        sent = whatsapp_reply.reply(number, text)
+        # This reply IS the "we have it" message, so the outbox says so; otherwise the sweep reads the silence as a
+        # message the resident never got and sends a second one a quarter of an hour later.
+        notifications.record_reply(receipt.case["$id"], NotificationEvent.SUBMITTED, NotificationChannel.WHATSAPP,
+                                   text, sent)
 
 
 def answer(number: str, question: str, heard: Heard | None = None) -> None:
-    """A cited answer. Asked in a voice note: what was understood comes first, and the answer is also spoken."""
     if not channel_limits.QUESTIONS.allow(number, utc_now().timestamp()):
         whatsapp_reply.reply(number, "You've asked a lot of questions this hour. Please try again later.")
         return
@@ -264,21 +250,42 @@ def answer(number: str, question: str, heard: Heard | None = None) -> None:
         whatsapp_voice.speak_answer(number, found, heard)
 
 
+def petition_asked(text: str) -> str | None:
+    """The number in "petition 482913", or None if the message isn't that."""
+    match = _PETITION.match(text or "")
+    return normalise_code(match.group(1)) if match else None
+
+
+def petition_standing(number: str, code: str) -> None:
+    """What became of a petition. A removed one answers from its removal record: the ground, the date, and nothing
+    of the words that came down."""
+    if not channel_limits.LOOKUPS.allow(number, utc_now().timestamp()):
+        whatsapp_reply.reply(number, TOO_MANY_LOOKUPS)
+        return
+    try:
+        found = channel_petitions.standing(code)
+    except petitions.PetitionNotFound:
+        whatsapp_reply.reply(number, phrase("petition.channel.not_found_whatsapp").format(number=code))
+        return
+    whatsapp_reply.reply(number, channel_petitions.standing_text(found, _site()))
+
+
 def status(number: str, reference: str) -> None:
     if not channel_limits.LOOKUPS.allow(number, utc_now().timestamp()):
-        whatsapp_reply.reply(number, "Too many lookups this hour. Please try again later.")
+        whatsapp_reply.reply(number, TOO_MANY_LOOKUPS)
         return
     try:
         case = report_followups.find(reference)
     except report_followups.CaseNotFound:
         whatsapp_reply.reply(number, f"No case has the reference {reference}. Check it and send it again.")
         return
-    found = report_followups.public_status(case, report_store.assignments_for(case["$id"]), utc_now())
+    found = report_followups.public_status(
+        case, report_store.assignments_for(case["$id"]), utc_now(), report_followups.history_for(case)
+    )
     whatsapp_reply.reply(number, status_text(found, _site()))
 
 
 def _sub_metro_named(text: str) -> str | None:
-    """A sub-metro by its number in the list or its name; an electoral area named gives only its sub-metro."""
     ids = list(sub_metros())
     if text.isdigit():
         return ids[int(text) - 1] if 1 <= int(text) <= len(ids) else None
@@ -288,10 +295,9 @@ def _sub_metro_named(text: str) -> str | None:
 
 
 def _place_reply(state: State, text: str) -> State | str:
-    """The answer to the place question: the state with it, or what to say if it can't be used."""
     if state["step"] == "sub_metro":
         if text == "0":
-            return {**state, "sub_metro": None}  # skipped: nothing is kept
+            return {**state, "sub_metro": None}
         chosen = _sub_metro_named(text)
         return {**state, "sub_metro": chosen} if chosen else "Reply with a number from the list, or *0* to skip."
     ward = find_ward(text) or ward_mentioned(text)
@@ -301,7 +307,6 @@ def _place_reply(state: State, text: str) -> State | str:
 
 
 def _draft_step(inbound: Inbound, state: State) -> bool:
-    """A message while a report is being drafted: a photo, the description, the place, or the yes."""
     number, text, step = inbound.number, inbound.text.strip(), state["step"]
     problem = _keep_photo(number, inbound.media) if inbound.media else None
     if problem:
@@ -325,12 +330,11 @@ def _draft_step(inbound: Inbound, state: State) -> bool:
 
 
 def _kind_step(inbound: Inbound, state: State) -> bool:
-    """The answer to "question or report?"; anything else is a new message."""
+    """Anything but 1 or 2 is read as a new message."""
     choice = inbound.text.strip()
-    if choice not in ("1", "2"):
-        channel_sessions.clear("whatsapp", inbound.number)
-        return False
     channel_sessions.clear("whatsapp", inbound.number)
+    if choice not in ("1", "2"):
+        return False
     heard = Heard(**state["heard"]) if state.get("heard") else None
     if choice == "1":
         answer(inbound.number, state["text"], heard)
@@ -372,7 +376,7 @@ def _media_problem(media: Media | None) -> str | None:
 
 
 def _heard(inbound: Inbound) -> Inbound | None:
-    """A voice note as the message its words would have made if typed; None if it couldn't be used."""
+    """None if a voice note couldn't be used."""
     if not (inbound.media and whatsapp_voice.is_voice(inbound.media.content_type)):
         return inbound
     heard = whatsapp_voice.hear(inbound.number, inbound.media.url, inbound.media.content_type)
@@ -380,14 +384,12 @@ def _heard(inbound: Inbound) -> Inbound | None:
 
 
 def _confirm_code(number: str, code: str) -> None:
-    """A code from a Nokware page, sent to confirm this number: claimed, and answered once."""
     if channel_limits.CODE_CLAIMS.allow(number, utc_now().timestamp()):
         claimed = phone_proof.claim(code, number, phone_proof.Channel.WHATSAPP, utc_now())
         whatsapp_reply.reply(number, phone_proof.CLAIM_REPLIES[claimed])
 
 
 def _route(inbound: Inbound) -> None:
-    """A message to the step its chat is at, or read afresh."""
     problem = _media_problem(inbound.media)
     if problem:
         whatsapp_reply.reply(inbound.number, problem)
@@ -395,6 +397,10 @@ def _route(inbound: Inbound) -> None:
     code = None if inbound.media else phone_proof.typed_code(inbound.text)
     if code:
         _confirm_code(inbound.number, code)
+        return
+    asked = None if inbound.media else petition_asked(inbound.text)
+    if asked:
+        petition_standing(inbound.number, asked)
         return
     state = channel_sessions.load("whatsapp", inbound.number)
     step = STEPS.get(state.get("step", "")) if state else None
@@ -405,7 +411,7 @@ def _route(inbound: Inbound) -> None:
 
 
 def handle(inbound: Inbound) -> None:
-    """One incoming WhatsApp message, after the webhook has answered Twilio."""
+    """Runs after the webhook has answered Twilio."""
     open_window(inbound.number)
     if not first_delivery(inbound.message_sid) or not channel_limits.MESSAGES.allow(inbound.number, utc_now().timestamp()):
         return

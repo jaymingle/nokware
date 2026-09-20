@@ -65,7 +65,6 @@ def wards() -> dict[str, Ward]:
 
 
 def source() -> dict[str, str]:
-    """Where the electoral areas and chairpersons come from: a label and URL."""
     return {key: _raw()["source"][key] for key in ("label", "url")}
 
 

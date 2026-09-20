@@ -1,9 +1,8 @@
 "use client";
 
 import { Input } from "@/components/ui/input";
+import { NAME_MAX } from "@/lib/limits";
 import { NAME_NOTE } from "@/lib/petitions";
-
-const NAME_MAX = 80;
 
 function Choice({ checked, onChange, testId, label, hint }: { checked: boolean; onChange: () => void; testId: string; label: string; hint: string }) {
   return (

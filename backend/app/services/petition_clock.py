@@ -1,14 +1,10 @@
 """The petition clock: what happens to a petition when no one acts.
 
-Run by the API every DEADLINE_JOB_INTERVAL_SECONDS, in the same loop as the
-Ledger's deadline job:
-- a petition the MCE left undecided for 72 hours publishes automatically;
-- an open petition that reaches 90 days short of its threshold closes;
-- a petition that reached its threshold and has had no response for 30 days
-  gets that recorded, once: the page says "No response 30 days after the
-  petition reached its threshold." A late response is still taken.
-Each tells the petition's creator. Every change re-reads the petition under its
-lock first, in case someone acted a moment before.
+Two things do. A petition open for its 90 days without reaching its threshold closes, and one the MCE has not
+answered 30 days after it reached its threshold is marked unanswered on its own page. Nothing here publishes
+anything: a petition is published by the person who wrote it, so there is no waiting to run out.
+
+Every change re-reads the petition under its lock first, in case someone acted a moment before.
 """
 
 import logging
@@ -20,15 +16,7 @@ from appwrite.query import Query
 
 from app.services import petition_updates, petitions
 from app.services.locks import record_lock
-from app.services.petition_rules import (
-    PetitionAction,
-    PetitionStatus,
-    PublishedBy,
-    closing_due,
-    publish_fields,
-    response_overdue,
-    review_expired,
-)
+from app.services.petition_rules import PetitionAction, PetitionStatus, closing_due, response_overdue
 from app.services.petition_updates import Update
 
 logger = logging.getLogger(__name__)
@@ -43,7 +31,6 @@ def _due(queries: list[str]) -> list[dict[str, Any]]:
 
 
 def _apply(candidate: dict[str, Any], now: datetime, step: Step) -> bool:
-    """One change the clock makes, if it is still due once the petition is re-read under its lock."""
     is_due, changes, action, update = step
     with record_lock(candidate["$id"]):
         petition = petitions.find(candidate["code"])
@@ -55,17 +42,13 @@ def _apply(candidate: dict[str, Any], now: datetime, step: Step) -> bool:
     return True
 
 
-AUTO_PUBLISH: Step = (review_expired, lambda p, now: publish_fields(p, PublishedBy.AUTOMATIC, now, petitions.threshold_of(p)),
-                      PetitionAction.AUTO_PUBLISHED, Update.AUTO_PUBLISHED)
 CLOSE: Step = (closing_due, lambda p, now: petitions.finish_fields(PetitionStatus.CLOSED, now), PetitionAction.CLOSED, Update.CLOSED)
 NO_RESPONSE: Step = (response_overdue, lambda p, now: {"noResponseAt": now.isoformat()}, PetitionAction.NO_RESPONSE, Update.NO_RESPONSE)
 
 
 def run_clock(now: datetime) -> dict[str, list[str]]:
-    """Every change due now, by kind: the petitions published automatically, closed, and recorded as unanswered."""
     at = now.isoformat()
     due = {
-        "published": (_due([Query.equal("status", PetitionStatus.IN_REVIEW.value), Query.less_than_equal("reviewDeadline", at)]), AUTO_PUBLISH),
         "closed": (_due([Query.equal("status", PetitionStatus.OPEN.value), Query.less_than_equal("closesAt", at)]), CLOSE),
         "unanswered": (_due([Query.equal("status", PetitionStatus.AWAITING_RESPONSE.value), Query.less_than_equal("responseDue", at),
                              Query.is_null("noResponseAt")]), NO_RESPONSE),

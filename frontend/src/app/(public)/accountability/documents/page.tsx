@@ -1,12 +1,6 @@
-import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 
-import { PublishingRecordPage } from "@/components/accountability/publishing-record-page";
-
-export const metadata: Metadata = {
-  title: "What the Assembly publishes",
-  description: "The documents the Accra Metropolitan Assembly is required to publish, against what The Ledger holds, by year.",
-};
-
+// Kept because links to it exist in the wild; the record itself now lives at /accountability.
 export default function Page() {
-  return <PublishingRecordPage />;
+  redirect("/accountability");
 }

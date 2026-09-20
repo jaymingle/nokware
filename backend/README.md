@@ -49,6 +49,22 @@ it. Every `DEADLINE_JOB_INTERVAL_SECONDS` the API publishes documents whose
 
 Health check: `GET http://localhost:8000/health` → `{"status": "ok"}`.
 
+### Tests, and what they can't tell you
+
+`pytest` runs against fakes: Appwrite, MinIO, Redis and the models are all stood
+in for, so the suite says the rules are right, not that the system works. Twice
+in one day a green suite sat beside a broken path — a cache decorator left on
+`as_record` that failed every Appwrite read and write, and three writes sent
+together that died on a connection Appwrite had closed. Both were found by
+running something real, in seconds.
+
+So before trusting a change to the storage or channel paths, run the lifecycle
+scripts, which use the live services: `scripts/report_lifecycle.py`,
+`scripts/case_lifecycle.py`, `scripts/portal_lifecycle.py`, and the USSD and
+WhatsApp simulators (`--url` pointing at a scratch API, with `SMS_PROVIDER=log
+WHATSAPP_PROVIDER=log` so nothing is sent or charged). They file `[TEST]` data,
+which every public surface excludes and `scripts/delete_test_*.py` removes.
+
 At startup the API checks that `POSTGRES_URL` reaches the Ledger's search index
 (`app/services/search_index.py`): the database it names, holding
 `document_chunks` with its 768-dimension embeddings. Postgres comes through a

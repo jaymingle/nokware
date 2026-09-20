@@ -1,9 +1,10 @@
 import type { Me, Role } from "@/lib/api/types";
 
-/** A live count shown on a nav item, e.g. documents awaiting review. */
-export type NavCountKind = "review" | "responses" | "escalations" | "cases" | "case-escalations" | "petitions";
+export type NavCountKind =
+  | "review" | "responses" | "escalations" | "cases" | "case-escalations" | "petitions" | "petition-reports"
+  | "shared-petitions";
 
-export type NavItem = { href: string; label: string; testId: string; count?: NavCountKind };
+type NavItem = { href: string; label: string; testId: string; count?: NavCountKind };
 
 export const ROLE_HOME: Record<Role, string> = {
   department: "/portal/department",
@@ -18,20 +19,21 @@ export const ROLE_NAV: Record<Role, NavItem[]> = {
     { href: "/portal/department/publish", label: "Publish", testId: "portal-nav-publish" },
     { href: "/portal/department/library", label: "Library", testId: "portal-nav-library" },
     { href: "/portal/department/cases", label: "Cases", testId: "portal-nav-cases", count: "cases" },
+    { href: "/portal/department/petitions", label: "Petitions", testId: "portal-nav-shared-petitions", count: "shared-petitions" },
   ],
   agency: [{ href: "/portal/agency", label: "Cases", testId: "portal-nav-cases", count: "cases" }],
   contributor: [
     { href: "/portal/contributor", label: "My submissions", testId: "portal-nav-submissions", count: "responses" },
     { href: "/portal/contributor/submit", label: "Submit a document", testId: "portal-nav-submit" },
+    { href: "/portal/contributor/petitions", label: "Reported petitions", testId: "portal-nav-petition-reports", count: "petition-reports" },
   ],
   mce: [
-    { href: "/portal/mce", label: "Disputes", testId: "portal-nav-escalations", count: "escalations" },
+    { href: "/portal/mce", label: "Document disputes", testId: "portal-nav-escalations", count: "escalations" },
     { href: "/portal/mce/cases", label: "Cases", testId: "portal-nav-cases", count: "case-escalations" },
     { href: "/portal/mce/petitions", label: "Petitions", testId: "portal-nav-petitions", count: "petitions" },
   ],
 };
 
-/** Where the user sits in the Assembly, as shown beside their name. */
 export function roleLabel(me: Me): string {
   if (me.role === "department") return me.department_name ?? "Department";
   if (me.role === "agency") return me.agency_name ?? "Agency";
@@ -46,7 +48,7 @@ export function initials(name: string): string {
     .join("");
 }
 
-/** Only portal paths may be a post-sign-in destination (never an external URL). */
+/** Never an external URL after sign-in. */
 export function safeNext(next: string | null): string {
   return next && next.startsWith("/portal") && !next.startsWith("//") ? next : "/portal";
 }

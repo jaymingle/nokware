@@ -1,5 +1,4 @@
 import Link from "next/link";
-import type { ReactNode } from "react";
 
 import { CountValue } from "@/components/dashboard/count";
 import { Button } from "@/components/ui/button";
@@ -9,6 +8,7 @@ import { formatDate } from "@/lib/time";
 import { cn } from "@/lib/utils";
 
 import type { RecentDocument, SubMetroFigures, TopicFigures } from "@/lib/api/types";
+import type { ReactNode } from "react";
 
 export function Panel({ title, lead, children, className, testId }: {
   title: string; lead?: string; children: ReactNode; className?: string; testId?: string;
@@ -22,7 +22,6 @@ export function Panel({ title, lead, children, className, testId }: {
   );
 }
 
-/** Each topic's share of the period's reports, most reported first. */
 export function TopicShares({ topics, total }: { topics: TopicFigures[]; total: Count }) {
   if (topics.length === 0) return <p className="text-[13.5px] text-ink-soft">No reports in this period yet.</p>;
   const top = Math.max(1, ...topics.map((t) => t.count ?? 0));
@@ -46,7 +45,7 @@ export function TopicShares({ topics, total }: { topics: TopicFigures[]; total: 
   );
 }
 
-/** Reports, resolutions and the median time to resolve, by sub-metro: no finer. */
+/** By sub-metro and no finer. */
 export function SubMetroTable({ rows }: { rows: SubMetroFigures[] }) {
   const cell = "px-5 py-3 text-[13.5px] tabular-nums";
   return (
@@ -75,7 +74,6 @@ export function SubMetroTable({ rows }: { rows: SubMetroFigures[] }) {
   );
 }
 
-/** The latest documents the Ledger published, each opening its PDF. */
 export function RecentDocuments({ documents }: { documents: RecentDocument[] }) {
   return (
     <ul className="flex flex-col" data-testid="dashboard-documents">

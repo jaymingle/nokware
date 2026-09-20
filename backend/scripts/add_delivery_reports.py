@@ -13,9 +13,10 @@ adds; nothing is deleted. Safe to re-run.
 import argparse
 import sys
 
+from create_citizen_reports import KEY, Creator, ensure, ensure_indexes, wait_for_attributes
+
 from app.services.appwrite_client import DATABASE_ID, get_databases, quiet_sdk_deprecation_warnings
 from app.services.citizen_reports import NOTIFICATIONS_COLLECTION as OUTBOX
-from create_citizen_reports import KEY, Creator, ensure, ensure_indexes, wait_for_attributes
 
 DELIVERY_STATUS = 32
 INDEXES = {"idx_providerMessageId": (KEY, ["providerMessageId"])}

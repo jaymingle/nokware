@@ -8,15 +8,7 @@ ENV_FILE = Path(__file__).resolve().parents[1] / ".env"
 
 
 class Settings(BaseSettings):
-    """Application settings loaded from environment / .env file.
-
-    Field names are snake_case; pydantic-settings maps them to the uppercase
-    environment variables case-insensitively (e.g. ``appwrite_endpoint`` reads
-    ``APPWRITE_ENDPOINT``). Service settings are required — a missing variable
-    raises at startup rather than silently defaulting. Only settings whose
-    defaults suit local development (CORS, the job intervals, the notification
-    providers and the public site URL) and the optional JOB_TOKEN have defaults.
-    """
+    """Service settings have no defaults, so a missing variable raises at startup rather than silently defaulting."""
 
     model_config = SettingsConfigDict(
         env_file=ENV_FILE,
@@ -24,115 +16,89 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # Appwrite
     appwrite_endpoint: str
     appwrite_project_id: str
     appwrite_api_key: str
 
-    # Postgres (pgvector)
     postgres_url: str
 
-    # MinIO
     minio_endpoint: str
     minio_access_key: str
     minio_secret_key: str
     minio_ledger_bucket: str
     minio_photos_bucket: str
 
-    # Google Gemini
     gemini_api_key: str
 
-    # Browser origins allowed to call the API: exact origins (comma-separated)
-    # plus a pattern. The default pattern admits localhost on any port.
-    cors_origins: str = ""
+    cors_origins: str = ""  # comma-separated
     cors_origin_regex: str = r"^http://(localhost|127\.0\.0\.1)(:\d+)?$"
 
-    # Lets a scheduler call POST /api/jobs/publish-expired with an X-Job-Token
-    # header. Empty means only a signed-in MCE can run the job.
+    # For a scheduler's X-Job-Token. Empty means only a signed-in MCE can run the jobs.
     job_token: str = ""
 
-    # How often the API publishes documents whose 72-hour clock has run out
-    # (and retries stalled ingestion). 0 turns the built-in runner off.
+    # 0 turns the built-in runner off.
     deadline_job_interval_seconds: int = 120
 
-    # Citizen notifications. "log" records each message without sending it.
-    # SMS_PROVIDER=arkesel sends SMS through Arkesel, SMS_PROVIDER=bms through
-    # BMS Africa; WHATSAPP_PROVIDER=twilio sends WhatsApp through Twilio.
+    # "log" records each message without sending it.
     sms_provider: str = "log"
     whatsapp_provider: str = "log"
-    # Arkesel SMS. In sandbox mode (the default) Arkesel accepts each message
-    # without delivering it or spending credits.
+    # In sandbox mode Arkesel accepts each message without delivering it or spending credits.
     arkesel_api_key: str = ""
     arkesel_sender_id: str = ""
     arkesel_sandbox: bool = True
-    # The most SMS pages (credits) sent in a day outside the sandbox.
     sms_daily_limit: int = 50
-    # Arkesel's webhook secret: verifies the signed delivery reports it sends.
+    # Answers by SMS one number may have in a day, on top of SMS_DAILY_LIMIT: one resident asking all afternoon must
+    # not use up the day for everyone else. Nothing is counted while SMS_PROVIDER=log, which is what a test pass runs.
+    sms_answer_daily_limit: int = 5
     arkesel_webhook_secret: str = ""
-    # BMS Africa SMS (mNotify's API), needed when SMS_PROVIDER=bms. There is no
-    # sandbox: every message is live and charged. The key travels in the
-    # request address, so it is redacted from logs and never stored.
+    # BMS has no sandbox: every message is live and charged. The key travels in the request address, so it is
+    # redacted from logs and never stored.
     bms_api_key: str = ""
     bms_sender_id: str = ""
-    # BMS has no delivery webhook: how often the API asks it what became of the
-    # SMS sent in the last two days. 0 turns it off.
+    # BMS has no delivery webhook, so the API polls it. 0 turns it off.
     bms_delivery_poll_seconds: int = 120
-    # The secret in Arkesel's USSD callback address. Arkesel doesn't sign USSD
-    # callbacks yet, so this is their only protection. Empty: USSD is off.
+    # Arkesel doesn't sign USSD callbacks yet, so this secret in the callback address is their only protection.
+    # Empty: USSD is off.
     arkesel_ussd_token: str = ""
-    # Twilio WhatsApp, needed when WHATSAPP_PROVIDER=twilio. The sender is the
-    # WhatsApp address messages come from, e.g. whatsapp:+14155238886 (the sandbox).
     twilio_account_sid: str = ""
     twilio_auth_token: str = ""
-    twilio_whatsapp_from: str = ""
-    # The API's public HTTPS address, which Arkesel and Twilio call back.
+    twilio_whatsapp_from: str = ""  # e.g. whatsapp:+14155238886 (the sandbox)
     # Empty means no callbacks are asked for.
     public_api_url: str = ""
-    # Redis, for short-lived channel state (USSD menus, WhatsApp drafts),
-    # per-number limits and the SMS page count. Empty: channels are off and the
-    # SMS count is kept in this process.
+    # Empty: channels are off and the SMS count is kept in this process.
     redis_url: str = ""
-    # Spoken replies to WhatsApp voice questions: Gemini's speech model (a
-    # preview, hence a setting) and its voice, and the most spoken replies sent
-    # in a day across everyone (each is an extra WhatsApp message).
+    # Gemini's speech model is a preview, hence a setting. Each spoken reply is an extra WhatsApp message.
     gemini_tts_model: str = "gemini-3.1-flash-tts-preview"
     gemini_tts_voice: str = "Charon"
     voice_daily_limit: int = 20
-    # The web's read-aloud button (Ask answers, report confirmations and status
-    # pages): the most fresh parts of speech made in a day across everyone. A
-    # reading is made in parts of about 25 seconds (a long answer is up to
-    # seven); the same words are spoken once and kept for six hours, so repeats
-    # don't count.
+    # Fresh parts of speech a day across everyone; cached repeats don't count.
     read_aloud_daily_limit: int = 300
-    # The USSD code residents dial (e.g. *920*123#), shown on the web where USSD
-    # can confirm a phone number. Empty: USSD isn't offered for that.
+    # Empty: USSD isn't offered for confirming a phone number.
     ussd_service_code: str = ""
-    # Where citizens follow their reports; used in the links messages carry.
-    public_site_url: str = "http://localhost:3000"
+    # No default: this address goes into the messages residents are sent, and a default would put a developer's
+    # own machine into an SMS the Assembly paid for. A deploy that forgets it doesn't start.
+    public_site_url: str
 
-    # Petitions. Signatures needed before a petition goes to the MCE: fixed on
-    # each petition when it opens, so changing these never moves a live goal.
-    petition_threshold_area: int = 150  # a petition about one electoral area
-    petition_threshold_metro: int = 500  # a petition about the whole Assembly
-    # Verification codes by SMS, as a third way to confirm a phone number beside
-    # WhatsApp and USSD. Only with an approved sender ID: messages from an
-    # unregistered one are held for review for about 15 minutes, and a code that
-    # arrives 15 minutes late is worse than no SMS option at all. "Nokware" is
-    # approved on BMS, so turn this on with SMS_PROVIDER=bms; keep it off on
-    # Arkesel until its sender ID is registered.
+    # Fixed on each petition when it opens, so changing these never moves a live goal.
+    petition_threshold_area: int = 150
+    petition_threshold_metro: int = 500
+    # Only with an approved sender ID: messages from an unregistered one are held for review for about 15 minutes,
+    # and a code that arrives 15 minutes late is worse than no SMS option at all. "Nokware" is approved on BMS; keep
+    # this off on Arkesel until its sender ID is registered.
     sms_verification_codes: bool = False
-    # The most SMS pages sent in a day for verification codes: a cap of its own,
-    # apart from SMS_DAILY_LIMIT, so codes never use up report notifications.
+    # A cap of its own, so codes never use up report notifications.
     sms_code_daily_limit: int = 30
-    # The secret behind the keyed hash stored for a verified phone (who started
-    # a petition; from P2, one signature per phone per petition). Empty: derived
-    # from the Appwrite API key. Set it before launch, so that rotating that key
-    # doesn't reset who has already signed.
+    # Empty: derived from the Appwrite API key. Set it before launch, so that rotating that key doesn't reset who has
+    # already signed.
     phone_key_secret: str = ""
 
-    # How often the API deletes citizens' numbers whose retention has ended.
     # 0 turns it off.
     contact_purge_interval_seconds: int = 3600
+
+    # The sweep for a "received" message that never reached the outbox at all (a restart between the 201 and the
+    # background task). The gap is rare and the scan is not free, so it is not worth the deadline job's two minutes;
+    # a quarter of an hour still reaches the resident while they are plausibly still waiting. 0 turns it off.
+    missed_message_sweep_interval_seconds: int = 900
 
     @property
     def cors_origin_list(self) -> list[str]:
@@ -145,11 +111,7 @@ def get_settings() -> Settings:
 
 
 def settings_error_summary(exc: ValidationError) -> str:
-    """Name the missing/invalid variables without echoing any values.
-
-    Never print str(exc) for a settings error: pydantic includes the loaded
-    input in it, which is the secrets.
-    """
+    """Never print str(exc) for a settings error: pydantic includes the loaded input in it, which is the secrets."""
     problems = [
         f"{str(err['loc'][0]).upper()} ({err['msg'].lower()})"
         for err in exc.errors(include_url=False, include_input=False)

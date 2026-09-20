@@ -12,7 +12,7 @@ import { spacedCode, type KeptChallenge, type KeptProof } from "@/lib/petitions"
 
 import type { PhoneChallengeStatus } from "@/lib/api/types";
 
-export const PHONE_PRIVACY =
+const PHONE_PRIVACY =
   "Ghanaian mobile numbers (+233) only. Nokware never shows your number. It keeps a scrambled form of it, so you can find your petition again, and the number itself only to send you updates about your petition, deleted 30 days after the petition closes.";
 
 function Way({ icon, title, children }: { icon: ReactNode; title: string; children: ReactNode }) {
@@ -47,7 +47,6 @@ function useSmsCode(challenge: KeptChallenge, settle: (status: PhoneChallengeSta
   return { sentTo, error, busy, send, confirm };
 }
 
-/** Only while SMS codes are switched on: a code texted to the number typed here. */
 function SmsWay({ challenge, settle }: { challenge: KeptChallenge; settle: (status: PhoneChallengeStatus) => void }) {
   const sms = useSmsCode(challenge, settle);
   const onSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -96,7 +95,6 @@ function Ways({ challenge, settle }: { challenge: KeptChallenge; settle: (status
   );
 }
 
-/** The code, the ways to send it, and a live line while the page waits. */
 function Waiting({ challenge, settle, onCancel }: { challenge: KeptChallenge; settle: (s: PhoneChallengeStatus) => void; onCancel: () => void }) {
   return (
     <div className="flex flex-col gap-3">
@@ -113,7 +111,6 @@ function Waiting({ challenge, settle, onCancel }: { challenge: KeptChallenge; se
   );
 }
 
-/** Confirm a Ghanaian mobile number from this page, by WhatsApp, a USSD dial, or (once switched on) an SMS code. */
 export function PhoneConfirm({ onConfirmed, lead }: { onConfirmed: (proof: KeptProof) => void; lead: string }) {
   const phone = usePhoneChallenge(onConfirmed);
   return (
@@ -132,7 +129,6 @@ export function PhoneConfirm({ onConfirmed, lead }: { onConfirmed: (proof: KeptP
   );
 }
 
-/** A confirmed number, with the way to use another. */
 export function PhoneConfirmed({ proof, onForget }: { proof: KeptProof; onForget: () => void }) {
   return (
     <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[14px]" data-testid="phone-confirmed">

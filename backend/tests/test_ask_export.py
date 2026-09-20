@@ -4,7 +4,7 @@ import csv
 import io
 import json
 from collections import defaultdict, deque
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
@@ -24,7 +24,7 @@ from app.services.export_docx import docx
 from app.services.export_pdf import pdf
 from app.services.retrieval import Chunk, Retrieval, RetrievedChunk
 
-NOW = datetime(2026, 9, 14, 22, 46, tzinfo=timezone.utc)
+NOW = datetime(2026, 9, 14, 22, 46, tzinfo=UTC)
 AT = "2026-09-14T22:40:00+00:00"
 
 
@@ -41,8 +41,6 @@ RESOLVED_SMALL = figure("R2", "Resolved reports · since Nokware began", "12", [
                                                                               ("Ashiedu Keteke", "5")], "sub_metro")
 MONTHS = figure("R1", "Reports · this year", "40", [("Jul 2026", "fewer than 5"), ("Aug 2026", "12"), ("Sep 2026", "25")], "month")
 
-
-# Charts: the kind asked for, unless it can't show the data honestly.
 
 @pytest.mark.parametrize(("question", "figures", "kind", "horizontal", "why"), [
     ("Show open reports by sub-metro as a chart", [OPEN], "bar", False, None),  # unnamed: bars to compare
@@ -98,7 +96,8 @@ def _answer(monkeypatch: pytest.MonkeyPatch, question: str, figures: FigurePlan,
             return text
 
     chunk = RetrievedChunk(chunk=Chunk(1, "d1", 0, passage), score=1.0, document={"title": "2026 Budget", "department": "dept-finance"})
-    monkeypatch.setattr(rag, "figures_to_chart", lambda q, a, passages: plotted)  # the reading is tested on its own
+    # The reading is tested on its own; here a Plotted means figures were found, None means none were.
+    monkeypatch.setattr(rag, "read_for_chart", lambda q, a, passages: (plotted, True))
     monkeypatch.setattr(rag, "retrieve", lambda q: Retrieval(queries=[q], chunks=[chunk]))
     monkeypatch.setattr(rag, "plan_figures", lambda q, now: figures)
     monkeypatch.setattr(rag, "_answer_chain", lambda: Model())
@@ -144,8 +143,6 @@ def test_a_breakdown_by_month_runs_oldest_first_with_the_empty_months() -> None:
                                 stats.ReportFilter(topic="solid_waste"), NOW)
     assert waste_only[0] == ("2026-05", 0)  # from Nokware's first report of any kind: May really had none
 
-
-# Exports: signed, laid out once, and every page saying what it is.
 
 def _source(label: str, document_id: str, title: str, cited: bool = True, **extra: Any) -> dict[str, Any]:
     return {"label": label, "cited": cited, "document_id": document_id, "title": title, "chunk_text": "…", "department": None,

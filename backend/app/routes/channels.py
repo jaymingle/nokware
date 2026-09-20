@@ -1,11 +1,4 @@
-"""Callbacks from the messaging providers. Public routes: each is verified before it is trusted.
-
-    GET  /api/channels/sms/delivery       Arkesel's delivery report for one SMS (signed)
-    POST /api/channels/ussd/{token}       one keypress in an Arkesel USSD session (secret in the URL)
-    POST /api/channels/whatsapp           one incoming WhatsApp message, from Twilio (signed)
-    POST /api/channels/whatsapp/status    Twilio's delivery status for a WhatsApp message (signed)
-    GET  /api/channels/whatsapp/audio/{name}  a spoken reply for Twilio to fetch (a random link, for 10 minutes)
-"""
+"""Callbacks from the messaging providers. Public routes: each is verified before it is trusted."""
 
 import hmac
 import logging
@@ -93,7 +86,6 @@ EMPTY_TWIML = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Response></Response>"
 
 
 async def _signed_form(request: Request, path: str) -> dict[str, str]:
-    """Twilio's form fields, once its signature over them and the public URL checks out."""
     form = {name: str(value) for name, value in (await request.form()).items()}
     if not whatsapp.signed_by_twilio(path, form, request.headers.get("X-Twilio-Signature", "")):
         raise HTTPException(status_code=403, detail="The request's signature is not valid.")

@@ -1,9 +1,4 @@
-"""Singleton Appwrite client and service accessors.
-
-The client is configured from application settings and cached so the whole
-backend shares one instance. Service accessors are also cached; import the
-accessor you need rather than building services ad hoc.
-"""
+"""The shared Appwrite client and service accessors."""
 
 import logging
 import threading
@@ -14,24 +9,28 @@ from typing import Any
 
 import appwrite.client as sdk_client_module
 import requests
-from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
 from appwrite.client import Client
 from appwrite.exception import AppwriteException
 from appwrite.models import Document
 from appwrite.query import Query
 from appwrite.services.databases import Databases
-from appwrite.services.storage import Storage
 from appwrite.services.teams import Teams
 from appwrite.services.users import Users
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 from app.config import get_settings
 
 DATABASE_ID = "nokware"
 _DEPRECATION_MARKER = "has been deprecated since"
 # Appwrite's side closes a kept-alive connection left idle for a few minutes (seen at about four); after this long
-# without a call, the kept connections are dropped rather than tried.
+# without a call, the kept connections are dropped rather than tried. Three minutes was tried, to save the ~0.9s a
+# quiet site pays opening a new connection for its first write; a filing then died on a connection Appwrite had
+# closed anyway, and a create can't be retried without risking a second report. A minute stays.
 IDLE_RESET_SECONDS = 60
+# The SDK sends no timeout of its own, so a stalled connection would hold a worker thread — and a resident's
+# "Filing…" button — for as long as the network let it. Seconds to connect, then to wait for a reply.
+TIMEOUT = (5, 25)
 
 
 class _DropSdkDeprecations(logging.Filter):
@@ -40,35 +39,22 @@ class _DropSdkDeprecations(logging.Filter):
 
 
 def quiet_sdk_deprecation_warnings() -> None:
-    """Hide the SDK's per-call "Databases API is deprecated" warnings.
-
-    The 'nokware' database is a legacy-type database, so the Databases API is
-    the right one for it on this 1.9 server. The SDK forces these warnings on
-    for every call (it resets warning filters itself, so warnings.filterwarnings
-    cannot stop them); routing warnings through logging lets us drop just these
-    while every other warning still shows.
-    """
+    """The 'nokware' database is legacy-type, so the Databases API is the right one on this 1.9 server. The SDK
+    resets warning filters itself, so warnings.filterwarnings can't stop its per-call deprecation warnings; routing
+    warnings through logging drops just these."""
     logging.captureWarnings(True)
     logging.getLogger("py.warnings").addFilter(_DropSdkDeprecations())
 
 
 class _PooledRequests:
-    """Stands in for the requests module inside the SDK, reusing connections.
+    """Stands in for the requests module inside the SDK, so calls reuse connections.
 
-    The SDK sends every call through requests.request(), which opens a new TLS
-    connection each time: about 430 ms per call to our Appwrite, against about
-    140 ms on a reused connection. Routing that one function through a shared
-    Session keeps connections alive; everything else falls through to requests.
+    The SDK's requests.request() opens a new TLS connection each call: about 430 ms against 140 ms reused.
 
-    The Session must never carry cookies: calls made with different users' JWTs
-    share it, so cookies are refused outright rather than stored.
+    The Session never carries cookies: calls made with different users' JWTs share it.
 
-    A kept connection can be closed at Appwrite's end while it sits idle, and
-    the next call on it fails ("Remote end closed connection without
-    response"). So after IDLE_RESET_SECONDS of quiet the kept connections are
-    dropped first, and a call that meets a dropped connection anyway is sent
-    once more on a new one, but only when repeating it is harmless (GET, PUT,
-    DELETE): a create is never sent twice.
+    Appwrite closes idle kept connections, so they are dropped after IDLE_RESET_SECONDS of quiet, and a call that
+    meets a closed one anyway is retried once, only for idempotent methods: a create is never sent twice.
     """
 
     def __init__(self) -> None:
@@ -81,6 +67,7 @@ class _PooledRequests:
         self._lock = threading.Lock()
 
     def request(self, *args: Any, **kwargs: Any) -> requests.Response:
+        kwargs.setdefault("timeout", TIMEOUT)
         with self._lock:
             now = time.monotonic()
             if now - self._last_call > IDLE_RESET_SECONDS:
@@ -120,18 +107,11 @@ def get_users() -> Users:
     return Users(get_client())
 
 
-@lru_cache
-def get_storage() -> Storage:
-    return Storage(get_client())
-
-
 def as_record(document: Document) -> dict[str, Any]:
-    """A stored document's attributes plus its $id, $createdAt and $updatedAt."""
     return {**document.data, "$id": document.id, "$createdAt": document.createdat, "$updatedAt": document.updatedat}
 
 
 def find_record(collection_id: str, document_id: str) -> dict[str, Any] | None:
-    """One document as a record, or None if it doesn't exist."""
     try:
         return as_record(get_databases().get_document(DATABASE_ID, collection_id, document_id))
     except AppwriteException as exc:
@@ -144,7 +124,6 @@ PAGE_SIZE = 500
 
 
 def every_record(collection_id: str, queries: list[str]) -> list[dict[str, Any]]:
-    """Every document matching the queries, read a page at a time."""
     found: list[dict[str, Any]] = []
     cursor: list[str] = []
     while True:

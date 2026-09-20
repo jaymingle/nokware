@@ -5,7 +5,7 @@ from typing import Any
 import pytest
 
 from app.services import ask_language, rag
-from app.services.ask_figures import FigurePlan, NO_FIGURES
+from app.services.ask_figures import NO_FIGURES, FigurePlan
 from app.services.ask_language import Asked, figures_and_labels, survives
 from app.services.phrases import Language, english, phrase
 from app.services.retrieval import Chunk, Retrieval, RetrievedChunk

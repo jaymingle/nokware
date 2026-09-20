@@ -1,32 +1,15 @@
-"""Ask in French or Twi: the question comes in, the answer goes back, and the figures are checked on the way out.
+"""Ask in French or Twi: the question is translated in, the answer out, and the figures are checked on the way out.
 
-A question is read first: its language, and the same question in English. Then
-the whole of Ask runs on the English, unchanged — retrieval, the live figures,
-the chart rules, and the word tests that decide whether a question is about
-someone's safety or wants a chart. Those tests are written in English, so a
-French question about domestic-violence counts would otherwise walk past the
+All of Ask runs on the English question, because the word tests that decide whether a question is about someone's
+safety are written in English: a French question about domestic-violence counts would otherwise walk past the
 refusal that exists to stop it.
 
-The answer is written and checked in English, then translated back. Two things
-guard the translation:
+Nothing fixed is translated by a model: the sentences around an answer come from the hand-written catalogue. Every
+figure and citation label must survive translation as a set with its counts ("1,234.56" rewritten as "1 234,56" is a
+different number); where they don't, the reader gets the English, because a wrong figure is worse than a language
+they have to read twice.
 
-- **Nothing fixed is translated by a model.** The sentences Nokware puts around
-  an answer come from the catalogue (phrases.py), which is written by hand and,
-  for anything someone acts on in danger, reviewed by a named person.
-- **Every figure and citation must survive.** The numbers in the translation,
-  and the [S1]/[R1] labels, must match the English exactly — not in order, but as
-  a set with their counts. "GH¢ 1,234.56" rewritten as "1 234,56" is a different
-  number, and a citation dropped is a claim with no source. Where they don't
-  match, the reader gets the English answer and is told why, because a wrong
-  figure is worse than a language they have to read twice.
-
-A language Nokware can't write back in (the catalogue holds English, French and
-Twi) is answered in English: the question is still understood, and the answer
-still cites its sources.
-
-The answer itself carries no note about being translated: `translated` says so
-in the response, and the page says it once, beside the way back to the English.
-Saying it twice in the answer was the first thing that looked wrong on screen.
+The answer itself carries no note about being translated: the page says it once, beside the way back to the English.
 """
 
 import logging
@@ -36,9 +19,9 @@ from dataclasses import dataclass
 
 from pydantic import BaseModel, Field
 
+from app.services.citations import KINDS
 from app.services.llm import get_quick_model
 from app.services.phrases import Language, phrase
-from app.services.citations import KINDS
 
 logger = logging.getLogger(__name__)
 
@@ -57,8 +40,6 @@ class _Read(BaseModel):
 
 @dataclass(frozen=True)
 class Asked:
-    """A question as Ask will work on it: in English, with the language to answer in."""
-
     question: str  # as the resident wrote it
     english: str  # what the pipeline runs on
     language: Language  # the language to answer in: English where Nokware can't write the one they used
@@ -94,12 +75,12 @@ _ANSWER_PROMPT = (
 
 
 def _obviously_english(question: str) -> bool:
-    """Plain ASCII with English function words: worth skipping a model call for."""
+    """Worth skipping a model call for."""
     return bool(_LATIN.match(question)) and bool(_ENGLISH_HINT.search(question))
 
 
 def read_question(question: str) -> Asked:
-    """The question in English, and the language to answer in. English on any doubt or failure."""
+    """English on any doubt or failure."""
     if _obviously_english(question):
         return Asked(question, question, Language.ENGLISH, "English")
     try:
@@ -114,19 +95,18 @@ def read_question(question: str) -> Asked:
 
 
 def figures_and_labels(text: str) -> tuple[Counter[str], Counter[str]]:
-    """The figures and citation labels in an answer, as sets with their counts. A label's own digits aren't a figure."""
+    """A label's own digits aren't a figure."""
     labels = Counter(_LABEL.findall(text))
     numbers = Counter(re.sub(r"[ ,]", "", found).rstrip(".") for found in _NUMBER.findall(_LABEL.sub("", text)))
     return numbers, labels
 
 
 def survives(answer: str, translation: str) -> bool:
-    """Whether every figure and citation came through the translation unchanged."""
     return figures_and_labels(answer) == figures_and_labels(translation)
 
 
 def translate_answer(answer: str, asked: Asked) -> str | None:
-    """The answer in the language asked, or None where it can't be trusted: then the English stands."""
+    """None where the translation can't be trusted: then the English stands."""
     if not asked.translated or not answer.strip():
         return None
     prompt = _ANSWER_PROMPT.format(language=asked.named, question=asked.english, answer=answer)

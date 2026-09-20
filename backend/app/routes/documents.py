@@ -1,8 +1,6 @@
-"""Portal document routes: upload, view, and the workflow actions.
+"""Portal document routes.
 
-Routes are plain defs: Appwrite, MinIO and ingestion calls block, so FastAPI
-runs them in its threadpool. Publishing queues ingestion as a background task,
-so the response returns before the document is searchable in Ask.
+Routes are plain defs because Appwrite, MinIO and ingestion calls block, so FastAPI runs them in its threadpool.
 """
 
 from typing import Annotated
@@ -37,7 +35,7 @@ def new_document_form(
     department: Annotated[str | None, Form(description="Contributors only: the department it belongs to")] = None,
     source_url: Annotated[str | None, Form(description="Required from contributors")] = None,
 ) -> NewDocumentForm:
-    """The upload's form fields, validated. (A Form() model can't share a request with a file part.)"""
+    """A Form() model can't share a request with a file part, hence the fields one by one."""
     fields = {
         "title": title,
         "category": category,

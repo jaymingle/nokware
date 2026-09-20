@@ -7,6 +7,7 @@ charges a credit a page, so text is made plain before it is sent.
 """
 
 import math
+import re
 
 GSM7_BASIC = frozenset(
     "@£$¥èéùìòÇ\nØø\rÅåΔ_ΦΓΛΩΠΨΣΘΞÆæßÉ !\"#¤%&'()*+,-./0123456789:;<=>?"
@@ -22,23 +23,35 @@ _PLAIN = str.maketrans({
 })
 
 
+# One cedi sign sends a whole budget answer as UCS-2, at less than half the words a page: GHS is the same amount.
+_CEDI = re.compile(r"(?:GH)?\s*[¢₵]\s*(\d?)")
+
+
 def plain(text: str) -> str:
-    """Typographic punctuation as its GSM-7 equivalent: the same words, a third of the cost."""
-    return text.translate(_PLAIN)
+    """Typographic punctuation and the cedi sign as their GSM-7 equivalents: the same words, a third of the cost."""
+    return _CEDI.sub(lambda match: f"GHS {match[1]}" if match[1] else "GHS", text.translate(_PLAIN))
 
 
 def is_gsm7(text: str) -> bool:
     return all(c in GSM7_BASIC or c in GSM7_EXTENDED for c in text)
 
 
+def cost(text: str) -> int:
+    """The places the text takes on a page: an extended GSM-7 character, like an emoji in UCS-2, takes two."""
+    if is_gsm7(text):
+        return len(text) + sum(c in GSM7_EXTENDED for c in text)
+    return len(text.encode("utf-16-le")) // 2
+
+
+def part_room(text: str) -> int:
+    """How much one page of a multipart message holds, in the alphabet this text forces."""
+    return GSM_PART if is_gsm7(text) else UCS2_PART
+
+
 def pages(text: str) -> int:
     """How many SMS pages (Arkesel credits) the text takes."""
-    if is_gsm7(text):
-        length = len(text) + sum(c in GSM7_EXTENDED for c in text)
-        page, part = GSM_PAGE, GSM_PART
-    else:
-        length = len(text.encode("utf-16-le")) // 2  # an emoji takes two UCS-2 units
-        page, part = UCS2_PAGE, UCS2_PART
+    page, part = (GSM_PAGE, GSM_PART) if is_gsm7(text) else (UCS2_PAGE, UCS2_PART)
+    length = cost(text)
     return 1 if length <= page else math.ceil(length / part)
 
 

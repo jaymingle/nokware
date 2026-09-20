@@ -1,7 +1,7 @@
 """Accountability: the publishing record (required against held, careful about what a gap means) and departmental
 responsiveness (personal safety out, "fewer than 5", no ranking, no leak by subtraction)."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
@@ -9,10 +9,12 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 from app.services import department_responsiveness, publishing_record, reporting_gaps
-from app.services.department_responsiveness import build as build_responsiveness, complement
-from app.services.publishing_record import build as build_record, document_year, quarter_of
+from app.services.department_responsiveness import build as build_responsiveness
+from app.services.department_responsiveness import complement
+from app.services.publishing_record import build as build_record
+from app.services.publishing_record import document_year, quarter_of
 
-NOW = datetime(2026, 9, 15, 12, 0, tzinfo=timezone.utc)
+NOW = datetime(2026, 9, 15, 12, 0, tzinfo=UTC)
 
 
 def doc(doc_id: str, title: str, year: int | None = None, department: str = "dept-budget-rating", category: str = "Budget And Fee Fixing") -> dict[str, Any]:
@@ -139,8 +141,6 @@ def test_test_documents_are_left_out_of_the_record(monkeypatch: pytest.MonkeyPat
     assert "t" not in {d["$id"] for d in publishing_record.published_documents()}
 
 
-# Responsiveness.
-
 def case(case_id: str, created: datetime, category: str = "civic_service", sensitive: bool = False) -> dict[str, Any]:
     return {"$id": case_id, "category": category, "isSensitive": sensitive, "createdAt": created.isoformat()}
 
@@ -238,7 +238,7 @@ def test_only_the_last_twelve_months_count() -> None:
 
 def test_both_routes_answer_publicly(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(publishing_record, "published_documents", lambda: LEDGER)
-    monkeypatch.setattr(publishing_record, "first_chunks", lambda: {})
+    monkeypatch.setattr(publishing_record, "first_chunks", dict)
     monkeypatch.setattr(publishing_record.CACHE, "_value", None)
     monkeypatch.setattr(department_responsiveness, "public_cases", lambda: works_cases(6, 6)[0])
     monkeypatch.setattr(department_responsiveness, "every_record", lambda collection, queries: works_cases(6, 6)[1] if "assign" in collection else [])
@@ -259,4 +259,4 @@ def test_both_routes_answer_publicly(monkeypatch: pytest.MonkeyPatch) -> None:
     assert len(missing["electoral-area-boundaries"]["checked"]) >= 3 and record["unpublished_about"]
     response = client.get("/api/responsiveness").json()
     assert response["waiting_days"] == 7 and department(response, "Works Department")["reports"]["received"] == 6
-    assert response["petitions"]["reached_threshold"] == 0 and len(response["petitions"]["refusals"]) == 6
+    assert response["petitions"]["reached_threshold"] == 0 and len(response["petitions"]["removals"]) == 4

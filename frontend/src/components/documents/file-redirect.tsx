@@ -1,17 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useEffect, useState } from "react";
 
 import { StatusScreen } from "@/components/portal/status-screen";
 import { getFileLink } from "@/lib/api/endpoints";
 import { useAuth } from "@/lib/auth/auth-context";
 
-/**
- * Opens a document's PDF. File links are short-lived, so View PDF links here
- * (a plain link that pop-up blockers leave alone), and this page fetches a
- * fresh link as the signed-in user and replaces itself with the PDF.
- */
+// File links are short-lived, so View PDF links here (a plain link pop-up blockers leave alone) and this page
+// fetches a fresh one.
 export function FileRedirect({ id }: { id: string }) {
   const { status } = useAuth();
   const [error, setError] = useState<string | null>(null);

@@ -1,18 +1,11 @@
 """Ask: answer a question from the Ledger with cited sources. Public, no sign-in.
 
-POST /api/ask returns the whole answer at once. POST /api/ask/stream sends the
-same answer as newline-delimited JSON events (see AskStreamEvent), so the page
-can show progress during the 6-13 seconds an answer takes. Each answer comes with
-its export view, signed; POST /api/ask/export takes one back and returns it as a
-PDF, a Word document, a CSV or an Excel workbook (ask_export.py). POST /api/ask/voice turns a spoken
-question into words through the same pipeline as a WhatsApp voice note
-(voice_transcribe.listen), for the person to check before it is asked. The
-recording is held in memory only: never stored, and its words never logged.
+The stream exists so the page can show progress during the 6-13 seconds an answer takes. Exports render only a view
+the API signed. A spoken question's recording is held in memory only: never stored, and its words never logged.
 """
 
 import logging
 from collections.abc import Iterator
-
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile, status
@@ -28,6 +21,7 @@ from app.services.export_docx import docx
 from app.services.export_pdf import pdf
 from app.services.export_xlsx import xlsx
 from app.services.ledger_documents import utc_now
+from app.services.phrases import Language, phrase
 from app.services.rag import answer_question, stream_answer
 from app.services.voice_audio import AudioRejected
 from app.services.voice_transcribe import TranscriptionFailed, Unusable, listen, understood
@@ -39,9 +33,6 @@ BUSY_MESSAGE = "Ask is busy right now. Try again in a minute."
 FAILED_MESSAGE = "Something went wrong while answering. Try again."
 _BUSY_MARKERS = ("429", "RESOURCE_EXHAUSTED", "ResourceExhausted", "quota")
 
-
-# Plain defs (not async): the pipeline blocks on Postgres and Gemini, so FastAPI
-# runs it in its threadpool instead of stalling the event loop.
 FORMATS = {
     "pdf": (pdf, "application/pdf", "pdf"),
     "docx": (docx, "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "docx"),
@@ -58,18 +49,37 @@ VOICE_FAILED = "Your recording couldn't be read just now. Try again, or type you
 VOICE_NOT_AUDIO = "That recording couldn't be played. Try again, or type your question."
 
 
+# Plain defs (not async): the pipeline blocks on Postgres and Gemini, so FastAPI
+# runs it in its threadpool instead of stalling the event loop.
+def _spoken(result: dict[str, Any], question: str, in_english: str) -> tuple[Answered, bool, str | None]:
+    """What can be read aloud, and in which language. The reading is of the answer as the reader was given it; the
+    safety rule is judged on the English, which is the text that was checked. A language whose fixed lines Nokware
+    hasn't written by hand isn't spoken at all, and says so rather than offering nothing."""
+    language = str(result.get("language") or "en")
+    translated = bool(result.get("translated"))
+    answered = Answered(question, in_english, result["status"], list(result["sources"]), list(result["figures"]),
+                        result["chart"], result["chart_note"],
+                        spoken=result["answer"] if translated else None, language=language)
+    if not read_aloud.may_speak_answer(question, in_english):
+        return answered, False, None  # nothing is said: an answer about someone's safety isn't discussed at all
+    if not read_aloud.may_speak_language(language):
+        # In the reader's language where the catalogue has it; Twi has no text at all, so it falls back to English,
+        # which is the same rule every other fixed sentence follows.
+        return answered, False, phrase("speech.not_in_this_language", Language(language))
+    return answered, True, None
+
+
 @router.post("/ask", response_model=AskResponse)
 def ask(request: AskRequest) -> AskResponse:
     result = answer_question(request.question, languages=True)
-    # The export and the reading are of the English: it is the answer that was checked, and the sources are in it.
-    answered = Answered(request.question, result["answer_english"], result["status"], list(result["sources"]),
-                        list(result["figures"]), result["chart"], result["chart_note"])
-    speakable = not result["translated"] and read_aloud.may_speak_answer(request.question, result["answer_english"])
-    return AskResponse.model_validate({**result, "export": export_view(answered, utc_now()), "speakable": speakable})
+    # The export is of the English: it is the answer that was checked, and the sources are in it.
+    answered, speakable, note = _spoken(result, request.question, result["answer_english"])
+    return AskResponse.model_validate({**result, "export": export_view(answered, utc_now()), "speakable": speakable,
+                                       "speech_note": note})
 
 
 def error_message(error: Exception) -> str:
-    """What to tell the reader: busy (rate limited) or a plain failure; never internals."""
+    """Never internals."""
     text = f"{type(error).__name__} {error}"
     return BUSY_MESSAGE if any(marker in text for marker in _BUSY_MARKERS) else FAILED_MESSAGE
 
@@ -79,7 +89,7 @@ def _line(event: dict[str, object]) -> str:
 
 
 def _signed(question: str, event: dict[str, Any], seen: dict[str, Any]) -> dict[str, Any]:
-    """The final event with the answer's export view: the sources and figures sent earlier, marked as cited."""
+    """The done event carries the export view, built from the sources and figures sent earlier."""
     if event["type"] == "sources":
         seen.update(sources=event["sources"], figures=event["figures"])
     if event["type"] != "done":
@@ -87,13 +97,13 @@ def _signed(question: str, event: dict[str, Any], seen: dict[str, Any]) -> dict[
     cited = set(event["cited"])
     marked = {name: [{**item, "cited": item["label"] in cited} for item in seen.get(name, [])] for name in ("sources", "figures")}
     in_english = event.get("answer_english") or event["answer"]
-    answered = Answered(question, in_english, event["status"], marked["sources"], marked["figures"], event["chart"], event["chart_note"])
-    speakable = not event.get("translated") and read_aloud.may_speak_answer(question, in_english)
-    return {**event, "export": export_view(answered, utc_now()), "speakable": speakable}
+    answered, speakable, note = _spoken({**event, "sources": marked["sources"], "figures": marked["figures"]},
+                                        question, in_english)
+    return {**event, "export": export_view(answered, utc_now()), "speakable": speakable, "speech_note": note}
 
 
 def ndjson_events(question: str) -> Iterator[str]:
-    """The stream's lines. A failure mid-answer ends it with an error event, not a broken stream."""
+    """A failure mid-answer ends the stream with an error event, not a broken stream."""
     seen: dict[str, Any] = {}
     try:
         for event in stream_answer(question, languages=True):

@@ -44,3 +44,11 @@ def no_network(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr(httpx.HTTPTransport, "handle_request", guarded_httpx)
     monkeypatch.setattr(requests.Session, "request", guarded_requests)
+
+
+@pytest.fixture(autouse=True)
+def no_naming_model(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A staff note is checked for the name of a private person by the model. It is advisory and fails open, so
+    every test that saves a note would otherwise reach for the network to be told nothing. A test about the check
+    itself stubs it the other way."""
+    monkeypatch.setattr("app.services.case_notes.private_person", lambda text: None)

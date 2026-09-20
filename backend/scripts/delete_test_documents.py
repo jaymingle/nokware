@@ -1,6 +1,6 @@
 """Remove every "[TEST] ..." Ledger document and everything derived from it.
 
-For each ledger_documents record whose title starts with "[TEST] ", deletes, in
+For each ledger_documents record whose title starts with "[TEST]", deletes, in
 order (so Ask stops finding it first):
   1. its chunks in Postgres (document_chunks)
   2. its PDFs in MinIO: every object under portal/<document id>/, which covers
@@ -26,9 +26,9 @@ from app.config import get_settings
 from app.services import document_history, ledger_documents
 from app.services.appwrite_client import DATABASE_ID, get_databases, quiet_sdk_deprecation_warnings
 from app.services.storage import get_minio
+from app.services.test_fixtures import TEST_PREFIX
 from app.services.vectorstore import DOCUMENT_ID_COLUMN, TABLE_NAME, connect
 
-TEST_PREFIX = "[TEST] "
 PAGE = 100
 
 
@@ -41,7 +41,6 @@ class TestDocument:
 
 
 def test_records() -> list[dict[str, Any]]:
-    """All ledger records titled "[TEST] ...", paging through the collection."""
     found, cursor = [], None
     while True:
         queries = [Query.limit(PAGE), *([Query.cursor_after(cursor)] if cursor else [])]

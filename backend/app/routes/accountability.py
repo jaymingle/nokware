@@ -1,14 +1,8 @@
-"""Accountability: what the Assembly publishes, and how its departments respond. Public, no sign-in.
-
-    GET /api/publishing-record   the documents it is required to publish, against what the Ledger holds, by year,
-                                 with the figures its documents once reported and haven't since, and the things
-                                 nobody publishes at all
-    GET /api/responsiveness      each department's handling of reports and contributors' documents, last 12 months
-"""
-
-from fastapi import APIRouter
+"""Accountability: what the Assembly publishes, and how its departments respond. Public, no sign-in."""
 
 from dataclasses import asdict
+
+from fastapi import APIRouter
 
 from app.schemas.accountability import PublishingRecord, Responsiveness
 from app.services import department_responsiveness, publishing_record, reporting_gaps, unpublished_data

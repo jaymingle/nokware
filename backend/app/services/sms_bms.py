@@ -1,22 +1,13 @@
-"""BMS Africa SMS (mNotify's API): the second SMS provider, SMS_PROVIDER=bms, beside Arkesel.
+"""BMS Africa SMS (mNotify's API), SMS_PROVIDER=bms, beside Arkesel.
 
-Why it's here: "Nokware" is already an approved sender ID on BMS, so messages go
-out at once instead of being held for review, which is what lets verification
-codes by SMS go live. Arkesel stays in place (SMS_PROVIDER=arkesel), and USSD
-stays on Arkesel either way.
+"Nokware" is already an approved sender ID on BMS, so messages go out at once instead of being held for review,
+which is what lets verification codes by SMS go live. USSD stays on Arkesel either way.
 
-A message is a POST to /api/sms/quick; BMS answers with a campaign ID, which
-stands as the message's ID in the outbox. BMS has no sandbox, so every send is
-live and charged: the daily page limits (SMS_DAILY_LIMIT, and
-SMS_CODE_DAILY_LIMIT for codes) are the same counters Arkesel uses.
+BMS has no sandbox, so every send is live and charged, and no delivery webhook, so delivery is polled
+(bms_deliveries.py). Its campaign ID stands as the message's ID in the outbox.
 
-BMS offers no delivery webhook for SMS, so delivery is polled instead
-(bms_deliveries.py): there is no inbound request to verify, and so none to forge.
-
-BMS takes its API key as a query parameter (?key=), never a header, so the key
-is in every request's address. It is kept out of every error this module
-raises (so out of the outbox), and a filter redacts it from httpx's request log
-line, the one place a library would write the address.
+BMS takes its API key as a query parameter, so the key is in every request's address. It is kept out of every
+error raised here (so out of the outbox), and redacted from httpx's request log line.
 """
 
 import logging
@@ -37,6 +28,7 @@ from app.services.sms import (
     DailyBudget,
     SmsError,
     SmsNotConfigured,
+    SmsUnreachable,
     _body,
     _MemoryCount,
     _RedisCount,
@@ -55,7 +47,7 @@ _KEY = re.compile(r"(key=)[^&\s\"']+")
 
 
 class _RedactKey(logging.Filter):
-    """httpx logs each request's full address at INFO: BMS's key rides in it, so it is redacted before any handler."""
+    """httpx logs each request's full address at INFO."""
 
     def filter(self, record: logging.LogRecord) -> bool:
         if isinstance(record.args, tuple):
@@ -83,14 +75,15 @@ class BmsSms:
     delivers: bool = True  # no sandbox: whatever is accepted is sent
 
     def _safe(self, text: str) -> str:
-        """BMS's words without the key (should it ever echo the address) or any phone number."""
+        """In case BMS ever echoes the address, and so the key."""
         return _scrub(_KEY.sub(r"\1[redacted]", text.replace(self.api_key, "[redacted]")))
 
     def _request(self, method: str, url: str, **kwargs: Any) -> dict[str, Any]:
         try:
             response = self.client.request(method, url, params={"key": self.api_key}, **kwargs)
         except httpx.HTTPError as error:  # the type only: httpx's message can carry the address, and so the key
-            raise SmsError(f"BMS couldn't be reached ({type(error).__name__}).") from None
+            # No answer at all: the campaign may have been created. Told apart from a refusal so the sweep can send again.
+            raise SmsUnreachable(f"BMS couldn't be reached ({type(error).__name__}).") from None
         body = _body(response)
         if response.is_error or body.get("status") != "success":
             detail = self._safe(str(body.get("message") or body or response.reason_phrase))
@@ -107,7 +100,7 @@ class BmsSms:
         return str(summary["_id"])
 
     def send(self, to: str, body: str) -> str:
-        """Send one SMS; return BMS's campaign ID. Raises SmsError, SmsLimitReached."""
+        """Returns BMS's campaign ID. Raises SmsError, SmsLimitReached."""
         text = plain(body)
         count = pages(text)
         if not is_gsm7(text):
@@ -121,14 +114,14 @@ class BmsSms:
             raise
 
     def delivery_status(self, campaign_id: str) -> str | None:
-        """What BMS last knew of the message: DELIVERED, SUBMITTED, UNDELIVERED, FAILED, REJECTED; None if no report yet."""
+        """DELIVERED, SUBMITTED, UNDELIVERED, FAILED or REJECTED; None if no report yet."""
         body = self._request("GET", CAMPAIGN_URL.format(campaign_id=quote(campaign_id, safe="")))
         report = body.get("report") if isinstance(body.get("report"), list) else []
         statuses = [str(entry.get("status") or "").upper() for entry in report if isinstance(entry, dict)]
         return next((status for status in statuses if status), None)
 
     def balance(self) -> dict[str, Any]:
-        """The account's SMS credit and bonus. Costs nothing."""
+        """Costs nothing."""
         body = self._request("GET", BALANCE_URL)
         return {k: v for k, v in body.items() if k in ("balance", "bonus")}
 
@@ -144,16 +137,15 @@ def _configured() -> tuple[str, str]:
 
 @lru_cache
 def bms() -> BmsSms:
-    """The one BMS client for report notifications and petition updates, on SMS_DAILY_LIMIT."""
     api_key, sender = _configured()
     settings = get_settings()
-    return BmsSms(api_key, sender, DailyBudget(settings.sms_daily_limit, _RedisCount() if settings.redis_url else _MemoryCount()))
+    return BmsSms(api_key, sender, DailyBudget(lambda: get_settings().sms_daily_limit, _RedisCount() if settings.redis_url else _MemoryCount()))
 
 
 @lru_cache
 def bms_codes() -> BmsSms:
-    """The BMS client for verification codes: the same account, on SMS_CODE_DAILY_LIMIT, as Arkesel's code client is."""
+    """Verification codes: the same account, on their own daily limit, as Arkesel's code client is."""
     api_key, sender = _configured()
     settings = get_settings()
     counter = _RedisCount("code-pages") if settings.redis_url else _MemoryCount()
-    return BmsSms(api_key, sender, DailyBudget(settings.sms_code_daily_limit, counter))
+    return BmsSms(api_key, sender, DailyBudget(lambda: get_settings().sms_code_daily_limit, counter))

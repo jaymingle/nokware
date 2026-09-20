@@ -1,22 +1,27 @@
 "use client";
 
+import { PhoneIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { ReactNode } from "react";
 
 import { Brand } from "@/components/portal/brand";
 import { cn } from "@/lib/utils";
 
+import type { ReactNode } from "react";
+
 function NavLink({ href, testId, children }: { href: string; testId: string; children: ReactNode }) {
   const pathname = usePathname();
-  const active = pathname === href || pathname.startsWith(`${href}/`);
+  // Home is only itself: every path starts with "/", so the prefix test would mark it current everywhere.
+  const active = pathname === href || (href !== "/" && pathname.startsWith(`${href}/`));
   return (
     <Link
       href={href}
       aria-current={active ? "page" : undefined}
       data-touch-target
       className={cn(
-        "inline-flex items-center rounded-lg px-3 py-2 text-[13.5px] whitespace-nowrap transition-colors",
+        // shrink-0: in the scrolling strip these would otherwise squeeze to the 44px touch minimum and their
+        // labels would run over each other on a phone.
+        "inline-flex shrink-0 items-center rounded-lg px-3 py-2 text-[13.5px] whitespace-nowrap transition-colors",
         active ? "font-medium text-ink" : "text-ink-soft hover:text-ink",
       )}
       data-testid={testId}
@@ -26,7 +31,6 @@ function NavLink({ href, testId, children }: { href: string; testId: string; chi
   );
 }
 
-/** The public site's header: Ask, reporting, the dashboard, petitions, accountability, and the way in for staff. On a phone or tablet the links take a second row. */
 export function PublicHeader() {
   return (
     <header className="border-b bg-paper-raised">
@@ -35,25 +39,32 @@ export function PublicHeader() {
           <Brand />
         </Link>
         <nav aria-label="Main" className="-mx-3 flex w-[calc(100%+1.5rem)] items-center overflow-x-auto md:mx-0 md:w-auto md:shrink-0">
-          <NavLink href="/ask" testId="public-ask-link">
-            Ask
+          <NavLink href="/" testId="public-home-link">
+            Home
+          </NavLink>
+          <NavLink href="/accountability" testId="public-accountability-link">
+            Accountability
+          </NavLink>
+          <NavLink href="/dashboard" testId="public-dashboard-link">
+            Dashboard
           </NavLink>
           <NavLink href="/report" testId="public-report-link">
             <span className="lg:hidden">Report</span>
             <span className="hidden lg:inline">Report an issue</span>
           </NavLink>
-          <NavLink href="/dashboard" testId="public-dashboard-link">
-            Dashboard
+          <NavLink href="/ask" testId="public-ask-link">
+            Ask
           </NavLink>
           <NavLink href="/petitions" testId="public-petitions-link">
             Petitions
           </NavLink>
-          <NavLink href="/accountability" testId="public-accountability-link">
-            Accountability
-          </NavLink>
-          <NavLink href="/contacts" testId="public-contacts-link">
+          {/* Contacts is the emergency route: the number to call when nothing on this site is fast enough. It is
+              marked out because in that moment nobody scans a row of equal-weight words. */}
+          <Link href="/contacts" data-touch-target data-testid="public-contacts-link"
+            className="ms-1 inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-brick/35 bg-brick-tint px-3 py-2 text-[13.5px] font-medium whitespace-nowrap text-brick transition-colors hover:border-brick">
+            <PhoneIcon aria-hidden className="size-4" />
             Contacts
-          </NavLink>
+          </Link>
           <NavLink href="/login" testId="public-portal-link">
             <span className="lg:hidden">Portal</span>
             <span className="hidden lg:inline">Institution portal</span>

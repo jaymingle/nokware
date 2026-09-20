@@ -1,17 +1,12 @@
-"""Access to the ledger_documents collection in Appwrite.
-
-One place for the collection's ID, its status values and the reads and writes
-the backend makes, so ingestion, the AMA import and the portal routes agree.
-"""
+"""The ledger_documents collection in Appwrite, in one place so ingestion, the AMA import and the portal agree."""
 
 import re
 from collections.abc import Iterable
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
 
 from appwrite.exception import AppwriteException
-from appwrite.models import Document
 from appwrite.query import Query
 
 from app.services.appwrite_client import DATABASE_ID, as_record, get_databases
@@ -32,10 +27,8 @@ class LedgerStatus(StrEnum):
 
 
 def is_public_document(record: dict[str, Any] | None) -> bool:
-    """Published, and not a test fixture: a document an answer may cite and a count may include.
-
-    A document titled "[TEST] …" is published by the portal's own lifecycle test so ingestion is tested for real,
-    and without this an answer could cite it to a resident as the Assembly's."""
+    """A document titled "[TEST] …" is published by the portal's own lifecycle test so ingestion is tested for real;
+    without this an answer could cite it to a resident as the Assembly's."""
     return bool(record) and record.get("status") == LedgerStatus.PUBLISHED and not is_test(record.get("title"))
 
 
@@ -82,7 +75,7 @@ class IngestionState(StrEnum):
 
 
 def utc_now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def now_iso() -> str:
@@ -90,21 +83,15 @@ def now_iso() -> str:
 
 
 def parse_datetime(value: str | None) -> datetime | None:
-    """Appwrite datetime strings (ISO 8601 with offset) as aware datetimes."""
     return datetime.fromisoformat(value) if value else None
 
 
 def plausible_year(year: int | None) -> int | None:
-    """Keep a year only if it could be a document's own year (not in the future)."""
     return year if year and EARLIEST_YEAR <= year <= datetime.now().year else None
 
 
 def year_from_title(title: str) -> int | None:
-    """A document's year as stated in its title.
-
-    A range such as "Medium Term Development Plan, 2026-2029" gives its first
-    year; otherwise the first plausible year in the title is used.
-    """
+    """A range such as "Medium Term Development Plan, 2026-2029" gives its first year."""
     year_range = _YEAR_RANGE.search(title)
     if year_range:
         return plausible_year(int(year_range.group(1)))
@@ -115,12 +102,8 @@ def year_from_title(title: str) -> int | None:
     return None
 
 
-def _record(document: Document) -> dict[str, Any]:
-    return as_record(document)
-
-
 def get_documents(document_ids: Iterable[str]) -> dict[str, dict[str, Any]]:
-    """Fetch many documents in one call; missing ids are simply absent."""
+    """Missing ids are simply absent."""
     ids = list(dict.fromkeys(document_ids))
     if not ids:
         return {}
@@ -129,18 +112,16 @@ def get_documents(document_ids: Iterable[str]) -> dict[str, dict[str, Any]]:
 
 
 def list_documents(queries: list[str]) -> tuple[list[dict[str, Any]], int]:
-    """Documents matching the queries, and the total number that match."""
     listing = get_databases().list_documents(DATABASE_ID, COLLECTION_ID, queries=queries)
-    return [_record(document) for document in listing.documents], int(listing.total)
+    return [as_record(document) for document in listing.documents], int(listing.total)
 
 
 def get_document(document_id: str) -> dict[str, Any]:
-    """Return the document's attributes. Raises AppwriteException (404) if missing."""
-    return _record(get_databases().get_document(DATABASE_ID, COLLECTION_ID, document_id))
+    """Raises AppwriteException (404) if missing."""
+    return as_record(get_databases().get_document(DATABASE_ID, COLLECTION_ID, document_id))
 
 
 def find_document(document_id: str) -> dict[str, Any] | None:
-    """Like get_document, but None when the document does not exist."""
     try:
         return get_document(document_id)
     except AppwriteException as exc:
@@ -150,15 +131,14 @@ def find_document(document_id: str) -> dict[str, Any] | None:
 
 
 def create_document(document_id: str, data: dict[str, Any]) -> dict[str, Any]:
-    return _record(get_databases().create_document(DATABASE_ID, COLLECTION_ID, document_id, data))
+    return as_record(get_databases().create_document(DATABASE_ID, COLLECTION_ID, document_id, data))
 
 
 def update_document(document_id: str, data: dict[str, Any]) -> dict[str, Any]:
-    return _record(get_databases().update_document(DATABASE_ID, COLLECTION_ID, document_id, data))
+    return as_record(get_databases().update_document(DATABASE_ID, COLLECTION_ID, document_id, data))
 
 
 def ingestion_state(record: dict[str, Any]) -> IngestionState | None:
-    """Where a published document is in ingestion; None for unpublished ones."""
     if record.get("status") != LedgerStatus.PUBLISHED:
         return None
     if record.get("ingestedAt"):
@@ -167,12 +147,8 @@ def ingestion_state(record: dict[str, Any]) -> IngestionState | None:
 
 
 def mark_ingested(document_id: str, chunk_count: int, note: str | None = None) -> None:
-    """Record a completed ingestion.
-
-    chunk_count=0 with a note means the document is published but not
-    searchable (e.g. an image-only PDF). ingestedAt being set is what tells the
-    import and any retry that this document is done.
-    """
+    """chunk_count=0 with a note: published but not searchable (e.g. an image-only PDF). ingestedAt being set is
+    what tells the import and any retry that this document is done."""
     update_document(
         document_id,
         {"ingestedAt": now_iso(), "chunkCount": chunk_count, "ingestionError": note},
@@ -180,7 +156,7 @@ def mark_ingested(document_id: str, chunk_count: int, note: str | None = None) -
 
 
 def mark_ingestion_failed(document_id: str, error: str) -> None:
-    """Record a failed attempt. ingestedAt is cleared so a retry picks it up."""
+    """ingestedAt is cleared so a retry picks it up."""
     update_document(
         document_id,
         {"ingestedAt": None, "chunkCount": None, "ingestionError": error[:INGESTION_ERROR_MAX]},

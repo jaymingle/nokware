@@ -1,28 +1,18 @@
-"""The petition rules: what a petition must hold, what the MCE may decide, and when each clock runs out.
-
-Pure functions over a petition record, with no Appwrite calls, so every rule is
-unit-tested and the routes cannot drift from each other.
+"""The petition rules, as pure functions with no Appwrite calls, so every rule is unit-tested and the routes can't drift.
 
 Lifecycle:
-  a resident with a verified phone submits a petition -> in_review; the MCE has 72 hours
-    the MCE publishes it -> open
-    the MCE refuses it, for one of the fixed reasons only -> refused
-      the creator edits and resubmits it (at most twice) -> in_review, with a fresh 72 hours
-    the MCE decides nothing in 72 hours -> open: it publishes automatically
-  it reaches its threshold of signatures -> awaiting_response; the MCE has 30 days to respond publicly
-    (it keeps taking signatures until its 90 days are up, or the MCE responds)
-    the MCE responds: will act, referred to a department, or can't act and why -> responded
-    30 days pass with no response -> still awaiting_response, and the page says so plainly; a late response is
-    still taken, and says how late it was
-  open for 90 days without reaching it -> closed
-  the creator may withdraw it until it reaches its threshold or closes -> withdrawn
+  a draft that passes the screen is published by the person who wrote it -> open (90 days)
+  open -> awaiting_response at its threshold (the MCE has 30 days; a late response is still taken) -> responded
+  open for 90 days without reaching it -> closed; the creator can close it themselves until it reaches its threshold
+  open, awaiting_response, responded or closed -> removed, by a verified contributor, on one of four grounds
 
-One signature per confirmed Ghanaian number per petition. A signer is
-anonymous unless they choose to show their name, which is then public.
+A response is not the end of the exchange, and none of what follows moves the petition anywhere: the MCE shares the
+petition with a department, which writes one note under its own name, and the petitioner replies once to the
+response. What stands on the page is a conversation, not another state.
 
-The MCE is usually the petition's target, so moderation can't be a veto: a
-refusal must name a reason from REFUSALS, the public list counts refusals by
-reason, and silence publishes.
+Nobody approves a petition into existence. The Assembly is usually what a petition is about, so the MCE cannot
+publish, refuse or remove one: it decides only whether to answer. What comes down comes down on a named ground,
+against a published tombstone that says which, and the creator can mend the words and publish it again.
 """
 
 import re
@@ -33,30 +23,48 @@ from enum import StrEnum
 from typing import Any
 
 from app.services.ledger_documents import parse_datetime
+from app.services.petition_grounds import Ground
+from app.services.phrases import phrase
 from app.services.report_taxonomy import TOPICS, TOPICS_BY_ID, Category, Topic
 from app.teams import DEPARTMENT_TEAMS
 from app.wards import wards
 
-REVIEW_WINDOW = timedelta(hours=72)  # the MCE's time to publish or refuse; then it publishes automatically
 OPEN_FOR = timedelta(days=90)
 RESPONSE_WINDOW = timedelta(days=30)  # the MCE's time to answer publicly once a petition reaches its threshold
-MAX_RESUBMISSIONS = 2
 TITLE_MIN, TITLE_MAX = 15, 150
 BODY_MIN, BODY_MAX = 50, 4000
 NAME_MAX = 80
-NOTE_MAX = 1000
+NOTE_MAX = 1000  # a line of the audit trail
+DEPARTMENT_NOTE_MAX = 500  # one department's answer, on the public page, to a petition the MCE shared with it
+REPLY_MAX = 1000  # the petitioner's reply to the response the MCE published
+REMOVAL_NOTE_MAX = 500  # what a contributor writes for the record when they remove a petition
+REPORT_NOTE_MAX = 300  # what a reader may add when they report one
 DOCUMENTS_MAX = 3
+IMAGES_MAX = 4  # a petition shows more of a place than a report does: four sides of one problem
 CODE_DIGITS = 6  # digits only, so a petition can be typed on a USSD keypad or read aloud
+FIRST_VERSION = 1
 
 
 class PetitionStatus(StrEnum):
-    IN_REVIEW = "in_review"
-    REFUSED = "refused"
     OPEN = "open"
     AWAITING_RESPONSE = "awaiting_response"  # reached its threshold: the MCE must respond publicly
     RESPONDED = "responded"
+    REMOVED = "removed"  # a contributor took it down on one of the four grounds; only the tombstone is public
     CLOSED = "closed"
-    WITHDRAWN = "withdrawn"
+
+
+# What the database held before the MCE's review gate was taken out. No code puts a petition into one of these
+# again; they stay named here so the schema still accepts a row the migration has yet to move, and so the
+# migration's mapping reads against the same words the old rows carry.
+LEGACY_STATUSES = ("in_review", "refused", "withdrawn")
+LEGACY_ACTIONS = ("resubmitted", "auto_published", "refused")
+# How a petition the old process ended is described to a reader. A refusal is named as a refusal under the process
+# that made it, never as a contributor's removal: saying a contributor took it down would be untrue.
+LEGACY_LABELS: dict[str, str] = {
+    "refused": "petition.legacy.refused",
+    "withdrawn": "petition.legacy.withdrawn",
+    "in_review": "petition.legacy.closed_in_move",
+}
 
 
 class Scope(StrEnum):
@@ -64,53 +72,22 @@ class Scope(StrEnum):
     AREA = "area"  # one electoral area
 
 
-class PublishedBy(StrEnum):
-    MCE = "mce"
-    AUTOMATIC = "automatic"  # the MCE didn't decide within 72 hours
-
-
 class PetitionAction(StrEnum):
-    SUBMITTED = "submitted"
-    RESUBMITTED = "resubmitted"
-    PUBLISHED = "published"
-    AUTO_PUBLISHED = "auto_published"
-    REFUSED = "refused"
-    WITHDRAWN = "withdrawn"
+    PUBLISHED = "published"  # the creator published it: there is no other way one begins
+    EDITED = "edited"  # a new version of a petition that was standing
+    REPUBLISHED = "republished"  # a new version of one that had been removed
+    REMOVED = "removed"
+    WITHDRAWN = "withdrawn"  # the creator closed their own petition
     CLOSED = "closed"
     MADE_ANONYMOUS = "made_anonymous"
     THRESHOLD_REACHED = "threshold_reached"
     RESPONDED = "responded"
     NO_RESPONSE = "no_response"  # 30 days after the threshold, with no response
+    SHARED = "shared"  # the MCE sent the petition to a department for its answer
+    DEPARTMENT_NOTE = "department_note"  # that department wrote its one note
+    CREATOR_REPLIED = "creator_replied"  # the petitioner answered the MCE's response
+    IMAGE_REMOVED = "image_removed"  # a contributor took one photo off; the petition and the rest stand
     CREATOR_NOTIFIED = "creator_notified"  # a message to the creator: never public
-
-
-@dataclass(frozen=True)
-class Refusal:
-    label: str  # as the public list counts it
-    explanation: str  # as the creator reads it
-
-
-REFUSALS: dict[str, Refusal] = {
-    "private_individual": Refusal(
-        "Names a private individual",
-        "It names or targets a private person. A petition can ask the Assembly to act, or name a public official in their "
-        "public role, but not a private individual."),
-    "personal_safety": Refusal(
-        "About someone's personal safety",
-        "It is about someone's personal safety. That goes to the Assembly privately, through Report, not in public."),
-    "duplicate": Refusal(
-        "Duplicates an open petition",
-        "An open petition already asks for this. Add your support to that one instead."),
-    "not_assembly": Refusal(
-        "Not the Assembly's responsibility",
-        "What it asks for isn't something the Accra Metropolitan Assembly is responsible for."),
-    "hate_or_incitement": Refusal(
-        "Hate speech or incitement",
-        "It contains hate speech or encourages violence."),
-    "personal_data": Refusal(
-        "Contains personal data",
-        "It contains someone's personal data, such as a phone number, a home address or an ID number."),
-}
 
 
 @dataclass(frozen=True)
@@ -124,6 +101,14 @@ RESPONSE_KINDS: dict[str, ResponseKind] = {
     "cannot_act": ResponseKind("The Assembly can't act"),
 }
 RESPONSE_MIN, RESPONSE_MAX = 50, 4000
+
+STATUS_WORDS: dict[PetitionStatus, str] = {
+    PetitionStatus.OPEN: "petition.status.open",
+    PetitionStatus.AWAITING_RESPONSE: "petition.status.awaiting_response",
+    PetitionStatus.RESPONDED: "petition.status.responded",
+    PetitionStatus.REMOVED: "petition.status.removed",
+    PetitionStatus.CLOSED: "petition.status.closed",
+}
 
 
 class PetitionError(Exception):
@@ -154,7 +139,6 @@ def new_code() -> str:
 
 
 def normalise_code(typed: str) -> str | None:
-    """A petition number as typed ("482 913", "482-913"), or None if it isn't one."""
     code = typed.strip().replace(" ", "").replace("-", "")
     return code if re.fullmatch(f"[0-9]{{{CODE_DIGITS}}}", code) else None
 
@@ -168,6 +152,7 @@ class Draft:
     ward: str | None  # the electoral area, for an area petition
     issue: str | None  # an open civic issue's public ID
     documents: tuple[str, ...]  # Ledger document IDs the creator cites
+    images: tuple[str, ...] = ()  # what the creator shows, as stored object names
 
 
 def _text(value: str, name: str, low: int, high: int) -> str:
@@ -180,7 +165,6 @@ def _text(value: str, name: str, low: int, high: int) -> str:
 
 
 def clean_draft(draft: Draft) -> Draft:
-    """The draft as it will be stored, or InvalidPetition saying what to fix."""
     if draft.topic not in {t.id for t in petition_topics()}:
         raise InvalidPetition("Choose a topic from the list.")
     ward = draft.ward if draft.scope == Scope.AREA else None
@@ -189,12 +173,13 @@ def clean_draft(draft: Draft) -> Draft:
     documents = tuple(dict.fromkeys(draft.documents))
     if len(documents) > DOCUMENTS_MAX:
         raise InvalidPetition(f"Cite at most {DOCUMENTS_MAX} documents.")
+    if len(draft.images) > IMAGES_MAX:
+        raise InvalidPetition(f"Attach at most {IMAGES_MAX} images.")
     return Draft(_text(draft.title, "title", TITLE_MIN, TITLE_MAX), _text(draft.body, "reasons", BODY_MIN, BODY_MAX),
-                 draft.topic, draft.scope, ward, (draft.issue or "").strip() or None, documents)
+                 draft.topic, draft.scope, ward, (draft.issue or "").strip() or None, documents, draft.images)
 
 
 def clean_name(show_name: bool, name: str | None) -> str | None:
-    """A name to show publicly, only when the person chose to show one."""
     given = " ".join((name or "").split()) if show_name else ""
     if show_name and not given:
         raise InvalidPetition("Enter the name to show, or choose to stay anonymous.")
@@ -205,60 +190,70 @@ def clean_name(show_name: bool, name: str | None) -> str | None:
 
 def draft_fields(draft: Draft) -> dict[str, Any]:
     return {"title": draft.title, "body": draft.body, "topic": draft.topic, "recipients": list(TOPICS_BY_ID[draft.topic].recipients),
-            "scope": draft.scope.value, "wardLocation": draft.ward, "issueId": draft.issue, "documentIds": list(draft.documents)}
-
-
-def review_fields(now: datetime) -> dict[str, Any]:
-    return {"status": PetitionStatus.IN_REVIEW.value, "submittedAt": now.isoformat(),
-            "reviewDeadline": (now + REVIEW_WINDOW).isoformat(), "refusalReason": None, "refusalNote": None, "duplicateOf": None}
+            "scope": draft.scope.value, "wardLocation": draft.ward, "issueId": draft.issue,
+            "documentIds": list(draft.documents), "imageIds": list(draft.images)}
 
 
 def threshold_for(scope: Scope, area_threshold: int, metro_threshold: int) -> int:
     return area_threshold if scope == Scope.AREA else metro_threshold
 
 
-def publish_fields(petition: dict[str, Any], by: PublishedBy, now: datetime, threshold: int) -> dict[str, Any]:
-    """Opening for signatures. The threshold is fixed now, so a later change to the setting never moves the goal."""
-    return {"status": PetitionStatus.OPEN.value, "publishedAt": now.isoformat(), "publishedBy": by.value,
-            "closesAt": (now + OPEN_FOR).isoformat(), "threshold": threshold}
+def publish_fields(now: datetime, threshold: int) -> dict[str, Any]:
+    """The threshold is fixed now, so a later change to the setting never moves the goal."""
+    return {"status": PetitionStatus.OPEN.value, "submittedAt": now.isoformat(), "publishedAt": now.isoformat(),
+            "closesAt": (now + OPEN_FOR).isoformat(), "threshold": threshold, "version": FIRST_VERSION,
+            "versionedAt": now.isoformat(), "removalCount": 0}
 
 
-def review_expired(petition: dict[str, Any], now: datetime) -> bool:
-    deadline = parse_datetime(petition.get("reviewDeadline"))
-    return petition.get("status") == PetitionStatus.IN_REVIEW and deadline is not None and deadline <= now
+def version_of(petition: dict[str, Any]) -> int:
+    """A petition written before versions were kept stands at its first version."""
+    return int(petition.get("version") or FIRST_VERSION)
 
 
-def check_review(petition: dict[str, Any], now: datetime) -> None:
-    """The MCE may decide only while the petition is in review and its clock is still running."""
-    if petition.get("status") != PetitionStatus.IN_REVIEW:
-        raise WrongState("This petition is no longer waiting for a decision.")
-    if review_expired(petition, now):
-        raise WrongState("The 72 hours have passed, so this petition publishes automatically.")
+EDITABLE = (PetitionStatus.OPEN, PetitionStatus.AWAITING_RESPONSE, PetitionStatus.REMOVED)
 
 
-def refusal_fields(reason: str, note: str | None, duplicate_of: str | None) -> dict[str, Any]:
-    if reason not in REFUSALS:
-        raise InvalidPetition("Choose one of the reasons a petition can be refused for.")
-    if reason == "duplicate" and not duplicate_of:
-        raise InvalidPetition("Give the number of the open petition this one duplicates.")
-    note = (note or "").strip() or None
-    if note and len(note) > NOTE_MAX:
-        raise InvalidPetition(f"Keep the note under {NOTE_MAX:,} characters.")
-    return {"status": PetitionStatus.REFUSED.value, "refusalReason": reason, "refusalNote": note,
-            "duplicateOf": duplicate_of if reason == "duplicate" else None}
+def check_editable(petition: dict[str, Any]) -> None:
+    """A petition the MCE has answered is fixed: the answer was given to those words. A closed one is history."""
+    if petition.get("status") not in EDITABLE:
+        raise WrongState(phrase("petition.edit.not_editable"))
 
 
-def check_resubmit(petition: dict[str, Any]) -> None:
-    if petition.get("status") != PetitionStatus.REFUSED:
-        raise WrongState("Only a refused petition can be edited and sent back for review.")
-    if (petition.get("resubmissions") or 0) >= MAX_RESUBMISSIONS:
-        raise WrongState(f"A refused petition can be sent back {MAX_RESUBMISSIONS} times, and this one has been.")
+def edit_fields(draft: Draft, petition: dict[str, Any], now: datetime) -> dict[str, Any]:
+    """A new version of the words. A removed petition comes back to the state it was removed from, its closing date
+    untouched: time spent down is not time won."""
+    changes: dict[str, Any] = {**draft_fields(draft), "version": version_of(petition) + 1, "versionedAt": now.isoformat()}
+    if petition.get("status") == PetitionStatus.REMOVED:
+        changes.update(status=str(petition.get("removedFromStatus") or PetitionStatus.OPEN.value),
+                       removedAt=None, removalGround=None, removalDuplicateOf=None, removedFromStatus=None)
+    return changes
+
+
+def edit_action(petition: dict[str, Any]) -> PetitionAction:
+    return PetitionAction.REPUBLISHED if petition.get("status") == PetitionStatus.REMOVED else PetitionAction.EDITED
+
+
+def removal_fields(ground: Ground, duplicate_of: str | None, petition: dict[str, Any], now: datetime) -> dict[str, Any]:
+    """What a removal changes on the petition itself. Nothing public is built from these: the tombstone is built
+    from the removal record, so no title, body or image can reach a reader through them."""
+    return {"status": PetitionStatus.REMOVED.value, "removedAt": now.isoformat(), "removalGround": ground.value,
+            "removalDuplicateOf": duplicate_of, "removedFromStatus": str(petition["status"]),
+            "removalCount": removals_of(petition) + 1}
+
+
+def removals_of(petition: dict[str, Any]) -> int:
+    return int(petition.get("removalCount") or 0)
+
+
+def check_removable(petition: dict[str, Any]) -> None:
+    if petition.get("status") == PetitionStatus.REMOVED:
+        raise WrongState(phrase("petition.removal.already_removed"))
 
 
 def check_withdraw(petition: dict[str, Any]) -> None:
     if petition.get("status") == PetitionStatus.AWAITING_RESPONSE:
         raise WrongState("It has reached its signatures and gone to the MCE, so it can't be withdrawn now.")
-    if petition.get("status") not in (PetitionStatus.IN_REVIEW, PetitionStatus.REFUSED, PetitionStatus.OPEN):
+    if petition.get("status") != PetitionStatus.OPEN:
         raise WrongState("This petition has already closed.")
 
 
@@ -273,7 +268,7 @@ def check_signable(petition: dict[str, Any], now: datetime) -> None:
 
 
 def clean_signer_name(show_name: bool, name: str | None) -> str | None:
-    """A signer's name to show publicly: letters only, so the name field can't carry a number or a message."""
+    """Letters only, so the name field can't carry a number or a message."""
     given = clean_name(show_name, name)
     if given and not _NAME.match(given):
         raise InvalidPetition("A name can have letters, spaces, hyphens and apostrophes only.")
@@ -281,7 +276,6 @@ def clean_signer_name(show_name: bool, name: str | None) -> str | None:
 
 
 def threshold_fields(petition: dict[str, Any], signatures: int, now: datetime) -> dict[str, Any]:
-    """The new count, and, the moment it reaches the threshold, the MCE's 30 days to respond."""
     changes: dict[str, Any] = {"signatureCount": signatures}
     threshold = petition.get("threshold")
     if petition.get("status") == PetitionStatus.OPEN and threshold and signatures >= threshold:
@@ -295,16 +289,17 @@ def closing_due(petition: dict[str, Any], now: datetime) -> bool:
     return petition.get("status") == PetitionStatus.OPEN and closes is not None and closes <= now
 
 
-def was_published(petition: dict[str, Any]) -> bool:
-    """Whether the public may see it: it was published, even if it has since closed or been withdrawn."""
-    return bool(petition.get("publishedAt"))
+def is_public(petition: dict[str, Any]) -> bool:
+    """Public from the moment it is published, and still public once it has closed. A removed petition is not: its
+    page is the tombstone, which is built from the removal record alone."""
+    return bool(petition.get("publishedAt")) and petition.get("status") != PetitionStatus.REMOVED
 
 
 def creator_actions(petition: dict[str, Any]) -> list[str]:
     status = petition.get("status")
-    actions = ["withdraw"] if status in (PetitionStatus.IN_REVIEW, PetitionStatus.REFUSED, PetitionStatus.OPEN) else []
-    if status == PetitionStatus.REFUSED and (petition.get("resubmissions") or 0) < MAX_RESUBMISSIONS:
-        actions.append("resubmit")
+    actions = ["edit"] if status in EDITABLE else []
+    if status == PetitionStatus.OPEN:
+        actions.append("withdraw")
     if petition.get("creatorName"):
         actions.append("make_anonymous")
     return actions
@@ -319,7 +314,6 @@ class Response:
 
 
 def response_fields(petition: dict[str, Any], response: Response, now: datetime) -> dict[str, Any]:
-    """The MCE's public response, checked. Only a petition that reached its threshold is owed one; a late one is taken."""
     if petition.get("status") != PetitionStatus.AWAITING_RESPONSE:
         raise WrongState("Only a petition that has reached its signatures, and not been answered, is waiting for a response.")
     if response.kind not in RESPONSE_KINDS:
@@ -335,22 +329,40 @@ def response_fields(petition: dict[str, Any], response: Response, now: datetime)
             "responseDocumentIds": list(documents)}
 
 
+def check_department(team: str) -> None:
+    """A petition is shared with a department of the Assembly, from the one list of them there is."""
+    if team not in DEPARTMENT_TEAMS:
+        raise InvalidPetition(phrase("petition.share.not_a_department"))
+
+
+def check_repliable(petition: dict[str, Any]) -> None:
+    """One reply answers one response. It is the response that is being replied to, so there is nothing to reply
+    to until the MCE has published one, and nothing to reply to on a removed petition, whose response is down
+    with it."""
+    if not is_public(petition) or not petition.get("respondedAt"):
+        raise WrongState(phrase("petition.reply.no_response"))
+    if petition.get("replyAt"):
+        raise WrongState(phrase("petition.reply.already_replied"))
+
+
+def reply_fields(text: str, now: datetime) -> dict[str, Any]:
+    """Kept on the petition beside the response it answers: one response, one reply, read and removed together."""
+    return {"replyText": text, "replyAt": now.isoformat()}
+
+
 def response_overdue(petition: dict[str, Any], now: datetime) -> bool:
-    """The 30 days have passed with no response, and that hasn't been recorded yet."""
     due = parse_datetime(petition.get("responseDue"))
     return (petition.get("status") == PetitionStatus.AWAITING_RESPONSE and due is not None and due <= now
             and not petition.get("noResponseAt"))
 
 
 def responded_late(petition: dict[str, Any]) -> bool:
-    """Whether the MCE responded after the 30-day deadline."""
     due, responded = parse_datetime(petition.get("responseDue")), parse_datetime(petition.get("respondedAt"))
     return due is not None and responded is not None and responded > due
 
 
 def days_late(petition: dict[str, Any]) -> int:
-    """Whole days after the 30-day deadline the MCE responded: never rounded up, so lateness is never overstated.
-    0 if in time, or late by less than a day (responded_late says which)."""
+    """Never rounded up, so lateness is never overstated."""
     if not responded_late(petition):
         return 0
     due, responded = parse_datetime(petition["responseDue"]), parse_datetime(petition["respondedAt"])

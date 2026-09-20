@@ -7,12 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useAddVoice } from "@/lib/api/public-queries";
+import { NAME_MAX } from "@/lib/limits";
 import { joinNames } from "@/lib/text";
 import { deviceToken, rememberVoiced } from "@/lib/voices";
 
 import type { Issue, VoiceResult } from "@/lib/api/types";
-
-const NAME_MAX = 80;
 
 function Choice({ checked, onChange, testId, label }: { checked: boolean; onChange: () => void; testId: string; label: string }) {
   return (
@@ -39,7 +38,6 @@ function NameChoice({ named, setNamed, name, setName, testId }: {
   );
 }
 
-/** The dialog's state: open or not, anonymous or named, and adding the voice. */
 function useVoiceForm(issue: Issue, onAdded: (result: VoiceResult) => void) {
   const [open, setOpen] = useState(false);
   const [named, setNamed] = useState(false);
@@ -63,7 +61,6 @@ function useVoiceForm(issue: Issue, onAdded: (result: VoiceResult) => void) {
   return { open, onOpenChange, named, setNamed, name, setName, add, submit };
 }
 
-/** "This affects me too": anonymous by default, a name only if the resident chooses. Not a petition. */
 export function VoiceDialog({ issue, onAdded }: { issue: Issue; onAdded: (result: VoiceResult) => void }) {
   const { open, onOpenChange, named, setNamed, name, setName, add, submit } = useVoiceForm(issue, onAdded);
   const testId = `voice-${issue.public_id}`;

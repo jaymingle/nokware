@@ -5,22 +5,22 @@ import { lowerFirst } from "@/lib/text";
 
 import type { PetitionFigures as Figures } from "@/lib/api/types";
 
-/**
- * How the MCE handled residents' petitions over the same twelve months: the review, and the response owed to
- * each that reached its signatures. Exact counts: they count the MCE's decisions on public petitions, not residents.
- */
 export function PetitionFigures({ figures }: { figures: Figures }) {
-  const reasons = figures.refusals.filter((r) => r.count > 0);
+  const grounds = figures.removals.filter((r) => r.count > 0);
   return (
     <article className="flex flex-col gap-4 rounded-xl border bg-card p-4 sm:p-5" data-testid="responsiveness-petitions">
       <h2 className="text-[18px]">The MCE and residents&apos; petitions</h2>
-      <Lines title="Review" lines={[
-        { label: "Petitions sent for review", value: figures.sent.toLocaleString(), testId: "responsiveness-petitions-sent" },
-        { label: "Published by the MCE", value: figures.published_by_mce.toLocaleString(), testId: "responsiveness-petitions-published" },
-        { label: "Published automatically: the MCE didn't decide within 72 hours", value: figures.published_automatically.toLocaleString(), testId: "responsiveness-petitions-automatic" },
-        { label: "Refused", value: figures.refused.toLocaleString(), testId: "responsiveness-petitions-refused" },
+      {/* Publishing and removing are residents' and contributors' doing, not the MCE's: only the answering below
+          is a figure the MCE can be held to. */}
+      <Lines title="What happened to petitions" lines={[
+        { label: "Published", value: figures.published.toLocaleString(), testId: "responsiveness-petitions-published" },
+        { label: "Mended and published again", value: figures.republished.toLocaleString(), testId: "responsiveness-petitions-republished" },
+        { label: "Removed by a contributor", value: figures.removed.toLocaleString(), testId: "responsiveness-petitions-removed" },
+        ...(figures.refused_under_the_earlier_process
+          ? [{ label: "Refused under the earlier review process", value: figures.refused_under_the_earlier_process.toLocaleString(), testId: "responsiveness-petitions-refused-before" }]
+          : []),
       ]}>
-        {reasons.length ? <p className="text-[12.5px] text-ink-soft">Refused for: {reasons.map((r) => `${lowerFirst(r.label)} (${r.count})`).join(", ")}.</p> : null}
+        {grounds.length ? <p className="text-[12.5px] text-ink-soft">Removed for: {grounds.map((r) => `${lowerFirst(r.label)} (${r.count})`).join(", ")}.</p> : null}
       </Lines>
       <Lines title={`Response to the ${figures.reached_threshold.toLocaleString()} that reached their signatures`} lines={[
         { label: "Answered within 30 days", value: figures.answered_in_time.toLocaleString(), testId: "responsiveness-petitions-in-time" },
@@ -29,7 +29,7 @@ export function PetitionFigures({ figures }: { figures: Figures }) {
         { label: "Still within the 30 days", value: figures.waiting.toLocaleString(), testId: "responsiveness-petitions-waiting" },
       ]} />
       <p className="text-[12.5px] text-ink-soft">
-        Exact counts, unlike the report figures: they count the MCE&apos;s decisions on public petitions, not residents.{" "}
+        Exact counts, unlike the report figures: they count public petitions, not residents.{" "}
         <Link href="/petitions" className="text-teal underline underline-offset-2" data-testid="responsiveness-petitions-link">See the petitions</Link>
       </p>
     </article>

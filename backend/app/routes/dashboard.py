@@ -1,7 +1,4 @@
-"""The public dashboard: citizen reports and the Ledger in aggregate. No sign-in.
-
-    GET /api/dashboard    the last twelve months' figures, at most a minute old
-"""
+"""The public dashboard: citizen reports and the Ledger in aggregate. No sign-in."""
 
 from fastapi import APIRouter
 

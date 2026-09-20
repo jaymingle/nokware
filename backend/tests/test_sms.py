@@ -6,15 +6,24 @@ from typing import Any
 
 import httpx
 import pytest
+import redis
 
 from app.config import get_settings
 from app.services import notifications, sms
 from app.services.citizen_reports import NotificationChannel, NotificationEvent, NotificationStatus
 from app.services.report_taxonomy import TOPICS, Category
-from app.services.sms import ArkeselSms, DailyBudget, SmsError, SmsLimitReached, SmsNotConfigured
+from app.services.sms import (
+    ArkeselSms,
+    DailyBudget,
+    SmsError,
+    SmsLimitReached,
+    SmsNotConfigured,
+    SmsNothingSent,
+    SmsUnreachable,
+    _RedisCount,
+)
 from app.services.sms_text import is_gsm7, pages, plain
 from app.teams import RECIPIENT_NAMES, short_name
-from app.teams import RECIPIENT_NAMES
 
 SITE = "https://nokware.tstitagency.com"  # where Nokware will be deployed (PUBLIC_SITE_URL)
 TODAY = date(2026, 9, 14)
@@ -53,12 +62,40 @@ def test_names_give_way_to_a_count_only_when_they_would_not_fit(monkeypatch: pyt
     assert "is with Works Department." in works.body
     # A report goes to one office: with the deployed address, every office's full name fits one page beside the link.
     for team in RECIPIENT_NAMES:
-        for event in (NotificationEvent.SUBMITTED, NotificationEvent.RESOLVED):
+        for event in (NotificationEvent.SUBMITTED, NotificationEvent.STARTED, NotificationEvent.RESOLVED):
             body = notifications.compose(event, {"reference": "K7QM-4TXP", "recipients": [team]}).body
             assert short_name(team) in body and pages(body) == 1 and "nokware.tstitagency.com/report/status" in body, body
             assert "https://" not in body and "K7QM-4TXP/" not in body  # no scheme, and the reference never in the address
     crowded = {"reference": "K7QM-4TXP", "recipients": ["dept-social-welfare", "dept-disaster-management", "agency-gnfs"]}
     assert pages(notifications.compose(NotificationEvent.SUBMITTED, crowded).body) == 1  # the count stands in if ever needed
+
+
+def test_a_move_says_where_the_report_went_now_and_fits_one_page(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Checked against every pair of offices, so the two longest names can't quietly cost a second credit. Where the
+    case is NOW is never given up: the office it came from is what gives way when both will not fit."""
+    monkeypatch.setattr(notifications, "get_settings", lambda: get_settings().model_copy(update={"public_site_url": SITE}))
+    for came in RECIPIENT_NAMES:
+        for went in RECIPIENT_NAMES:
+            if came == went:
+                continue
+            case = {"reference": "K7QM-4TXP", "category": "civic_service", "recipients": [went],
+                    "reassignedFrom": came, "reassignedTo": went}
+            body = notifications.compose(NotificationEvent.REASSIGNED, case).body
+            assert is_gsm7(body) and pages(body) == 1, (len(body), body)
+            assert short_name(went) in body and "nokware.tstitagency.com/report/status" in body, body
+            assert "https://" not in body and "K7QM-4TXP/" not in body
+
+
+def test_a_safety_case_is_never_told_it_moved_or_that_it_was_reopened() -> None:
+    """Which service holds such a case is the sensitive fact. Work starting again has its own neutral message."""
+    safety = {"$id": "c2", "reference": "M3RD-8WQA", "category": "personal_safety", "recipients": ["agency-police"]}
+    everyday = {**safety, "$id": "c1", "category": "civic_service", "recipients": ["dept-works"]}
+    silent = (NotificationEvent.REASSIGNED, NotificationEvent.REOPENED)
+
+    assert [e for e in NotificationEvent if not notifications.notifiable(safety, e)] == list(silent)
+    assert all(notifications.notifiable(everyday, event) for event in NotificationEvent)
+    for event in silent:  # and if one is ever composed by mistake, it still says nothing but "being worked on"
+        assert notifications.compose(event, safety).body == "Nokware: reference M3RD-8WQA is being worked on."
 
 
 def _client(handler: Any) -> httpx.Client:
@@ -101,11 +138,22 @@ def test_a_refusal_raises_without_the_number_or_the_key(response: httpx.Response
 
 
 def test_an_unreachable_gateway_raises_a_readable_error() -> None:
+    """Its own type: the gateway may have taken the message, so the outbox row is one the sweep sends again."""
     def handler(request: httpx.Request) -> httpx.Response:
         raise httpx.ConnectTimeout("timed out", request=request)
 
-    with pytest.raises(SmsError, match="couldn't be reached"):
+    with pytest.raises(SmsUnreachable, match="couldn't be reached"):
         _provider(handler).send("+233241234567", "Hello there")
+
+
+def test_a_count_that_cannot_be_reached_says_nothing_was_sent(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Nothing is handed to Arkesel, so it is the daily limit's own kind of refusal: the same message, later."""
+    def down() -> Any:
+        raise redis.ConnectionError("refused")
+
+    monkeypatch.setattr(sms, "get_redis", down)
+    with pytest.raises(SmsNothingSent, match="can't be checked"):
+        DailyBudget(3, _RedisCount()).take(1, TODAY)
 
 
 def test_the_daily_limit_counts_pages_and_only_outside_the_sandbox(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -165,3 +213,16 @@ def test_an_emergencys_received_message_carries_numbers_to_try_but_personal_safe
     private = notifications.compose(NotificationEvent.SUBMITTED, {"reference": "M3RD-8WQA", "category": "personal_safety",
                                                                    "topic": "abuse", "recipients": ["agency-police"]})
     assert private.body == "Nokware: reference M3RD-8WQA received."
+
+
+def test_the_daily_limit_is_the_one_set_now_not_the_one_the_client_was_built_with() -> None:
+    """The SMS clients are cached for the life of the process. A limit captured when one was built outlived every
+    change to it, and the refusal then named a number that was no longer set anywhere — 10, after it was raised."""
+    allowed = 2
+    budget = DailyBudget(lambda: allowed)
+    budget.take(2, TODAY)
+    with pytest.raises(SmsLimitReached, match="limit of 2"):
+        budget.take(1, TODAY)
+    allowed = 100
+    budget.take(1, TODAY)  # the same client, the raised limit
+    assert budget.limit == 100

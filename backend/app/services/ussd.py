@@ -1,32 +1,14 @@
-"""USSD (Arkesel): the keypad menu. Ask a question, report an issue, check a case, confirm a web code, sign a petition.
+"""USSD (Arkesel) keypad menu, using the same services as the web.
 
-A screen holds 160 characters and a session lasts seconds, so:
-- the menu's place is kept in Redis under the session ID, for 3 minutes;
-- an answer takes 6 to 13 seconds, longer than a screen can wait, so the
-  session ends with "your answer is on its way by SMS";
-- a report is filed while the citizen waits, for up to 8 seconds. If it takes
-  longer, the reference follows by SMS, even if they chose no updates: they
-  would otherwise lose it.
-The report is read (classified) as soon as it is described, allowed 4 seconds
-before the rules decide alone. An emergency (a danger to a person, a fire, an
-accident, a flood, a crime) then shows every number to call for it, over as
-many screens as they need, before anything else: help first, filing second. A
-personal-safety report then shows what to do right now, and is asked only for
-its sub-metro, which it may skip, never its electoral area; its Social Welfare
-desk is shown once the sub-metro is known. It gets the reference on screen,
-updates only if the citizen then says yes, and any SMS about the report says
-nothing but the reference. Last, the citizen may ask for the numbers by SMS,
-told first that anyone with the phone could see them: nobody gets them without
-choosing, and nobody who asks is refused (a phone that already had them three
-times today is told so; each is two SMS credits). Reports carry no photos.
-Described text that reads as a medical emergency (someone ill or hurt, no one
-else to blame) gets the ambulance numbers and is not filed, as on WhatsApp and
-menu 4, unless the citizen says to file it anyway. The same services as the web:
-report_intake.submit() and rag.answer_question(). "Confirm a web code" proves the
-number to a Nokware page that asked for it (phone_proof): the network says who dialled.
-"Sign a petition" takes the petition's six-digit number and signs it from the
-dialling number, anonymously unless the resident chooses to show a name, after
-being told that anyone can see it, including the department it concerns.
+A screen holds 160 characters and a session lasts seconds: an answer (6 to 13 seconds) always goes by SMS, and a
+report is filed while the citizen waits for at most 8 seconds. Past that its reference follows by SMS even if they
+chose no updates, or they would lose it.
+
+Help first, filing second: an emergency shows every number to call before any question about place. A
+personal-safety report also shows what to do now, asks only for a sub-metro it may skip (never the electoral area),
+keeps the number only if the citizen says yes to something, and any SMS about it carries nothing but the reference.
+The numbers go by SMS only when asked for, after a warning that anyone with the phone could see them. Text that
+reads as a medical emergency is not filed unless the citizen insists.
 """
 
 import logging
@@ -43,6 +25,7 @@ from app.contacts import EMERGENCY_TOPICS, short_line
 from app.services import (
     channel_intent,
     channel_limits,
+    channel_petitions,
     channel_sessions,
     petition_signatures,
     petition_updates,
@@ -52,19 +35,27 @@ from app.services import (
     report_intake,
     report_store,
 )
-from app.services.channel_answers import for_sms
-from app.services.channel_contacts import call_lines, desk_line, numbers_sms
+from app.services.channel_answers import for_sms, screens
+from app.services.channel_contacts import ambulance_calls, call_lines, desk_line, emergency_call, first_calls, numbers_sms
 from app.services.channel_messages import send_sms
 from app.services.channel_status import status_text
 from app.services.citizen_reports import IntakeChannel, NotificationEvent
 from app.services.ledger_documents import utc_now
 from app.services.notifications import notify_quietly
-from app.services.petition_rules import InvalidPetition, WrongState, check_signable, clean_signer_name, normalise_code
+from app.services.petition_rules import InvalidPetition, WrongState, clean_signer_name, normalise_code
+from app.services.phrases import phrase
 from app.services.rag import AnswerLength, answer_question
 from app.services.report_contacts import ContactChoice, InvalidNumber, masked, normalise_phone, save_contact, update_contact
 from app.services.report_intake import DESCRIPTION_MIN, Receipt, ReportSubmission
-from app.services.report_rules import Classification, ClassificationMethod, InvalidReport, classify, normalise_reference
-from app.services.report_taxonomy import Category
+from app.services.report_rules import (
+    Classification,
+    InvalidReport,
+    classify,
+    filed_privately,
+    normalise_reference,
+    restored_classification,
+    saved_classification,
+)
 from app.services.sms_text import plain
 from app.teams import short_name
 from app.wards import sub_metros, wards
@@ -78,19 +69,30 @@ CONTINUE = "\n1 Continue"
 SCREEN_MAX = 160
 QUESTION_MIN = 5
 WHO_MAX = 40  # longer office names give way to a count, so the receipt keeps its last words
-MENU = "Nokware - Accra Assembly\n1 Ask a question\n2 Report an issue\n3 Check a case\n4 Medical emergency\n5 Confirm a web code\n6 Sign a petition"
-MEDICAL = "Nokware can't file this: it isn't an Assembly matter. Ambulance: 193, 0501 614 877, 0505 982 870. Or call 112."
+# Emergency numbers lead the menu. Nothing is filed by that option and the screen says so first — but someone in
+# an emergency should not be reading past "Ask a question" to find a number, and two taps to an ambulance is a
+# service even though Nokware does nothing with it.
+# Seven items and the heading no longer leave room for both on a corrected screen, so the correction takes the
+# heading's line and the whole list still shows: a resident who mistyped needs the options, not the name again.
+MENU_ITEMS = ("1 Emergency numbers\n2 Ask a question\n3 Report an issue\n4 Check a case\n5 Confirm a web code\n"
+              "6 Sign a petition\n7 Check a petition")
+MENU = "Nokware - Accra Assembly\n" + MENU_ITEMS
+AMBULANCE, EMERGENCY = ", ".join(ambulance_calls()), emergency_call()  # from contacts.json, as WhatsApp gives them
+POLICE, FIRE = first_calls("police-191", "fire-192")
+EMERGENCY_NUMBERS = (f"Numbers to call now. Nokware gives them; it can't send help.\nAny emergency: {EMERGENCY}\n"
+                     f"Ambulance: {AMBULANCE}\nPolice: {POLICE}\nFire: {FIRE}")
+MEDICAL = f"Nokware can't file this: it isn't an Assembly matter. Ambulance: {AMBULANCE}. Or call {EMERGENCY}."
 CONFIRM = "File this report?\n1 File, and SMS me updates\n2 File, no SMS\n0 Cancel"
-# Personal safety asks about messages once, after filing, with the reason beside the question. Offering "SMS me
-# updates" here as well asked twice — and never turned updates on, since a report read as personal safety waits
-# for the citizen's say — so the first offer was misleading as well as repeated.
+# Personal safety asks about updates once, after filing: offering them here too asked twice and never turned them on.
 SEND = "Send this report?\n1 Send\n0 Cancel"
 UPDATES_ASK = "SMS updates on it? They never say what it is about.\n1 Yes\n2 No"
 NEXT = "\n1 Next"
 HELP_HEADING = "In danger now? Call 112. If it fails, try the next number."
-MEDICAL_REPORT = ("This sounds like a medical emergency, which Nokware can't send help for. Ambulance: 193, 0501 614 877, "
-                  "0505 982 870, or 112.\n1 File it as a report anyway\n0 End")
+MEDICAL_REPORT = (f"This sounds like a medical emergency, which Nokware can't send help for. Ambulance: {AMBULANCE}, "
+                  f"or {EMERGENCY}.\n1 File it as a report anyway\n0 End")
+MEDICAL_NOT_FILED = f"Nothing was filed. Ambulance: {ambulance_calls()[0]}, or call {EMERGENCY}."
 NUMBERS_OFFER = "Send these numbers by SMS? Anyone with your phone could see them.\n1 Yes\n2 No"
+TOO_MANY_LOOKUPS = "Too many lookups this hour. Please try again later."
 CALL_LIST = "Your call list may show you dialled Nokware: delete it if that is safer."
 _filing = ThreadPoolExecutor(max_workers=8, thread_name_prefix="ussd-filing")  # a reading takes two
 
@@ -113,8 +115,13 @@ class Dial:
 
 
 def _screen(text: str) -> str:
+    """A last guard, not a way of fitting text: every screen is built to fit, so cutting one means a screen was
+    composed wrong and a resident is reading half a sentence. It is logged rather than passing quietly."""
     text = plain(text)
-    return text if len(text) <= SCREEN_MAX else text[: SCREEN_MAX - 3].rstrip() + "..."
+    if len(text) <= SCREEN_MAX:
+        return text
+    logger.error("A USSD screen ran past %d characters and was cut: %r", SCREEN_MAX, text[:80])
+    return text[: SCREEN_MAX - 3].rstrip() + "..."
 
 
 def con(text: str) -> Reply:
@@ -130,7 +137,6 @@ def _numbered(title: str, names: list[str]) -> str:
 
 
 def _pick(text: str, count: int) -> int | None:
-    """The 0-based choice from a numbered list, or None if the reply isn't one of its numbers."""
     choice = text.strip()
     return int(choice) - 1 if choice.isdigit() and 1 <= int(choice) <= count else None
 
@@ -155,46 +161,111 @@ def _site() -> str:
     return get_settings().public_site_url.rstrip("/")
 
 
-def answer_by_sms(msisdn: str, question: str) -> None:
-    """After the screen has closed: answer the question and send it as one SMS of two pages at most."""
+# The lines under an answer screen. The room they take is kept back from every screen, so a screen is never
+# composed to the full width and then squeezed by its own menu.
+MORE_MENU = "\n1 More  0 Back"
+LAST_MENU = "\n1 Send by SMS  0 Menu"
+MENU_COST = max(len(MORE_MENU), len(LAST_MENU))
+ANSWER_FAILED = "Sorry, we couldn't answer your question just now. Please try again later."
+
+
+def answer_screens(question: str) -> list[str]:
+    """The answer, already paged for the screen. The same pipeline the web and WhatsApp use: only the length
+    asked of the model differs, so a question never gets a lighter answer for having been dialled.
+
+    The SMS budget is asked for here too, so what a resident reads on the screen is what arrives if they then
+    ask for it by text, rather than a longer answer they would find cut down when it came."""
+    return screens(answer_question(question, AnswerLength.SMS)["answer"], MENU_COST)
+
+
+def send_answer_by_sms(msisdn: str, question: str) -> None:
+    """The parts go one after another: each is a whole thought, numbered, and the last carries the citation."""
     try:
-        text = for_sms(answer_question(question, AnswerLength.SMS), _site())
+        parts = for_sms(answer_question(question, AnswerLength.SMS), _site(),
+                        shorter=lambda: answer_question(question, AnswerLength.SMS_SHORTER))
     except Exception:
         logger.exception("Answering a USSD question for %s failed", masked(msisdn))
-        text = "Nokware: sorry, we couldn't answer your question just now. Please try again later."
-    send_sms(msisdn, text)
+        parts = [f"Nokware: {ANSWER_FAILED}"]
+    for part in parts:
+        send_sms(msisdn, part)
 
 
 def _menu(dial: Dial, state: State, later: Later) -> tuple[Reply, State | None]:
     choice = dial.text.strip()
-    if choice == "1":
-        return con("Type your question. The answer comes by SMS."), {"step": "ask"}
+    if choice == "1":  # nothing is filed here, and the screen says so before the numbers
+        return end(EMERGENCY_NUMBERS), None
     if choice == "2":
-        return con("Describe the problem and where it is (a street or a landmark):"), {"step": "describe"}
+        return con("Type your question. You'll read the answer here, free."), {"step": "ask"}
     if choice == "3":
+        return con("Describe the problem and where it is (a street or a landmark):"), {"step": "describe"}
+    if choice == "4":
         return con("Enter your case reference, e.g. K7QM-4TXP:"), {"step": "check"}
-    if choice == "4":  # not the Assembly's to act on, but the numbers cost nothing to give
-        return end(MEDICAL), None
     if choice == "5":
         return con("Enter the 6-digit code shown on the Nokware page:"), {"step": "code"}
     if choice == "6":
-        return con("Enter the petition's 6-digit number:"), {"step": "sign_code"}
-    return con("Choose 1 to 6.\n" + MENU), state
+        return con(PETITION_NUMBER), {"step": "sign_code"}
+    if choice == "7":
+        return con(PETITION_NUMBER), {"step": "petition"}
+    return con("Choose 1 to 7.\n" + MENU_ITEMS), state
 
 
 def _ask(dial: Dial, state: State, later: Later) -> tuple[Reply, State | None]:
+    """The answer is read on the screen, which costs the resident nothing. Only sending it by SMS is capped, and
+    that is asked for at the end of it."""
     question = dial.text.strip()
     if len(question) < QUESTION_MIN:
         return con("Type your question in a few words:"), state
+    try:
+        pages = answer_screens(question)
+    except Exception:
+        logger.exception("Answering a USSD question for %s failed", masked(dial.msisdn))
+        return end(ANSWER_FAILED), None
+    if not pages:
+        return end(ANSWER_FAILED), None
+    return _answer_page({"question": question, "pages": pages}, 0)
+
+
+def _answer_page(state: State, page: int) -> tuple[Reply, State]:
+    pages = state["pages"]
+    last = page == len(pages) - 1
+    return con(pages[page] + (LAST_MENU if last else MORE_MENU)), {**state, "step": "answer", "page": page}
+
+
+def _answer(dial: Dial, state: State, later: Later) -> tuple[Reply, State | None]:
+    page = int(state["page"])
+    choice, last = dial.text.strip(), page == len(state["pages"]) - 1
+    if choice == "1" and not last:
+        return _answer_page(state, page + 1)
+    if choice == "1":
+        return _send_answer(dial, state, later)
+    if choice == "0" and page > 0:
+        return _answer_page(state, page - 1)
+    if choice == "0":
+        return con(MENU), {"step": "menu"}
+    return _answer_page(state, page)
+
+
+def _send_answer(dial: Dial, state: State, later: Later) -> tuple[Reply, State | None]:
+    """The cap is the Assembly's SMS credit, not the resident's right to the answer: refused, they keep reading."""
     if not channel_limits.SMS_ANSWERS.allow(dial.msisdn, utc_now().timestamp()):
-        return end(f"You've had today's answers by SMS. Ask again tomorrow, or at {_site()}/ask"), None
-    later(answer_by_sms, dial.msisdn, question)
+        return _refused_sms(state)
+    later(send_answer_by_sms, dial.msisdn, state["question"])
     return end("Thank you. Your answer is on its way by SMS."), None
 
 
+REFUSED_SMS = "You've had today's answers by SMS. The answer is still here, free to read."
+
+
+def _refused_sms(state: State) -> tuple[Reply, State]:
+    """Back to the top of the answer, with the keys that screen really offers: pressing 1 there reads on, and a
+    one-screen answer has nothing to read on to."""
+    menu = "\n1 More  0 Menu" if len(state["pages"]) > 1 else "\n0 Menu"
+    return con(REFUSED_SMS + menu), {**state, "step": "answer", "page": 0}
+
+
 def _read(description: str) -> Classification:
-    """How the report will be filed, within a few seconds: past that, the rules alone (whose danger screen
-    still catches a report about a person), so a slow model never costs the citizen their session."""
+    """A slow model must not cost the citizen their session: past the wait, the rules alone decide (their danger
+    screen still catches a report about a person)."""
     reading = _filing.submit(report_intake.read_report, description)
     try:
         return reading.result(timeout=CLASSIFY_WAIT_SECONDS)
@@ -202,23 +273,7 @@ def _read(description: str) -> Classification:
         return classify(description, None, None)
 
 
-def _saved(filed: Classification) -> dict[str, Any]:
-    return {"category": filed.category.value, "topic": filed.topic, "severity": filed.severity,
-            "recipients": list(filed.recipients), "method": filed.method.value}
-
-
-def _classification(state: State) -> Classification:
-    saved = state["filed"]
-    return Classification(Category(saved["category"]), saved["topic"], saved["severity"], tuple(saved["recipients"]),
-                          ClassificationMethod(saved["method"]))
-
-
-def _private(state: State) -> bool:
-    return state["filed"]["category"] == Category.PERSONAL_SAFETY
-
-
 def _pack(lines: list[str]) -> list[str]:
-    """Lines on as few screens as hold them, each screen leaving room for its key line."""
     pages: list[str] = []
     page: list[str] = []
     for line in lines:
@@ -230,13 +285,12 @@ def _pack(lines: list[str]) -> list[str]:
 
 
 def numbers_pages(topic: str) -> list[str]:
-    """Every number to call for an emergency, the services that come to you first. Empty for everyday topics."""
+    """Empty for everyday topics."""
     lines = call_lines(topic, None)
     return _pack([HELP_HEADING, *lines]) if lines else []
 
 
 def help_pages(topic: str, private: bool) -> list[str]:
-    """What comes before any question about place: the numbers, then for personal safety what to do now."""
     return numbers_pages(topic) + (_pack(list(safety_steps.STEPS)) if private else [])
 
 
@@ -245,13 +299,13 @@ def safety_sub_metro_screen() -> str:
 
 
 def _after_help(state: State) -> tuple[Reply, State]:
-    if _private(state):
+    if filed_privately(state):
         return con(safety_sub_metro_screen()), {**state, "step": "safety_sub_metro"}
     return con(sub_metro_screen()), {**state, "step": "sub_metro"}
 
 
 def _help_page(state: State, page: int) -> tuple[Reply, State]:
-    pages = help_pages(state["filed"]["topic"], _private(state))
+    pages = help_pages(state["filed"]["topic"], filed_privately(state))
     if page >= len(pages):
         return _after_help(state)
     key = CONTINUE if page == len(pages) - 1 else NEXT
@@ -263,14 +317,13 @@ def _describe(dial: Dial, state: State, later: Later) -> tuple[Reply, State | No
     if len(description) < DESCRIPTION_MIN:
         return con("Please describe it in a few more words, with where it is:"), state
     started, check = time.monotonic(), _filing.submit(channel_intent.is_medical, description)
-    state = {"description": description, "filed": _saved(_read(description))}
+    state = {"description": description, "filed": saved_classification(_read(description))}
     if _medical_now(check, started):
         return con(MEDICAL_REPORT), {**state, "step": "medical"}
     return _help_page(state, 0)  # help first, filing second
 
 
-def _medical_now(check: "Future[bool]", started: float) -> bool:
-    """Whether the text reads as medical, if that is known within the same few seconds as the reading."""
+def _medical_now(check: Future[bool], started: float) -> bool:
     try:
         return check.result(timeout=max(0.0, started + CLASSIFY_WAIT_SECONDS - time.monotonic()))
     except FilingTimeout:
@@ -281,7 +334,7 @@ def _medical(dial: Dial, state: State, later: Later) -> tuple[Reply, State | Non
     """The model can misread: a citizen who chose to report something can still file it."""
     if dial.text.strip() == "1":
         return _help_page(state, 0)
-    return end("Nothing was filed. Ambulance: 193, or call 112."), None
+    return end(MEDICAL_NOT_FILED), None
 
 
 def _help(dial: Dial, state: State, later: Later) -> tuple[Reply, State | None]:
@@ -296,7 +349,7 @@ def _safety_sub_metro(dial: Dial, state: State, later: Later) -> tuple[Reply, St
     if choice != "0" and index is None:
         return con("Choose a number from the list, or 0 to skip.\n" + safety_sub_metro_screen()), state
     sub_metro = None if choice == "0" else ids[index]
-    desk = desk_line(sub_metro)  # their own desk, now that it is known
+    desk = desk_line(sub_metro)
     return con(f"{desk}\n{SEND}" if desk else SEND), {**state, "step": "confirm", "sub_metro": sub_metro}
 
 
@@ -317,7 +370,6 @@ def _ward(dial: Dial, state: State, later: Later) -> tuple[Reply, State | None]:
 
 
 def _receipt(receipt: Receipt, later: Later) -> tuple[Reply, State | None]:
-    """The screen after filing: the reference, who has it, and what happens next."""
     case = receipt.case
     reference = case["reference"]
     if receipt.messages_on:
@@ -335,8 +387,7 @@ def _receipt(receipt: Receipt, later: Later) -> tuple[Reply, State | None]:
     return end(f"Report {reference} filed with {who}.{emergency}{updates} Keep this reference."), None
 
 
-def _reference_later(filing: "Future[Receipt]", msisdn: str) -> None:
-    """A filing that outlasted the screen: send its reference (neutral for personal safety) or say it failed."""
+def _reference_later(filing: Future[Receipt], msisdn: str) -> None:
     try:
         receipt = filing.result()
     except Exception:
@@ -355,14 +406,14 @@ def _reference_later(filing: "Future[Receipt]", msisdn: str) -> None:
 
 
 def _file(dial: Dial, state: State, updates: bool, later: Later) -> tuple[Reply, State | None]:
-    private = _private(state)
+    private = filed_privately(state)
     submission = ReportSubmission(
         description=state["description"], ward=None if private else state["ward"],
         sub_metro=state.get("sub_metro") if private else None, safety_topic=None,
         phone=dial.msisdn if updates else None, whatsapp=None, notify=updates, callback_consent=False,
         channel=IntakeChannel.USSD,
     )
-    filing = _filing.submit(report_intake.submit, submission, [], utc_now(), _classification(state))
+    filing = _filing.submit(report_intake.submit, submission, [], utc_now(), restored_classification(state))
     try:
         return _receipt(filing.result(timeout=FILING_WAIT_SECONDS), later)
     except FilingTimeout:
@@ -380,19 +431,18 @@ def _confirm(dial: Dial, state: State, later: Later) -> tuple[Reply, State | Non
     choice = dial.text.strip()
     if choice == "0":
         return end("Cancelled. Nothing was filed."), None
-    if _private(state):  # sent without the number: it is attached only if they say yes to something
+    # Personal safety is sent without the number, and never turned away by the hourly report limit.
+    if filed_privately(state):
         return _file(dial, state, False, later) if choice == "1" else (con("Choose 1 or 0.\n" + SEND), state)
     if choice not in ("1", "2"):
         return con("Choose 1, 2 or 0.\n" + CONFIRM), state
-    # Someone in danger is never turned away by the hourly report limit.
-    if not _private(state) and not channel_limits.REPORTS.allow(dial.msisdn, utc_now().timestamp()):
+    if not channel_limits.REPORTS.allow(dial.msisdn, utc_now().timestamp()):
         return end("You've filed several reports this hour. Please try again later."), None
     return _file(dial, state, choice == "1", later)
 
 
 def _updates(dial: Dial, state: State, later: Later) -> tuple[Reply, State | None]:
-    """Messages about a personal-safety report, asked once. The number is kept only if they say yes: this is a
-    live session on their own phone, so a session that drops before they answer leaves nothing behind."""
+    """The number is kept only on a yes, so a session that drops before they answer leaves nothing behind."""
     choice = dial.text.strip()
     if choice not in ("1", "2"):
         return con("Choose 1 for updates or 2 for none."), state
@@ -406,12 +456,11 @@ def _updates(dial: Dial, state: State, later: Later) -> tuple[Reply, State | Non
 
 
 def _offer(state: State) -> State:
-    """What the numbers SMS at the end of a personal-safety report needs to know."""
     return {name: state.get(name) for name in ("reference", "topic", "sub_metro")}
 
 
 def _call(dial: Dial, state: State, later: Later) -> tuple[Reply, State | None]:
-    """A separate, explicit choice from updates: whether the responders may phone the citizen."""
+    """Being phoned is a separate, explicit choice from updates."""
     choice = dial.text.strip()
     if choice not in ("1", "2"):
         return con("Choose 1 if they may phone you, or 2 if not."), state
@@ -426,7 +475,6 @@ def _call(dial: Dial, state: State, later: Later) -> tuple[Reply, State | None]:
 
 
 def _numbers_sms(dial: Dial, state: State, later: Later) -> tuple[Reply, State | None]:
-    """The citizen's own choice, knowing who else might read their phone: the numbers by SMS, or not."""
     choice = dial.text.strip()
     if choice not in ("1", "2"):
         return con("Choose 1 or 2.\n" + NUMBERS_OFFER), state
@@ -444,13 +492,15 @@ def _check(dial: Dial, state: State, later: Later) -> tuple[Reply, State | None]
     if reference is None:
         return con("That isn't a reference. It looks like K7QM-4TXP. Try again:"), state
     if not channel_limits.LOOKUPS.allow(dial.msisdn, utc_now().timestamp()):
-        return end("Too many lookups this hour. Please try again later."), None
+        return end(TOO_MANY_LOOKUPS), None
     try:
         case = report_followups.find(reference)
     except report_followups.CaseNotFound:
         return end(f"No case has the reference {reference}. Check it and dial again."), None
-    status = report_followups.public_status(case, report_store.assignments_for(case["$id"]), utc_now())
-    return end(status_text(status, _site(), compact=True)), None
+    status = report_followups.public_status(
+        case, report_store.assignments_for(case["$id"]), utc_now(), report_followups.history_for(case)
+    )
+    return end(status_text(status, _site(), compact=True, limit=SCREEN_MAX)), None
 
 
 CODE_REPLIES = {
@@ -467,8 +517,25 @@ def _code(dial: Dial, state: State, later: Later) -> tuple[Reply, State | None]:
 
 
 TITLE_ON_SCREEN = 70
+PETITION_NUMBER = "Enter the petition's 6-digit number:"
+SIX_DIGITS = "A petition number has 6 digits. Try again:"
 NAME_PROMPT = ("Your name will be shown on the petition: anyone can see it, including the department it concerns. "
                "Type your name, or 0 to sign anonymously:")
+
+
+def _petition(dial: Dial, state: State, later: Later) -> tuple[Reply, State | None]:
+    """What became of a petition, by the number the resident typed when they signed it. A removed one answers from
+    its removal record, so the screen carries the tombstone's words and nothing of the petition."""
+    code = normalise_code(dial.text)
+    if code is None:
+        return con(SIX_DIGITS), state
+    if not channel_limits.LOOKUPS.allow(dial.msisdn, utc_now().timestamp()):
+        return end(TOO_MANY_LOOKUPS), None
+    try:
+        found = channel_petitions.standing(code)
+    except petitions.PetitionNotFound:
+        return end(phrase("petition.channel.not_found_ussd").format(number=code)), None
+    return end(channel_petitions.standing_text(found, _site(), compact=True, limit=SCREEN_MAX)), None
 
 
 def _signed(dial: Dial, code: str, name: str | None, later: Later) -> tuple[Reply, State | None]:
@@ -487,11 +554,12 @@ def _signed(dial: Dial, code: str, name: str | None, later: Later) -> tuple[Repl
 def _sign_code(dial: Dial, state: State, later: Later) -> tuple[Reply, State | None]:
     code = normalise_code(dial.text)
     if code is None:
-        return con("A petition number has 6 digits. Try again:"), state
+        return con(SIX_DIGITS), state
     try:
-        petition = petitions.public(code)
-        check_signable(petition, utc_now())
-    except (petitions.PetitionNotFound, WrongState):
+        petition = petition_signatures.open_for_signing(code, utc_now())
+    except WrongState as refused:  # removed, or closed: each says which, and a removed one says nothing more
+        return end(str(refused)), None
+    except petitions.PetitionNotFound:
         return end("No open petition has that number. Check it and dial again."), None
     title = petition["title"] if len(petition["title"]) <= TITLE_ON_SCREEN else petition["title"][: TITLE_ON_SCREEN - 3] + "..."
     menu = f"{title}\n1 Sign, name not shown\n2 Sign with my name shown\n0 Cancel"
@@ -521,14 +589,14 @@ def _sign_name(dial: Dial, state: State, later: Later) -> tuple[Reply, State | N
 
 
 STEPS: dict[str, Callable[[Dial, State, Later], tuple[Reply, State | None]]] = {
-    "menu": _menu, "ask": _ask, "describe": _describe, "medical": _medical, "help": _help, "sub_metro": _sub_metro,
+    "menu": _menu, "ask": _ask, "answer": _answer, "describe": _describe, "medical": _medical, "help": _help, "sub_metro": _sub_metro,
     "ward": _ward, "safety_sub_metro": _safety_sub_metro, "confirm": _confirm, "updates": _updates, "call": _call,
-    "numbers_sms": _numbers_sms, "check": _check, "code": _code, "sign_code": _sign_code, "sign_choice": _sign_choice, "sign_name": _sign_name,
+    "numbers_sms": _numbers_sms, "check": _check, "code": _code, "petition": _petition, "sign_code": _sign_code,
+    "sign_choice": _sign_choice, "sign_name": _sign_name,
 }
 
 
 def respond(dial: Dial, later: Later) -> Reply:
-    """The next screen for one keypress (or the opening dial) in a USSD session."""
     if dial.new:
         channel_sessions.save("ussd", dial.session_id, {"step": "menu"}, SESSION_SECONDS)
         return con(MENU)

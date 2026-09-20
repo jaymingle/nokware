@@ -1,6 +1,6 @@
-import type { Metadata } from "next";
-
 import { ResponsivenessPage } from "@/components/accountability/responsiveness-page";
+
+import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "How departments respond",

@@ -1,11 +1,11 @@
 "use client";
 
-import type { ReactNode } from "react";
-
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { useCategories, useDepartments } from "@/lib/api/queries";
+
+import type { ReactNode } from "react";
 
 export function FormField({ id, label, hint, children }: { id: string; label: string; hint?: string; children: ReactNode }) {
   return (

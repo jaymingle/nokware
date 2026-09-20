@@ -1,9 +1,4 @@
-"""Where a conversation is: a USSD menu's place or a WhatsApp draft, kept in Redis until it goes quiet.
-
-A session is a small JSON object under a keyed hash of its subject (the USSD
-session ID, or the citizen's number), and it disappears after ttl seconds
-without a message. Nothing in it is kept longer.
-"""
+"""Where a conversation is: a USSD menu's place or a WhatsApp draft, kept in Redis until it goes quiet."""
 
 import json
 from typing import Any

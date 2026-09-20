@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect } from "react";
 import { LogOutIcon } from "lucide-react";
+import { useEffect } from "react";
 
 import { Button } from "@/components/ui/button";
 
@@ -30,11 +30,10 @@ function useShiftToLeave() {
   }, []);
 }
 
-/** Leaves for a neutral site at once, for someone who may be watched while reporting. */
+/** For someone who may be watched while reporting. */
 export function QuickExit() {
   useShiftToLeave();
   return (
-    // Pinned at the top on a phone; in the page's right margin on a wide screen, clear of the form.
     <div className="sticky top-3 z-40 flex justify-end lg:fixed lg:top-24 lg:right-6">
       <div className="flex flex-col items-end gap-1">
         <Button onClick={leave} className="bg-ink text-paper hover:bg-ink/85" data-testid="quick-exit">

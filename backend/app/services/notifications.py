@@ -1,31 +1,22 @@
 """Messages to citizens about their reports, by SMS and WhatsApp.
 
-Three moments only: the report is received, it is resolved, an escalation is
-received. Nothing in between: status changes would feel like spam and each
-message costs money. A message goes to every channel the citizen gave (both if
-both) and to none if they gave no number or didn't agree to messages.
+Six moments only (received, work started, moved to another office, resolved, reopened, escalation received):
+anything more would feel like spam, and each message costs money. "Work started" goes once, when the FIRST recipient
+starts: a citizen doesn't need to know that the Police and Social Welfare each opened their own part.
+Personal-safety messages say nothing but the reference, not even the word "report": a phone can be shared. Every
+other message fits one GSM-7 SMS page (one credit), except an emergency's "received" message, whose numbers to call
+are worth a second page.
 
-Personal-safety messages say nothing but the reference: no category, no
-service, not even the word "report". A phone can be shared.
+A personal-safety case is told nothing at all when it moves between the Police and Social Welfare, or when the MCE
+reopens it: which service holds such a case is itself the sensitive fact, and work starting again already has its
+own neutral message when a recipient picks it up. notifiable() is the one place that says so, and both the ordinary
+path and the missed-message sweep ask it.
 
-Every message fits one SMS page in plain GSM-7 (a credit each): the office
-names are short names, and when they still don't fit, a shorter way of saying
-who replaces them. The one exception: the "received" message for an emergency
-(a fire, a flood, a crime) carries two numbers per service to try, on up to
-two pages. A personal-safety message never does: it says only the reference.
+The outbox row never holds the number; it is read from report_contacts at the moment of sending.
 
-Every message is written to the notifications outbox first (never with the
-number, which is read from report_contacts at the moment of sending), then
-handed to the channel's provider: Arkesel or BMS Africa for SMS
-(SMS_PROVIDER=arkesel or bms), Twilio for WhatsApp (WHATSAPP_PROVIDER=twilio),
-or "log", which records the message as not sent.
-
-WhatsApp carries a free-form message only within 24 hours of the citizen's last
-message, and until WhatsApp templates are approved nothing else can go. So a
-WhatsApp update outside that window goes by SMS to the same number instead,
-when the number is Ghanaian and the citizen isn't getting SMS already: before
-sending, when Redis shows the window closed, and afterwards, when Twilio reports
-the message undelivered for that reason (error 63016).
+WhatsApp carries a free-form message only within 24 hours of the citizen's last message, and no templates are
+approved yet. So an update outside that window goes by SMS to the same number when it is Ghanaian and gets no SMS
+already: before sending if Redis shows the window closed, or afterwards when Twilio reports error 63016.
 """
 
 import logging
@@ -35,6 +26,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Protocol
 
+from appwrite.exception import AppwriteException
 from appwrite.id import ID
 from appwrite.query import Query
 
@@ -52,20 +44,40 @@ from app.services.citizen_reports import (
 from app.services.ledger_documents import now_iso
 from app.services.report_contacts import GHANA_CODE, contact_for, masked
 from app.services.report_taxonomy import Category
-from app.services.sms import arkesel
+from app.services.sms import SmsLimitReached, SmsNothingSent, SmsUnreachable, arkesel
 from app.services.sms_bms import bms
 from app.services.sms_text import bare_address, pages
-from app.services.whatsapp import first_delivery, twilio, window_open
+from app.services.whatsapp import WhatsAppNothingSent, WhatsAppUnreachable, first_delivery, twilio, window_open
 from app.teams import short_name
 
 logger = logging.getLogger(__name__)
 
+# Things that look alike in the outbox and are not: a message our own daily budget refused, where nothing at all
+# left this process and sending it tomorrow is simply the message arriving late; a message our own side never
+# attempted for some other reason; a message the provider never answered, which may have gone out and can never be
+# settled by any delivery report; and a message the provider was asked for and refused with an answer. All end as
+# `failed` — the outbox has no column for the difference and adding one would be a schema change — so the free-form
+# `error` string carries it, under a prefix written here and read back by the readers below. A stale row the sweep
+# gave up on is closed the same way: `failed` is the only status that means "settled, never retried", and the prefix
+# says which kind of settled it is. REPAIRED is the one prefix that leaves the status alone: it is written onto a
+# row whose message the sweep has now sent again, and it is what stops that row being sent a third time.
+BUDGET_REFUSED = "our-daily-budget: "
+NOTHING_SENT = "nothing-sent: "
+UNREACHABLE = "provider-unreachable: "
+STALE_QUEUED = "stale-queued: "
+REPAIRED = "repaired: "
+
 CHANNEL_NAMES = {NotificationChannel.SMS: "SMS", NotificationChannel.WHATSAPP: "WhatsApp message"}
 EVENT_NAMES = {
     NotificationEvent.SUBMITTED: "Submission",
+    NotificationEvent.STARTED: "Work started",
     NotificationEvent.RESOLVED: "Resolution",
     NotificationEvent.ESCALATED: "Escalation",
+    NotificationEvent.REASSIGNED: "Reassignment",
+    NotificationEvent.REOPENED: "Reopening",
 }
+# What a personal-safety case's resident is never written to about, because the routing itself is the sensitive fact.
+SILENT_ON_SAFETY = (NotificationEvent.REASSIGNED, NotificationEvent.REOPENED)
 
 
 class Provider(Protocol):
@@ -73,7 +85,7 @@ class Provider(Protocol):
     delivers: bool  # False for a sandbox: accepted, never delivered
 
     def send(self, to: str, body: str) -> str:
-        """Send the message; return the provider's message ID. Raise on failure."""
+        """Returns the provider's message ID; raises on failure."""
         ...
 
 
@@ -84,7 +96,6 @@ class Message:
 
 
 def _who_options(case: dict[str, Any]) -> list[str]:
-    """Ways to say who has the report, fullest first."""
     names = [short_name(r) for r in case.get("recipients") or []]
     if len(names) <= 1:
         return [*names, "the office responsible"]
@@ -93,39 +104,66 @@ def _who_options(case: dict[str, Any]) -> list[str]:
 
 
 def _one_page(render: Callable[[str], str], case: dict[str, Any], pages_allowed: int = 1) -> str:
-    """The fullest wording that fits one SMS page (two for an emergency's numbers)."""
     bodies = [render(who) for who in _who_options(case)]
     return next((body for body in bodies if pages(body) <= pages_allowed), bodies[-1])
 
 
 def _neutral(event: NotificationEvent, reference: str) -> Message:
-    """Personal safety: the reference and nothing else. A phone can be shared."""
+    """The only words a personal-safety case is ever sent. The two moments nothing is sent about fall back to "being
+    worked on", which is true of both and says nothing more, so a caller that reaches here by mistake still can't
+    write anything revealing; notifiable() is what stops them being sent at all."""
+    working = f"Nokware: reference {reference} is being worked on."
     bodies = {
         NotificationEvent.SUBMITTED: f"Nokware: reference {reference} received.",
+        NotificationEvent.STARTED: working,
         NotificationEvent.RESOLVED: f"Nokware: reference {reference} has been updated.",
         NotificationEvent.ESCALATED: f"Nokware: reference {reference}: your request has been received.",
+        NotificationEvent.REASSIGNED: working,
+        NotificationEvent.REOPENED: working,
     }
     return Message(f"private_{event.value}", bodies[event])
 
 
+def notifiable(case: dict[str, Any], event: NotificationEvent) -> bool:
+    """Whether this case's resident is written to about this moment at all."""
+    return not (case.get("category") == Category.PERSONAL_SAFETY and event in SILENT_ON_SAFETY)
+
+
+def _moved(case: dict[str, Any], reference: str, status_page: str) -> Message:
+    """Where the case went, and where the reason is. Both offices are named when they fit one page; when they don't,
+    the office that has it now is named, which is what a resident asking "who has my report?" needs."""
+    came, went = short_name(case.get("reassignedFrom") or ""), short_name(case.get("reassignedTo") or "")
+    tail = f"Why and what's next: {status_page}"
+    moves = [f"moved from {came} to {went}", f"moved to {went}", "moved to another office"]
+    bodies = [f"Nokware: report {reference} {move}. {tail}" for move in moves]
+    return Message("reassigned", next((body for body in bodies if pages(body) <= 1), bodies[-1]))
+
+
 def compose(event: NotificationEvent, case: dict[str, Any]) -> Message:
-    """The message for an event, on one SMS page: content-neutral for personal safety."""
     reference = case["reference"]
     if case.get("category") == Category.PERSONAL_SAFETY:
         return _neutral(event, reference)
     # Without "https://", so the office's full name fits one page beside the link. The reference stays out of the
     # address: the status page asks for it, so it never lands in browser history or server logs.
-    status_page = f"{bare_address(get_settings().public_site_url)}/report/status"
+    site = bare_address(get_settings().public_site_url)
+    status_page = f"{site}/report/status"
     if event == NotificationEvent.RESOLVED and case.get("escalatedAt"):  # after the one escalation: final
         return Message("resolved_after_escalation", f"Nokware: report {reference} was reviewed and resolved. Outcome: {status_page}")
     if event == NotificationEvent.ESCALATED:
         return Message(event.value, f"Nokware: we've received your escalation of report {reference}. The MCE's office will review it.")
+    if event == NotificationEvent.REASSIGNED:
+        return _moved(case, reference, status_page)
     if event == NotificationEvent.SUBMITTED and case.get("topic") in EMERGENCY_TOPICS:  # worth a second page
-        numbers = f"If anyone is in danger: {short_line(case['topic'], None)} More numbers: {bare_address(get_settings().public_site_url)}/contacts/emergency"
+        numbers = f"If anyone is in danger: {short_line(case['topic'], None)} More numbers: {site}/contacts/emergency"
         return Message("submitted_emergency", _one_page(lambda who: f"Nokware: report {reference} is with {who}. {numbers}", case, pages_allowed=2))
     renders: dict[NotificationEvent, Callable[[str], str]] = {
         NotificationEvent.SUBMITTED: lambda who: f"Nokware: report {reference} is with {who}. "
         f"We'll message you when it's resolved. Track it: {status_page}",
+        # The receipt already promised a message at the end, so this one carries the news and the link and stops.
+        NotificationEvent.STARTED: lambda who: f"Nokware: {who} has started work on report {reference}. "
+        f"Track it: {status_page}",
+        NotificationEvent.REOPENED: lambda who: f"Nokware: report {reference} is open again: the MCE sent it back "
+        f"to {who}. Track it: {status_page}",
         NotificationEvent.RESOLVED: lambda who: f"Nokware: {who} marked report {reference} resolved. "
         f"Not fixed? Escalate within 14 days: {status_page}",
     }
@@ -133,7 +171,6 @@ def compose(event: NotificationEvent, case: dict[str, Any]) -> Message:
 
 
 def channels_for(contact: dict[str, Any] | None) -> list[tuple[NotificationChannel, str]]:
-    """Each channel to use, with its number: none unless the citizen agreed to messages."""
     if not contact or not contact.get("notify"):
         return []
     pairs = [(NotificationChannel.SMS, contact.get("phone")), (NotificationChannel.WHATSAPP, contact.get("whatsapp"))]
@@ -141,7 +178,6 @@ def channels_for(contact: dict[str, Any] | None) -> list[tuple[NotificationChann
 
 
 def provider_for(channel: NotificationChannel) -> Provider | None:
-    """The configured provider, or None while the channel is on "log"."""
     settings = get_settings()
     configured = settings.sms_provider if channel == NotificationChannel.SMS else settings.whatsapp_provider
     if configured == "log":
@@ -155,10 +191,28 @@ def provider_for(channel: NotificationChannel) -> Provider | None:
     raise NotImplementedError(f"{channel.value} provider {configured!r} is not wired in yet")
 
 
+def sms_is_charged() -> bool:
+    """Whether an SMS is handed to a provider that delivers and bills for it, rather than only logged or accepted by
+    a sandbox.
+
+    A per-number cap exists to protect credits. Under SMS_PROVIDER=log, and in Arkesel's sandbox, there are none to
+    protect — the day's page budget already declines to count there — and counting anyway left a resident with
+    nothing sent and nothing left to ask for.
+    """
+    provider = provider_for(NotificationChannel.SMS)
+    return provider is not None and provider.delivers
+
+
 def check_providers() -> None:
-    """At startup: a provider that is named but can't be built stops the API, not the first message."""
+    """A provider that is named but can't be built stops the API at startup, not the first message.
+
+    The daily limit is logged with them: it is read once at startup, and a message refused by a number nobody can
+    see is indistinguishable from a provider that is turned off."""
     for channel in NotificationChannel:
         provider_for(channel)
+    settings = get_settings()
+    logger.info("SMS: %s, up to %d pages a day (%d for codes); WhatsApp: %s", settings.sms_provider,
+                settings.sms_daily_limit, settings.sms_code_daily_limit, settings.whatsapp_provider)
 
 
 def _outbox(case_id: str, event: NotificationEvent, channel: NotificationChannel, message: Message) -> str:
@@ -179,8 +233,25 @@ def _outbox(case_id: str, event: NotificationEvent, channel: NotificationChannel
     return document.id
 
 
+NOTHING_LEFT_US = (SmsNothingSent, WhatsAppNothingSent)
+NO_ANSWER = (SmsUnreachable, WhatsAppUnreachable)
+
+
+def _why_failed(error: Exception) -> str:
+    """Which kind of failure this was, as the prefix the sweep reads back. An unknown one carries none: it means the
+    provider answered, so the message may have gone out, and only the three named kinds are ever sent again.
+
+    Both channels are read the same way. A WhatsApp send that never reached Twilio is the same thing to a resident as
+    an SMS that never reached Arkesel, and a Twilio timeout is the same thing as an Arkesel one.
+    """
+    if isinstance(error, SmsLimitReached):
+        return BUDGET_REFUSED
+    if isinstance(error, NOTHING_LEFT_US):
+        return NOTHING_SENT
+    return UNREACHABLE if isinstance(error, NO_ANSWER) else ""
+
+
 def _deliver(provider: Provider | None, number: str, message: Message) -> dict[str, Any]:
-    """Hand one message to its provider; the outbox fields that record what happened."""
     if provider is None:
         logger.info("Message not sent (no provider configured) to %s: %s", masked(number), message.body)
         return {"status": NotificationStatus.NOT_SENT.value, "provider": "log"}
@@ -188,8 +259,50 @@ def _deliver(provider: Provider | None, number: str, message: Message) -> dict[s
         message_id = provider.send(number, message.body)
     except Exception as error:  # a provider failure must never break the case itself
         logger.exception("Message to %s failed", masked(number))
-        return {"status": NotificationStatus.FAILED.value, "provider": provider.name, "error": str(error)[:500]}
+        return {"status": NotificationStatus.FAILED.value, "provider": provider.name, "error": f"{_why_failed(error)}{error}"[:500]}
     return {"status": NotificationStatus.SENT.value, "provider": provider.name, "providerMessageId": message_id, "sentAt": now_iso()}
+
+
+def _failed_with(row: dict[str, Any], prefix: str) -> bool:
+    return row.get("status") == NotificationStatus.FAILED and (row.get("error") or "").startswith(prefix)
+
+
+def budget_refused(row: dict[str, Any]) -> bool:
+    """True when our own daily budget refused this message: nothing reached anyone, so sending it again is safe."""
+    return _failed_with(row, BUDGET_REFUSED)
+
+
+def nothing_was_sent(row: dict[str, Any]) -> bool:
+    """True when our own side stopped before the provider was asked: the budget, or the counter it needs. Nothing
+    reached anyone, so a later send is this message arriving late, not a second one."""
+    return budget_refused(row) or _failed_with(row, NOTHING_SENT)
+
+
+def provider_unreachable(row: dict[str, Any]) -> bool:
+    """True when the provider never answered: no message ID, so no delivery report and no poll can ever say whether
+    the resident got it. The sweep sends it again once — a duplicate reference is smaller than a silence."""
+    return _failed_with(row, UNREACHABLE)
+
+
+def repaired(row: dict[str, Any]) -> bool:
+    """True when the sweep has already sent this row's message again. It is never sent a third time."""
+    return (row.get("error") or "").startswith(REPAIRED)
+
+
+def _mark(outbox_id: str, changes: dict[str, Any]) -> None:
+    get_databases().update_document(DATABASE_ID, NOTIFICATIONS_COLLECTION, outbox_id, changes)
+
+
+def mark_stale_queued(outbox_id: str, note: str) -> None:
+    """Closes a row left `queued` by a process that died mid-send. We can never learn whether that message went, so
+    the row is settled rather than left open, and the prefix keeps it from being retried a second time."""
+    _mark(outbox_id, {"status": NotificationStatus.FAILED.value, "error": f"{STALE_QUEUED}{note}"[:500]})
+
+
+def mark_repaired(outbox_id: str, note: str, was: str = "") -> None:
+    """Records that the sweep has sent this row's message again. The status is left as it was — `not_sent` really is
+    what happened to this row, and `failed` really was — and the prefix alone settles it."""
+    _mark(outbox_id, {"error": f"{REPAIRED}{note}{f' (was: {was})' if was else ''}"[:500]})
 
 
 def _history_note(event: NotificationEvent, channel: NotificationChannel, outcome: dict[str, Any], provider: Provider | None) -> str:
@@ -197,7 +310,13 @@ def _history_note(event: NotificationEvent, channel: NotificationChannel, outcom
     if outcome["status"] == NotificationStatus.SENT:
         return f"{what} sent." if provider is None or provider.delivers else f"{what} accepted by the provider's sandbox, not delivered."
     if outcome["status"] == NotificationStatus.NOT_SENT:
-        return f"{what} recorded, not sent: no provider is configured yet."
+        return f"{what} recorded, not sent: no provider is configured yet. It will be sent once one is."
+    if budget_refused(outcome):  # nothing left this process, and a later sweep sends it: don't call that a failure
+        return f"{what} not sent: today's message limit was reached. It will be sent again."
+    if nothing_was_sent(outcome):  # likewise: our own side stopped short of the provider
+        return f"{what} not sent: it never reached the provider. It will be sent again."
+    if provider_unreachable(outcome):  # nobody can ever learn whether it went, so it is sent again
+        return f"{what} may not have gone out: the provider didn't answer. It will be sent again."
     return f"{what} failed to send."
 
 
@@ -206,7 +325,6 @@ OUTSIDE_WINDOW_ERROR = "63016"  # Twilio: a free-form WhatsApp message outside t
 
 
 def _send(case_id: str, event: NotificationEvent, channel: NotificationChannel, number: str, message: Message, why: str = "") -> None:
-    """One message: written to the outbox, handed to the provider, and the outcome in the case history."""
     outbox_id = _outbox(case_id, event, channel, message)
     provider = provider_for(channel)
     outcome = _deliver(provider, number, message)
@@ -216,22 +334,77 @@ def _send(case_id: str, event: NotificationEvent, channel: NotificationChannel, 
 
 
 def _sms_can_stand_in(number: str, contact: dict[str, Any]) -> bool:
-    """SMS can carry a WhatsApp update: Twilio is on, the number is Ghanaian and gets no SMS already."""
     return get_settings().whatsapp_provider == "twilio" and number.startswith(f"+{GHANA_CODE}") and not contact.get("phone")
 
 
-def notify(case: dict[str, Any], event: NotificationEvent) -> None:
-    """Message the citizen about one of the three events, on every channel they agreed to."""
+def record_reply(case_id: str, event: NotificationEvent, channel: NotificationChannel, body: str,
+                 provider_message_id: str | None) -> None:
+    """A message the conversation itself already sent, written to the outbox as what it is.
+
+    A report filed in a WhatsApp chat gets its confirmation as the reply to that chat, so nothing went through
+    notify() and the outbox held nothing. The sweep reads an empty outbox as a message a resident never got, and
+    sent it again a quarter of an hour later — a duplicate, and a charge, for every filing on that channel.
+    """
+    sent = provider_message_id is not None
+    outcome = ({"status": NotificationStatus.SENT.value, "provider": "twilio", "providerMessageId": provider_message_id,
+                "sentAt": now_iso()} if sent
+               else {"status": NotificationStatus.NOT_SENT.value, "provider": "log"})
+    said = f"{EVENT_NAMES[event]} {CHANNEL_NAMES[channel]}"
+    note = f"{said} sent." if sent else f"{said} recorded, not sent: no provider is configured yet."
+    try:
+        outbox_id = _outbox(case_id, event, channel, Message("reply", body))
+        get_databases().update_document(DATABASE_ID, NOTIFICATIONS_COLLECTION, outbox_id, outcome)
+        case_history.record(case_id, CaseEntry(CaseHistoryAction.NOTIFIED, SYSTEM, note=note, channel=channel.value))
+    except AppwriteException:
+        # The message is already in the resident's hand; the record of it is what failed. Telling them their report
+        # went wrong would be false, and the worst the lost row costs is one duplicate from the sweep.
+        logger.exception("The WhatsApp confirmation for case %s couldn't be written to the outbox", case_id)
+
+
+def notify_channel(case: dict[str, Any], event: NotificationEvent, channel: NotificationChannel) -> None:
+    """One message, on one channel the resident agreed to. Every send goes through here, whether it is the ordinary
+    one (notify, below, calls this once per agreed channel) or the sweep repairing the one channel still owed.
+
+    The WhatsApp-window rule lives here rather than in notify, so a repair obeys it exactly as a first send does: the
+    window is read at the moment of sending, so repairing the WhatsApp channel hours later may go out by SMS to the
+    same number even though the first attempt went (or tried to go) by WhatsApp, and the other way round. The row it
+    writes then names the SMS channel, which is why the sweep reads a stand-in row as settling the WhatsApp channel.
+    """
+    if not notifiable(case, event):
+        # A personal-safety case moving between services, or being reopened: refused here, the one place every send
+        # passes through, so the sweep can't send later what the ordinary path wouldn't send now. Said aloud, so the
+        # quiet is a decision on the record rather than a message that went missing.
+        logger.info("No %s about case %s (%s): a safety case is never told this", channel.value, case["$id"], EVENT_NAMES[event])
+        return
     contact = contact_for(case["$id"]) or {}
-    for channel, number in channels_for(contact):
-        message = compose(event, case)
-        if channel == NotificationChannel.WHATSAPP and _sms_can_stand_in(number, contact) and not window_open(number):
-            _send(case["$id"], event, NotificationChannel.SMS, number, message, WINDOW_CLOSED)
-        else:
-            _send(case["$id"], event, channel, number, message)
+    number = dict(channels_for(contact)).get(channel)
+    if number is None:
+        # The contact changed between a caller reading it and this send. Nothing is sent and nothing fails, so say so.
+        logger.info("No %s about case %s: the citizen hasn't agreed to it (%s)", channel.value, case["$id"], EVENT_NAMES[event])
+        return
+    message = compose(event, case)
+    if channel == NotificationChannel.WHATSAPP and _sms_can_stand_in(number, contact) and not window_open(number):
+        _send(case["$id"], event, NotificationChannel.SMS, number, message, WINDOW_CLOSED)
+    else:
+        _send(case["$id"], event, channel, number, message)
+
+
+def notify(case: dict[str, Any], event: NotificationEvent) -> None:
+    channels = channels_for(contact_for(case["$id"]) or {})
+    if not channels:
+        # Nothing is sent and nothing fails: without this line the quiet is indistinguishable from a lost message.
+        logger.info("No message about case %s: the citizen agreed to none (%s)", case["$id"], EVENT_NAMES[event])
+    for channel, _ in channels:
+        notify_channel(case, event, channel)
 
 
 def _outbox_row(provider_message_id: str) -> dict[str, Any] | None:
+    if not provider_message_id:
+        # A provider that answers without an ID leaves a row with an empty one, so an empty ID here would match some
+        # other resident's message — and a delivery report about nothing would be written onto it, or the SMS
+        # stand-in sent to whoever it belongs to.
+        logger.warning("A delivery report arrived with no message ID, so no outbox row can answer for it")
+        return None
     rows = get_databases().list_documents(
         DATABASE_ID, NOTIFICATIONS_COLLECTION, queries=[Query.equal("providerMessageId", provider_message_id), Query.limit(1)]
     ).documents
@@ -239,7 +412,6 @@ def _outbox_row(provider_message_id: str) -> dict[str, Any] | None:
 
 
 def record_delivery(provider_message_id: str, status: str, now: datetime) -> bool:
-    """A provider's delivery report, on the outbox row it is about. False if no message has that ID."""
     row = _outbox_row(provider_message_id)
     if row is None:
         return False
@@ -250,7 +422,6 @@ def record_delivery(provider_message_id: str, status: str, now: datetime) -> boo
 
 
 def whatsapp_undelivered(provider_message_id: str, error_code: str) -> bool:
-    """Twilio couldn't deliver a WhatsApp update because the window had closed: send it by SMS instead, once."""
     row = _outbox_row(provider_message_id) if error_code == OUTSIDE_WINDOW_ERROR else None
     if row is None or row["channel"] != NotificationChannel.WHATSAPP.value:
         return False
@@ -266,7 +437,6 @@ def whatsapp_undelivered(provider_message_id: str, error_code: str) -> bool:
 
 
 def notify_quietly(case: dict[str, Any], event: NotificationEvent) -> None:
-    """For background tasks: a messaging failure is logged, never raised."""
     try:
         notify(case, event)
     except Exception:

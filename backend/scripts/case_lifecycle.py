@@ -15,11 +15,11 @@ import sys
 from typing import Any
 
 from appwrite.query import Query
+from report_lifecycle import check, client, failures, file
 
 from app.services import rate_limit
 from app.services.appwrite_client import DATABASE_ID, get_databases, get_teams, get_users
 from app.services.citizen_reports import NOTIFICATIONS_COLLECTION
-from report_lifecycle import check, client, failures, file
 
 
 def token_for(team: str) -> dict[str, str]:
@@ -63,7 +63,7 @@ def work_escalate_reopen() -> None:
     resolved = act(WORKS, case_id, "resolve", note="[TEST] Drain desilted and cover replaced.")
     check("resolve -> resolved, resolution message sent", resolved.json()["status"] == "resolved" and "resolved" in templates(case_id), resolved.text)
     rate_limit.ESCALATIONS._hits.clear()
-    client.post(f"/api/reports/{ref}/escalate", json={"note": "[TEST] It overflowed again on Tuesday."})
+    client.post(f"/api/reports/{ref}/escalate", data={"note": "[TEST] It overflowed again on Tuesday."})
     check("Works can't act while escalated -> 409", act(WORKS, case_id, "resolve", note="again").status_code == 409)
     oversight = client.get("/api/cases/oversight", headers=MCE).json()
     row = next(c for c in oversight["cases"] if c["case_id"] == case_id)

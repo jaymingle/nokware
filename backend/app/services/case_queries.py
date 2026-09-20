@@ -51,7 +51,7 @@ def queue(recipient: str, now: datetime) -> list[tuple[dict[str, Any], dict[str,
 
 
 def all_cases() -> list[dict[str, Any]]:
-    """Every case, newest first, for the MCE's oversight (each shown as its view allows)."""
+    """For the MCE's oversight: each case is shown only as its view allows."""
     listing = get_databases().list_documents(
         DATABASE_ID, REPORTS_COLLECTION, queries=[Query.order_desc("createdAt"), Query.limit(QUEUE_LIMIT)]
     )

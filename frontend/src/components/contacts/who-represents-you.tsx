@@ -21,7 +21,6 @@ function Fact({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-/** The chosen area's sub-metro, chairperson and office, and the switchboard as the way to reach it. */
 function Representative({ match, data }: { match: AreaMatch; data: Representation }) {
   const { area, subMetro, spelledAs } = match;
   return (
@@ -76,7 +75,6 @@ function AreaChoices({ matches, chosen, onChoose }: { matches: AreaMatch[]; chos
   );
 }
 
-/** A citizen finds their electoral area (by any spelling) and sees who represents it. */
 export function WhoRepresentsYou() {
   const { data, error } = useRepresentatives();
   const [query, setQuery] = useState("");

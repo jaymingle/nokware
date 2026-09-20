@@ -1,14 +1,8 @@
 """pgvector-backed vector store for RAG document chunks.
 
-Reads go through langchain-postgres' ``PGVectorStore``, mapped onto the
-pre-provisioned ``document_chunks`` table in ``nokware_rag``. Embeddings are
-Google Gemini ``gemini-embedding-2`` truncated to 768 dimensions to match the
-table's ``VECTOR(768)`` column. ``PGVectorStore.create_sync`` only introspects
-the table and validates that the mapped columns exist; it never alters it.
+``PGVectorStore.create_sync`` only introspects the pre-provisioned table; it never alters it.
 
-Writes bypass PGVectorStore: it inserts random UUID strings as row ids, but
-``id`` here is an integer SERIAL. ``replace_document_chunks`` writes rows with
-psycopg directly and lets Postgres assign ``id`` and ``created_at``.
+Writes bypass PGVectorStore: it inserts random UUID strings as row ids, but ``id`` here is an integer SERIAL.
 
 Table schema:
     id                    SERIAL        -> id_column
@@ -18,8 +12,6 @@ Table schema:
     embedding             VECTOR(768)   -> embedding_column (HNSW, cosine)
     created_at            TIMESTAMPTZ   -> metadata (defaults to now())
     chunk_tsv             TSVECTOR      -> generated from chunk_text; keyword search (GIN)
-
-There is no JSON metadata column, so ``metadata_json_column`` is ``None``.
 
 Note: ``POSTGRES_URL`` must use the psycopg v3 driver scheme, e.g.
 ``postgresql+psycopg://user:pass@host:5432/nokware_rag``.
@@ -51,13 +43,17 @@ EMBEDDING_MODEL = "models/gemini-embedding-2"
 EMBEDDING_DIMENSIONS = 768  # must equal the VECTOR(n) size of the embedding column
 FULLTEXT_COLUMN = "chunk_tsv"  # generated tsvector over chunk_text (migration 0002)
 POOL_MAX_SIZE = 8  # enough for retrieval's parallel keyword queries
+POOL_CONNECT_SECONDS = 10
+# What a caller waits is the pool's checkout timeout, not connect_timeout: its 30s default retried until the page
+# had already given up at 30s, so an unreachable index reached the reader as a generic timeout instead of our 503.
+# One connect attempt plus a second's grace surfaces the first failure rather than a retry loop.
+POOL_CHECKOUT_SECONDS = POOL_CONNECT_SECONDS + 1
 
 _DELETE_SQL = f'DELETE FROM "{TABLE_NAME}" WHERE "{DOCUMENT_ID_COLUMN}" = %s'
 _INSERT_SQL = (
     f'INSERT INTO "{TABLE_NAME}" ("{DOCUMENT_ID_COLUMN}", "{CHUNK_INDEX_COLUMN}", '
     f'"{CONTENT_COLUMN}", "{EMBEDDING_COLUMN}") VALUES (%s, %s, %s, %s)'
 )
-_COUNT_SQL = f'SELECT count(*) FROM "{TABLE_NAME}" WHERE "{DOCUMENT_ID_COLUMN}" = %s'
 
 
 def libpq_url(url: str) -> str:
@@ -105,7 +101,8 @@ def get_pool() -> ConnectionPool:
         libpq_url(get_settings().postgres_url),
         min_size=1,
         max_size=POOL_MAX_SIZE,
-        kwargs={"connect_timeout": 10},
+        timeout=POOL_CHECKOUT_SECONDS,
+        kwargs={"connect_timeout": POOL_CONNECT_SECONDS},
         configure=register_vector,
         check=ConnectionPool.check_connection,
         open=True,
@@ -116,21 +113,14 @@ def get_pool() -> ConnectionPool:
 
 @contextmanager
 def connect() -> Iterator[psycopg.Connection]:
-    """A pooled connection to nokware_rag with the pgvector type registered.
-
-    Commits on normal exit, rolls back on an exception, then returns to the pool.
-    """
+    """Commits on normal exit, rolls back on an exception."""
     with get_pool().connection() as conn:
         yield conn
 
 
 def replace_document_chunks(document_id: str, chunks: list[str], embeddings: list[list[float]]) -> int:
-    """Atomically replace every chunk of one document; returns the number written.
-
-    The delete and inserts run in one transaction, so a retry or re-ingestion
-    never duplicates chunks and an interrupted run never leaves a partial set.
-    Passing no chunks clears the document's rows.
-    """
+    """One transaction, so a retry or re-ingestion never duplicates chunks and an interrupted run never leaves a
+    partial set."""
     if len(chunks) != len(embeddings):
         raise ValueError(f"{len(chunks)} chunks but {len(embeddings)} embeddings")
     rows = [
@@ -145,12 +135,7 @@ def replace_document_chunks(document_id: str, chunks: list[str], embeddings: lis
 
 
 def first_chunks() -> dict[str, str]:
-    """Every document's first chunk (its first page, roughly), by document ID: for checking what a document is."""
+    """A document's first chunk is roughly its first page: enough to check what the document is."""
     with connect() as conn:
         rows = conn.execute(f'SELECT "{DOCUMENT_ID_COLUMN}", "{CONTENT_COLUMN}" FROM "{TABLE_NAME}" WHERE "{CHUNK_INDEX_COLUMN}" = 0').fetchall()
     return {document_id: text for document_id, text in rows}
-
-
-def count_document_chunks(document_id: str) -> int:
-    with connect() as conn:
-        return conn.execute(_COUNT_SQL, (document_id,)).fetchone()[0]

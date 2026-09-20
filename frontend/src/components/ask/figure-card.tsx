@@ -1,8 +1,7 @@
-import Link from "next/link";
 import { ActivityIcon, LandmarkIcon } from "lucide-react";
+import Link from "next/link";
 
 import { LedgerPdfLink } from "@/components/ask/ledger-pdf-link";
-
 import { countedAt, labelNumber } from "@/lib/ask/figures";
 import { cn } from "@/lib/utils";
 
@@ -23,7 +22,6 @@ function Breakdown({ figure }: { figure: AskFigure }) {
 
 type FigureCardProps = { figure: AskFigure; anchorId: string; highlighted: boolean; testIdPrefix: string };
 
-/** Where a budget figure comes from: the document, the year, and how much of it the rows cover. */
 function ReadFromDocument({ figure, testId }: { figure: AskFigure; testId: string }) {
   return (
     <div className="flex flex-col gap-1.5 text-[12px] text-ink-soft">
@@ -37,7 +35,6 @@ function ReadFromDocument({ figure, testId }: { figure: AskFigure; testId: strin
   );
 }
 
-/** A figure cited beside the documents: a live count of reports, or an approved amount read from a budget. */
 export function FigureCard({ figure, anchorId, highlighted, testIdPrefix }: FigureCardProps) {
   const fromDocument = figure.source === "documents";
   return (

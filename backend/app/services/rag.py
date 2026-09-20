@@ -1,24 +1,12 @@
 """Ask: answer a question from the Ledger with verifiable citations.
 
-Retrieval (hybrid, edition-aware, de-duplicated) supplies up to eight chunks.
-Each document is shown to gemini-2.5-flash under a short label ([S1], [S2], ...)
-with its title, year, department and source type; raw document ids never appear
-in the prompt. The model cites labels, and sanitize_citations() drops any label
-that does not map to a retrieved document. The answer and its labelled sources
-are returned together, so every citation resolves to a real document.
+Raw document ids never appear in the prompt: the model cites short labels ([S1]), and sanitize_citations() drops
+any label that doesn't map to a retrieved document, so every citation resolves to a real document.
 
-Years come from ``documentYear`` (the year of the document itself), never
-``publishedAt``, which is when the document was added to the Ledger.
+Years come from ``documentYear`` (the year of the document itself), never ``publishedAt``, which is when the
+document was added to the Ledger.
 
-A question about reports residents have filed also gets live figures
-(ask_figures.py), counted while retrieval runs. Each figure is a source under an
-R label ([R1]) beside the documents, and the model is told to say when a figure
-is live report data rather than a document. Personal-safety figures are never
-given: the answer says so in fixed words.
-
-answer_question() returns the whole answer at once; stream_answer() yields the
-same pipeline's progress as events (searching, the sources found, the answer
-text as it is written, then the checked answer), so a reader sees it working.
+Live report figures ([R1]) are kept apart from documents, and personal-safety figures are never given.
 """
 
 from collections.abc import Iterator
@@ -32,29 +20,29 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import Runnable
 
 from app.services.ask_charts import (
-    DOCUMENT_CHART_REFUSAL,
-    SPREADSHEET_REFUSAL,
+    ALL_ZERO,
+    ONE_COUNT,
+    ONE_MONTH,
+    TOTAL_AND_PARTS,
     ChartDict,
     asks_for_chart,
     asks_for_spreadsheet,
     chart_for,
     document_chart,
 )
-from app.services.ask_document_charts import figures_to_chart
+from app.services.ask_document_charts import read_for_chart
 from app.services.ask_figures import (
     NO_FIGURES,
-    NO_SAFETY_DOCUMENTS,
     SAFETY_FIGURES_ANSWER,
-    SAFETY_IN_DOCUMENTS,
     Figure,
     FigurePlan,
     figure_context,
     wants_figures,
 )
 from app.services.ask_figures import plan as plan_figures
+from app.services.ask_language import Asked, failed_note, read_question, translate_answer
 from app.services.budget_figures import context as budget_context
 from app.services.budget_figures import years as budget_years
-from app.services.ask_language import Asked, failed_note, read_question, translate_answer
 from app.services.citations import make_label, sanitize_citations
 from app.services.ledger_documents import Provenance, provenance, utc_now
 from app.services.llm import get_chat_model
@@ -120,11 +108,10 @@ _PROMPT = ChatPromptTemplate.from_messages(
 
 
 class AnswerLength(StrEnum):
-    """How long an answer may be: in full on the web, shorter in a chat, a sentence or two by SMS."""
-
     WEB = "web"
     CHAT = "chat"
     SMS = "sms"
+    SMS_SHORTER = "sms_shorter"  # asked for once, when what SMS produced still needed a fourth page
 
 
 # Only the length changes between channels: the same sources, figures, citation and safety rules apply.
@@ -134,9 +121,17 @@ _LENGTH_RULES = {
         "\n\nThis answer goes to a phone chat: keep it under 1,000 characters. Give the most important points "
         "only, as short paragraphs or a few bullets, and still cite each one."
     ),
+    # The composer pages this into three SMS parts and spends the rest of them on the citation and the web address,
+    # so what is asked for here is what is left. An answer written past it is asked for again, never cut.
     AnswerLength.SMS: (
-        "\n\nThis answer goes by SMS: at most 240 characters of plain text, one or two sentences with the single "
-        "most important point, cited. No lists and no formatting."
+        "\n\nThis answer is read as a text message on a phone. Hard limit: 300 characters in total, about two "
+        "sentences. Give the figures that answer the question, cited, and stop there: a complete short answer, "
+        "never a first instalment and never a sentence left unfinished. No lists, no bullets, no formatting."
+    ),
+    AnswerLength.SMS_SHORTER: (
+        "\n\nThis answer is read as a text message and the last one written was too long to send. Hard limit: 160 "
+        "characters in total, one sentence. Give the single figure or fact that answers the question, cited, and "
+        "nothing else. It must be a complete sentence: shorten by leaving things out, never by stopping early."
     ),
 }
 
@@ -189,8 +184,6 @@ class RagAnswer(TypedDict):
 
 @dataclass(frozen=True)
 class Prepared:
-    """A question with its retrieved chunks, each document under its citation label."""
-
     question: str
     chunks: list[RetrievedChunk]
     labels: dict[str, str]  # {document_id: "S1", ...}
@@ -199,12 +192,10 @@ class Prepared:
 
     @property
     def has_sources(self) -> bool:
-        """Whether there is anything to answer from: passages, live counts, budget figures, or a gap to explain."""
         return bool(self.chunks or self.figures.figures or self.figures.budget or self.figures.budget_missing)
 
 
 def _assign_labels(chunks: list[RetrievedChunk]) -> dict[str, str]:
-    """One label per document, numbered in retrieval order: {document_id: "S1", ...}."""
     labels: dict[str, str] = {}
     for retrieved in chunks:
         labels.setdefault(retrieved.chunk.document_id, make_label(len(labels) + 1))
@@ -292,12 +283,10 @@ def _to_sources(chunks: list[RetrievedChunk], labels: dict[str, str], cited: set
 
 
 def answer_status(answer: str) -> AnswerStatus:
-    """Whether the Ledger answered, from the fixed no-information reply the model is told to give."""
     return "no_information" if answer.strip().startswith(NO_INFO_ANSWER) else "answered"
 
 
 def prepare(question: str) -> Prepared:
-    """Retrieve documents and, while that runs, count any live figures the question needs."""
     with ThreadPoolExecutor(max_workers=1) as pool:
         planned = pool.submit(plan_figures, question, utc_now())
         retrieval = retrieve(question)
@@ -321,35 +310,59 @@ def _prompt_input(prepared: Prepared, length: AnswerLength = AnswerLength.WEB) -
 
 
 def _budget_gap(prepared: Prepared) -> str:
-    """What the resident asked for that Nokware holds no budget figures for: said plainly, never filled in."""
     missing = prepared.figures.budget_missing
     if not missing:
         return ""
     held = ", ".join(str(year) for year in budget_years()) or "none"
     return ("Nokware holds no budget figures for: " + "; ".join(missing) + f". The budget years it holds are {held}. "
-            "Do not give the no-information reply here. Say plainly that the figures they asked for aren't "
-            "available and name the budget years there are, so the gap is explained rather than left looking like "
-            "the figures are being withheld. Never estimate them from another year, another department or a "
-            "document not listed above.")
+            "Do not give the no-information reply here. Say plainly, in your first sentence, what was asked for "
+            "and isn't held. Then give the figures above that are held, with their [B#] citations, saying which "
+            "year each belongs to — an answer that names the gap and stops leaves the resident with nothing, when "
+            "the figures beside the one they asked for are right here. Never present a year you do hold as the "
+            "year they asked for, and never estimate one from another year, another department or a document not "
+            "listed above.")
 
 
 BODY = "\x00body"  # where the answer itself goes among the fixed sentences around it
 
 
-def _notices(body: str, prepared: Prepared, question: str, chart: ChartDict | None, note: str | None,
-             figures: list[FigureSource]) -> list[list[str]]:
-    """The answer as paragraphs of catalogue keys around BODY, so each language writes its own fixed sentences.
+NO_ANSWER_TO_CHART = phrase("ask.no_answer_to_chart")
+NO_FIGURES_TO_CHART = phrase("ask.no_figures_to_chart")
+# A note is written in English and shown in the language asked; the composed ones (a chart kind, a cap) stay English.
+_NOTE_KEYS = {ONE_COUNT: "ask.one_count", ONE_MONTH: "ask.one_month", ALL_ZERO: "ask.all_zero",
+              TOTAL_AND_PARTS: "ask.total_and_parts_only", NO_ANSWER_TO_CHART: "ask.no_answer_to_chart",
+              NO_FIGURES_TO_CHART: "ask.no_figures_to_chart"}
 
-    Nokware's safety figures are refused whatever else is said: the refusal covers its own report counts, which
-    could identify a person, never AMA's documents, which are public and downloadable by anyone.
+
+def _why_no_chart(prepared: Prepared, body: str, chart: ChartDict | None, table_refused: bool) -> str | None:
+    """A chart that can't be drawn is always accounted for: a request answered with nothing tells the reader
+    neither that it failed nor that it was never tried. The safety refusal and the unprovable table are paragraphs
+    of their own."""
+    if chart is not None or not asks_for_chart(prepared.question) or prepared.figures.safety_asked or table_refused:
+        return None
+    return NO_ANSWER_TO_CHART if answer_status(body) != "answered" else NO_FIGURES_TO_CHART
+
+
+def _note_in(note: str | None, language: Language) -> str | None:
+    key = _NOTE_KEYS.get(note or "")
+    return phrase(key, language) if key else note
+
+
+def _notices(body: str, prepared: Prepared, question: str, table_refused: bool,
+             figures: list[FigureSource]) -> list[list[str]]:
+    """Paragraphs of catalogue keys around BODY, so each language writes its own fixed sentences.
+
+    The safety refusal covers Nokware's own report counts, which could identify a person, never AMA's documents,
+    which are public.
     """
     answered = answer_status(body) == "answered"
     if prepared.figures.safety_asked and SAFETY_FIGURES_ANSWER not in body:
+        no_chart = ["ask.no_safety_chart"] if asks_for_chart(question) else []
         if not answered:  # no document answers it either, and saying so beats leaving figures looking withheld
-            return [["ask.safety_figures", "ask.no_safety_documents"]]
-        return [["ask.safety_figures"], ["ask.safety_in_documents"], [BODY]]
+            return [["ask.safety_figures", "ask.no_safety_documents", *no_chart]]
+        return [["ask.safety_figures", *no_chart], ["ask.safety_in_documents"], [BODY]]
     paragraphs = []
-    if answered and asks_for_chart(question) and chart is None and note is None:
+    if answered and table_refused:
         paragraphs.append(["ask.document_chart_refusal"])
     if answered and asks_for_spreadsheet(question) and not any(figure["cited"] for figure in figures):
         paragraphs.append(["ask.spreadsheet_refusal"])
@@ -357,30 +370,34 @@ def _notices(body: str, prepared: Prepared, question: str, chart: ChartDict | No
 
 
 def _written(paragraphs: list[list[str]], body: str, language: Language) -> str:
-    """The answer in one language: the body as written, every fixed sentence from the catalogue."""
     return "\n\n".join(" ".join(body if part == BODY else phrase(part, language) for part in paragraph)
                         for paragraph in paragraphs)
 
 
-def _from_documents(prepared: Prepared, answer: str, sources: list[Source]) -> ChartDict | None:
-    """A chart of the figures in the cited passages, drawn only where each one is proved against them."""
+def _from_documents(prepared: Prepared, answer: str, sources: list[Source]) -> tuple[ChartDict | None, bool]:
+    """(chart, whether a table was found and couldn't be proved). Drawn only where each figure is proved against the
+    cited passages. Finding nothing chartable is not the same as failing to prove a table, and saying the second
+    when the first happened tells a reader their question hit a limit that wasn't there."""
     passages = [source["chunk_text"] for source in sources if source["cited"]]
-    plotted = figures_to_chart(prepared.question, answer, passages) if passages else None
-    return document_chart(prepared.question, plotted) if plotted else None
+    if not passages:
+        return None, False
+    plotted, found = read_for_chart(prepared.question, answer, passages)
+    chart = document_chart(prepared.question, plotted) if plotted else None
+    return chart, found and chart is None
 
 
 def finish(prepared: Prepared, raw_answer: str, asked: Asked | None = None) -> RagAnswer:
-    """The checked answer: only real citations kept, sources and figures marked cited or not, any chart, and —
-    where the question wasn't in English — the answer in the language it was asked in, if every figure survives."""
     valid = (set(prepared.labels.values()) | {f.label for f in prepared.figures.figures}
              | {f.label for f in prepared.figures.budget})
     body, cited = sanitize_citations(raw_answer if prepared.has_sources else NO_INFO_ANSWER, valid)
     figures = _to_figures(prepared, cited)
     sources = _to_sources(prepared.chunks, prepared.labels, cited)
     chart, chart_note = chart_for(prepared.question, [dict(f) for f in figures if f["cited"]])
+    table_refused = False
     if chart is None and chart_note is None and asks_for_chart(prepared.question):
-        chart = _from_documents(prepared, body, sources)
-    paragraphs = _notices(body, prepared, prepared.question, chart, chart_note, figures)
+        chart, table_refused = _from_documents(prepared, body, sources)
+    chart_note = chart_note or _why_no_chart(prepared, body, chart, table_refused)
+    paragraphs = _notices(body, prepared, prepared.question, table_refused, figures)
     in_english = _written(paragraphs, body, Language.ENGLISH)
     answer, language, translated = _in_the_language_asked(paragraphs, body, in_english, asked)
     return RagAnswer(
@@ -393,13 +410,13 @@ def finish(prepared: Prepared, raw_answer: str, asked: Asked | None = None) -> R
         figures=figures,
         search_queries=prepared.queries,
         chart=chart,
-        chart_note=chart_note,
+        chart_note=_note_in(chart_note, language),
     )
 
 
 def _in_the_language_asked(paragraphs: list[list[str]], body: str, in_english: str,
                            asked: Asked | None) -> tuple[str, Language, bool]:
-    """The answer to show: the language asked for where every figure and citation survived, the English otherwise."""
+    """English unless every figure and citation survived translation."""
     if asked is None or not asked.translated:
         return in_english, Language.ENGLISH, False
     if answer_status(body) == "no_information":  # the body is a fixed sentence: the catalogue has it already
@@ -411,11 +428,8 @@ def _in_the_language_asked(paragraphs: list[list[str]], body: str, in_english: s
 
 
 def answer_question(question: str, length: AnswerLength = AnswerLength.WEB, languages: bool = False) -> RagAnswer:
-    """Answer from the Ledger, at the length the channel allows. Every [S#] left maps to a returned source.
-
-    With languages on (the web), a question in French or Twi is answered in that language: it is read into English
-    first, so every rule in the pipeline still applies, and the answer is translated back only if its figures and
-    citations survive. The channels answer in English, as they always have.
+    """A French or Twi question is read into English first, so every rule in the pipeline still applies, and
+    translated back only if its figures and citations survive. The channels answer in English.
     """
     asked = read_question(question) if languages else None
     prepared = prepare(asked.english if asked else question)
@@ -425,11 +439,8 @@ def answer_question(question: str, length: AnswerLength = AnswerLength.WEB, lang
 
 
 def stream_answer(question: str, languages: bool = False) -> Iterator[dict[str, Any]]:
-    """The answer as events: stage, sources, deltas of raw text, then the checked answer.
-
-    Deltas are the model's raw text, shown while it writes; the final "done"
-    event carries the sanitized answer that replaces them, so a citation the
-    checker removes never survives.
+    """Deltas are the model's raw text; the final "done" event carries the sanitized answer that replaces them,
+    so a citation the checker removes never survives.
     """
     asked = read_question(question) if languages else None
     english_question = asked.english if asked else question

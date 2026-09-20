@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from app.services import phrases
-from app.services.phrases import DATA, Language, english, is_critical, keys, missing, phrase, shows_english
+from app.services.phrases import DATA, Language, english, is_critical, keys, missing, phrase
 
 CRITICAL = "safety.steps.someone_else"  # a lost negative here tells someone to confront an abuser
 ORDINARY = "ask.no_information"
@@ -25,7 +25,6 @@ def test_text_someone_acts_on_in_danger_stays_english_until_a_named_person_revie
     written = catalogue(Language.FRENCH)[CRITICAL]["text"]
     assert written and written != english(CRITICAL)  # French is drafted…
     assert phrase(CRITICAL, Language.FRENCH) == english(CRITICAL)  # …and still not shown
-    assert shows_english(CRITICAL, Language.FRENCH)
 
 
 def test_a_reviewed_translation_ships(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -33,8 +32,6 @@ def test_a_reviewed_translation_ships(monkeypatch: pytest.MonkeyPatch) -> None:
     reviewed[CRITICAL] = {**reviewed[CRITICAL], "reviewed_by": "A. Mensah", "reviewed_on": "2026-09-20"}
     monkeypatch.setattr(phrases, "_catalogue", lambda language: reviewed if language is Language.FRENCH else catalogue(language))
     assert phrase(CRITICAL, Language.FRENCH) == reviewed[CRITICAL]["text"]
-    assert not shows_english(CRITICAL, Language.FRENCH)
-    assert phrases.reviewer(CRITICAL, Language.FRENCH) == "A. Mensah"
 
 
 def test_a_language_with_nothing_written_shows_english_throughout() -> None:

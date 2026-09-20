@@ -2,7 +2,7 @@ import { ArrowRightIcon } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
-/** Questions the Ledger is known to answer, so a first visit starts somewhere useful. */
+/** Questions the Ledger is known to answer. */
 const SUGGESTIONS = [
   "How do I get a building permit?",
   "What fees does AMA charge for market stalls?",
@@ -16,11 +16,7 @@ export function SuggestedQuestions({ onAsk, disabled, compact = false }: Suggest
   return (
     <div className="flex flex-col gap-2.5">
       <p className="text-[13px] font-medium text-ink">Try asking</p>
-      {/*
-        Tinted, with the arrow a link carries. As plain bordered boxes of
-        left-aligned text these read as form fields, and the one thing on the
-        page a first visitor should press looked like something to type in.
-      */}
+      {/* Tinted, with an arrow: as plain bordered boxes these read as form fields to type in. */}
       <ul className={cn("grid gap-2", !compact && "sm:grid-cols-2")}>
         {SUGGESTIONS.map((question, index) => (
           <li key={question}>

@@ -30,7 +30,7 @@ class AskSource(BaseModel):
     """One retrieved chunk; a document's chunks share its label."""
 
     label: str  # "S1": the citation label used in the answer text
-    cited: bool  # whether the answer cites this source's label
+    cited: bool
     document_id: str
     title: str | None
     chunk_text: str
@@ -117,6 +117,8 @@ class ExportView(BaseModel):
     figures: list[AskFigure]  # cited only
     chart: AskChart | None
     chart_note: str | None
+    spoken: str | None = None  # the answer in the language it was asked in, when that isn't English
+    language: str = "en"
     token: str
 
 
@@ -132,6 +134,7 @@ class AskResponse(BaseModel):
     chart_note: str | None = None  # why the chart isn't the kind asked for, or why there is none
     export: ExportView
     speakable: bool = False  # whether it can be read aloud: never an answer about someone's safety
+    speech_note: str | None = None  # why it can't be, when it can't
 
 
 class AskExportRequest(BaseModel):
@@ -163,7 +166,7 @@ class DoneEvent(BaseModel):
     """The checked answer, which replaces the streamed text, and the labels it cites."""
 
     type: Literal["done"]
-    answer: str  # what the resident reads: their own language where it could be translated safely
+    answer: str
     answer_english: str = ""  # the answer as written and checked; the sources are in English
     language: str = "en"  # the language the answer is written in: "en", "fr" or "tw"
     translated: bool = False  # whether a machine translated it from the English
@@ -172,7 +175,8 @@ class DoneEvent(BaseModel):
     chart: AskChart | None = None
     chart_note: str | None = None
     export: ExportView | None = None  # what POST /api/ask/export takes back, signed
-    speakable: bool = False  # whether it can be read aloud: never an answer about someone's safety
+    speakable: bool = False
+    speech_note: str | None = None
 
 
 class ErrorEvent(BaseModel):

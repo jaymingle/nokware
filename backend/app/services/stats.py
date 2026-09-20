@@ -1,20 +1,14 @@
-"""Counts over citizen reports for the public: Ask's live figures and the dashboard. Aggregates only.
+"""Public counts over citizen reports (Ask's live figures and the dashboard), with the rules enforced here so no
+caller can skip them:
 
-The rules are enforced here, so no caller can skip them:
-
-- Personal safety is never counted. It is not a filter, and it is left out of
-  every count and total; otherwise a total less the visible topics would give
-  its number away.
-- A count from 1 to 4 is shown as "fewer than 5" (``shown``). Zero is shown.
+- Personal safety is left out of every count and total, not just unfiltered: a total less the visible topics would
+  otherwise give its number away.
+- A count from 1 to 4 is shown as "fewer than 5". Zero is shown.
 - Callers get numbers only, never a case's content.
 
-Known limit: any system that answers counts allows differencing. Comparing the
-count for one electoral area with its sub-metro's, or a total with its parts,
-can narrow a suppressed cell. Leaving personal safety out entirely is the
-protection that matters; for civic and public-safety counts, the residual risk
+Known limit: comparing an electoral area with its sub-metro, or a total with its parts, can narrow a suppressed
+cell. Leaving personal safety out entirely is the protection that matters; for the other counts the residual risk
 is accepted and documented.
-
-The case list is read from Appwrite at most once a minute and shared.
 """
 
 import threading
@@ -29,13 +23,13 @@ from typing import Any
 from appwrite.query import Query
 
 from app.services.appwrite_client import every_record
-from app.services.case_workflow import CaseStatus
+from app.services.case_workflow import SMALL_COUNT, CaseStatus
 from app.services.citizen_reports import REPORTS_COLLECTION
-from app.services.test_fixtures import TEST_PREFIX
 from app.services.ledger_documents import parse_datetime
 from app.services.report_taxonomy import TOPICS_BY_ID, Category
+from app.services.test_fixtures import TEST_PREFIX
 
-SMALL = 5  # counts below this (other than zero) are never shown as numbers
+SMALL = SMALL_COUNT  # counts below this (other than zero) are never shown as numbers
 FEWER_THAN_SMALL = "fewer than 5"
 CACHE_SECONDS = 60
 CASE_FIELDS = ["category", "isSensitive", "topic", "wardLocation", "subMetro", "recipients", "status", "createdAt", "resolvedAt"]
@@ -59,7 +53,7 @@ class StatusGroup(StrEnum):
 
 
 def shown(count: int) -> int | None:
-    """A count as the public may see it: None ("fewer than 5") from 1 to 4."""
+    """None means "fewer than 5"."""
     return None if 0 < count < SMALL else count
 
 
@@ -139,9 +133,8 @@ def month_key(moment: datetime) -> str:
 
 
 def by_month(cases: list[dict[str, Any]], wanted: ReportFilter, now: datetime) -> list[tuple[str, int]]:
-    """Counts per calendar month ("2026-09"), oldest first, with the months that had none, up to the last 24:
-    from the period's start, but never before Nokware's first report (a month before it began isn't a month
-    with none)."""
+    """Oldest first, including months with none, but never before Nokware's first report: a month before it began
+    isn't a month with none."""
     dates = [d for d in (parse_datetime(c.get("createdAt")) for c in cases if matches(c, wanted, now)) if d]
     counts = Counter(month_key(d) for d in dates)
     first_ever = min((d for d in (parse_datetime(c.get("createdAt")) for c in cases) if d), default=now)
@@ -152,7 +145,6 @@ def by_month(cases: list[dict[str, Any]], wanted: ReportFilter, now: datetime) -
 
 
 def month_label(key: str) -> str:
-    """"2026-09" as "Sep 2026"."""
     return datetime.strptime(key, "%Y-%m").strftime("%b %Y")
 
 
@@ -161,8 +153,7 @@ def topic_label(topic: str) -> str:
 
 
 def _fetch_public_cases() -> list[dict[str, Any]]:
-    """Every report the public figures may count. Test fixtures are filtered out by the database, so their
-    descriptions never enter this path at all."""
+    """Test fixtures are filtered out by the database, so their descriptions never enter this path at all."""
     return every_record(
         REPORTS_COLLECTION,
         [
@@ -180,7 +171,6 @@ class _Cache:
         self._lock = threading.Lock()
 
     def get(self) -> tuple[float, list[dict[str, Any]]]:
-        """(when it was read, as time.time(); the cases)."""
         with self._lock:
             if self._value is None or time.time() - self._value[0] > self.seconds:
                 self._value = (time.time(), self.make())
@@ -190,14 +180,13 @@ class _Cache:
         self._value = None
 
 
-CASES = _Cache(CACHE_SECONDS, lambda: _fetch_public_cases())
+CASES = _Cache(CACHE_SECONDS, _fetch_public_cases)
 
 
 def public_cases() -> list[dict[str, Any]]:
-    """Every report but personal safety, with only the fields counts need; at most a minute old."""
     return CASES.get()[1]
 
 
 def counted_at() -> float:
-    """When the shared case list was read (time.time())."""
+    """As time.time()."""
     return CASES.get()[0]

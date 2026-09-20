@@ -1,12 +1,14 @@
 "use client";
 
-import { useState } from "react";
 import { ChevronRightIcon } from "lucide-react";
+import { useState } from "react";
 
 import { ErrorNote } from "@/components/documents/panels";
+import { StatusMark } from "@/components/status-tag";
 import { Button } from "@/components/ui/button";
 import { useDocumentDetail } from "@/lib/api/queries";
 import { historyActor, historyLabel } from "@/lib/history";
+import { historyTone } from "@/lib/status";
 import { formatDateTime } from "@/lib/time";
 
 import type { HistoryEntry } from "@/lib/api/types";
@@ -15,7 +17,7 @@ function TrailEntry({ entry }: { entry: HistoryEntry }) {
   const who = [historyActor(entry), formatDateTime(entry.at)].filter(Boolean).join(" · ");
   return (
     <li className="grid grid-cols-[12px_minmax(0,1fr)] gap-2.5 pb-3.5 last:pb-0">
-      <span aria-hidden className="mt-[7px] size-[5px] rounded-full bg-teal" />
+      <StatusMark tone={historyTone(entry.action)} className="mt-[3px] size-3" />
       <div>
         <p className="text-[13px]">{historyLabel(entry.action)}</p>
         <p className="text-[12px] text-ink-soft tabular-nums">{who}</p>
@@ -47,7 +49,6 @@ function Trail({ documentId }: { documentId: string }) {
   );
 }
 
-/** A document's audit trail, oldest first, loaded when opened: who did what, and when. */
 export function ChainOfCustody({ documentId }: { documentId: string }) {
   const [open, setOpen] = useState(false);
   return (

@@ -1,6 +1,6 @@
 """The portal's document rules: roles, ownership, states, clocks and changes."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
@@ -23,7 +23,7 @@ from app.services.workflow import (
     transition,
 )
 
-NOW = datetime(2026, 9, 13, 12, 0, tzinfo=timezone.utc)
+NOW = datetime(2026, 9, 13, 12, 0, tzinfo=UTC)
 FINANCE = Principal("u-fin", "Finance", "f@x.org", Role.DEPARTMENT, "dept-finance")
 WORKS = Principal("u-works", "Works", "w@x.org", Role.DEPARTMENT, "dept-works")
 CONTRIBUTOR = Principal("u-con", "Contributor", "c@x.org", Role.CONTRIBUTOR)
@@ -49,8 +49,6 @@ def escalated(**fields: Any) -> dict[str, Any]:
         LedgerStatus.DISPUTED, **{"escalatedToMce": True, "heldUntil": (NOW + timedelta(hours=5)).isoformat(), **fields}
     )
 
-
-# Department review of held documents
 
 
 def test_department_accepts_its_held_document() -> None:
@@ -97,8 +95,6 @@ def test_no_review_once_the_clock_has_run_out() -> None:
     with pytest.raises(WrongState, match="published automatically"):
         transition(Action.DISPUTE, expired, FINANCE, NOW, note="too late")
 
-
-# Contributor responses to a dispute
 
 
 def test_contributor_accepts_the_dispute() -> None:
@@ -155,8 +151,6 @@ def test_contributor_cannot_act_once_escalated() -> None:
             transition(action, escalated(), CONTRIBUTOR, NOW, note="n", file_id="f")
 
 
-# MCE rulings
-
 
 def test_mce_upholds_or_overrules_escalated_disputes() -> None:
     assert transition(Action.UPHOLD, escalated(), MCE, NOW).changes["status"] == "withdrawn"
@@ -173,8 +167,6 @@ def test_departments_cannot_rule_on_escalations() -> None:
         transition(Action.OVERRULE, escalated(), FINANCE, NOW)
 
 
-# The clock
-
 
 def test_expired_held_and_escalated_documents_publish() -> None:
     past = (NOW - timedelta(seconds=1)).isoformat()
@@ -185,11 +177,9 @@ def test_expired_held_and_escalated_documents_publish() -> None:
 
 def test_nothing_expires_early_or_while_waiting_on_the_contributor() -> None:
     assert expiry(doc(LedgerStatus.HELD), NOW) is None
-    assert expiry(doc(LedgerStatus.DISPUTED), NOW) is None  # no clock
+    assert expiry(doc(LedgerStatus.DISPUTED), NOW) is None
     assert expiry(doc(LedgerStatus.WITHDRAWN, heldUntil=(NOW - timedelta(days=1)).isoformat()), NOW) is None
 
-
-# What each role sees and may do
 
 
 def test_allowed_actions_match_the_rules() -> None:
@@ -209,8 +199,6 @@ def test_visibility() -> None:
     assert not can_view(WORKS, held) and not can_view(OTHER_CONTRIBUTOR, held)
     assert can_view(OTHER_CONTRIBUTOR, doc(LedgerStatus.PUBLISHED))
 
-
-# Uploads
 
 SUBMISSION = Submission(title="Budget", category="Annual Reports", document_year=2025, department=None, source_url=None)
 

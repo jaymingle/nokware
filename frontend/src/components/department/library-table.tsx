@@ -3,8 +3,8 @@
 import { useState } from "react";
 
 import { EmptyPanel, ErrorPanel, LoadingPanel } from "@/components/documents/panels";
-import { IngestionTag } from "@/components/documents/tag";
 import { ViewPdfButton } from "@/components/documents/view-pdf-button";
+import { IngestionTag } from "@/components/status-tag";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { LIBRARY_PAGE_SIZE, useLibrary } from "@/lib/api/queries";

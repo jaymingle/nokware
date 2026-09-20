@@ -1,12 +1,8 @@
 """Audio for WhatsApp voice notes and the web's read-aloud, through PyAV (FFmpeg bundled in its wheel: nothing to
 install on the server).
 
-A spoken reply on WhatsApp goes as OGG/Opus, the format WhatsApp plays as a voice
-note (Twilio accepts OGG only with the Opus codec). If Opus can't be encoded, MP3
-is the fallback: WhatsApp shows it as an audio file rather than a voice note. The
-web gets MP3 first, the one format every browser plays (Safari included), and
-OGG/Opus only if MP3 fails. Incoming audio is only measured here, or re-encoded
-when Gemini can't read its format.
+WhatsApp gets OGG/Opus first, the format it plays as a voice note (Twilio accepts OGG only with the Opus codec); MP3
+shows as an audio file instead. The web gets MP3 first, the one format every browser plays (Safari included).
 """
 
 import io
@@ -39,7 +35,7 @@ FORMATS = (("ogg", "libopus", OPUS_BITRATE, "audio/ogg", "ogg"), ("mp3", "libmp3
 
 
 def seconds(data: bytes) -> float:
-    """How long a recording is. Raises AudioRejected if it isn't readable audio."""
+    """Raises AudioRejected if it isn't readable audio."""
     try:
         with av.open(io.BytesIO(data)) as container:
             if not container.streams.audio:
@@ -48,9 +44,9 @@ def seconds(data: bytes) -> float:
                 return container.duration / av.time_base
             stream = container.streams.audio[0]
             return float(sum(frame.samples for frame in container.decode(stream)) / (stream.rate or SAMPLE_RATE))
-    except (av.FFmpegError, OSError, ValueError) as error:
-        if isinstance(error, AudioRejected):
-            raise
+    except AudioRejected:
+        raise
+    except (av.FFmpegError, OSError, ValueError):
         raise AudioRejected("That voice note couldn't be played.") from None
 
 
@@ -82,12 +78,12 @@ def _encode(source: bytes, container_format: str, codec: str, bitrate: int) -> b
 
 
 def voice_note(source: bytes) -> Encoded:
-    """Any recording as a WhatsApp voice note: OGG/Opus, or MP3 if Opus fails. Raises AudioRejected."""
+    """Raises AudioRejected."""
     return _first_that_encodes(source, FORMATS)
 
 
 def for_browser(source: bytes) -> Encoded:
-    """Any recording for a web page to play: MP3, or OGG/Opus if MP3 fails. Raises AudioRejected."""
+    """Raises AudioRejected."""
     return _first_that_encodes(source, tuple(reversed(FORMATS)))
 
 

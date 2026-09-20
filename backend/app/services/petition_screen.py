@@ -10,6 +10,11 @@ One only warns: Gemini's reading that the petition names a private person. A
 model can be wrong about who is a public official, so the creator may edit it
 or send it as it is, and the MCE, who can refuse it for that reason, decides.
 If Gemini can't be reached, the petition goes on with the pattern checks alone.
+
+Shorter words written under a petition — a resident's comment, a department's
+note, the creator's reply to the MCE — pass screened() below: the same two
+checks, refusing with the reason rather than quietly mending anything. It is
+written once here so no page can end up with a screen of its own.
 """
 
 import logging
@@ -21,6 +26,8 @@ from google.genai import errors, types
 from pydantic import BaseModel, ValidationError
 
 from app.services.llm import CHAT_MODEL, get_genai_client
+from app.services.petition_rules import InvalidPetition
+from app.services.phrases import phrase
 from app.services.report_rules import suggests_danger_to_a_person
 
 logger = logging.getLogger(__name__)
@@ -55,11 +62,12 @@ class Screening:
 
 
 def personal_data(text: str) -> str | None:
-    """What kind of personal data the text holds, if any."""
     return next((kind for kind, pattern in _PERSONAL_DATA if pattern.search(text)), None)
 
 
-def _private_person(text: str) -> str | None:
+def private_person(text: str) -> str | None:
+    """Whether the words name a private individual, as the model reads them. Advisory: a model that fails or times
+    out returns None, because a check nobody can run is not a reason to stop someone working."""
     config = types.GenerateContentConfig(
         temperature=0.0, thinking_config=types.ThinkingConfig(thinking_budget=0),
         response_mime_type="application/json", response_schema=_Reading,
@@ -75,8 +83,38 @@ def _private_person(text: str) -> str | None:
     return (reading.private_individual.strip() or "someone") if reading.names_private_individual else None
 
 
+@dataclass(frozen=True)
+class Refusals:
+    """What is said when short words written under a petition can't be kept as written: a comment, a department's
+    note, the creator's reply. The keys differ because each is read in a different place; the checks never do."""
+
+    empty: str
+    too_long: str
+    personal_data: str
+    private_individual: str
+
+
+def screened(text: str, limit: int, refusals: Refusals) -> str:
+    """The words as they will be stored, or a refusal saying why they can't be.
+
+    The cheap checks run first, so words that can't be kept cost no model call and no read of the petition. The
+    model's reading comes last and refuses too: a creator may weigh that warning about their own petition, because
+    they answer for it, but these words are written on somebody else's page.
+    """
+    said = " ".join((text or "").split())
+    if not said:
+        raise InvalidPetition(phrase(refusals.empty))
+    if len(said) > limit:
+        raise InvalidPetition(phrase(refusals.too_long))
+    if personal_data(said):
+        raise InvalidPetition(phrase(refusals.personal_data))
+    if private_person(said):
+        raise InvalidPetition(phrase(refusals.private_individual))
+    return said
+
+
 def hard_stop(title: str, body: str) -> str | None:
-    """Why the petition can't go as written, if it can't: checked on the draft and again when it is sent."""
+    """Checked on the draft and again when it is sent."""
     text = f"{title}\n\n{body}"
     if suggests_danger_to_a_person(text):
         return SAFETY_STOP
@@ -88,7 +126,7 @@ def screen(title: str, body: str) -> Screening:
     stop = hard_stop(title, body)
     if stop:
         return Screening(stop, None)
-    person = _private_person(f"{title}\n\n{body}")
+    person = private_person(f"{title}\n\n{body}")
     warning = (f"This seems to name a private person (“{person}”). A petition can't: the MCE can refuse it for that. "
                "Edit it, or send it as it is if they are a public official acting in their role.") if person else None
     return Screening(None, warning)

@@ -8,8 +8,8 @@ import { DescriptionField } from "@/components/report/description-field";
 import { FormActions, FormSection } from "@/components/report/form-parts";
 import { Note } from "@/components/report/notes";
 import { PhotoField } from "@/components/report/photo-field";
-import { SafetySteps } from "@/components/report/safety-steps";
 import { SubMetroField } from "@/components/report/place-fields";
+import { SafetySteps } from "@/components/report/safety-steps";
 import { SafetyTypeField } from "@/components/report/safety-type-field";
 import { Card, CardContent } from "@/components/ui/card";
 import { useReportForm } from "@/hooks/use-report-form";
@@ -27,9 +27,9 @@ function WhoReceives({ type }: { type: SafetyType }) {
   );
 }
 
-/** Someone's safety: the citizen names the danger, so the report goes straight to its services, privately. */
+/** The citizen names the danger, so the report goes straight to its services, privately. */
 export function SafetyForm({ options, onFiled, onBack }: ReportFormProps) {
-  const { photos, setPhotos, contact, setContact, submit, filing } = useReportForm(onFiled);
+  const { photos, setPhotos, contact, setContact, submit, filing, sending } = useReportForm(onFiled);
   const [topic, setTopic] = useState("");
   const chosen = options.safety_types.find((type) => type.id === topic);
   const limits = { maxPhotos: options.max_photos, maxBytes: options.max_photo_bytes };
@@ -65,7 +65,7 @@ export function SafetyForm({ options, onFiled, onBack }: ReportFormProps) {
             <NumberFields contact={contact} onChange={setContact} sensitive />
             <SafetyConsents contact={contact} onChange={setContact} />
           </FormSection>
-          <FormActions busy={filing.isPending} error={filing.error} onBack={onBack} />
+          <FormActions busy={filing.isPending} error={filing.error} sending={sending} onBack={onBack} />
         </form>
       </CardContent>
     </Card>

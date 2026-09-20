@@ -3,9 +3,9 @@
 from typing import Any
 
 from app.schemas.cases import CaseAssignment, CaseDetail, CaseEvent, CaseSummary, Contact
-from app.services import case_history, issue_voices, report_locations
-from app.services.case_history import CaseHistoryAction
+from app.services import case_history, case_timeline, issue_voices, report_locations
 from app.services.auth import Principal
+from app.services.case_history import CaseHistoryAction
 from app.services.case_workflow import CaseView, allowed_case_actions, assignment_for, case_view, may_see_contact
 from app.services.report_contacts import contact_for
 from app.services.report_photos import photo_link
@@ -71,12 +71,18 @@ def _contact(principal: Principal, case: dict[str, Any]) -> Contact | None:
     return Contact(phone=contact.get("phone"), whatsapp=contact.get("whatsapp"))
 
 
-def _event(entry: dict[str, Any], full: bool) -> CaseEvent:
-    """An audit entry. In an outline, the classification says only "personal safety", not which kind."""
+def _event(entry: dict[str, Any], full: bool, private: bool) -> CaseEvent:
+    """In an outline, the classification says only "personal safety", not which kind, and what staff wrote at a
+    stage is left out: the MCE reads a personal-safety case's trail, not its content.
+
+    Whether a step reaches the resident is answered here, by the module that decides it, so the portal can say
+    "the resident reads this" without keeping its own copy of the rule to drift out of step."""
     note = entry.get("note")
     if not full and entry["action"] == CaseHistoryAction.CLASSIFIED:
         note = "Filed as personal safety."
-    return CaseEvent(action=entry["action"], actor_name=entry["actorName"], actor_role=entry["actorRole"], note=note, at=entry["timestamp"])
+    return CaseEvent(action=entry["action"], actor_name=entry["actorName"], actor_role=entry["actorRole"], note=note,
+                     staff_note=entry.get("staffNote") if full else None, at=entry["timestamp"],
+                     seen_by_the_resident=case_timeline.reaches_the_resident(entry["action"], private=private))
 
 
 def _voice_names(principal: Principal, case: dict[str, Any], assignments: list[dict[str, Any]]) -> list[str] | None:
@@ -86,13 +92,21 @@ def _voice_names(principal: Principal, case: dict[str, Any], assignments: list[d
     return issue_voices.named_voices(case["$id"]) if case.get("voiceCount") else []
 
 
+def _photos(case: dict[str, Any], stored_in: str, full: bool) -> list[str]:
+    """The photos held under one attribute of the case, as links good for a few minutes. Which stage a photo
+    belongs to is the attribute it is stored in — never its file name, which is meaningless on purpose."""
+    return [photo_link(name) for name in case.get(stored_in) or []] if full else []
+
+
 def detail(principal: Principal, case: dict[str, Any], assignments: list[dict[str, Any]]) -> CaseDetail:
     full = case_view(principal, case) == CaseView.FULL
-    history = [_event(entry, full) for entry in case_history.entries_for(case["$id"])]
+    private = bool(case.get("isSensitive"))
+    history = [_event(entry, full, private) for entry in case_history.entries_for(case["$id"])]
     return CaseDetail(
         **summary(principal, case, assignments).model_dump(),
         description=case["description"] if full else None,
-        photos=[photo_link(p) for p in case.get("photoIds") or []] if full else [],
+        photos=_photos(case, "photoIds", full),
+        escalation_photos=_photos(case, "escalationPhotoIds", full),
         escalation_note=case.get("escalationNote") if full else None,
         classification_note=case.get("classificationNote") if full else None,
         contact=_contact(principal, case) if full else None,

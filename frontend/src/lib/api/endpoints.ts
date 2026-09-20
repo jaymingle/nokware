@@ -13,13 +13,18 @@ import type {
   FileLink,
   Me,
   Option,
-  PetitionDecision,
+  PetitionDetail,
+  PetitionDismissal,
+  PetitionGround,
+  PetitionRemovalRequest,
+  PetitionReportQueue,
   PetitionResponseRequest,
   ReviewAction,
-  ReviewQueue,
+  SharedPetition,
 } from "@/lib/api/types";
 
 const documentPath = (id: string) => `/api/documents/${encodeURIComponent(id)}`;
+const petitionPath = (code: string) => `/api/petitions/${encodeURIComponent(code)}`;
 
 export function getMe(): Promise<Me> {
   return apiRequest<Me>("/api/me");
@@ -105,17 +110,56 @@ export function takeCaseAction(id: string, action: CaseAction, body?: CaseAction
   });
 }
 
-/** Petitions waiting for the MCE, the one closest to publishing automatically first. */
-export function getPetitionReview(): Promise<ReviewQueue> {
-  return apiRequest<ReviewQueue>("/api/petitions/review");
+/** What readers have reported about published petitions, newest first, for a contributor to read. */
+export function getPetitionReports(): Promise<PetitionReportQueue> {
+  return apiRequest<PetitionReportQueue>("/api/petitions/reports");
 }
 
-/** Publish a petition, or refuse it for one of the fixed reasons; the queue as it then stands. */
-export function decidePetition(code: string, decision: PetitionDecision): Promise<ReviewQueue> {
-  return apiRequest<ReviewQueue>(`/api/petitions/${encodeURIComponent(code)}/decision`, {
+/** Settles one report on a fixed reason and leaves the petition alone. Answers with the queue that is left. */
+export function dismissPetitionReport(reportId: string, reason: PetitionDismissal): Promise<PetitionReportQueue> {
+  return apiRequest<PetitionReportQueue>(`/api/petitions/reports/${encodeURIComponent(reportId)}/dismiss`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(decision),
+    body: JSON.stringify({ reason }),
+  });
+}
+
+/** Settles one report about a comment. The comment stays exactly as it is. */
+export function dismissCommentReport(reportId: string, reason: PetitionDismissal): Promise<PetitionReportQueue> {
+  return apiRequest<PetitionReportQueue>(`/api/petitions/comment-reports/${encodeURIComponent(reportId)}/dismiss`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ reason }),
+  });
+}
+
+/** Takes one comment down on a named ground. No phone proof: a comment is not a petition anyone could have signed. */
+export function removeComment(code: string, commentId: string, ground: PetitionGround): Promise<PetitionReportQueue> {
+  return apiRequest<PetitionReportQueue>(`${petitionPath(code)}/comments/${encodeURIComponent(commentId)}/removal`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ground }),
+  });
+}
+
+/** Takes one photograph off. The petition, its words and its other photographs stand. */
+export function removePetitionImage(code: string, imageId: string, ground: PetitionGround): Promise<PetitionReportQueue> {
+  return apiRequest<PetitionReportQueue>(`${petitionPath(code)}/images/removal`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ image_id: imageId, ground }),
+  });
+}
+
+/**
+ * Takes a petition down on a named ground. It needs the contributor's sign-in *and* a confirmed phone: the number
+ * is how the server can tell they neither started nor signed this petition.
+ */
+export function removePetition(code: string, removal: PetitionRemovalRequest, proof: string): Promise<PetitionReportQueue> {
+  return apiRequest<PetitionReportQueue>(`${petitionPath(code)}/removal`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Phone-Proof": proof },
+    body: JSON.stringify(removal),
   });
 }
 
@@ -124,11 +168,37 @@ export function getAwaitingResponses(): Promise<AwaitingResponse[]> {
   return apiRequest<AwaitingResponse[]>("/api/petitions/responses");
 }
 
-/** The MCE's public response to a petition; the petitions still waiting for one. */
 export function respondToPetition(code: string, response: PetitionResponseRequest): Promise<AwaitingResponse[]> {
-  return apiRequest<AwaitingResponse[]>(`/api/petitions/${encodeURIComponent(code)}/response`, {
+  return apiRequest<AwaitingResponse[]>(`${petitionPath(code)}/response`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(response),
+  });
+}
+
+/**
+ * The MCE asks one department of the Assembly to answer this petition, by the department's team ID from
+ * /api/departments. It is not a decision on the petition: the status doesn't move, and the page comes back with
+ * the department on it.
+ */
+export function sharePetition(code: string, department: string): Promise<PetitionDetail> {
+  return apiRequest<PetitionDetail>(`${petitionPath(code)}/share`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ department }),
+  });
+}
+
+/** The petitions shared with the caller's own department, newest first. The server reads the department, never a page. */
+export function getSharedPetitions(): Promise<SharedPetition[]> {
+  return apiRequest<SharedPetition[]>("/api/petitions/shared");
+}
+
+/** The one note this department writes on a petition shared with it, published under the department's name. */
+export function writeDepartmentNote(code: string, text: string): Promise<SharedPetition> {
+  return apiRequest<SharedPetition>(`${petitionPath(code)}/note`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text }),
   });
 }

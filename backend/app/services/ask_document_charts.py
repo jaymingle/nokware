@@ -1,44 +1,20 @@
-"""A chart of figures in AMA's documents — drawn only when every bar can be proved against a cited passage.
+"""A chart of figures in AMA's documents, drawn only when every bar can be proved against a cited passage.
 
-A document's numbers aren't safe to plot in general: pypdf flattens a table's
-columns, so a value can lose its row, and a chart inside a PDF comes through as
-its axis ticks. But an answer that lists a fee against each stall type is already
-label-and-value, and refusing to chart that is refusing to do the job.
+pypdf flattens a table's columns, so a document's number can lose its row. But an answer that lists a fee against
+each stall type is already label-and-value, and refusing to chart it is refusing to do the job. So the model offers
+label-value pairs and code proves each one; the model's word alone draws nothing:
 
-So the rule is narrow. gemini-2.5-flash reads the answer and the passages it
-cites and offers label-value pairs; then this module checks every pair against
-the passages in code, and the model's word alone draws nothing:
+- the label must appear in a cited passage with exactly its figure beside it and no other amount in between (a
+  second amount means a flattened table, and the chart is dropped). Numbers inside a name, a bracketed year and a
+  percentage beside a figure of its own aren't amounts;
+- a table writes the figure after the label, prose before it. One direction has to tie every pair, or
+  "Stores - A 800 Stores - B 900" would prove Stores - B costs 800;
+- a repeated label drops the chart: two "Stores - A" bars with different fees would mislead;
+- a label qualified with its section must sit under that section as the nearest heading above the row;
+- at most twelve figures, and the chart says so rather than quietly dropping the rest.
 
-- the label must appear in a cited passage with its figure beside it, and no
-  other amount in between, so a value keeps what it was written against. A table
-  writes the figure after the label ("Stores - A 800.00"); a report writes it
-  before ("mobilised 48.3 percent of its IGF budget"). Both are read, but one
-  direction has to tie every pair in the chart: letting each pair tie whichever
-  way suited it would let "Stores - A 800 Stores - B 900" prove Stores - B costs
-  800. A table's unit is the row; prose's is the sentence;
-- if that stretch holds another amount (a second column of a flattened table),
-  the pair can't be tied and the chart is dropped. Numbers inside a name ("Chop
-  Bars 1-6"), a year in brackets and a percentage written with a "%" beside a
-  figure of its own ("800.00, up 6.5%") aren't amounts — but a percentage that
-  is itself the figure being reported is;
-- the number must match what is plotted, digit for digit, ignoring thousands
-  separators;
-- only the figures the answer itself gives are charted, and at most twelve of
-  them: past that the chart says so, rather than quietly dropping the rest;
-- a label may appear once. Two bars reading "Stores - A" with different fees
-  would mislead, so a repeated label drops the chart;
-- where the answer qualifies a label with its section ("Ashiedu Keteke Central
-  Market Stores - A") and the passage writes that section as a heading above the
-  row, the row must tie the figure AND the section must be the nearest heading
-  written above it. A row under another market's heading proves nothing about
-  this one.
-
-If any pair fails, there is no chart: the answer keeps its figures in text with
-DOCUMENT_CHART_REFUSAL, exactly as before. Charting the rest would leave a chart
-that looks whole but isn't.
-
-This is not table extraction, which stays on the roadmap: it charts only what an
-answer already set out as labels and single values.
+If any pair fails there is no chart, and the answer keeps its figures in text: charting the rest would leave a
+chart that looks whole but isn't. This is not table extraction.
 """
 
 import logging
@@ -109,16 +85,10 @@ _PROMPT = (
 
 PARTIAL_NOTE = (f"Only the first {MAX_PAIRS} figures the answer gives are drawn; the rest are in the answer above.")
 
-# A label that names a whole rather than one of its parts.
 _TOTAL = re.compile(r"\b(total|overall|grand total|in totality|altogether|aggregate)\b", re.IGNORECASE)
 
 
 def total_left_out(named: list[str]) -> str:
-    """Why a total isn't drawn beside the parts it is the total of.
-
-    A total is by definition the largest bar, so beside its own parts it reads as
-    one of them and the biggest — the same kind of false comparison as an
-    overspend drawn beside a proportion. It is still in the answer."""
     listed = " and ".join(named)
     many = len(named) > 1
     return (f"{listed} {'are' if many else 'is'} left out of the chart: a total drawn beside its own parts reads as "
@@ -127,8 +97,6 @@ def total_left_out(named: list[str]) -> str:
 
 @dataclass(frozen=True)
 class Plotted:
-    """Pairs that were proved against the passages, with each figure as a number."""
-
     title: str
     pairs: list[tuple[str, str, float]]  # (label, figure as shown, its value)
     partial: bool = False  # the answer listed more figures than a chart can hold
@@ -140,7 +108,6 @@ def _collapsed(text: str) -> list[str]:
 
 
 def _loose(text: str) -> str:
-    """The same words, with spacing around punctuation settled, for comparing a label with a passage's row."""
     return _LOOSE.sub(r"\1", _SPACES.sub(" ", text)).strip().lower()
 
 
@@ -148,8 +115,7 @@ _NOT_DIGITS = re.compile(r"[^\d.\-]")
 
 
 def _as_number(shown: str) -> float | None:
-    """A figure the model copied, as a number. It copies the unit with it — "GH¢ 49,091,751.00", "48.3%" — and
-    a value that carries its own currency was being thrown away as though the passage never gave it."""
+    """The model copies the unit with the figure ("GH¢ 49,091,751.00", "48.3%"), which must not make it unreadable."""
     try:
         return float(_NOT_DIGITS.sub("", shown.replace(",", "")))
     except ValueError:
@@ -161,12 +127,8 @@ def _amounts_in(span: str, wanted: float | None) -> list[str]:
 
 
 def _amount_spans(span: str, wanted: float | None) -> list[tuple[str, int, int]]:
-    """The figures in a stretch of a line that could be a column's value.
-
-    Not every number in a row is its figure: "31st December Market" and "Chop Bars 1-6" carry numbers in their
-    names. So a number glued to a letter (31st, B1), a year in brackets, a percentage, and a bare one- or
-    two-digit number are passed over — unless it is exactly the figure claimed, which is never passed over.
-    """
+    """Numbers in names ("31st December Market", "Chop Bars 1-6"), years and percentages are passed over, unless
+    one is exactly the figure claimed."""
     kept = []
     for match in _NUMBER.finditer(span):
         before = span[match.start() - 1:match.start()]
@@ -179,13 +141,12 @@ def _amount_spans(span: str, wanted: float | None) -> list[tuple[str, int, int]]
         if before.isalpha() or after.isalpha() or after == "%" or _YEAR.match(figure):
             continue
         if "." not in figure and "," not in figure and len(figure) < 3:
-            continue  # a small whole number in a name ("Chop Bars 1-6"), not an amount
+            continue
         kept.append((figure, match.start(), match.end()))
     return kept
 
 
 def _span_after(line: str, label: str, others: list[str]) -> str | None:
-    """What follows the label on this line, up to the next label: the stretch its own figure must be in."""
     loose, wanted = _loose(line), _loose(label)
     start = loose.find(wanted)
     if start == -1:
@@ -197,11 +158,6 @@ def _span_after(line: str, label: str, others: list[str]) -> str | None:
 
 
 def _span_before(line: str, label: str, others: list[str]) -> str | None:
-    """What runs up to the label, back to the end of the label before it: the stretch a prose figure sits in.
-
-    A table writes "Stores - A 800.00"; a report writes "mobilised 48.3 percent of its IGF budget". The figure
-    belongs to the label it is written against either way, and only the side it is written on differs.
-    """
     loose, wanted = _loose(line), _loose(label)
     start = loose.find(wanted)
     if start == -1:
@@ -213,14 +169,8 @@ def _span_before(line: str, label: str, others: list[str]) -> str | None:
 
 
 def _tied_on_line(line: str, label: str, shown: str, others: list[str], backwards: bool = False) -> bool:
-    """Whether this line writes the label with exactly this figure beside it, no other amount, and nothing
-    separating the two.
-
-    The separator matters in prose. "48.3 percent of its IGF budget, 19.0 percent of its revenue from the Central
-    Government" reads correctly backwards — and also reads forwards, shifted by one, with every pair tying to the
-    figure of the item before it. What tells them apart is the comma: a figure is joined to its own label by words
-    ("percent of its"), and separated from the next item's by a list separator.
-    """
+    """A list separator between figure and label rules the tie out: "48.3 percent of its IGF budget, 19.0 percent
+    of its revenue" also reads forwards, shifted by one, and only the comma tells the two readings apart."""
     span = (_span_before if backwards else _span_after)(line, label, others)
     wanted = _as_number(shown)
     found = _amount_spans(span, wanted) if span else []
@@ -231,17 +181,15 @@ def _tied_on_line(line: str, label: str, shown: str, others: list[str], backward
 
 
 def _splits(label: str) -> list[tuple[str, str]]:
-    """A label the answer qualified ("Tema Station Market Stalls lock-up") as (heading, row) pairs to try."""
     words = label.split()
     return [(" ".join(words[:i]), " ".join(words[i:])) for i in range(1, len(words)) if len(" ".join(words[:i])) >= MIN_HEADING]
 
 
 def _under_heading(lines: list[str], row: int, heading: str) -> bool:
-    """Whether this row falls under this heading: a line carrying no figure is a heading, and the nearest one
-    above the row must be this one. A row under another market's heading proves nothing about this one."""
+    """A line carrying no figure is a heading."""
     for line in reversed(lines[:row]):
         if _amounts_in(line, None):
-            continue  # another row, not a heading
+            continue
         return _loose(heading) in _loose(line)
     return False
 
@@ -250,20 +198,12 @@ _SENTENCE_END = re.compile(r"(?<=[.;])\s+")
 
 
 def _sentences(passage: str) -> list[str]:
-    """A prose passage as sentences, line wrapping settled. A row is a table's unit; a sentence is prose's."""
     return [part for part in _SENTENCE_END.split(_SPACES.sub(" ", passage.replace("\n", " "))) if part.strip()]
 
 
 def _tied(label: str, shown: str, others: list[str], passages: list[str], backwards: bool = False) -> bool:
-    """Whether the passages write this figure against this label, on its line and under its heading if it has one.
-
-    A fees answer often names the market with the stall type ("Ashiedu Keteke Central Market Stores - A") while the
-    passage writes the market as a heading above the row. Then the row must tie the figure, and the market must be
-    the nearest heading above it: a row under another market's heading proves nothing about this one.
-    """
     rows = [(other, tail) for other in others for _, tail in _splits(other)]
     for passage in passages:
-        # A table keeps its figure on the row; prose keeps it in the sentence, whatever line it wrapped onto.
         lines = _sentences(passage) if backwards else _collapsed(passage)
         for number, line in enumerate(lines):
             if _tied_on_line(line, label, shown, others, backwards):
@@ -278,7 +218,6 @@ def _tied(label: str, shown: str, others: list[str], passages: list[str], backwa
 
 
 def verified(extracted: _Extracted, passages: list[str]) -> Plotted | None:
-    """The pairs, if every one of them is written that way in a cited passage. Otherwise nothing is drawn."""
     wanted = extracted.pairs[:MAX_PAIRS]
     labels = [pair.label.strip() for pair in wanted]
     if len(labels) < MIN_PAIRS or len(set(labels)) != len(labels):
@@ -295,14 +234,11 @@ def verified(extracted: _Extracted, passages: list[str]) -> Plotted | None:
             logger.info("No document chart: %r is not a number", shown)
             return None
         pairs.append((pair.label.strip(), shown, value))
-    # One direction for the whole chart. A document writes its figures before its labels or after them, not both,
-    # and allowing a pair to tie whichever way suited it would let "Stores - A 800 Stores - B 900" prove that
-    # Stores - B costs 800. So every pair must tie the same way, or nothing is drawn.
     if not any(all(_tied(label, shown, labels, passages, backwards) for label, shown, _ in pairs)
                for backwards in (False, True)):
         logger.info("No document chart: %d pairs, and no one direction ties them all to a cited passage", len(pairs))
         return None
-    # Every pair is proved, the total included; the total just isn't drawn beside its own parts.
+    # A total is proved too, but drawn beside its own parts it reads as one of them, and the largest.
     totals = [pair for pair in pairs if _TOTAL.search(pair[0])]
     parts = [pair for pair in pairs if not _TOTAL.search(pair[0])]
     if totals and parts:
@@ -327,7 +263,17 @@ def _extract(question: str, answer: str, passages: list[str]) -> _Extracted | No
     return result
 
 
-def figures_to_chart(question: str, answer: str, passages: list[str]) -> Plotted | None:
-    """Label-value pairs from the cited passages that can be charted, each one proved against them. None if not."""
+def read_for_chart(question: str, answer: str, passages: list[str]) -> tuple[Plotted | None, bool]:
+    """(what can be plotted, whether any figures were read out of the passages at all).
+
+    The second tells apart "this answer holds no figures" from "figures were found and couldn't be proved against
+    the passages" — the first isn't a limit of how tables are read, and shouldn't be explained as one.
+    """
     extracted = _extract(question, answer, passages)
-    return verified(extracted, passages) if extracted else None
+    if extracted is None:
+        return None, False
+    return verified(extracted, passages), True
+
+
+def figures_to_chart(question: str, answer: str, passages: list[str]) -> Plotted | None:
+    return read_for_chart(question, answer, passages)[0]

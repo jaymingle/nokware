@@ -1,21 +1,16 @@
 """Emergency numbers laid out for a phone: every number for a chat, and every number to call for a keypad.
 
-The same numbers the web shows (contacts.emergency_groups), in the order to try
-them. A number that isn't independently verified says so, as it does on the
-web: in an emergency a number worth trying beats none. An earlier listing of a
-number is kept too in a chat, marked as one that may not connect.
+A number that isn't independently verified is still listed, and says so: in an emergency a number worth trying beats
+none.
 
-For USSD screens and the SMS a safety reporter may ask for (call_lines): one
-line per service, the numbers that can be called from the phone in hand (no
-WhatsApp lines, no earlier listings), the services that come to you first.
-The Police reporting lines, reported on X and not independently verified,
-stay on the web and WhatsApp: on a keypad, whose sessions time out, their
-screen is better spent on DOVVSU's verified line.
+On a keypad (USSD, SMS) only numbers callable from the phone in hand are listed. The unverified Police reporting lines
+stay off it: USSD sessions time out, and the screen is better spent on DOVVSU's verified line.
 """
 
 from app import safety_steps
 from app.contacts import (
     MEDICAL_SERVICES,
+    PUBLIC_EMERGENCY,
     SAFETY_DESK_FALLBACK,
     SERVICE_NAMES,
     contacts,
@@ -68,7 +63,6 @@ def _text(groups: list[tuple[str, list[PublicContact]]], heading: str = HEADING)
 
 
 def numbers_text(topic: str, sub_metro: str | None) -> str:
-    """Every emergency number for the topic, grouped by service. Empty for everyday topics."""
     return _text(emergency_groups(topic, sub_metro))
 
 
@@ -77,15 +71,28 @@ def _calls(contact: PublicContact) -> list[str]:
     return [number.number + note for number in contact.numbers if number.current and number.kind == "call"]
 
 
+def ambulance_calls() -> list[str]:
+    """Every ambulance number to call, as contacts.json orders them: "193", "0501 614 877", "0505 982 870"."""
+    return [number for _, group in service_groups(MEDICAL_SERVICES, None)[1:] for contact in group for number in _calls(contact)]
+
+
+def emergency_call() -> str:
+    return _calls(contacts()[PUBLIC_EMERGENCY])[0]
+
+
+def first_calls(*contact_ids: str) -> list[str]:
+    """The first number of each named contact, for a screen with room for one apiece."""
+    held = contacts()
+    return [_calls(held[contact_id])[0] for contact_id in contact_ids if contact_id in held and _calls(held[contact_id])]
+
+
 def _welfare_calls(sub_metro: str | None) -> list[str]:
-    """The sub-metro's desk, then the head office; the head office alone when the sub-metro isn't known."""
     desk, head = welfare_desk(sub_metro), _calls(contacts()[SAFETY_DESK_FALLBACK])
     return [*_calls(desk), *(f"head office {number}" for number in head)] if desk else head
 
 
 def call_lines(topic: str, sub_metro: str | None, labels: dict[str, str] = CALL_LABELS) -> list[str]:
-    """Each service's numbers to call, one line each, the services that come to you first: "Police: 191, 18555,
-    0302 779 300 (HQ)". 112 isn't a line: it leads the heading. Empty for everyday topics."""
+    """E.g. "Police: 191, 18555, 0302 779 300 (HQ)". 112 isn't a line: it leads the heading."""
     groups = dict(emergency_groups(topic, sub_metro)[1:])
     lines = []
     for service in (s for s in CALL_ORDER if s in groups):
@@ -95,23 +102,20 @@ def call_lines(topic: str, sub_metro: str | None, labels: dict[str, str] = CALL_
 
 
 def desk_line(sub_metro: str | None) -> str | None:
-    """The Social Welfare desk for the sub-metro, once it is known."""
     desk = welfare_desk(sub_metro)
     return f"Your Social Welfare desk: {', '.join(_calls(desk))}" if desk else None
 
 
 def numbers_sms(topic: str, sub_metro: str | None) -> str:
-    """The numbers a safety reporter asked to have by SMS: every one to call, and nothing saying what happened."""
+    """Nothing in it says what happened: others may read the phone."""
     return "\n".join([SMS_HEADING, *call_lines(topic, sub_metro, SMS_LABELS)])
 
 
 def steps_text() -> str:
-    """What to do right now, for a chat: after a personal-safety report's numbers, before any question."""
     return "\n".join(["*What to do now*", *(f"- {step}" for step in safety_steps.STEPS)])
 
 
 def medical_text() -> str:
-    """For someone ill or hurt: said plainly that it isn't the Assembly's to act on, then who to call."""
     heading = ("This isn't something the Assembly can act on, so Nokware won't file it. But here's who to call, "
                "and if a number doesn't connect, try the next one:")
     return _text(service_groups(MEDICAL_SERVICES, None), heading)

@@ -1,11 +1,12 @@
 import Link from "next/link";
 
+import { StatusTag } from "@/components/status-tag";
 import { closingLine, placeLine, progressPercent, responseLine, signaturesLine, spacedCode } from "@/lib/petitions";
+import { petitionStatus } from "@/lib/status";
 import { cn } from "@/lib/utils";
 
 import type { PetitionCard as Card } from "@/lib/api/types";
 
-/** How far a petition is towards the signatures that take it to the MCE. */
 export function Progress({ signatures, threshold, large = false }: { signatures: number; threshold: number | null; large?: boolean }) {
   const percent = progressPercent(signatures, threshold);
   return (
@@ -19,14 +20,17 @@ export function Progress({ signatures, threshold, large = false }: { signatures:
   );
 }
 
-/** A published petition in a list: the ask, where and on what, and how far it has got. */
 export function PetitionCard({ petition, now }: { petition: Card; now: number }) {
+  const tag = petitionStatus(petition.status);
   return (
     <li className="flex flex-col gap-2 border-b py-4 last:border-0" data-testid={`petition-${petition.code}`}>
-      <Link href={`/petitions/${petition.code}`} className="text-[16px] font-medium underline underline-offset-2"
-        data-testid={`petition-${petition.code}-link`}>
-        {petition.title}
-      </Link>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <Link href={`/petitions/${petition.code}`} className="text-[16px] font-medium underline underline-offset-2"
+          data-testid={`petition-${petition.code}-link`}>
+          {petition.title}
+        </Link>
+        <StatusTag tone={tag.tone} testId={`petition-${petition.code}-status`}>{tag.label}</StatusTag>
+      </div>
       <p className="text-[12.5px] text-ink-soft">
         No. {spacedCode(petition.code)} · {petition.topic} · {placeLine(petition)}
       </p>

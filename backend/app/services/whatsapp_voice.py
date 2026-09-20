@@ -1,26 +1,14 @@
 """Voice notes on WhatsApp: heard, handled as if typed, and a question answered aloud as well as in text.
 
-In: the note is fetched from Twilio once and deleted there at once; it is never
-stored. It may be up to 3 minutes long, 10 an hour per number, and is heard by
-voice_transcribe.listen(), as a question spoken on the web is. Gemini's English
-for it is handled exactly like a typed message, through every step of the chat;
-a lone spoken choice ("one", "yes", "remove") or a spelled-out reference is read
-as its typed form, so someone who can't type can use every menu.
+An incoming note is deleted from Twilio as soon as it is fetched and never stored. A lone spoken choice ("one",
+"yes") or a spelled-out reference is read as its typed form, so someone who can't type can use every menu.
 
-Out: only an answer to a question is spoken, after the text answer that carries
-the sources, and only in English. Never a report, a status, a safety or medical
-reply, and never anything about harm to a person, by Gemini's reading or by the
-report rules' danger words: a voice note about abuse could play aloud near the
-abuser. Each spoken reply is an extra WhatsApp message, so there are 10 a day per
-number and VOICE_DAILY_LIMIT across everyone; past either, the text answer stands.
+Only an answer to a question is spoken, never a report, status, safety or medical reply, or anything about harm to a
+person: a voice note about abuse could play aloud near the abuser. Each spoken reply is an extra WhatsApp
+message, hence the per-number and daily limits.
 
-Twilio fetches the voice note from the API's public address, at a random link
-held in Redis for 10 minutes and deleted as soon as Twilio reports on the message.
-Twilio keeps its own copy in its media store, which would tie the answer (and so
-the question) to the citizen's number: that copy is deleted once Twilio reports
-the message delivered (or read), or failed or undelivered, since then it is going
-nowhere; never on sent or queued. One Twilio never reports on is swept from
-Twilio a day after it was sent, by the hourly purge job.
+Twilio's own copy of a spoken reply would tie the answer (and so the question) to the citizen's number, so it is
+deleted once the message has arrived or never will; one Twilio never reports on is swept a day later.
 """
 
 import base64
@@ -69,7 +57,6 @@ def is_voice(content_type: str) -> bool:
 
 
 def _fetch(url: str) -> tuple[bytes, str]:
-    """The voice note from Twilio, deleted there at once. Raises WhatsAppError or WhatsAppNotConfigured."""
     client = twilio()
     data, content_type = client.download(url)
     client.delete_media(url)
@@ -77,7 +64,6 @@ def _fetch(url: str) -> tuple[bytes, str]:
 
 
 def _listen(url: str, content_type: str) -> Heard | str:
-    """What the voice note says, or what to tell the citizen if it can't be used."""
     try:
         data, fetched_type = _fetch(url)
         heard = listen(data, content_type or fetched_type, VOICE_MAX_SECONDS)
@@ -88,7 +74,7 @@ def _listen(url: str, content_type: str) -> Heard | str:
 
 
 def hear(number: str, url: str, content_type: str) -> Heard | None:
-    """A voice note's words; None once the citizen has been told why it can't be used."""
+    """None once the citizen has been told why it can't be used."""
     if not channel_limits.VOICE_NOTES.allow(number, utc_now().timestamp()):
         whatsapp_reply.reply(number, TOO_MANY)
         return None
@@ -126,7 +112,6 @@ def _today_allows(now: datetime) -> bool:
 
 
 def _may_speak(number: str, heard: Heard, answer: RagAnswer) -> bool:
-    """Only an answer that is safe to play aloud, within the limits, with a public address for Twilio to fetch."""
     if not get_settings().public_api_url:
         return False
     if heard.about_harm or suggests_danger_to_a_person(heard.english) or suggests_danger_to_a_person(answer["answer"]):
@@ -138,14 +123,13 @@ def _may_speak(number: str, heard: Heard, answer: RagAnswer) -> bool:
 
 
 def _hold(note: Encoded) -> tuple[str, str]:
-    """Keep the voice note for Twilio to fetch; its token and public link."""
     token = secrets.token_urlsafe(32)
     get_redis().set(key("wa-audio", token), f"{note.extension}:{base64.b64encode(note.data).decode()}", ex=HOLD_SECONDS)
     return token, f"{get_settings().public_api_url.rstrip('/')}{AUDIO_PATH}/{token}.{note.extension}"
 
 
 def speak_answer(number: str, answer: RagAnswer, heard: Heard) -> None:
-    """After the text answer, the same answer aloud, when that is safe and allowed. A failure leaves the text."""
+    """A failure leaves the text answer standing."""
     try:
         if not _may_speak(number, heard, answer):
             return
@@ -162,7 +146,7 @@ def speak_answer(number: str, answer: RagAnswer, heard: Heard) -> None:
 
 
 def held(name: str) -> tuple[bytes, str] | None:
-    """A held voice note by its link's last part ("<token>.ogg"), with its content type."""
+    """name is the link's last part: "<token>.ogg"."""
     match = _NAME.match(name)
     stored = get_redis().get(key("wa-audio", match[1])) if match else None
     if not match or not stored:
@@ -172,7 +156,7 @@ def held(name: str) -> tuple[bytes, str] | None:
 
 
 def _forget_at_twilio(message_sid: str) -> None:
-    """Delete a spoken reply's file from Twilio's media store; it stays listed for the sweep until that works."""
+    """The reply stays listed for the sweep until the delete works."""
     try:
         deleted = twilio().delete_sent_media(message_sid)
     except WhatsAppNotConfigured:
@@ -182,8 +166,6 @@ def _forget_at_twilio(message_sid: str) -> None:
 
 
 def release(message_sid: str, status: str) -> None:
-    """Twilio has reported on a voice note it sent: once it has the file, delete the held copy; once the message
-    has arrived, or never will, delete Twilio's copy too."""
     try:
         if status in FETCHED:
             token = get_redis().getdel(key("wa-audio-sid", message_sid))
@@ -196,7 +178,6 @@ def release(message_sid: str, status: str) -> None:
 
 
 def sweep(now: datetime) -> int:
-    """Spoken replies Twilio never reported on within a day: delete their files from Twilio anyway. How many."""
     try:
         stale = get_redis().zrangebyscore(key(*SPOKEN), 0, now.timestamp() - SWEEP_AFTER_SECONDS)
         for message_sid in stale:

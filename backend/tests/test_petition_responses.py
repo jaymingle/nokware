@@ -1,6 +1,6 @@
 """Petitions P3: the MCE's public response, the 30 days made visible, the creator's updates, and the figures."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
@@ -11,6 +11,7 @@ from app.routes import petition_presenters as present
 from app.services import petition_clock, petition_figures, petition_responses, petition_updates, petitions
 from app.services.auth import Principal, Role
 from app.services.citizen_reports import NotificationChannel
+from app.services.petition_grounds import Ground, in_plain_words
 from app.services.petition_rules import (
     InvalidPetition,
     PetitionAction,
@@ -25,7 +26,7 @@ from app.services.petition_rules import (
 from app.services.petition_updates import Update
 from app.services.sms_text import is_gsm7, pages
 
-NOW = datetime(2026, 9, 15, 12, 0, tzinfo=timezone.utc)
+NOW = datetime(2026, 9, 15, 12, 0, tzinfo=UTC)
 MCE = Principal("u-m", "Hon. Test MCE", "m@x.org", Role.MCE)
 TEXT = "The Works Department will desilt the Kaneshie market drain before 30 May, and publish the schedule on this page."
 AWAITING = {"$id": "p1", "code": "534079", "title": "[TEST] Desilt the drain", "status": "awaiting_response", "threshold": 150,
@@ -94,10 +95,11 @@ def test_thirty_days_without_a_response_is_recorded_once_and_the_creator_told(st
 
 
 def _petition_for(update: Update) -> dict[str, Any]:
-    return {**AWAITING, "refusalReason": "not_assembly" if update == Update.REFUSED else None}
+    return {**AWAITING, "removalGround": "private_individual" if update == Update.REMOVED else None}
 
 
 SITE = "https://nokware.tstitagency.com"  # where Nokware will be deployed
+GROUND = in_plain_words(Ground.PRIVATE_INDIVIDUAL)  # the longest of the four, so the message fits with any of them
 
 
 def test_every_update_is_one_plain_sms_page_in_full_with_the_deployed_address(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -108,12 +110,12 @@ def test_every_update_is_one_plain_sms_page_in_full_with_the_deployed_address(mo
         text = petition_updates.compose(update, petition)
         full = petition_updates.plain(petition_updates.MESSAGES[update][0].format(
             number="534 079", link=f"{SITE}/petitions/534079", mine=f"{SITE}/petitions/mine", threshold="500", signatures="1,234",
-            reason="Not the Assembly's responsibility"))
+            reason=GROUND))
         assert text == full, (update, text)  # the full wording, not the short fallback
         assert pages(text) == 1 and is_gsm7(text) and "534 079" in text, (update, text)
-        assert ("petitions/mine" if update == Update.REFUSED else "petitions/534079") in text, (update, text)
+        assert ("petitions/mine" if update == Update.REMOVED else "petitions/534079") in text, (update, text)
         assert not any(word in text.lower() for word in ("ignored", "failed", "sorry", "unfortunately", "!")), text
-    assert "Not the Assembly's responsibility" in petition_updates.compose(Update.REFUSED, _petition_for(Update.REFUSED))
+    assert GROUND in petition_updates.compose(Update.REMOVED, _petition_for(Update.REMOVED))
 
 
 def test_no_response_is_said_plainly_in_full_with_the_deployed_address(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -157,8 +159,8 @@ def test_an_update_leaves_a_private_line_in_the_trail_and_nothing_once_the_numbe
 def test_the_figures_partition_every_petition_that_reached_its_threshold() -> None:
     start = NOW - timedelta(days=365)
     history = [{"action": a, "at": NOW.isoformat(), "reason": r} for a, r in
-               (("submitted", None), ("submitted", None), ("published", None), ("auto_published", None), ("refused", "duplicate"))]
-    history.append({"action": "submitted", "at": (start - timedelta(days=1)).isoformat(), "reason": None})  # before the period
+               (("published", None), ("published", None), ("republished", None), ("removed", "duplicate"))]
+    history.append({"action": "published", "at": (start - timedelta(days=1)).isoformat(), "reason": None})  # before the period
     reached = [
         {**AWAITING, "status": "responded", "respondedAt": NOW.isoformat()},
         {**AWAITING, "status": "responded", "responseDue": (NOW - timedelta(days=2)).isoformat(), "respondedAt": NOW.isoformat()},
@@ -166,9 +168,9 @@ def test_the_figures_partition_every_petition_that_reached_its_threshold() -> No
         dict(AWAITING),
     ]
     figures = petition_figures.build(history, reached, start, NOW)
-    assert (figures["sent"], figures["published_by_mce"], figures["published_automatically"], figures["refused"]) == (2, 1, 1, 1)
+    assert (figures["published"], figures["republished"], figures["removed"]) == (2, 1, 1)
     assert (figures["answered_in_time"], figures["answered_late"], figures["unanswered"], figures["waiting"]) == (1, 1, 1, 1)
-    assert figures["reached_threshold"] == 4 and next(r for r in figures["refusals"] if r["reason"] == "duplicate")["count"] == 1
+    assert figures["reached_threshold"] == 4 and next(r for r in figures["removals"] if r["ground"] == "duplicate")["count"] == 1
 
 
 def test_only_the_mce_can_respond() -> None:

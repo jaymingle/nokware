@@ -1,6 +1,5 @@
 import { RtiPanel } from "@/components/ask/rti-panel";
 
-/** The Ledger holds nothing that answers the question: say so plainly, and say where else to ask. */
 export function NoInformation({ testIdPrefix }: { testIdPrefix: string }) {
   return (
     <div className="flex flex-col gap-4" data-testid={`${testIdPrefix}-no-information`}>

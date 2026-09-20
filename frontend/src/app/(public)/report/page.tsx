@@ -1,6 +1,6 @@
-import type { Metadata } from "next";
-
 import { ReportPage } from "@/components/report/report-page";
+
+import type { Metadata } from "next";
 
 // The title stays neutral on every step, the safety form included.
 export const metadata: Metadata = {

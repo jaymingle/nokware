@@ -1,5 +1,6 @@
 """USSD: every screen fits, each menu path does what it says, and the callback's secret is checked."""
 
+import json
 import logging
 import time
 from typing import Any
@@ -9,18 +10,27 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.config import get_settings
+from app.contacts import CONTACTS_FILE, EMERGENCY_TOPICS
 from app.main import RedactChannelSecrets, app
-from app.safety_steps import STEPS
 from app.routes import channels
-from app.services import channel_intent, channel_limits, channel_sessions, redis_store, report_followups, report_intake, ussd
+from app.safety_steps import STEPS
+from app.services import (
+    channel_answers,
+    channel_intent,
+    channel_limits,
+    channel_sessions,
+    redis_store,
+    report_followups,
+    report_intake,
+    ussd,
+)
 from app.services.channel_contacts import numbers_sms
 from app.services.citizen_reports import IntakeChannel, NotificationEvent
-from app.contacts import EMERGENCY_TOPICS
+from app.services.report_contacts import ContactChoice, normalise_phone
 from app.services.report_intake import Receipt, ReportSubmission
 from app.services.report_rules import Classification, ClassificationMethod
 from app.services.report_taxonomy import TOPICS_BY_ID
 from app.services.sms_text import is_gsm7, pages
-from app.services.report_contacts import ContactChoice, normalise_phone
 from app.services.ussd import CONFIRM, MENU, SEND, UPDATES_ASK, Dial, sub_metro_screen, ward_screen
 from app.wards import sub_metros
 
@@ -44,7 +54,7 @@ def session(monkeypatch: pytest.MonkeyPatch) -> list[tuple[Any, ...]]:
 
 def keys(later: list[tuple[Any, ...]], *presses: str, session_id: str = "s1") -> ussd.Reply:
     """Dial, then press each key in turn; the last screen."""
-    add = lambda *args: later.append(args)  # noqa: E731
+    add = lambda *args: later.append(args)
     reply = ussd.respond(Dial(session_id, PHONE, "*928*1#", True), add)
     for press in presses:
         reply = ussd.respond(Dial(session_id, PHONE, press, False), add)
@@ -59,27 +69,59 @@ def test_every_fixed_screen_fits_one_plain_screen() -> None:
         assert len(screen) <= ussd.SCREEN_MAX and is_gsm7(screen), screen
 
 
-def test_a_question_ends_the_session_and_its_answer_follows_by_sms(session: list[tuple[Any, ...]]) -> None:
-    reply = keys(session, "1", "What does AMA charge for a market stall?")
-    assert reply == ussd.Reply("Thank you. Your answer is on its way by SMS.", False)
-    assert session == [(ussd.answer_by_sms, PHONE, "What does AMA charge for a market stall?")]
+LONG_ANSWER = ("The approved budget for 2026 is GH1 million. Waste management takes GH200,000 of it. "
+               "Drains take GH50,000. Street lighting takes GH50,000 more. The rest is staff and offices. "
+               "These are approved amounts, not money released or spent, and they come from the 2026 budget.")
 
 
-def test_answers_by_sms_are_limited_per_number(session: list[tuple[Any, ...]], monkeypatch: pytest.MonkeyPatch) -> None:
+def _answering(monkeypatch: pytest.MonkeyPatch, text: str = LONG_ANSWER) -> None:
+    monkeypatch.setattr(ussd, "answer_question", lambda question, length: {"answer": text, "status": "answered"})
+
+
+def test_an_answer_is_read_on_the_screen_and_nothing_is_texted_unless_it_is_asked_for(
+        session: list[tuple[Any, ...]], monkeypatch: pytest.MonkeyPatch) -> None:
+    """Reading it costs the resident nothing, so nothing is sent and nothing is capped until they ask for it."""
+    _answering(monkeypatch)
+    reply = keys(session, "2", "What is AMA's approved budget for 2026?")
+    assert reply.more and reply.message.endswith(ussd.MORE_MENU) and session == []
+
+
+def test_paging_reaches_the_end_of_the_answer_and_loses_none_of_it(
+        session: list[tuple[Any, ...]], monkeypatch: pytest.MonkeyPatch) -> None:
+    """The screens a resident reads, joined, are the answer: none is cut and nothing falls between them."""
+    _answering(monkeypatch)
+    pages, reply = [], keys(session, "2", "What is AMA's approved budget for 2026?")
+    while True:
+        assert len(reply.message) <= ussd.SCREEN_MAX and "..." not in reply.message
+        last = reply.message.endswith(ussd.LAST_MENU)
+        pages.append(reply.message.removesuffix(ussd.LAST_MENU if last else ussd.MORE_MENU))
+        if last:
+            break
+        reply = ussd.respond(Dial("s1", PHONE, "1", False), lambda *args: session.append(args))
+    assert len(pages) > 1 and " ".join(pages) == channel_answers.flat_text(LONG_ANSWER)
+
+
+def test_the_cap_falls_on_sending_the_answer_not_on_reading_it(
+        session: list[tuple[Any, ...]], monkeypatch: pytest.MonkeyPatch) -> None:
+    """Refused the text, the resident still has the answer in front of them, and the screen says so."""
+    _answering(monkeypatch, "Short enough for one screen.")
     monkeypatch.setattr(channel_limits, "SMS_ANSWERS", channel_limits.NumberLimit("sms-answers", 1, 86400))
-    keys(session, "1", "What are the market fees?", session_id="a")
-    assert "today's answers" in keys(session, "1", "And the toll fees?", session_id="b").message
+    assert keys(session, "2", "What are the market fees?", "1", session_id="a").message.startswith("Thank you")
+    refused = keys(session, "2", "And the toll fees?", "1", session_id="b")
+    assert ussd.REFUSED_SMS in refused.message and refused.message.endswith("\n0 Menu") and refused.more
     assert len(session) == 1
 
 
-def test_the_answer_sms_is_the_sms_layout_and_a_failure_still_gets_a_reply(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_the_answer_goes_by_sms_in_parts_and_a_failure_still_gets_a_reply(monkeypatch: pytest.MonkeyPatch) -> None:
     sent: list[tuple[str, str]] = []
     monkeypatch.setattr(ussd, "send_sms", lambda to, text: sent.append((to, text)) or True)
-    monkeypatch.setattr(ussd, "answer_question", lambda q, length: {"status": "no_information"})
-    ussd.answer_by_sms(PHONE, "Where is the moon?")
+    monkeypatch.setattr(ussd, "for_sms", lambda answer, site, shorter=None: ["Nokware: first. (1/2)", "second. (2/2)"])
+    monkeypatch.setattr(ussd, "answer_question", lambda q, length: {"status": "answered", "answer": "x"})
+    ussd.send_answer_by_sms(PHONE, "What is the budget?")
+    assert [text for _, text in sent] == ["Nokware: first. (1/2)", "second. (2/2)"]
     monkeypatch.setattr(ussd, "answer_question", lambda q, length: 1 / 0)
-    ussd.answer_by_sms(PHONE, "Where is the moon?")
-    assert "don't have information" in sent[0][1] and "sorry" in sent[1][1] and {to for to, _ in sent} == {PHONE}
+    ussd.send_answer_by_sms(PHONE, "Where is the moon?")
+    assert ussd.ANSWER_FAILED in sent[-1][1] and {to for to, _ in sent} == {PHONE}
 
 
 def _classified(topic: str) -> Classification:
@@ -103,9 +145,9 @@ def _filed(case: dict[str, Any], messages_on: bool = True, token: str | None = N
 def test_a_report_is_described_placed_confirmed_and_filed(session: list[tuple[Any, ...]], monkeypatch: pytest.MonkeyPatch) -> None:
     submitted, submit = _filed(CIVIC, monkeypatch=monkeypatch)
     monkeypatch.setattr(report_intake, "submit", submit)
-    assert keys(session, "2", "bad").message.startswith("Please describe it")  # too short: asked again
+    assert keys(session, "3", "bad").message.startswith("Please describe it")  # too short: asked again
     kaneshie = str(ussd._ward_ids("okaikoi-south").index("kaneshie") + 1)
-    reply = keys(session, "2", "The drain at Kaneshie market is choked", "9", "2", kaneshie, "1", session_id="s2")
+    reply = keys(session, "3", "The drain at Kaneshie market is choked", "9", "2", kaneshie, "1", session_id="s2")
     assert reply.message == "Report K7QM-4TXP filed with Works Department. We'll SMS you when it's resolved. Keep this reference."
     assert not reply.more
     filed = submitted[0]
@@ -116,14 +158,14 @@ def test_a_report_is_described_placed_confirmed_and_filed(session: list[tuple[An
 def test_filing_without_updates_keeps_the_number_out(session: list[tuple[Any, ...]], monkeypatch: pytest.MonkeyPatch) -> None:
     submitted, submit = _filed(CIVIC, messages_on=False, monkeypatch=monkeypatch)
     monkeypatch.setattr(report_intake, "submit", submit)
-    reply = keys(session, "2", "The drain at Kaneshie market is choked", "2", "1", "2")
+    reply = keys(session, "3", "The drain at Kaneshie market is choked", "2", "1", "2")
     assert submitted[0].phone is None and "We'll SMS" not in reply.message and not session
 
 
 def test_cancel_files_nothing(session: list[tuple[Any, ...]], monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(report_intake, "read_report", lambda description: _classified("drainage"))
     monkeypatch.setattr(report_intake, "submit", lambda *args: pytest.fail("filed"))
-    assert keys(session, "2", "The drain at Kaneshie market is choked", "2", "1", "0").message == "Cancelled. Nothing was filed."
+    assert keys(session, "3", "The drain at Kaneshie market is choked", "2", "1", "0").message == "Cancelled. Nothing was filed."
 
 
 def _contacts(monkeypatch: pytest.MonkeyPatch) -> tuple[list[Any], list[Any]]:
@@ -142,7 +184,7 @@ def test_personal_safety_shows_numbers_first_asks_only_the_sub_metro_and_updates
     submitted, submit = _filed(SAFETY, messages_on=False, monkeypatch=monkeypatch)
     monkeypatch.setattr(report_intake, "submit", submit)
     saved, changed = _contacts(monkeypatch)
-    first = keys(session, "2", "My neighbour beats his wife every night")
+    first = keys(session, "3", "My neighbour beats his wife every night")
     assert first.message.startswith(ussd.HELP_HEADING + "\nPolice: 191, 18555, 0302 779 300 (HQ)") and first.message.endswith("1 Next")
     shown = [first.message] + [ussd.respond(Dial("s1", PHONE, "1", False), lambda *a: None).message for _ in range(3)]
     assert "DOVVSU (domestic violence): 0551 000 900" in shown[0]
@@ -176,7 +218,7 @@ def test_saying_no_to_updates_and_calls_keeps_no_number(session: list[tuple[Any,
     _, submit = _filed(SAFETY, messages_on=False, monkeypatch=monkeypatch)
     monkeypatch.setattr(report_intake, "submit", submit)
     saved, changed = _contacts(monkeypatch)
-    offer = keys(session, "2", "My husband beats me", *_through_help("abuse"), "0", "1", "2", "2")
+    offer = keys(session, "3", "My husband beats me", *_through_help("abuse"), "0", "1", "2", "2")
     assert offer.message == "No one will phone you.\n" + ussd.NUMBERS_OFFER
     assert saved == [] and changed == [] and session == []
 
@@ -185,7 +227,7 @@ def test_a_call_only_keeps_the_number_for_calls_and_nothing_else(session: list[t
     _, submit = _filed(SAFETY, messages_on=False, monkeypatch=monkeypatch)
     monkeypatch.setattr(report_intake, "submit", submit)
     saved, changed = _contacts(monkeypatch)
-    keys(session, "2", "My husband beats me", *_through_help("abuse"), "0", "1", "2", "1")
+    keys(session, "3", "My husband beats me", *_through_help("abuse"), "0", "1", "2", "1")
     assert saved == [("c2", ContactChoice(normalise_phone(PHONE), None, notify=False, callback_consent=True))]
     assert changed == [] and session == []  # no messages sent
 
@@ -195,14 +237,14 @@ def test_a_session_that_drops_before_the_question_keeps_no_number(session: list[
     submitted, submit = _filed(SAFETY, messages_on=False, monkeypatch=monkeypatch)
     monkeypatch.setattr(report_intake, "submit", submit)
     saved, changed = _contacts(monkeypatch)
-    receipt = keys(session, "2", "My husband beats me", *_through_help("abuse"), "0", "1")
+    receipt = keys(session, "3", "My husband beats me", *_through_help("abuse"), "0", "1")
     assert receipt.message.endswith(UPDATES_ASK) and submitted[0].phone is None and saved == [] and changed == []
 
 
 def test_a_safety_reporter_can_skip_the_sub_metro(session: list[tuple[Any, ...]], monkeypatch: pytest.MonkeyPatch) -> None:
     submitted, submit = _filed(SAFETY, messages_on=False, monkeypatch=monkeypatch)
     monkeypatch.setattr(report_intake, "submit", submit)
-    confirm = keys(session, "2", "Someone has threatened to kill me", *_through_help("threat_to_life"), "0")
+    confirm = keys(session, "3", "Someone has threatened to kill me", *_through_help("threat_to_life"), "0")
     assert confirm.message == SEND  # no desk to show
     receipt = ussd.respond(Dial("s1", PHONE, "1", False), lambda *a: None)
     assert (submitted[0].ward, submitted[0].sub_metro) == (None, None)
@@ -232,7 +274,7 @@ def _offered(session: list[tuple[Any, ...]], monkeypatch: pytest.MonkeyPatch, se
     _, submit = _filed({**SAFETY, "subMetro": "ashiedu-keteke"}, messages_on=False, monkeypatch=monkeypatch)
     monkeypatch.setattr(report_intake, "submit", submit)
     # Ashiedu Keteke, send, no updates, no calls: then the numbers are offered.
-    return keys(session, "2", "My husband beats me", *_through_help("abuse"), "1", "1", "2", "2", session_id=session_id)
+    return keys(session, "3", "My husband beats me", *_through_help("abuse"), "1", "1", "2", "2", session_id=session_id)
 
 
 def test_the_numbers_go_by_sms_only_when_asked_for(session: list[tuple[Any, ...]], monkeypatch: pytest.MonkeyPatch) -> None:
@@ -271,7 +313,7 @@ def test_a_slow_safety_filing_still_offers_the_numbers(session: list[tuple[Any, 
     monkeypatch.setattr(report_intake, "read_report", lambda description: _classified("abuse"))
     monkeypatch.setattr(report_intake, "submit", lambda *args: time.sleep(0.3) or Receipt(SAFETY, False, False, None))
     monkeypatch.setattr(ussd, "send_sms", lambda to, text: True)
-    slow = keys(session, "2", "My husband beats me", *_through_help("abuse"), "0", "1")
+    slow = keys(session, "3", "My husband beats me", *_through_help("abuse"), "0", "1")
     assert slow.message == "Your report is being filed. Your reference will come by SMS.\n" + ussd.NUMBERS_OFFER
     done = ussd.respond(Dial("s1", PHONE, "1", False), lambda *args: session.append(args))
     assert done.message == f"The numbers are on their way by SMS.\n{ussd.CALL_LIST}" and session[0][0] is ussd.send_sms
@@ -287,12 +329,13 @@ def test_a_slow_model_leaves_the_rules_to_decide_and_they_still_catch_danger(mon
 def test_checking_a_case_shows_its_status_in_one_screen(session: list[tuple[Any, ...]], monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(report_followups, "find", lambda ref: CIVIC if ref == "K7QM-4TXP" else (_ for _ in ()).throw(report_followups.CaseNotFound(ref)))
     monkeypatch.setattr(ussd.report_store, "assignments_for", lambda case_id: [])
+    monkeypatch.setattr(report_followups, "history_for", lambda case: [])
     status = {"reference": "K7QM-4TXP", "private": False, "status": "in_progress", "topic": "Drainage and flooding",
               "ward": "Kaneshie", "recipients": ["Works Department"]}
-    monkeypatch.setattr(report_followups, "public_status", lambda case, assignments, now: status)
-    assert keys(session, "3", "k7qm 4txp").message == "Report K7QM-4TXP (Drainage and flooding in Kaneshie) is in progress with Works Department."
-    assert keys(session, "3", "hello", session_id="x").more  # not a reference: asked again
-    assert keys(session, "3", "ZZZZ-2222", session_id="y").message.startswith("No case has the reference ZZZZ-2222")
+    monkeypatch.setattr(report_followups, "public_status", lambda case, assignments, now, history=None: status)
+    assert keys(session, "4", "k7qm 4txp").message == "Report K7QM-4TXP (Drainage and flooding in Kaneshie) is in progress with Works Department."
+    assert keys(session, "4", "hello", session_id="x").more  # not a reference: asked again
+    assert keys(session, "4", "ZZZZ-2222", session_id="y").message.startswith("No case has the reference ZZZZ-2222")
 
 
 def test_an_expired_session_asks_to_dial_again(session: list[tuple[Any, ...]]) -> None:
@@ -327,17 +370,23 @@ def test_the_ussd_secret_never_reaches_the_access_log() -> None:
     assert "/api/channels/ussd/[secret]" in record.getMessage()
 
 
-def test_a_medical_emergency_gets_numbers_and_nothing_is_filed(session: list[tuple[Any, ...]], monkeypatch: pytest.MonkeyPatch) -> None:
+def test_emergency_numbers_lead_the_menu_and_say_first_that_nothing_is_filed(
+    session: list[tuple[Any, ...]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Two taps to an ambulance is a service even though Nokware does nothing with it — but nobody in an emergency
+    should read past "Ask a question" to reach it, and nobody should think a report was filed."""
     monkeypatch.setattr(report_intake, "submit", lambda *args: pytest.fail("filed"))
-    reply = keys(session, "4")
-    assert not reply.more and reply.message.startswith("Nokware can't file this: it isn't an Assembly matter.")
-    assert "193" in reply.message and "112" in reply.message
+    reply = keys(session, "1")
+    assert not reply.more and reply.message.startswith("Numbers to call now. Nokware gives them; it can't send help.")
+    for number in ("112", "193", "191", "192"):
+        assert number in reply.message
+    assert len(reply.message) <= ussd.SCREEN_MAX and ussd.MENU.splitlines()[1] == "1 Emergency numbers"
 
 
 def test_more_numbers_point_to_the_emergency_page_not_the_directory(session: list[tuple[Any, ...]], monkeypatch: pytest.MonkeyPatch) -> None:
     _, submit = _filed(SAFETY, messages_on=False, token="one-time", monkeypatch=monkeypatch)
     monkeypatch.setattr(report_intake, "submit", submit)
-    receipt = keys(session, "2", "My husband beats me", *_through_help("abuse"), "0", "1")
+    receipt = keys(session, "3", "My husband beats me", *_through_help("abuse"), "0", "1")
     assert receipt.message.split("More numbers: ")[1].startswith("http://localhost:3000/contacts/emergency")
 
 
@@ -347,24 +396,32 @@ def test_a_ussd_session_from_an_older_version_ends_cleanly(session: list[tuple[A
     assert channel_sessions.load("ussd", "old") is None
 
 
+def test_the_medical_screens_give_the_ambulance_numbers_in_contacts_json() -> None:
+    listed = {c["id"]: [n["number"] for n in c["numbers"]] for c in json.loads(CONTACTS_FILE.read_text(encoding="utf-8"))["contacts"]}
+    ambulance, emergency = [*listed["ambulance-193"], *listed["nas"]], listed["emergency-112"][0]
+    assert f"Ambulance: {', '.join(ambulance)}. Or call {emergency}." in ussd.MEDICAL
+    assert f"Ambulance: {', '.join(ambulance)}, or {emergency}." in ussd.MEDICAL_REPORT
+    assert f"Nothing was filed. Ambulance: {ambulance[0]}, or call {emergency}." == ussd.MEDICAL_NOT_FILED
+
+
 def test_a_medical_emergency_described_as_a_report_gets_the_ambulance_and_is_not_filed(
     session: list[tuple[Any, ...]], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(report_intake, "read_report", lambda description: _classified("public_health"))
     monkeypatch.setattr(channel_intent, "is_medical", lambda text: "collapsed" in text)
     monkeypatch.setattr(report_intake, "submit", lambda *args: pytest.fail("filed"))
-    screen = keys(session, "2", "A man has collapsed at Kaneshie market and is not breathing")
+    screen = keys(session, "3", "A man has collapsed at Kaneshie market and is not breathing")
     assert screen.more and screen.message == ussd.MEDICAL_REPORT and "193" in screen.message and "112" in screen.message
-    assert keys(session, "2", "A man has collapsed at Kaneshie market", "0").message.startswith("Nothing was filed.")
+    assert keys(session, "3", "A man has collapsed at Kaneshie market", "0").message.startswith("Nothing was filed.")
 
 
 def test_a_citizen_can_file_what_the_model_took_for_medical(session: list[tuple[Any, ...]], monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(channel_intent, "is_medical", lambda text: True)
     submitted, submit = _filed(SAFETY, messages_on=False, monkeypatch=monkeypatch)
     monkeypatch.setattr(report_intake, "submit", submit)
-    first = keys(session, "2", "My husband hit me and I am bleeding", "1")
+    first = keys(session, "3", "My husband hit me and I am bleeding", "1")
     assert first.message.startswith(ussd.HELP_HEADING)  # the emergency numbers, as for any danger to a person
-    keys(session, "2", "My husband hit me and I am bleeding", "1", *_through_help("abuse"), "0", "1", session_id="s2")
+    keys(session, "3", "My husband hit me and I am bleeding", "1", *_through_help("abuse"), "0", "1", session_id="s2")
     assert submitted and submitted[0].sub_metro is None
 
 

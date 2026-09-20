@@ -5,7 +5,7 @@ import io
 import logging
 import math
 import wave
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from urllib.parse import parse_qsl
 
@@ -85,8 +85,6 @@ def test_a_file_that_is_not_audio_is_rejected() -> None:
         voice_audio.seconds(b"%PDF-1.7 not a voice note")
 
 
-# What is said aloud, and Gemini's speech.
-
 def test_the_spoken_script_is_the_gist_without_tags_markup_or_links_and_points_to_the_sources() -> None:
     answer: RagAnswer = {**ANSWER, "answer": "## Fees\n* A stall costs **GHS 1,200** a year [S1]\n- Pay at the sub-metro [S2]\n"
                                              "See https://ama.gov.gh/fees for more [R1]."}
@@ -143,8 +141,6 @@ def test_a_reply_with_no_audio_is_asked_for_once_more(monkeypatch: pytest.Monkey
         voice_speech.speak("Hello")
 
 
-# Transcription: Gemini listens, told the place names and how references are spelled.
-
 def test_a_voice_note_is_transcribed_with_the_place_names_and_a_failure_is_reported(monkeypatch: pytest.MonkeyPatch) -> None:
     parsed = voice_transcribe._Transcript(heard="Me ho yɛ", english="I am fine", language="Twi", clear=True, about_harm=False)
     client = _Genai(type("Response", (), {"parsed": parsed, "text": ""}))
@@ -177,8 +173,6 @@ def test_a_format_gemini_cannot_read_is_re_encoded_first(monkeypatch: pytest.Mon
 def test_a_spoken_choice_or_reference_reads_as_typed(said: str, typed: str) -> None:
     assert whatsapp_voice.as_typed(said) == typed
 
-
-# The conversation, with Redis faked and Twilio, Gemini and the replies stubbed.
 
 @pytest.fixture
 def redis_server(monkeypatch: pytest.MonkeyPatch) -> fakeredis.FakeRedis:
@@ -292,7 +286,7 @@ def test_twilios_copy_goes_once_the_message_has_arrived_or_never_will(
 def test_a_spoken_reply_twilio_never_reports_on_is_swept_after_a_day(
     monkeypatch: pytest.MonkeyPatch, phone: dict[str, Any], redis_server: fakeredis.FakeRedis
 ) -> None:
-    now = datetime(2026, 9, 15, 12, 0, tzinfo=timezone.utc)
+    now = datetime(2026, 9, 15, 12, 0, tzinfo=UTC)
     spoken = redis_store.key(*whatsapp_voice.SPOKEN)
     redis_server.zadd(spoken, {"MMold": (now - timedelta(hours=25)).timestamp(), "MMnew": (now - timedelta(hours=2)).timestamp()})
     phone["twilio"].can_delete = False

@@ -1,4 +1,4 @@
-/** The citizen's numbers, and (safety form only) what they agreed they may be used for. */
+/** The consents are asked on the safety form only. */
 export type Contact = { phone: string; whatsapp: string; notify: boolean; callbackConsent: boolean };
 
 export const NO_CONTACT: Contact = { phone: "", whatsapp: "", notify: false, callbackConsent: false };
@@ -7,7 +7,6 @@ export function hasNumber(contact: Pick<Contact, "phone" | "whatsapp">): boolean
   return Boolean(contact.phone.trim() || contact.whatsapp.trim());
 }
 
-/** What the citizen filled in, from either form. */
 export type ReportDraft = Contact & {
   description: string;
   ward?: string;
@@ -21,11 +20,7 @@ function setIfGiven(form: FormData, name: string, value: string | undefined) {
   if (trimmed) form.set(name, trimmed);
 }
 
-/**
- * The multipart body for POST /api/reports. On the safety form a number goes
- * only if the citizen agreed to messages or a call: otherwise there is no use
- * for it, and it isn't sent.
- */
+/** On the safety form a number is sent only if the citizen agreed to messages or a call: otherwise it has no use. */
 export function reportFormData(draft: ReportDraft): FormData {
   const form = new FormData();
   form.set("description", draft.description.trim());

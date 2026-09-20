@@ -7,6 +7,7 @@ from urllib.parse import parse_qsl
 import fakeredis
 import httpx
 import pytest
+from appwrite.exception import AppwriteException
 from fastapi.testclient import TestClient
 from PIL import Image
 from twilio.request_validator import RequestValidator
@@ -31,7 +32,7 @@ from app.services.citizen_reports import IntakeChannel, NotificationChannel, Not
 from app.services.report_intake import Receipt, ReportSubmission
 from app.services.report_rules import Classification, ClassificationMethod
 from app.services.report_taxonomy import TOPICS_BY_ID, Category
-from app.services.whatsapp import TwilioWhatsApp, WhatsAppError, split
+from app.services.whatsapp import TwilioWhatsApp, WhatsAppError, WhatsAppNothingSent, WhatsAppUnreachable, split
 from app.services.whatsapp_conversation import ASK_KIND, CANCELLED, Inbound, Media
 
 NUMBER = "+233507387216"
@@ -82,6 +83,40 @@ def test_a_message_is_posted_to_twilio_with_the_status_callback() -> None:
         lambda r: httpx.Response(401, json={"code": 20003, "message": "Authenticate"}))))
     with pytest.raises(WhatsAppError, match="20003"):
         refusing.send(NUMBER, "Hello")
+
+
+def _twilio_raising(error: Exception) -> TwilioWhatsApp:
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise error
+
+    return TwilioWhatsApp("AC1", TOKEN, "whatsapp:+1", client=httpx.Client(transport=httpx.MockTransport(handler)))
+
+
+@pytest.mark.parametrize("error", [httpx.ConnectError("no route"), httpx.ConnectTimeout("too slow")])
+def test_a_whatsapp_message_that_never_reached_twilio_says_nothing_was_sent(error: Exception) -> None:
+    """No connection was ever made, so nobody got anything: sending it again is the same message arriving late."""
+    with pytest.raises(WhatsAppNothingSent) as raised:
+        _twilio_raising(error).send(NUMBER, "Hello")
+    assert type(error).__name__ in str(raised.value) and NUMBER not in str(raised.value)
+
+
+@pytest.mark.parametrize("error", [httpx.ReadTimeout("no answer"), httpx.RemoteProtocolError("dropped")])
+def test_a_whatsapp_message_twilio_never_answered_may_have_gone_out_and_is_told_apart(error: Exception) -> None:
+    """The request may have arrived; no SID came back, so no status callback can ever settle it."""
+    with pytest.raises(WhatsAppUnreachable) as raised:
+        _twilio_raising(error).send(NUMBER, "Hello")
+    assert not isinstance(raised.value, WhatsAppNothingSent) and NUMBER not in str(raised.value)
+
+
+def test_a_whatsapp_refusal_twilio_answered_is_neither_and_is_never_sent_again() -> None:
+    """Twilio answered, so the message may have been delivered anyway — and 63016 is the SMS stand-in's to handle."""
+    refusing = TwilioWhatsApp("AC1", TOKEN, "whatsapp:+1", client=httpx.Client(transport=httpx.MockTransport(
+        lambda r: httpx.Response(400, json={"code": 63016, "message": "Outside the window"}))))
+    with pytest.raises(WhatsAppError) as raised:
+        refusing.send(NUMBER, "Hello")
+    assert "63016" in str(raised.value)
+    assert not isinstance(raised.value, (WhatsAppNothingSent, WhatsAppUnreachable))
+    assert notifications._why_failed(raised.value) == ""  # no prefix: the sweep leaves it alone
 
 
 def test_only_twilios_signature_for_our_public_url_is_accepted(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -165,8 +200,6 @@ def test_the_status_callback_records_delivery_and_falls_back_on_the_window_error
     _signed_post(client, "/api/channels/whatsapp/status", {"MessageSid": "SM7", "MessageStatus": "undelivered", "ErrorCode": "63016"})
     assert calls == [("SM6", "delivered"), ("SM7", "undelivered"), ("fallback", "63016")]
 
-
-# The conversation: Redis faked, replies collected, the models and Twilio stubbed.
 
 @pytest.fixture
 def chat(monkeypatch: pytest.MonkeyPatch, redis_server: fakeredis.FakeRedis) -> list[str]:
@@ -332,9 +365,10 @@ def test_a_fire_gets_its_numbers_first_then_the_area_question(monkeypatch: pytes
 def test_a_reference_gets_its_status(monkeypatch: pytest.MonkeyPatch, chat: list[str]) -> None:
     monkeypatch.setattr(report_followups, "find", lambda ref: CIVIC)
     monkeypatch.setattr(whatsapp_conversation.report_store, "assignments_for", lambda case_id: [])
+    monkeypatch.setattr(report_followups, "history_for", lambda case: [])
     status = {"reference": "K7QM-4TXP", "private": False, "status": "assigned", "topic": "Drainage and flooding",
               "ward": "Kaneshie", "recipients": ["Works Department"]}
-    monkeypatch.setattr(report_followups, "public_status", lambda case, assignments, now: status)
+    monkeypatch.setattr(report_followups, "public_status", lambda case, assignments, now, history=None: status)
     say("K7QM-4TXP")
     assert chat[-1] == "Report K7QM-4TXP (Drainage and flooding in Kaneshie) was received and is with Works Department."
 
@@ -460,3 +494,33 @@ def test_the_hourly_report_limit_never_turns_away_someone_in_danger(monkeypatch:
     say("0")
     say("1")
     assert len(filed) == 1 and chat[-1].startswith("This has gone to")
+
+
+def test_a_report_filed_in_the_chat_is_recorded_as_told_so_the_sweep_does_not_say_it_twice(
+    monkeypatch: pytest.MonkeyPatch, chat: list[str]
+) -> None:
+    """The reply to the chat IS the "we have it" message. With nothing in the outbox the sweep read that silence as
+    a message the resident never got, and sent a second one a quarter of an hour later — at a charge, every time."""
+    recorded: list[tuple[Any, Any]] = []
+    monkeypatch.setattr(whatsapp_conversation.notifications, "record_reply",
+                        lambda case_id, event, channel, body, message_id: recorded.append((event, channel)))
+    _reads(monkeypatch, "report")
+    _filing(monkeypatch, CIVIC)
+    say("The drain at Kaneshie market is choked")
+    say("1")
+    assert recorded == [(NotificationEvent.SUBMITTED, NotificationChannel.WHATSAPP)]
+
+
+def test_a_confirmation_that_cannot_be_written_down_still_reaches_the_resident(
+    monkeypatch: pytest.MonkeyPatch, chat: list[str]
+) -> None:
+    """The message is already in their hand; only the record of it failed. Saying their report went wrong is false."""
+    def refuse(*args: Any, **kwargs: Any) -> str:
+        raise AppwriteException("the database is away")
+
+    monkeypatch.setattr(notifications, "_outbox", refuse)
+    _reads(monkeypatch, "report")
+    _filing(monkeypatch, CIVIC)
+    say("The drain at Kaneshie market is choked")
+    say("1")
+    assert chat[-1].startswith("Filed. Your reference is")

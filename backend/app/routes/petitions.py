@@ -1,60 +1,68 @@
-"""Petitions: public pages, the creator's own petitions (by a confirmed phone), and the MCE's review.
+"""Petitions: public pages, the creator's own petitions (by a confirmed phone), what residents say under one, the
+contributors' queue of what has been reported, the MCE's responses, the departments they are shared with, and the
+creator's reply to the answer they were given.
 
-    GET  /api/petitions/options            topics, areas, thresholds, refusal reasons, ways to confirm a number
-    GET  /api/petitions                    published petitions (?group=open|closed, ?topic) and the MCE's moderation record
-    GET  /api/petitions/review             MCE: petitions waiting for a decision, closest to publishing automatically first
-    GET  /api/petitions/responses          MCE: petitions that reached their threshold, closest to their 30 days first
-    GET  /api/petitions/mine               the creator's own petitions (X-Phone-Proof)
-    POST /api/petitions/check              the draft's words, checked before it is sent
-    POST /api/petitions/ledger             what the Ledger holds on a draft's subject
-    POST /api/petitions                    submit a petition for review (X-Phone-Proof)
-    GET  /api/petitions/{code}             one published petition
-    GET  /api/petitions/{code}/ledger      what the Ledger holds on its subject
-    POST /api/petitions/{code}/resubmit    a refused petition, edited (X-Phone-Proof)
-    POST /api/petitions/{code}/withdraw    (X-Phone-Proof)
-    POST /api/petitions/{code}/anonymous   take the creator's name off it (X-Phone-Proof)
-    POST /api/petitions/{code}/decision    MCE: publish, or refuse for a fixed reason
-    POST /api/petitions/{code}/response    MCE: the public response to a petition that reached its threshold
-    POST /api/petitions/{code}/signatures  sign it, anonymous unless a name is shown (X-Phone-Proof)
-    GET  /api/petitions/{code}/signature   whether this number has signed (X-Phone-Proof)
-    POST /api/petitions/{code}/signature/anonymous   take the signer's name off (X-Phone-Proof)
-    GET  /api/petitions/{code}/names       the names signers chose to show, newest first
+Nobody approves a petition here. A draft that passes the screen is published by the person who wrote it; what comes
+down, comes down on a named ground, by a contributor who neither started it nor signed it.
 """
 
 from dataclasses import asdict
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Header, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Header, Query, Request, UploadFile
 
 from app.config import get_settings
-from app.dependencies import rate_limited, require_roles
+from app.dependencies import client_address, rate_limited, refuse_if_over, require_roles
 from app.routes import petition_presenters as present
 from app.schemas.documents import Option
 from app.schemas.petitions import (
     AreaOption,
     AwaitingResponse,
-    DecisionRequest,
+    Comment,
+    CommentPage,
+    CommentRemovalRequest,
+    CommentReportRequest,
+    CommentRequest,
+    DismissRequest,
     DraftRequest,
+    EditRequest,
+    ImageRemovalRequest,
     LedgerMatch,
     LedgerSearchRequest,
     MyPetitions,
     MySignature,
     NamedSignatures,
+    NoteRequest,
     OwnPetition,
+    OwnPetitionDetail,
+    PetitionCard,
     PetitionDetail,
     PetitionOptions,
     PetitionPage,
+    RemovalRequest,
+    ReplyRequest,
+    ReportedComment,
+    ReportFiled,
+    ReportQueue,
+    ReportRequest,
     ResponseRequest,
-    ReviewQueue,
     ScreenRequest,
     ScreenResult,
+    SharedPetition,
+    ShareRequest,
     SignRequest,
     SignResult,
     SubmitRequest,
+    Tombstone,
     Verification,
 )
 from app.services import (
+    petition_comments,
+    petition_departments,
+    petition_images,
     petition_ledger,
+    petition_removals,
+    petition_reports,
     petition_responses,
     petition_screen,
     petition_signatures,
@@ -63,20 +71,28 @@ from app.services import (
     phone_proof,
     rate_limit,
 )
-from app.services.petition_updates import Update
 from app.services.auth import Principal, Role
 from app.services.ledger_documents import utc_now
+from app.services.petition_comments import COMMENT_MAX
+from app.services.petition_grounds import Dismissal, Ground, Subject, in_plain_words
 from app.services.petition_rules import (
+    DEPARTMENT_NOTE_MAX,
+    DOCUMENTS_MAX,
+    IMAGES_MAX,
     OPEN_FOR,
+    REMOVAL_NOTE_MAX,
+    REPLY_MAX,
+    REPORT_NOTE_MAX,
     RESPONSE_WINDOW,
-    REVIEW_WINDOW,
     Draft,
     InvalidPetition,
-    PetitionStatus,
     Response,
     Scope,
     petition_topics,
+    version_of,
 )
+from app.services.petition_updates import Update
+from app.services.report_photos import MAX_PHOTO_BYTES
 from app.services.report_taxonomy import TOPICS_BY_ID
 from app.wards import sub_metros, wards
 
@@ -85,22 +101,30 @@ Checks = Depends(rate_limited(rate_limit.PETITION_CHECKS))
 Changes = Depends(rate_limited(rate_limit.PETITION_CHANGES))
 Signing = Depends(rate_limited(rate_limit.SIGNING))
 Mce = Annotated[Principal, Depends(require_roles(Role.MCE))]
+Contributor = Annotated[Principal, Depends(require_roles(Role.CONTRIBUTOR))]
+Department = Annotated[Principal, Depends(require_roles(Role.DEPARTMENT))]
 PAGE_MAX = 50
-GROUPS = {"open": [PetitionStatus.OPEN], "awaiting": [PetitionStatus.AWAITING_RESPONSE], "responded": [PetitionStatus.RESPONDED],
-          "closed": [PetitionStatus.CLOSED, PetitionStatus.WITHDRAWN]}
+GROUPS = petitions.PUBLIC_GROUPS
+REMOVED = petitions.REMOVED_GROUP
 
 
 def confirmed_phone(x_phone_proof: Annotated[str | None, Header()] = None) -> phone_proof.Proof:
-    """The number a page confirmed, from its sealed proof (401 if missing, altered or expired)."""
+    """401 if the proof is missing, altered or expired."""
     return phone_proof.open_proof(x_phone_proof, utc_now())
 
 
 Phone = Annotated[phone_proof.Proof, Depends(confirmed_phone)]
 
 
-def _draft(request: DraftRequest) -> Draft:
+def _draft(request: DraftRequest, images: tuple[str, ...]) -> Draft:
     return Draft(request.title, request.body, request.topic, Scope(request.scope), request.ward, request.issue,
-                 tuple(request.documents))
+                 tuple(request.documents), images)
+
+
+def _stored_images(images: list[UploadFile], keep: tuple[str, ...] = ()) -> tuple[str, ...]:
+    """What the petition will show: the images kept from the version before, then whatever was just uploaded."""
+    sent = [image.file.read(MAX_PHOTO_BYTES + 1) for image in images if image.filename]
+    return (*keep, *petition_images.store_images(sent, IMAGES_MAX - len(keep)))
 
 
 @router.get("/options", response_model=PetitionOptions)
@@ -110,8 +134,12 @@ def options() -> PetitionOptions:
         topics=[Option(id=t.id, name=t.label) for t in petition_topics()],
         areas=[AreaOption(id=w.id, name=w.name, sub_metro=sub_metros()[w.sub_metro].name) for w in wards().values()],
         threshold_area=settings.petition_threshold_area, threshold_metro=settings.petition_threshold_metro,
-        review_hours=int(REVIEW_WINDOW.total_seconds() // 3600), open_days=OPEN_FOR.days, response_days=RESPONSE_WINDOW.days,
-        refusal_reasons=present.refusal_reasons(),
+        open_days=OPEN_FOR.days, response_days=RESPONSE_WINDOW.days, max_images=IMAGES_MAX,
+        max_documents=DOCUMENTS_MAX, report_note_max=REPORT_NOTE_MAX, removal_note_max=REMOVAL_NOTE_MAX,
+        department_note_max=DEPARTMENT_NOTE_MAX, reply_max=REPLY_MAX, comment_max=COMMENT_MAX,
+        grounds=present.grounds(), comment_grounds=present.grounds(Subject.COMMENT),
+        image_grounds=present.grounds(Subject.IMAGE),
+        dismissal_reasons=present.dismissal_reasons(), status_words=present.status_catalogue(),
         verification=Verification(whatsapp=phone_proof.whatsapp_available(), ussd_code=phone_proof.ussd_code(),
                                   sms=phone_proof.sms_available()),
     )
@@ -119,21 +147,26 @@ def options() -> PetitionOptions:
 
 @router.get("", response_model=PetitionPage)
 def published(
-    group: Literal["open", "awaiting", "responded", "closed"] = "open",
+    group: Literal["open", "awaiting", "responded", "closed", "removed"] = "open",
     topic: str | None = None,
     limit: Annotated[int, Query(ge=1, le=PAGE_MAX)] = 20,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> PetitionPage:
+    """The petitions standing in one group, or — for "removed" — the tombstones of the ones taken down, which are
+    built from the removal records and carry nothing of the petitions. `topic` doesn't narrow that group: a
+    tombstone has no topic, and reading one off the petition is the leak the tombstone exists to prevent."""
+    if group == REMOVED:
+        stones, removed_total = petition_removals.standing_tombstones(limit, offset)
+        return _page([], removed_total, [present.tombstone(stone) for stone in stones])
     found, total = petitions.list_public(GROUPS[group], topic, limit, offset)
-    return PetitionPage(petitions=[present.card(p) for p in found], total=total,
-                        moderation=present.moderation(petitions.moderation_counts()),
+    return _page([present.card(p) for p in found], total)
+
+
+def _page(cards: list[PetitionCard], total: int, removed: list[Tombstone] | None = None) -> PetitionPage:
+    """Every group is handed the same counts and the same removal figures, so the tabs read alike from any of them."""
+    return PetitionPage(petitions=cards, removed=removed or [], total=total, counts=petitions.public_counts(),
+                        removals=present.removals(petition_removals.removals_by_ground()),
                         topics=[Option(id=t.id, name=t.label) for t in petition_topics()])
-
-
-@router.get("/review", response_model=ReviewQueue)
-def review(_: Mce) -> ReviewQueue:
-    return ReviewQueue(petitions=[present.review_item(p) for p in petitions.review_queue()],
-                       refusal_reasons=present.refusal_reasons())
 
 
 @router.get("/responses", response_model=list[AwaitingResponse])
@@ -141,9 +174,59 @@ def responses(_: Mce) -> list[AwaitingResponse]:
     return [present.awaiting(p) for p in petitions.awaiting_response()]
 
 
+@router.get("/shared", response_model=list[SharedPetition])
+def shared(principal: Department) -> list[SharedPetition]:
+    """The petitions the MCE has shared with the caller's department, newest first."""
+    return [present.shared(item) for item in petition_departments.shared_with(principal)]
+
+
+@router.get("/reports", response_model=ReportQueue)
+def reported(_: Contributor) -> ReportQueue:
+    """What readers have reported, newest first: the petitions, and the comments standing under them."""
+    return ReportQueue(reports=[present.reported(item) for item in petition_reports.queue()],
+                       comments=[_reported_comment(item) for item in petition_comments.queue()],
+                       grounds=present.grounds(), comment_grounds=present.grounds(Subject.COMMENT),
+                       image_grounds=present.grounds(Subject.IMAGE),
+                       dismissal_reasons=present.dismissal_reasons())
+
+
+def _comment(seen: petition_comments.Seen) -> Comment:
+    return Comment(id=seen.id, name=seen.name, text=seen.text, at=seen.at, removed=seen.removed)
+
+
+def _reported_comment(item: petition_comments.ReportedComment) -> ReportedComment:
+    ground = Ground(item.report["ground"])
+    return ReportedComment(id=item.report["$id"], reported_at=item.report["createdAt"], ground=ground.value,
+                           ground_words=in_plain_words(ground, subject=Subject.COMMENT), note=item.report.get("note"),
+                           reports_on_this_comment=item.reports_on_this_comment, code=item.report["code"],
+                           comment=_comment(item.comment))
+
+
+@router.post("/reports/{report_id}/dismiss", response_model=ReportQueue, dependencies=[Changes])
+def dismiss(report_id: str, request: DismissRequest, principal: Contributor) -> ReportQueue:
+    """The report is settled with one of two fixed reasons; the petition is untouched."""
+    petition_reports.dismiss(principal, report_id, Dismissal(request.reason), utc_now())
+    return reported(principal)
+
+
+@router.post("/comment-reports/{report_id}/dismiss", response_model=ReportQueue, dependencies=[Changes])
+def dismiss_comment_report(report_id: str, request: DismissRequest, principal: Contributor) -> ReportQueue:
+    """The same two fixed reasons settle a report about a comment; the comment stays as it is."""
+    petition_comments.dismiss(principal, report_id, Dismissal(request.reason), utc_now())
+    return reported(principal)
+
+
 @router.get("/mine", response_model=MyPetitions)
 def mine(proof: Phone) -> MyPetitions:
     return MyPetitions(number=proof.hint, petitions=[present.own(p) for p in petitions.mine(proof)])
+
+
+@router.get("/{code}/mine", response_model=OwnPetitionDetail)
+def my_petition(code: str, proof: Phone) -> OwnPetitionDetail:
+    """One petition, read by its number and the number that started it. Anyone else's is simply not found, and a
+    removed one still answers here: its public page is a tombstone, but its creator has words to mend."""
+    petition = petitions.owned(code, proof)
+    return present.own_detail(petition, petition_departments.shares_on(petition["$id"]))
 
 
 @router.post("/check", response_model=ScreenResult, dependencies=[Checks])
@@ -160,10 +243,16 @@ def draft_ledger(request: LedgerSearchRequest) -> list[LedgerMatch]:
     return [LedgerMatch(**asdict(match)) for match in petition_ledger.cached_search(query)]
 
 
-@router.post("", response_model=OwnPetition, dependencies=[Changes])
-def submit(request: SubmitRequest, proof: Phone) -> OwnPetition:
+@router.post("", response_model=OwnPetition, status_code=201, dependencies=[Changes])
+def submit(request: Annotated[SubmitRequest, File()], proof: Phone) -> OwnPetition:
+    """A form, so the petition's images arrive with its words. It is published by this call: nobody approves it.
+
+    `File()`, not `Form()`: the form carries file parts, and only File() has FastAPI declare the multipart the
+    route actually reads. Under Form() the schema said urlencoded, which no browser can send an image in and no
+    generated client can type."""
     _stop_if_screened(request.title, request.body)
-    return present.own(petitions.submit(proof, _draft(request), request.show_name, request.name, utc_now()))
+    draft = _draft(request, _stored_images(request.images))
+    return present.own(petitions.submit(proof, draft, request.show_name, request.name, utc_now()))
 
 
 def _stop_if_screened(title: str, body: str) -> None:
@@ -173,9 +262,30 @@ def _stop_if_screened(title: str, body: str) -> None:
         raise InvalidPetition(stop)
 
 
-@router.get("/{code}", response_model=PetitionDetail)
-def petition(code: str) -> PetitionDetail:
-    return present.detail(petitions.public(code))
+@router.get("/{code}", response_model=PetitionDetail | Tombstone)
+def petition(code: str) -> PetitionDetail | Tombstone:
+    """A petition, or — where one was removed — the tombstone, which is built from the removal record alone."""
+    try:
+        standing = petitions.public(code)
+    except petitions.PetitionNotFound:
+        return _tombstone(code)
+    return _detail(standing)
+
+
+def _detail(standing: dict[str, Any]) -> PetitionDetail:
+    """Comments and departments are read only for a petition the caller has already read publicly, so a removed
+    one carries neither, as it carries no answer: the tombstone route never comes through here."""
+    return present.detail(standing).model_copy(update={
+        "comments": petition_comments.count_on(standing),
+        "shared_with": present.shares(petition_departments.shares_on(standing["$id"]))})
+
+
+def _tombstone(code: str) -> Tombstone:
+    removed = petitions.find(code)  # raises PetitionNotFound if there is no such petition at all
+    removal = petition_removals.latest_removal(removed["$id"])
+    if removal is None:
+        raise petitions.PetitionNotFound(code)
+    return present.tombstone(petition_removals.tombstone(removal))
 
 
 @router.get("/{code}/ledger", response_model=list[LedgerMatch])
@@ -183,14 +293,17 @@ def petition_ledger_matches(code: str) -> list[LedgerMatch]:
     return present.ledger_matches(petitions.public(code))
 
 
-@router.post("/{code}/resubmit", response_model=OwnPetition, dependencies=[Changes])
-def resubmit(code: str, request: DraftRequest, proof: Phone) -> OwnPetition:
+@router.post("/{code}/edit", response_model=OwnPetition, dependencies=[Changes])
+def edit(code: str, request: Annotated[EditRequest, File()], proof: Phone) -> OwnPetition:
+    """A new version of the words, and — for a petition that was removed — its publication again."""
     _stop_if_screened(request.title, request.body)
-    return present.own(petitions.resubmit(code, proof, _draft(request), utc_now()))
+    draft = _draft(request, _stored_images(request.images, tuple(request.keep_images)))
+    return present.own(petitions.edit(code, proof, draft, utc_now()))
 
 
 @router.post("/{code}/withdraw", response_model=OwnPetition, dependencies=[Changes])
 def withdraw(code: str, proof: Phone) -> OwnPetition:
+    """The creator closes their own petition. It stays public, closed, with the signatures it has."""
     return present.own(petitions.withdraw(code, proof, utc_now()))
 
 
@@ -199,13 +312,36 @@ def anonymous(code: str, proof: Phone) -> OwnPetition:
     return present.own(petitions.make_anonymous(code, proof))
 
 
-@router.post("/{code}/decision", response_model=ReviewQueue)
-def decide(code: str, request: DecisionRequest, principal: Mce, tasks: BackgroundTasks) -> ReviewQueue:
-    """The decision, then the queue as it now stands. The creator is told after the answer is sent."""
-    publish = request.decision == "publish"
-    updated = petitions.decide(principal, code, publish, request.reason, request.note, request.duplicate_of, utc_now())
-    tasks.add_task(petition_updates.notify_quietly, updated, Update.PUBLISHED if publish else Update.REFUSED)
-    return review(principal)
+def report_limits(request: Request, code: str) -> None:
+    """Two counts: one device can't flood the queue, and one petition can't be buried under reports. Neither hides
+    anything — a report never does — so a limit here only keeps the queue readable."""
+    refuse_if_over(rate_limit.PETITION_REPORTS, client_address(request))
+    refuse_if_over(rate_limit.PETITION_REPORTS_ABOUT_ONE, f"petition:{code}")
+
+
+@router.post("/{code}/report", response_model=ReportFiled, status_code=201, dependencies=[Depends(report_limits)])
+def report(code: str, request: ReportRequest) -> ReportFiled:
+    """Anyone, without signing in. The petition stays exactly as it is while a contributor reads this."""
+    filed = petition_reports.file_report(code, Ground(request.ground), request.duplicate_of, request.note, utc_now())
+    return ReportFiled(message=present.report_received(), reported_at=filed["createdAt"])
+
+
+@router.post("/{code}/removal", response_model=ReportQueue, dependencies=[Changes])
+def remove(code: str, request: RemovalRequest, principal: Contributor, proof: Phone, tasks: BackgroundTasks) -> ReportQueue:
+    """A contributor takes a petition down on a named ground. The confirmed phone is what proves they are neither
+    the person who started it nor one of its signers."""
+    removed = petition_removals.remove(principal, proof, code, Ground(request.ground), request.duplicate_of,
+                                       request.note, utc_now())
+    tasks.add_task(petition_updates.notify_quietly, removed.petition, Update.REMOVED)
+    return reported(principal)
+
+
+@router.post("/{code}/images/removal", response_model=ReportQueue, dependencies=[Changes])
+def remove_image(code: str, request: ImageRemovalRequest, principal: Contributor) -> ReportQueue:
+    """A contributor takes one photo off on a named ground. The petition and its other photos stand: taking the
+    whole petition down over one image would cost its signatures for something its creator can mend."""
+    petition_images.remove_image(principal, code, request.image_id, Ground(request.ground), utc_now())
+    return reported(principal)
 
 
 @router.post("/{code}/response", response_model=list[AwaitingResponse])
@@ -217,13 +353,32 @@ def respond(code: str, request: ResponseRequest, principal: Mce, tasks: Backgrou
     return responses(principal)
 
 
+@router.post("/{code}/share", response_model=PetitionDetail, dependencies=[Changes])
+def share(code: str, request: ShareRequest, principal: Mce) -> PetitionDetail:
+    """The MCE asks one department of the Assembly to answer this petition. The page comes back with it on."""
+    return _detail(petition_departments.share(principal, code, request.department, utc_now()))
+
+
+@router.post("/{code}/note", response_model=SharedPetition, dependencies=[Changes])
+def note(code: str, request: NoteRequest, principal: Department) -> SharedPetition:
+    """The one note the caller's department writes on a petition shared with it, public under its name."""
+    return present.shared(petition_departments.add_note(principal, code, request.text, utc_now()))
+
+
+@router.post("/{code}/reply", response_model=PetitionDetail, dependencies=[Changes])
+def reply(code: str, request: ReplyRequest, proof: Phone) -> PetitionDetail:
+    """The creator answers the MCE's response, once, on the confirmed number they started the petition with."""
+    return _detail(petition_responses.reply(code, proof, request.text, utc_now()))
+
+
 @router.post("/{code}/signatures", response_model=SignResult, dependencies=[Signing])
 def sign(code: str, request: SignRequest, proof: Phone, tasks: BackgroundTasks) -> SignResult:
     signed = petition_signatures.sign(code, proof.number, proof.channel, request.show_name, request.name, utc_now())
-    if signed.reached:  # this signature sent it to the MCE
+    if signed.reached:
         tasks.add_task(petition_updates.notify_quietly, signed.petition, Update.THRESHOLD_REACHED)
     return SignResult(added=signed.added, named=signed.named, signatures=signed.petition.get("signatureCount") or 0,
-                      threshold=signed.petition.get("threshold"), status=signed.petition["status"])
+                      threshold=signed.petition.get("threshold"), status=signed.petition["status"],
+                      version=version_of(signed.petition))
 
 
 @router.get("/{code}/signature", response_model=MySignature)
@@ -244,3 +399,43 @@ def names(
 ) -> NamedSignatures:
     rows, total = petition_signatures.named(code, limit, offset)
     return NamedSignatures(names=[present.named_signature(r) for r in rows if r.get("name")], total=total)
+
+
+def comment_limits(code: str, proof: Phone) -> None:
+    """Two counts, as a report's are: one confirmed number can't flood the petitions, and one petition can't be
+    buried under comments. The number itself is never a key here — its keyed hash is."""
+    refuse_if_over(rate_limit.PETITION_COMMENTS, f"comments:{phone_proof.phone_key(proof.number)}")
+    refuse_if_over(rate_limit.PETITION_COMMENTS_ON_ONE, f"petition:{code}")
+
+
+@router.get("/{code}/comments", response_model=CommentPage)
+def comments(
+    code: str,
+    limit: Annotated[int, Query(ge=1, le=petition_comments.PAGE_MAX)] = 20,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> CommentPage:
+    """Newest first. A removed petition has none to give: they went down with it, and are back when it is."""
+    seen, total = petition_comments.on_petition(code, limit, offset)
+    return CommentPage(comments=[_comment(said) for said in seen], total=total)
+
+
+@router.post("/{code}/comments", response_model=Comment, status_code=201, dependencies=[Depends(comment_limits)])
+def comment(code: str, request: CommentRequest, proof: Phone) -> Comment:
+    """The same confirmed number a signature is given with, and no more stored with the comment than with one."""
+    return _comment(petition_comments.add(code, proof, request.name, request.text, utc_now()))
+
+
+@router.post("/{code}/comments/{comment_id}/report", response_model=ReportFiled, status_code=201,
+             dependencies=[Depends(report_limits)])
+def report_comment(code: str, comment_id: str, request: CommentReportRequest) -> ReportFiled:
+    """Anyone, without signing in. The comment stays exactly as it is while a contributor reads this."""
+    filed = petition_comments.file_report(code, comment_id, Ground(request.ground), request.note, utc_now())
+    return ReportFiled(message=petition_comments.report_received(), reported_at=filed["createdAt"])
+
+
+@router.post("/{code}/comments/{comment_id}/removal", response_model=ReportQueue, dependencies=[Changes])
+def remove_comment(code: str, comment_id: str, request: CommentRemovalRequest, principal: Contributor) -> ReportQueue:
+    """A contributor takes one comment down on a named ground. The petition stays up and so does every other
+    comment: it was this comment that was judged, and the ground stands where its words were."""
+    petition_comments.remove(principal, code, comment_id, Ground(request.ground), utc_now())
+    return reported(principal)

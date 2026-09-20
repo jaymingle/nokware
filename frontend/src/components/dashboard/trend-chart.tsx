@@ -1,39 +1,35 @@
 "use client";
 
 import { useWidth } from "@/hooks/use-width";
-import { FEWER_THAN_FIVE, SUPPRESSED_RANGE, chartScale, drawnValue, longMonth, monthLabel, shownRuns, type Count } from "@/lib/report/dashboard";
+import { SUPPRESSED_RANGE, chartScale, drawnValue, longMonth, monthLabel, shownRuns, spokenCount } from "@/lib/report/dashboard";
 
 import type { MonthFigures } from "@/lib/api/types";
 
-// The design's chart: received as bars, resolved in the month as a line. It is
-// drawn at the width it is shown, so its labels stay 11px on a phone and a desktop.
+// Drawn at the width it is shown, so its labels stay 11px on a phone and a desktop.
 const H = 250;
 const PAD = { l: 34, r: 8, t: 12, b: 28 };
 const INNER_H = H - PAD.t - PAD.b;
 const FONT = 11;
 const LABEL_ROOM = 30; // below this much room per month, every other month is labelled
 
-function spoken(count: Count): string {
-  return count === null ? FEWER_THAN_FIVE : String(count);
-}
-
 function MonthsTable({ months }: { months: MonthFigures[] }) {
   return (
-    <table className="sr-only">
+    <div className="sr-only">
+      <table>
       <caption>Reports received and resolved each month</caption>
       <thead>
         <tr><th scope="col">Month</th><th scope="col">Received</th><th scope="col">Resolved</th></tr>
       </thead>
       <tbody>
         {months.map((m) => (
-          <tr key={m.month}><th scope="row">{longMonth(m.month)}</th><td>{spoken(m.received)}</td><td>{spoken(m.resolved)}</td></tr>
+          <tr key={m.month}><th scope="row">{longMonth(m.month)}</th><td>{spokenCount(m.received)}</td><td>{spokenCount(m.resolved)}</td></tr>
         ))}
       </tbody>
     </table>
+    </div>
   );
 }
 
-/** A point for each month's resolved count; a "fewer than 5" month is a dashed mark over the range 1 to 4. */
 function ResolvedMarks({ months, x, y }: { months: MonthFigures[]; x: (i: number) => number; y: (v: number) => number }) {
   const [low, high] = SUPPRESSED_RANGE;
   return months.map((m, i) => (m.resolved === null ? (
@@ -43,7 +39,6 @@ function ResolvedMarks({ months, x, y }: { months: MonthFigures[]; x: (i: number
   )));
 }
 
-/** Twelve months of reports received (bars) and resolved (line), scaled to whole numbers. */
 export function TrendChart({ months }: { months: MonthFigures[] }) {
   const [box, W] = useWidth(600);
   const { max, ticks } = chartScale(months.flatMap((m) => [m.received, m.resolved]));

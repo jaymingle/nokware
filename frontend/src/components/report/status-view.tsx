@@ -1,17 +1,18 @@
-import type { ReactNode } from "react";
-
 import { ContactList } from "@/components/contacts/contact-list";
-import { Tag } from "@/components/documents/tag";
 import { ReadAloud } from "@/components/read-aloud/read-aloud";
+import { CaseTimeline } from "@/components/report/case-timeline";
 import { EscalateForm } from "@/components/report/escalate-form";
+import { StatusTag } from "@/components/status-tag";
 import { Card, CardContent } from "@/components/ui/card";
 import { reportAudio } from "@/lib/api/public";
-import { STAGES, stageLabels, stageOf, statusTag } from "@/lib/report/status";
+import { STAGES, stageLabels, stageOf } from "@/lib/report/status";
+import { reportStatus } from "@/lib/status";
 import { joinNames } from "@/lib/text";
 import { formatDate, formatDateTime } from "@/lib/time";
 import { cn } from "@/lib/utils";
 
 import type { LocationViewNote, ReportStatus } from "@/lib/api/types";
+import type { ReactNode } from "react";
 
 function Steps({ status }: { status: ReportStatus }) {
   const labels = stageLabels(status.private);
@@ -29,13 +30,13 @@ function Steps({ status }: { status: ReportStatus }) {
 }
 
 function StatusFrame({ status, children }: { status: ReportStatus; children: ReactNode }) {
-  const tag = statusTag(status);
+  const tag = reportStatus(status);
   return (
     <Card data-testid="status-result">
       <CardContent className="flex flex-col gap-5 py-2 sm:px-6 sm:py-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="font-heading text-[30px] leading-none tracking-wide tabular-nums">{status.reference}</h2>
-          <Tag tone={tag.tone} testId="status-tag">{tag.label}</Tag>
+          <StatusTag tone={tag.tone} testId="status-tag">{tag.label}</StatusTag>
         </div>
         <Steps status={status} />
         <p className="text-[13px] text-ink-soft">Reported {formatDate(status.submitted_at)}</p>
@@ -76,7 +77,6 @@ function CivicFollowUp({ status }: { status: ReportStatus }) {
   return null;
 }
 
-/** An everyday report: what, where, who has it, and what they said when they resolved it. */
 export function CivicStatus({ status }: { status: ReportStatus }) {
   const where = [status.ward, status.sub_metro ? `${status.sub_metro} sub-metro` : null].filter(Boolean).join(", ");
   return (
@@ -94,13 +94,14 @@ export function CivicStatus({ status }: { status: ReportStatus }) {
         </p>
       ) : null}
       <ResolutionNotes status={status} />
+      <CaseTimeline timeline={status.timeline} />
       <CivicFollowUp status={status} />
       <ContactList title="Numbers for this report" contacts={status.contacts ?? []} testId="status-contacts" />
     </StatusFrame>
   );
 }
 
-/** Each time a service opened the location the citizen shared: they gave it for a reason and should know it was used. */
+/** The citizen gave their location for a reason and should know each time it was used. */
 function LocationViews({ views }: { views: LocationViewNote[] }) {
   if (views.length === 0) return null;
   return (
@@ -112,12 +113,13 @@ function LocationViews({ views }: { views: LocationViewNote[] }) {
   );
 }
 
-/** A personal-safety report: how far along it is, and nothing else. Anyone with the reference can open this. */
+/** Progress only: anyone with the reference can open this. */
 export function PrivateStatus({ status }: { status: ReportStatus }) {
   return (
     <StatusFrame status={status}>
       <p className="text-[13.5px] text-ink-soft">This page shows only how far along the case is. Nothing about what was reported appears here.</p>
       <LocationViews views={status.location_views ?? []} />
+      <CaseTimeline timeline={status.timeline} />
       {status.escalate_until ? (
         <EscalateForm reference={status.reference} until={status.escalate_until} intro="Not satisfied with how this was handled? You can ask for a review." action="Ask for a review" />
       ) : null}

@@ -52,7 +52,7 @@ describe("describeSubmission", () => {
 
   it("asks for a response to an open dispute, with no clock", () => {
     const view = describeSubmission(submission({ status: "disputed", held_until: null }), NOW);
-    expect(view).toEqual({ tone: "brick", label: "Your response needed", detail: "Disputed by Finance." });
+    expect(view).toEqual({ tone: "attention", label: "Your response needed", detail: "Disputed by Finance." });
   });
 
   it("shows the MCE's clock once escalated, and publishing once it runs out", () => {

@@ -1,11 +1,4 @@
-"""Citizen reports: public routes, no sign-in. Rate-limited per client address.
-
-    GET  /api/reports/options                 wards, sub-metros and personal-safety types for the form
-    POST /api/reports                         file a report (multipart: fields plus up to 10 photos)
-    GET  /api/reports/{reference}             follow a case by its reference (or case ID)
-    POST /api/reports/{reference}/escalate    escalate a resolved case to the MCE, once, within 14 days
-    POST /api/reports/{reference}/preferences answer the messages question after a safety reclassification
-"""
+"""Citizen reports: public routes, no sign-in. Rate-limited per client address."""
 
 from typing import Annotated, Any
 
@@ -13,9 +6,8 @@ from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, Header, Upl
 
 from app import contacts, safety_steps
 from app.dependencies import rate_limited
-from app.schemas.documents import Option
+from app.schemas.documents import NOTE_MAX, Option, blank_to_none
 from app.schemas.reports import (
-    EscalationRequest,
     PreferencesRequest,
     PreferencesResult,
     ReportOptions,
@@ -25,7 +17,7 @@ from app.schemas.reports import (
     SubMetroOption,
 )
 from app.services import rate_limit, report_followups, report_intake, report_store
-from app.services.citizen_reports import DESCRIPTION_MAX, MAX_PHOTOS, NotificationEvent
+from app.services.citizen_reports import DESCRIPTION_MAX, MAX_ESCALATION_PHOTOS, MAX_PHOTOS, NotificationEvent
 from app.services.ledger_documents import utc_now
 from app.services.notifications import notify_quietly
 from app.services.report_intake import DESCRIPTION_MIN, ReportSubmission
@@ -57,16 +49,13 @@ def options() -> ReportOptions:
         sub_metros=grouped,
         safety_types=safety,
         max_photos=MAX_PHOTOS,
+        max_escalation_photos=MAX_ESCALATION_PHOTOS,
         max_photo_bytes=MAX_PHOTO_BYTES,
         description_min=DESCRIPTION_MIN,
         description_max=DESCRIPTION_MAX,
         safety_contacts=contacts.safety_contacts(None),
         safety_steps=list(safety_steps.STEPS),
     )
-
-
-def _blank_to_none(value: str | None) -> str | None:
-    return (value.strip() or None) if value else None
 
 
 def report_form(
@@ -81,19 +70,20 @@ def report_form(
 ) -> ReportSubmission:
     return ReportSubmission(
         description=description,
-        ward=_blank_to_none(ward),
-        sub_metro=_blank_to_none(sub_metro),
-        safety_topic=_blank_to_none(safety_topic),
-        phone=_blank_to_none(phone),
-        whatsapp=_blank_to_none(whatsapp),
+        ward=blank_to_none(ward),
+        sub_metro=blank_to_none(sub_metro),
+        safety_topic=blank_to_none(safety_topic),
+        phone=blank_to_none(phone),
+        whatsapp=blank_to_none(whatsapp),
         notify=notify,
         callback_consent=callback_consent,
     )
 
 
-def _read_photos(photos: list[UploadFile]) -> list[bytes]:
-    if len(photos) > MAX_PHOTOS:
-        raise PhotoRejected(f"Attach at most {MAX_PHOTOS} photos.")
+def _read_photos(photos: list[UploadFile], limit: int = MAX_PHOTOS) -> list[bytes]:
+    """Read no further than one byte past the cap: what is over it is refused, not held in memory."""
+    if len(photos) > limit:
+        raise PhotoRejected(f"Attach at most {limit} photos.")
     return [photo.file.read(MAX_PHOTO_BYTES + 1) for photo in photos if photo.filename]
 
 
@@ -127,7 +117,8 @@ def file_report(
 
 def _status(case: dict[str, Any]) -> ReportStatus:
     assignments = report_store.assignments_for(case["$id"])
-    view = ReportStatus.model_validate(report_followups.public_status(case, assignments, utc_now()))
+    history = report_followups.history_for(case)
+    view = ReportStatus.model_validate(report_followups.public_status(case, assignments, utc_now(), history))
     if not view.private:  # anyone with the reference sees this; a safety case shows no hint of what it is
         view.contacts = contacts.for_report(case["topic"], case.get("subMetro"))
     return view
@@ -139,8 +130,14 @@ def status(reference: str) -> ReportStatus:
 
 
 @router.post("/{reference}/escalate", response_model=ReportStatus, dependencies=[Escalations])
-def escalate(reference: str, request: EscalationRequest, tasks: BackgroundTasks) -> ReportStatus:
-    case = report_followups.escalate_case(reference, request.note, utc_now())
+def escalate(
+    reference: str,
+    tasks: BackgroundTasks,
+    note: Annotated[str, Form(max_length=NOTE_MAX, description="What is still wrong.")],
+    photos: Annotated[list[UploadFile], File(description="Up to 5 JPEG, PNG or WebP photos.")] = [],  # noqa: B006
+) -> ReportStatus:
+    """Multipart, like filing: the note and, with it, what the resident can show of what is still wrong."""
+    case = report_followups.escalate_case(reference, note, utc_now(), _read_photos(photos, MAX_ESCALATION_PHOTOS))
     tasks.add_task(notify_quietly, case, NotificationEvent.ESCALATED)
     return _status(case)
 
@@ -153,7 +150,7 @@ def preferences(
     receipt_token: Annotated[str, Header(alias="X-Receipt-Token")],
 ) -> PreferencesResult:
     choice = report_followups.Preferences(notify=request.notify, callback_consent=request.callback_consent)
-    case, messages_on = report_followups.set_preferences(reference, receipt_token, choice, utc_now())
-    if messages_on:  # the "received" message they would otherwise have had
+    case, receipt_owed = report_followups.set_preferences(reference, receipt_token, choice, utc_now())
+    if receipt_owed:  # messages were off and are now on, so this is the "received" message they never had
         tasks.add_task(notify_quietly, case, NotificationEvent.SUBMITTED)
-    return PreferencesResult(messages_on=messages_on)
+    return PreferencesResult(messages_on=choice.notify)

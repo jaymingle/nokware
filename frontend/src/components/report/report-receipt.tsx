@@ -1,14 +1,14 @@
 "use client";
 
+import { CheckIcon, CopyIcon } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
-import { CheckIcon, CopyIcon } from "lucide-react";
 
 import { ContactList } from "@/components/contacts/contact-list";
-import { Tag } from "@/components/documents/tag";
 import { ReadAloud } from "@/components/read-aloud/read-aloud";
 import { PreferencesForm } from "@/components/report/preferences-form";
 import { SafetySteps } from "@/components/report/safety-steps";
+import { StatusTag } from "@/components/status-tag";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { reportAudio } from "@/lib/api/public";
@@ -43,6 +43,9 @@ function HeldForConsent({ receipt }: { receipt: ReportReceipt }) {
         From what you wrote, Nokware has filed this as a report about someone&apos;s safety, so it is handled privately
         and never appears on the public dashboard.
       </p>
+      <p className="text-[14px]">
+        Nothing has been sent to your number, and nothing will be unless you ask for it here.
+      </p>
       {receipt.preferences_token ? <PreferencesForm reference={receipt.reference} token={receipt.preferences_token} /> : null}
     </section>
   );
@@ -72,14 +75,13 @@ function Filed({ receipt }: { receipt: ReportReceipt }) {
 
 type ReceiptProps = { receipt: ReportReceipt; safetySteps: string[]; onAnother: () => void };
 
-/** The confirmation: the reference to keep, where the report went, and what messages to expect. */
 export function ReportReceiptView({ receipt, safetySteps, onAnother }: ReceiptProps) {
   const messages = messagesLine(receipt);
   return (
     <Card className="border-teal" data-testid="report-receipt">
       <CardContent className="flex flex-col gap-5 py-2 sm:px-6 sm:py-4">
         <div>
-          <Tag tone="teal">Report filed</Tag>
+          <StatusTag tone="done">Report filed</StatusTag>
         </div>
         <Filed receipt={receipt} />
         {!receipt.private ? (

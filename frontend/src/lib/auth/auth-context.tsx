@@ -1,17 +1,17 @@
 "use client";
 
-import { createContext, use, useCallback, useMemo, type ReactNode } from "react";
 import { useQuery, useQueryClient, type UseQueryResult } from "@tanstack/react-query";
+import { createContext, use, useCallback, useMemo, type ReactNode } from "react";
 
-import { ApiError } from "@/lib/api/errors";
 import { getMe } from "@/lib/api/endpoints";
+import { ApiError } from "@/lib/api/errors";
 import { endSession, SignInError, startSession } from "@/lib/auth/session";
 
 import type { Me } from "@/lib/api/types";
 
 const ME_QUERY_KEY = ["me"] as const;
 
-export type AuthStatus = "loading" | "signed-out" | "signed-in" | "no-role" | "unavailable";
+type AuthStatus = "loading" | "signed-out" | "signed-in" | "no-role" | "unavailable";
 
 type AuthContextValue = {
   status: AuthStatus;
@@ -24,7 +24,6 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-/** The signed-in user, or null when there is no Appwrite session. */
 async function loadMe(): Promise<Me | null> {
   try {
     return await getMe();
@@ -87,7 +86,6 @@ export function useAuth(): AuthContextValue {
   return value;
 }
 
-/** The signed-in user, for components rendered only inside the portal shell. */
 export function useMe(): Me {
   const { me } = useAuth();
   if (!me) throw new Error("useMe needs a signed-in user; render it inside <PortalShell>");

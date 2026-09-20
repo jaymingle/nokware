@@ -408,7 +408,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Escalate */
+        /**
+         * Escalate
+         * @description Multipart, like filing: the note and, with it, what the resident can show of what is still wrong.
+         */
         post: operations["escalate_api_reports__reference__escalate_post"];
         delete?: never;
         options?: never;
@@ -749,28 +752,23 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Published */
+        /**
+         * Published
+         * @description The petitions standing in one group, or — for "removed" — the tombstones of the ones taken down, which are
+         *     built from the removal records and carry nothing of the petitions. `topic` doesn't narrow that group: a
+         *     tombstone has no topic, and reading one off the petition is the leak the tombstone exists to prevent.
+         */
         get: operations["published_api_petitions_get"];
         put?: never;
-        /** Submit */
+        /**
+         * Submit
+         * @description A form, so the petition's images arrive with its words. It is published by this call: nobody approves it.
+         *
+         *     `File()`, not `Form()`: the form carries file parts, and only File() has FastAPI declare the multipart the
+         *     route actually reads. Under Form() the schema said urlencoded, which no browser can send an image in and no
+         *     generated client can type.
+         */
         post: operations["submit_api_petitions_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/petitions/review": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Review */
-        get: operations["review_api_petitions_review_get"];
-        put?: never;
-        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -794,6 +792,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/petitions/shared": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Shared
+         * @description The petitions the MCE has shared with the caller's department, newest first.
+         */
+        get: operations["shared_api_petitions_shared_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/petitions/reports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Reported
+         * @description What readers have reported, newest first: the petitions, and the comments standing under them.
+         */
+        get: operations["reported_api_petitions_reports_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/petitions/reports/{report_id}/dismiss": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Dismiss
+         * @description The report is settled with one of two fixed reasons; the petition is untouched.
+         */
+        post: operations["dismiss_api_petitions_reports__report_id__dismiss_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/petitions/comment-reports/{report_id}/dismiss": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Dismiss Comment Report
+         * @description The same two fixed reasons settle a report about a comment; the comment stays as it is.
+         */
+        post: operations["dismiss_comment_report_api_petitions_comment_reports__report_id__dismiss_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/petitions/mine": {
         parameters: {
             query?: never;
@@ -803,6 +881,27 @@ export interface paths {
         };
         /** Mine */
         get: operations["mine_api_petitions_mine_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/petitions/{code}/mine": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Petition
+         * @description One petition, read by its number and the number that started it. Anyone else's is simply not found, and a
+         *     removed one still answers here: its public page is a tombstone, but its creator has words to mend.
+         */
+        get: operations["my_petition_api_petitions__code__mine_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -852,7 +951,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Petition */
+        /**
+         * Petition
+         * @description A petition, or — where one was removed — the tombstone, which is built from the removal record alone.
+         */
         get: operations["petition_api_petitions__code__get"];
         put?: never;
         post?: never;
@@ -879,7 +981,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/petitions/{code}/resubmit": {
+    "/api/petitions/{code}/edit": {
         parameters: {
             query?: never;
             header?: never;
@@ -888,8 +990,11 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Resubmit */
-        post: operations["resubmit_api_petitions__code__resubmit_post"];
+        /**
+         * Edit
+         * @description A new version of the words, and — for a petition that was removed — its publication again.
+         */
+        post: operations["edit_api_petitions__code__edit_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -905,7 +1010,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Withdraw */
+        /**
+         * Withdraw
+         * @description The creator closes their own petition. It stays public, closed, with the signatures it has.
+         */
         post: operations["withdraw_api_petitions__code__withdraw_post"];
         delete?: never;
         options?: never;
@@ -930,7 +1038,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/petitions/{code}/decision": {
+    "/api/petitions/{code}/report": {
         parameters: {
             query?: never;
             header?: never;
@@ -940,10 +1048,52 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Decide
-         * @description The decision, then the queue as it now stands. The creator is told after the answer is sent.
+         * Report
+         * @description Anyone, without signing in. The petition stays exactly as it is while a contributor reads this.
          */
-        post: operations["decide_api_petitions__code__decision_post"];
+        post: operations["report_api_petitions__code__report_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/petitions/{code}/removal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Remove
+         * @description A contributor takes a petition down on a named ground. The confirmed phone is what proves they are neither
+         *     the person who started it nor one of its signers.
+         */
+        post: operations["remove_api_petitions__code__removal_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/petitions/{code}/images/removal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Remove Image
+         * @description A contributor takes one photo off on a named ground. The petition and its other photos stand: taking the
+         *     whole petition down over one image would cost its signatures for something its creator can mend.
+         */
+        post: operations["remove_image_api_petitions__code__images_removal_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -964,6 +1114,66 @@ export interface paths {
          * @description The MCE's public response; then the petitions still waiting for one.
          */
         post: operations["respond_api_petitions__code__response_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/petitions/{code}/share": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Share
+         * @description The MCE asks one department of the Assembly to answer this petition. The page comes back with it on.
+         */
+        post: operations["share_api_petitions__code__share_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/petitions/{code}/note": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Note
+         * @description The one note the caller's department writes on a petition shared with it, public under its name.
+         */
+        post: operations["note_api_petitions__code__note_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/petitions/{code}/reply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reply
+         * @description The creator answers the MCE's response, once, on the confirmed number they started the petition with.
+         */
+        post: operations["reply_api_petitions__code__reply_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1032,6 +1242,71 @@ export interface paths {
         get: operations["names_api_petitions__code__names_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/petitions/{code}/comments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Comments
+         * @description Newest first. A removed petition has none to give: they went down with it, and are back when it is.
+         */
+        get: operations["comments_api_petitions__code__comments_get"];
+        put?: never;
+        /**
+         * Comment
+         * @description The same confirmed number a signature is given with, and no more stored with the comment than with one.
+         */
+        post: operations["comment_api_petitions__code__comments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/petitions/{code}/comments/{comment_id}/report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Report Comment
+         * @description Anyone, without signing in. The comment stays exactly as it is while a contributor reads this.
+         */
+        post: operations["report_comment_api_petitions__code__comments__comment_id__report_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/petitions/{code}/comments/{comment_id}/removal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Remove Comment
+         * @description A contributor takes one comment down on a named ground. The petition stays up and so does every other
+         *     comment: it was this comment that was judged, and the ground stands where its words were.
+         */
+        post: operations["remove_comment_api_petitions__code__comments__comment_id__removal_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1236,7 +1511,7 @@ export interface paths {
          * @description A spoken reply, fetched by Twilio as it sends the voice note. The link is random and lasts 10 minutes, and
          *     the audio is an answer from public documents, never anything about a report.
          */
-        get: operations["whatsapp_audio_api_channels_whatsapp_audio__name__get"];
+        get: operations["whatsapp_audio_api_channels_whatsapp_audio__name__head"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1246,7 +1521,7 @@ export interface paths {
          * @description A spoken reply, fetched by Twilio as it sends the voice note. The link is random and lasts 10 minutes, and
          *     the audio is an answer from public documents, never anything about a report.
          */
-        head: operations["whatsapp_audio_api_channels_whatsapp_audio__name__get"];
+        head: operations["whatsapp_audio_api_channels_whatsapp_audio__name__head"];
         patch?: never;
         trace?: never;
     };
@@ -1410,6 +1685,8 @@ export interface components {
              * @default false
              */
             speakable: boolean;
+            /** Speech Note */
+            speech_note?: string | null;
         };
         /**
          * AskSource
@@ -1480,6 +1757,20 @@ export interface components {
              * @description The spoken question, as the browser recorded it
              */
             audio: string;
+        };
+        /** Body_escalate_api_reports__reference__escalate_post */
+        Body_escalate_api_reports__reference__escalate_post: {
+            /**
+             * Note
+             * @description What is still wrong.
+             */
+            note: string;
+            /**
+             * Photos
+             * @description Up to 5 JPEG, PNG or WebP photos.
+             * @default []
+             */
+            photos: string[];
         };
         /** Body_file_report_api_reports_post */
         Body_file_report_api_reports_post: {
@@ -1614,6 +1905,8 @@ export interface components {
             description: string | null;
             /** Photos */
             photos: string[];
+            /** Escalation Photos */
+            escalation_photos: string[];
             /** Escalation Note */
             escalation_note: string | null;
             /** Classification Note */
@@ -1638,8 +1931,12 @@ export interface components {
             actor_role: string;
             /** Note */
             note: string | null;
+            /** Staff Note */
+            staff_note: string | null;
             /** At */
             at: string;
+            /** Seen By The Resident */
+            seen_by_the_resident: boolean;
         };
         /** CaseOversight */
         CaseOversight: {
@@ -1752,6 +2049,59 @@ export interface components {
             holds: string;
         };
         /**
+         * Comment
+         * @description One comment as a reader meets it: what somebody wrote, or — where a contributor removed it — the notice
+         *     that stands in its place. Never a phone number: a comment holds none.
+         */
+        Comment: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string | null;
+            /** Text */
+            text: string;
+            /** At */
+            at: string;
+            /** Removed */
+            removed: boolean;
+        };
+        /** CommentPage */
+        CommentPage: {
+            /** Comments */
+            comments: components["schemas"]["Comment"][];
+            /** Total */
+            total: number;
+        };
+        /** CommentRemovalRequest */
+        CommentRemovalRequest: {
+            /**
+             * Ground
+             * @enum {string}
+             */
+            ground: "private_individual" | "incites_violence" | "personal_data" | "duplicate";
+        };
+        /**
+         * CommentReportRequest
+         * @description A comment is reported on the same four stored grounds a petition is, and names no other petition: a
+         *     duplicate here repeats another comment on the same page.
+         */
+        CommentReportRequest: {
+            /**
+             * Ground
+             * @enum {string}
+             */
+            ground: "private_individual" | "incites_violence" | "personal_data" | "duplicate";
+            /** Note */
+            note?: string | null;
+        };
+        /** CommentRequest */
+        CommentRequest: {
+            /** Text */
+            text: string;
+            /** Name */
+            name?: string | null;
+        };
+        /**
          * Contact
          * @description Shown only to a case's recipients, and only when the citizen allowed a call.
          */
@@ -1823,20 +2173,6 @@ export interface components {
             /** Recent Documents */
             recent_documents: components["schemas"]["RecentDocument"][];
         };
-        /** DecisionRequest */
-        DecisionRequest: {
-            /**
-             * Decision
-             * @enum {string}
-             */
-            decision: "publish" | "refuse";
-            /** Reason */
-            reason?: string | null;
-            /** Note */
-            note?: string | null;
-            /** Duplicate Of */
-            duplicate_of?: string | null;
-        };
         /**
          * DeltaEvent
          * @description The next piece of the model's raw answer text.
@@ -1893,6 +2229,38 @@ export interface components {
             confirmed: number | null;
             /** Reopened */
             reopened: number | null;
+        };
+        /**
+         * DepartmentShare
+         * @description One department the MCE sent this petition to, and the one note that department wrote back.
+         */
+        DepartmentShare: {
+            /** Department */
+            department: string;
+            /** Shared At */
+            shared_at: string;
+            /** Note */
+            note: string | null;
+            /** Note At */
+            note_at: string | null;
+        };
+        /** DismissRequest */
+        DismissRequest: {
+            /**
+             * Reason
+             * @enum {string}
+             */
+            reason: "not_the_ground" | "already_handled";
+        };
+        /** DismissalOption */
+        DismissalOption: {
+            /**
+             * Id
+             * @enum {string}
+             */
+            id: "not_the_ground" | "already_handled";
+            /** Label */
+            label: string;
         };
         /** DocumentDetail */
         DocumentDetail: {
@@ -2050,9 +2418,14 @@ export interface components {
              * @default false
              */
             speakable: boolean;
+            /** Speech Note */
+            speech_note?: string | null;
         };
-        /** DraftRequest */
-        DraftRequest: {
+        /**
+         * EditRequest
+         * @description An edit sends the words again, naming the images it keeps and attaching any new ones.
+         */
+        EditRequest: {
             /** Title */
             title: string;
             /** Body */
@@ -2070,6 +2443,10 @@ export interface components {
             issue?: string | null;
             /** Documents */
             documents?: string[];
+            /** Keep Images */
+            keep_images?: string[];
+            /** Images */
+            images?: string[];
         };
         /** ElectoralArea */
         ElectoralArea: {
@@ -2107,11 +2484,6 @@ export interface components {
             type: "error";
             /** Message */
             message: string;
-        };
-        /** EscalationRequest */
-        EscalationRequest: {
-            /** Note */
-            note: string;
         };
         /**
          * ExportSource
@@ -2157,6 +2529,13 @@ export interface components {
             chart: components["schemas"]["AskChart"] | null;
             /** Chart Note */
             chart_note: string | null;
+            /** Spoken */
+            spoken?: string | null;
+            /**
+             * Language
+             * @default en
+             */
+            language: string;
             /** Token */
             token: string;
         };
@@ -2173,6 +2552,22 @@ export interface components {
             url: string;
             /** Expires In */
             expires_in: number;
+        };
+        /**
+         * GroundOption
+         * @description One of the four grounds, in the words every screen shows it in. The same id is stored whether it was read
+         *     about a petition or about a comment; only the label differs.
+         */
+        GroundOption: {
+            /**
+             * Id
+             * @enum {string}
+             */
+            id: "private_individual" | "incites_violence" | "personal_data" | "duplicate";
+            /** Label */
+            label: string;
+            /** Needs Petition Number */
+            needs_petition_number: boolean;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -2197,6 +2592,19 @@ export interface components {
             note: string | null;
             /** At */
             at: string;
+        };
+        /**
+         * ImageRemovalRequest
+         * @description The photo is named as the petition stores it, so a contributor removes the one they are looking at.
+         */
+        ImageRemovalRequest: {
+            /** Image Id */
+            image_id: string;
+            /**
+             * Ground
+             * @enum {string}
+             */
+            ground: "private_individual" | "incites_violence" | "personal_data" | "duplicate";
         };
         /**
          * IngestionState
@@ -2323,22 +2731,6 @@ export interface components {
             /** Agency Name */
             agency_name: string | null;
         };
-        /**
-         * Moderation
-         * @description How the MCE has handled petitions: shown exactly, since the count is of decisions, not of people.
-         */
-        Moderation: {
-            /** Awaiting */
-            awaiting: number;
-            /** Published By Mce */
-            published_by_mce: number;
-            /** Published Automatically */
-            published_automatically: number;
-            /** Refusals */
-            refusals: components["schemas"]["RefusalCount"][];
-            /** Refusals Total */
-            refusals_total: number;
-        };
         /** MonthFigures */
         MonthFigures: {
             /** Month */
@@ -2365,6 +2757,8 @@ export interface components {
             name: string | null;
             /** Signed At */
             signed_at: string | null;
+            /** Version */
+            version: number | null;
         };
         /** NamedSignature */
         NamedSignature: {
@@ -2380,17 +2774,24 @@ export interface components {
             /** Total */
             total: number;
         };
-        /** NoteRequest */
-        NoteRequest: {
-            /** Note */
-            note: string;
-        };
         /** Option */
         Option: {
             /** Id */
             id: string;
             /** Name */
             name: string;
+        };
+        /**
+         * OptionalNoteRequest
+         * @description A note the stage offers: starting work, reopening, and the MCE's answer to an escalation. The body itself may
+         *     be left off altogether, so the route's default is one shared instance: frozen, so it stays one.
+         */
+        OptionalNoteRequest: {
+            /**
+             * Note
+             * @default
+             */
+            note: string;
         };
         /** OversightStats */
         OversightStats: {
@@ -2426,11 +2827,11 @@ export interface components {
              * Status
              * @enum {string}
              */
-            status: "in_review" | "refused" | "open" | "awaiting_response" | "responded" | "closed" | "withdrawn";
+            status: "open" | "awaiting_response" | "responded" | "removed" | "closed";
+            /** Status Label */
+            status_label: string;
             /** Published At */
             published_at: string | null;
-            /** Published By */
-            published_by: ("mce" | "automatic") | null;
             /** Closes At */
             closes_at: string | null;
             /** Closed At */
@@ -2451,8 +2852,16 @@ export interface components {
             response_label: string | null;
             /** Unanswered At */
             unanswered_at: string | null;
+            /** Version */
+            version: number;
+            /** Versioned At */
+            versioned_at: string | null;
+            /** Removals */
+            removals: number;
             /** Body */
             body: string;
+            /** Images */
+            images: string[];
             /** Topic Id */
             topic_id: string;
             /** Ward Id */
@@ -2461,15 +2870,101 @@ export interface components {
             issue_id: string | null;
             /** Document Ids */
             document_ids: string[];
+            /** Image Ids */
+            image_ids: string[];
             /** Submitted At */
             submitted_at: string | null;
-            /** Review Deadline */
-            review_deadline: string | null;
-            refusal: components["schemas"]["Refusal"] | null;
-            /** Resubmissions Left */
-            resubmissions_left: number;
+            removal: components["schemas"]["RemovalNotice"] | null;
             /** Actions */
-            actions: ("withdraw" | "resubmit" | "make_anonymous")[];
+            actions: ("edit" | "withdraw" | "make_anonymous")[];
+        };
+        /**
+         * OwnPetitionDetail
+         * @description A petition as the person who started it reads it: everything its public page shows, and the record of a
+         *     removal besides. Read by its number and the number that started it, so it answers for a removed petition too,
+         *     whose public page is only a tombstone.
+         */
+        OwnPetitionDetail: {
+            /** Code */
+            code: string;
+            /** Title */
+            title: string;
+            /** Topic */
+            topic: string;
+            /** Departments */
+            departments: string[];
+            /**
+             * Scope
+             * @enum {string}
+             */
+            scope: "metro" | "area";
+            /** Area */
+            area: string | null;
+            /** Sub Metro */
+            sub_metro: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "open" | "awaiting_response" | "responded" | "removed" | "closed";
+            /** Status Label */
+            status_label: string;
+            /** Published At */
+            published_at: string | null;
+            /** Closes At */
+            closes_at: string | null;
+            /** Closed At */
+            closed_at: string | null;
+            /** Threshold */
+            threshold: number | null;
+            /** Signatures */
+            signatures: number;
+            /** Started By */
+            started_by: string | null;
+            /** Threshold Reached At */
+            threshold_reached_at: string | null;
+            /** Response Due */
+            response_due: string | null;
+            /** Responded At */
+            responded_at: string | null;
+            /** Response Label */
+            response_label: string | null;
+            /** Unanswered At */
+            unanswered_at: string | null;
+            /** Version */
+            version: number;
+            /** Versioned At */
+            versioned_at: string | null;
+            /** Removals */
+            removals: number;
+            /** Body */
+            body: string;
+            /** Images */
+            images: string[];
+            /** Topic Id */
+            topic_id: string;
+            /** Ward Id */
+            ward_id: string | null;
+            /** Issue Id */
+            issue_id: string | null;
+            /** Document Ids */
+            document_ids: string[];
+            /** Image Ids */
+            image_ids: string[];
+            /** Submitted At */
+            submitted_at: string | null;
+            removal: components["schemas"]["RemovalNotice"] | null;
+            /** Actions */
+            actions: ("edit" | "withdraw" | "make_anonymous")[];
+            /** Timeline */
+            timeline: components["schemas"]["TimelineEntry"][];
+            /** Versions */
+            versions: components["schemas"]["VersionEntry"][];
+            response: components["schemas"]["PetitionResponse"] | null;
+            /** Shared With */
+            shared_with: components["schemas"]["DepartmentShare"][];
+            /** Signatures On Earlier Versions */
+            signatures_on_earlier_versions: number;
         };
         /** PetitionCard */
         PetitionCard: {
@@ -2494,11 +2989,11 @@ export interface components {
              * Status
              * @enum {string}
              */
-            status: "in_review" | "refused" | "open" | "awaiting_response" | "responded" | "closed" | "withdrawn";
+            status: "open" | "awaiting_response" | "responded" | "removed" | "closed";
+            /** Status Label */
+            status_label: string;
             /** Published At */
             published_at: string | null;
-            /** Published By */
-            published_by: ("mce" | "automatic") | null;
             /** Closes At */
             closes_at: string | null;
             /** Closed At */
@@ -2519,6 +3014,12 @@ export interface components {
             response_label: string | null;
             /** Unanswered At */
             unanswered_at: string | null;
+            /** Version */
+            version: number;
+            /** Versioned At */
+            versioned_at: string | null;
+            /** Removals */
+            removals: number;
         };
         /** PetitionDetail */
         PetitionDetail: {
@@ -2543,11 +3044,11 @@ export interface components {
              * Status
              * @enum {string}
              */
-            status: "in_review" | "refused" | "open" | "awaiting_response" | "responded" | "closed" | "withdrawn";
+            status: "open" | "awaiting_response" | "responded" | "removed" | "closed";
+            /** Status Label */
+            status_label: string;
             /** Published At */
             published_at: string | null;
-            /** Published By */
-            published_by: ("mce" | "automatic") | null;
             /** Closes At */
             closes_at: string | null;
             /** Closed At */
@@ -2568,30 +3069,54 @@ export interface components {
             response_label: string | null;
             /** Unanswered At */
             unanswered_at: string | null;
+            /** Version */
+            version: number;
+            /** Versioned At */
+            versioned_at: string | null;
+            /** Removals */
+            removals: number;
+            /**
+             * State
+             * @default published
+             * @constant
+             */
+            state: "published";
             /** Body */
             body: string;
+            /** Images */
+            images: string[];
             /** Timeline */
             timeline: components["schemas"]["TimelineEntry"][];
+            /** Versions */
+            versions: components["schemas"]["VersionEntry"][];
+            /** Signatures On Earlier Versions */
+            signatures_on_earlier_versions: number;
             issue: components["schemas"]["LinkedIssue"] | null;
             /** Documents */
             documents: components["schemas"]["DocumentRef"][];
             response: components["schemas"]["PetitionResponse"] | null;
+            /**
+             * Comments
+             * @default 0
+             */
+            comments: number;
+            /** Shared With */
+            shared_with?: components["schemas"]["DepartmentShare"][];
         };
         /**
          * PetitionFigures
-         * @description The MCE's handling of petitions: exact counts, since they count decisions on public petitions, not residents.
+         * @description What happened to petitions: exact counts, since they count public petitions, not residents. Publishing and
+         *     removing are residents' and contributors' doing; only the answering below is the MCE's.
          */
         PetitionFigures: {
-            /** Sent */
-            sent: number;
-            /** Published By Mce */
-            published_by_mce: number;
-            /** Published Automatically */
-            published_automatically: number;
-            /** Refused */
-            refused: number;
-            /** Refusals */
-            refusals: components["schemas"]["PetitionRefusals"][];
+            /** Published */
+            published: number;
+            /** Republished */
+            republished: number;
+            /** Removed */
+            removed: number;
+            /** Removals */
+            removals: components["schemas"]["PetitionRemovals"][];
             /** Reached Threshold */
             reached_threshold: number;
             /** Answered In Time */
@@ -2602,6 +3127,18 @@ export interface components {
             unanswered: number;
             /** Waiting */
             waiting: number;
+            /** Refused Under The Earlier Process */
+            refused_under_the_earlier_process: number;
+        };
+        /**
+         * PetitionImage
+         * @description A photograph as a contributor meets it: a link to look at, and the name that takes it down.
+         */
+        PetitionImage: {
+            /** Id */
+            id: string;
+            /** Url */
+            url: string;
         };
         /** PetitionOptions */
         PetitionOptions: {
@@ -2613,34 +3150,76 @@ export interface components {
             threshold_area: number;
             /** Threshold Metro */
             threshold_metro: number;
-            /** Review Hours */
-            review_hours: number;
             /** Open Days */
             open_days: number;
             /** Response Days */
             response_days: number;
-            /** Refusal Reasons */
-            refusal_reasons: components["schemas"]["RefusalReason"][];
+            /** Max Images */
+            max_images: number;
+            /** Max Documents */
+            max_documents: number;
+            /** Report Note Max */
+            report_note_max: number;
+            /** Removal Note Max */
+            removal_note_max: number;
+            /** Department Note Max */
+            department_note_max: number;
+            /** Reply Max */
+            reply_max: number;
+            /** Comment Max */
+            comment_max: number;
+            /** Grounds */
+            grounds: components["schemas"]["GroundOption"][];
+            /** Comment Grounds */
+            comment_grounds: components["schemas"]["GroundOption"][];
+            /** Image Grounds */
+            image_grounds: components["schemas"]["GroundOption"][];
+            /** Dismissal Reasons */
+            dismissal_reasons: components["schemas"]["DismissalOption"][];
+            /** Status Words */
+            status_words: {
+                [key: string]: string;
+            };
             verification: components["schemas"]["Verification"];
         };
-        /** PetitionPage */
+        /**
+         * PetitionPage
+         * @description One group of petitions. The removed group fills `removed` instead of `petitions`: there are no cards to
+         *     show, only the tombstones, which carry nothing of the petitions they stand for.
+         */
         PetitionPage: {
             /** Petitions */
             petitions: components["schemas"]["PetitionCard"][];
+            /** Removed */
+            removed: components["schemas"]["Tombstone"][];
             /** Total */
             total: number;
-            moderation: components["schemas"]["Moderation"];
+            /** Counts */
+            counts: {
+                [key: string]: number;
+            };
+            removals: components["schemas"]["Removals"];
             /** Topics */
             topics: components["schemas"]["Option"][];
         };
-        /** PetitionRefusals */
-        PetitionRefusals: {
-            /** Reason */
-            reason: string;
+        /** PetitionRemovals */
+        PetitionRemovals: {
+            /** Ground */
+            ground: string;
             /** Label */
             label: string;
             /** Count */
             count: number;
+        };
+        /**
+         * PetitionReply
+         * @description The petitioner's one answer to the response. Their name is the petition's own: none unless they showed it.
+         */
+        PetitionReply: {
+            /** Text */
+            text: string;
+            /** At */
+            at: string;
         };
         /**
          * PetitionResponse
@@ -2666,6 +3245,7 @@ export interface components {
             late: boolean;
             /** Days Late */
             days_late: number;
+            reply: components["schemas"]["PetitionReply"] | null;
         };
         /** PreferencesRequest */
         PreferencesRequest: {
@@ -2815,36 +3395,69 @@ export interface components {
             /** Not Due */
             not_due: number;
         };
-        /** Refusal */
-        Refusal: {
-            /** Reason */
-            reason: string;
-            /** Label */
-            label: string;
-            /** Explanation */
-            explanation: string;
-            /** Note */
-            note: string | null;
-            /** Duplicate Of */
-            duplicate_of: string | null;
-        };
-        /** RefusalCount */
-        RefusalCount: {
-            /** Reason */
-            reason: string;
+        /** RemovalCount */
+        RemovalCount: {
+            /**
+             * Ground
+             * @enum {string}
+             */
+            ground: "private_individual" | "incites_violence" | "personal_data" | "duplicate";
             /** Label */
             label: string;
             /** Count */
             count: number;
         };
-        /** RefusalReason */
-        RefusalReason: {
-            /** Id */
-            id: string;
+        /**
+         * RemovalNotice
+         * @description What the creator is told about their petition coming down. Not the contributor's note, which is internal,
+         *     and not who removed it: a ground is a ground whoever names it.
+         */
+        RemovalNotice: {
+            /**
+             * Ground
+             * @enum {string}
+             */
+            ground: "private_individual" | "incites_violence" | "personal_data" | "duplicate";
             /** Label */
             label: string;
-            /** Explanation */
-            explanation: string;
+            /** Removed At */
+            removed_at: string;
+            /** Duplicate Of */
+            duplicate_of: string | null;
+        };
+        /** RemovalRequest */
+        RemovalRequest: {
+            /**
+             * Ground
+             * @enum {string}
+             */
+            ground: "private_individual" | "incites_violence" | "personal_data" | "duplicate";
+            /** Duplicate Of */
+            duplicate_of?: string | null;
+            /** Note */
+            note?: string | null;
+        };
+        /**
+         * Removals
+         * @description How many petitions have come down, and on what grounds. Shown exactly: they count petitions, not residents.
+         */
+        Removals: {
+            /** Total */
+            total: number;
+            /** Grounds */
+            grounds: components["schemas"]["RemovalCount"][];
+        };
+        /** ReplyRequest */
+        ReplyRequest: {
+            /** Text */
+            text: string;
+        };
+        /** ReportFiled */
+        ReportFiled: {
+            /** Message */
+            message: string;
+            /** Reported At */
+            reported_at: string;
         };
         /** ReportOptions */
         ReportOptions: {
@@ -2854,6 +3467,8 @@ export interface components {
             safety_types: components["schemas"]["SafetyType"][];
             /** Max Photos */
             max_photos: number;
+            /** Max Escalation Photos */
+            max_escalation_photos: number;
             /** Max Photo Bytes */
             max_photo_bytes: number;
             /** Description Min */
@@ -2864,6 +3479,21 @@ export interface components {
             safety_contacts: components["schemas"]["PublicContact"][];
             /** Safety Steps */
             safety_steps: string[];
+        };
+        /** ReportQueue */
+        ReportQueue: {
+            /** Reports */
+            reports: components["schemas"]["ReportedPetition"][];
+            /** Comments */
+            comments: components["schemas"]["ReportedComment"][];
+            /** Grounds */
+            grounds: components["schemas"]["GroundOption"][];
+            /** Comment Grounds */
+            comment_grounds: components["schemas"]["GroundOption"][];
+            /** Image Grounds */
+            image_grounds: components["schemas"]["GroundOption"][];
+            /** Dismissal Reasons */
+            dismissal_reasons: components["schemas"]["DismissalOption"][];
         };
         /** ReportReceipt */
         ReportReceipt: {
@@ -2885,6 +3515,18 @@ export interface components {
             preferences_token: string | null;
             /** Contacts */
             contacts: components["schemas"]["PublicContact"][];
+        };
+        /** ReportRequest */
+        ReportRequest: {
+            /**
+             * Ground
+             * @enum {string}
+             */
+            ground: "private_individual" | "incites_violence" | "personal_data" | "duplicate";
+            /** Duplicate Of */
+            duplicate_of?: string | null;
+            /** Note */
+            note?: string | null;
         };
         /**
          * ReportStatus
@@ -2925,6 +3567,52 @@ export interface components {
             voices?: number | null;
             /** Location Views */
             location_views?: components["schemas"]["LocationViewNote"][];
+            /** Timeline */
+            timeline?: components["schemas"]["TimelineEvent"][];
+        };
+        /** ReportedComment */
+        ReportedComment: {
+            /** Id */
+            id: string;
+            /** Reported At */
+            reported_at: string;
+            /**
+             * Ground
+             * @enum {string}
+             */
+            ground: "private_individual" | "incites_violence" | "personal_data" | "duplicate";
+            /** Ground Words */
+            ground_words: string;
+            /** Note */
+            note: string | null;
+            /** Reports On This Comment */
+            reports_on_this_comment: number;
+            /** Code */
+            code: string;
+            comment: components["schemas"]["Comment"];
+        };
+        /** ReportedPetition */
+        ReportedPetition: {
+            /** Id */
+            id: string;
+            /** Reported At */
+            reported_at: string;
+            /**
+             * Ground
+             * @enum {string}
+             */
+            ground: "private_individual" | "incites_violence" | "personal_data" | "duplicate";
+            /** Ground Words */
+            ground_words: string;
+            /** Duplicate Of */
+            duplicate_of: string | null;
+            /** Note */
+            note: string | null;
+            /** Reports On This Petition */
+            reports_on_this_petition: number;
+            petition: components["schemas"]["PetitionCard"];
+            /** Images */
+            images: components["schemas"]["PetitionImage"][];
         };
         /**
          * ReportingGap
@@ -3039,48 +3727,6 @@ export interface components {
             mce: components["schemas"]["MceFigures"];
             petitions: components["schemas"]["PetitionFigures"];
         };
-        /** ReviewItem */
-        ReviewItem: {
-            /** Code */
-            code: string;
-            /** Title */
-            title: string;
-            /** Body */
-            body: string;
-            /** Topic */
-            topic: string;
-            /** Departments */
-            departments: string[];
-            /**
-             * Scope
-             * @enum {string}
-             */
-            scope: "metro" | "area";
-            /** Area */
-            area: string | null;
-            /** Sub Metro */
-            sub_metro: string | null;
-            /** Started By */
-            started_by: string | null;
-            /** Submitted At */
-            submitted_at: string;
-            /** Review Deadline */
-            review_deadline: string;
-            /** Resubmissions */
-            resubmissions: number;
-            /** Earlier Refusals */
-            earlier_refusals: components["schemas"]["Refusal"][];
-            issue: components["schemas"]["LinkedIssue"] | null;
-            /** Documents */
-            documents: components["schemas"]["DocumentRef"][];
-        };
-        /** ReviewQueue */
-        ReviewQueue: {
-            /** Petitions */
-            petitions: components["schemas"]["ReviewItem"][];
-            /** Refusal Reasons */
-            refusal_reasons: components["schemas"]["RefusalReason"][];
-        };
         /**
          * Role
          * @enum {string}
@@ -3121,6 +3767,14 @@ export interface components {
             contacts: components["schemas"]["PublicContact"][];
         };
         /**
+         * ShareRequest
+         * @description The department the MCE sends the petition to, from /api/departments — the Assembly's one list of them.
+         */
+        ShareRequest: {
+            /** Department */
+            department: string;
+        };
+        /**
          * SharedLocationView
          * @description A shared location, opened on purpose. The view is recorded and the citizen is told.
          */
@@ -3133,6 +3787,19 @@ export interface components {
             longitude: number | null;
             /** Shared At */
             shared_at: string;
+        };
+        /**
+         * SharedPetition
+         * @description A petition as the department it was shared with meets it, with the note it has written, if it has.
+         */
+        SharedPetition: {
+            petition: components["schemas"]["PetitionCard"];
+            /** Shared At */
+            shared_at: string;
+            /** Note */
+            note: string | null;
+            /** Note At */
+            note_at: string | null;
         };
         /** SignRequest */
         SignRequest: {
@@ -3158,7 +3825,9 @@ export interface components {
              * Status
              * @enum {string}
              */
-            status: "in_review" | "refused" | "open" | "awaiting_response" | "responded" | "closed" | "withdrawn";
+            status: "open" | "awaiting_response" | "responded" | "removed" | "closed";
+            /** Version */
+            version: number;
         };
         /** SmsCodeRequest */
         SmsCodeRequest: {
@@ -3277,7 +3946,10 @@ export interface components {
             /** Electoral Areas */
             electoral_areas: components["schemas"]["ElectoralArea"][];
         };
-        /** SubmitRequest */
+        /**
+         * SubmitRequest
+         * @description Sent as a form, so the images arrive with the words in one request.
+         */
         SubmitRequest: {
             /** Title */
             title: string;
@@ -3303,6 +3975,8 @@ export interface components {
             show_name: boolean;
             /** Name */
             name?: string | null;
+            /** Images */
+            images?: string[];
         };
         /** TimelineEntry */
         TimelineEntry: {
@@ -3310,11 +3984,55 @@ export interface components {
              * Action
              * @enum {string}
              */
-            action: "submitted" | "resubmitted" | "published" | "auto_published" | "refused" | "withdrawn" | "closed" | "threshold_reached" | "responded" | "no_response";
+            action: "published" | "edited" | "republished" | "removed" | "withdrawn" | "closed" | "threshold_reached" | "responded" | "no_response" | "shared" | "department_note" | "creator_replied" | "image_removed" | "moved_to_new_process";
             /** At */
             at: string;
             /** Reason */
             reason: string | null;
+        };
+        /**
+         * TimelineEvent
+         * @description One step of the case, as the resident reads it. Departments only: never the name of a member of staff.
+         */
+        TimelineEvent: {
+            /** Action */
+            action: string;
+            /** At */
+            at: string;
+            /** Description */
+            description: string;
+            /** Note */
+            note?: string | null;
+            /** Photos */
+            photos?: string[];
+        };
+        /**
+         * Tombstone
+         * @description All that is left of a removed petition. Built from the removal record, never from the petition, so there is
+         *     nothing here to leave out: no title, body, image, signature count, comment or answer exists to be shown.
+         */
+        Tombstone: {
+            /**
+             * State
+             * @default removed
+             * @constant
+             */
+            state: "removed";
+            /** Code */
+            code: string;
+            /**
+             * Ground
+             * @enum {string}
+             */
+            ground: "private_individual" | "incites_violence" | "personal_data" | "duplicate";
+            /** Ground Words */
+            ground_words: string;
+            /** Removed At */
+            removed_at: string;
+            /** Duplicate Of */
+            duplicate_of: string | null;
+            /** Previous Removals */
+            previous_removals: number;
         };
         /** TopicFigures */
         TopicFigures: {
@@ -3397,6 +4115,20 @@ export interface components {
             /** Sms */
             sms: boolean;
         };
+        /**
+         * VersionEntry
+         * @description One version of the words, as an edit history reads it.
+         */
+        VersionEntry: {
+            /** Version */
+            version: number;
+            /** At */
+            at: string;
+            /** Title */
+            title: string;
+            /** Changed */
+            changed: string[];
+        };
         /** VoiceRequest */
         VoiceRequest: {
             /** Device Token */
@@ -3410,6 +4142,19 @@ export interface components {
             voices: number;
             /** Added */
             added: boolean;
+        };
+        /**
+         * NoteRequest
+         * @description A note the stage requires: resolving, and the reason for a move.
+         */
+        app__schemas__cases__NoteRequest: {
+            /** Note */
+            note: string;
+        };
+        /** NoteRequest */
+        app__schemas__petitions__NoteRequest: {
+            /** Text */
+            text: string;
         };
     };
     responses: never;
@@ -4050,7 +4795,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["EscalationRequest"];
+                "multipart/form-data": components["schemas"]["Body_escalate_api_reports__reference__escalate_post"];
             };
         };
         responses: {
@@ -4191,7 +4936,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["OptionalNoteRequest"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -4224,7 +4973,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["NoteRequest"];
+                "application/json": components["schemas"]["app__schemas__cases__NoteRequest"];
             };
         };
         responses: {
@@ -4292,9 +5041,9 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody: {
+        requestBody?: {
             content: {
-                "application/json": components["schemas"]["NoteRequest"];
+                "application/json": components["schemas"]["OptionalNoteRequest"];
             };
         };
         responses: {
@@ -4327,9 +5076,9 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody: {
+        requestBody?: {
             content: {
-                "application/json": components["schemas"]["NoteRequest"];
+                "application/json": components["schemas"]["OptionalNoteRequest"];
             };
         };
         responses: {
@@ -4618,7 +5367,7 @@ export interface operations {
     published_api_petitions_get: {
         parameters: {
             query?: {
-                group?: "open" | "awaiting" | "responded" | "closed";
+                group?: "open" | "awaiting" | "responded" | "closed" | "removed";
                 topic?: string | null;
                 limit?: number;
                 offset?: number;
@@ -4660,12 +5409,12 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["SubmitRequest"];
+                "multipart/form-data": components["schemas"]["SubmitRequest"];
             };
         };
         responses: {
             /** @description Successful Response */
-            200: {
+            201: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -4680,26 +5429,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    review_api_petitions_review_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ReviewQueue"];
                 };
             };
         };
@@ -4724,6 +5453,116 @@ export interface operations {
             };
         };
     };
+    shared_api_petitions_shared_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SharedPetition"][];
+                };
+            };
+        };
+    };
+    reported_api_petitions_reports_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportQueue"];
+                };
+            };
+        };
+    };
+    dismiss_api_petitions_reports__report_id__dismiss_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                report_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DismissRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportQueue"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    dismiss_comment_report_api_petitions_comment_reports__report_id__dismiss_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                report_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DismissRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportQueue"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     mine_api_petitions_mine_get: {
         parameters: {
             query?: never;
@@ -4742,6 +5581,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MyPetitions"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    my_petition_api_petitions__code__mine_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-phone-proof"?: string | null;
+            };
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnPetitionDetail"];
                 };
             };
             /** @description Validation Error */
@@ -4838,7 +5710,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["PetitionDetail"];
+                    "application/json": components["schemas"]["PetitionDetail"] | components["schemas"]["Tombstone"];
                 };
             };
             /** @description Validation Error */
@@ -4883,7 +5755,7 @@ export interface operations {
             };
         };
     };
-    resubmit_api_petitions__code__resubmit_post: {
+    edit_api_petitions__code__edit_post: {
         parameters: {
             query?: never;
             header?: {
@@ -4896,7 +5768,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["DraftRequest"];
+                "multipart/form-data": components["schemas"]["EditRequest"];
             };
         };
         responses: {
@@ -4986,7 +5858,7 @@ export interface operations {
             };
         };
     };
-    decide_api_petitions__code__decision_post: {
+    report_api_petitions__code__report_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -4997,7 +5869,44 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["DecisionRequest"];
+                "application/json": components["schemas"]["ReportRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportFiled"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_api_petitions__code__removal_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-phone-proof"?: string | null;
+            };
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RemovalRequest"];
             };
         };
         responses: {
@@ -5007,7 +5916,42 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ReviewQueue"];
+                    "application/json": components["schemas"]["ReportQueue"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_image_api_petitions__code__images_removal_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImageRemovalRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportQueue"];
                 };
             };
             /** @description Validation Error */
@@ -5043,6 +5987,113 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AwaitingResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    share_api_petitions__code__share_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ShareRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PetitionDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    note_api_petitions__code__note_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["app__schemas__petitions__NoteRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SharedPetition"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reply_api_petitions__code__reply_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-phone-proof"?: string | null;
+            };
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReplyRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PetitionDetail"];
                 };
             };
             /** @description Validation Error */
@@ -5180,6 +6231,149 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NamedSignatures"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    comments_api_petitions__code__comments_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommentPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    comment_api_petitions__code__comments_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-phone-proof"?: string | null;
+            };
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CommentRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Comment"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    report_comment_api_petitions__code__comments__comment_id__report_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+                comment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CommentReportRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportFiled"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_comment_api_petitions__code__comments__comment_id__removal_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+                comment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CommentRemovalRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportQueue"];
                 };
             };
             /** @description Validation Error */
@@ -5479,7 +6673,7 @@ export interface operations {
             };
         };
     };
-    whatsapp_audio_api_channels_whatsapp_audio__name__get: {
+    whatsapp_audio_api_channels_whatsapp_audio__name__head: {
         parameters: {
             query?: never;
             header?: never;
@@ -5510,7 +6704,7 @@ export interface operations {
             };
         };
     };
-    whatsapp_audio_api_channels_whatsapp_audio__name__get: {
+    whatsapp_audio_api_channels_whatsapp_audio__name__head: {
         parameters: {
             query?: never;
             header?: never;

@@ -1,9 +1,11 @@
-"""What a citizen can do after filing, with only the case reference: follow it, escalate it once,
-and (straight after filing) answer the question about messages. Also the deletion of numbers
-whose retention has ended.
+"""What a citizen can do after filing with only the case reference, and the deletion of numbers past retention.
 
-Anyone holding a reference can open its status, so a personal-safety case's
-status says only how far along it is: no category, service, place or note.
+Anyone holding a reference can open its status, so a personal-safety case's status says only how far along it is:
+no category, service, place or note — including in its timeline, which case_timeline builds from fixed lines alone.
+
+The timeline is the whole trail, oldest first. Its entries come from the case's audit trail, so a caller that has
+one passes it in; a caller that doesn't (nothing else about the status needs it) gets the steps that can be read
+from the case's own dates.
 """
 
 import hmac
@@ -13,7 +15,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-from app.services import case_history, report_locations, report_store
+from app.services import case_history, case_timeline, report_locations, report_store
 from app.services.case_history import CITIZEN, SYSTEM, CaseEntry, CaseHistoryAction
 from app.services.case_workflow import (
     ESCALATION_WINDOW,
@@ -22,11 +24,13 @@ from app.services.case_workflow import (
     escalate,
     escalation_open,
 )
+from app.services.citizen_reports import MAX_ESCALATION_PHOTOS
+from app.services.issue_voices import sync_voice_retention
 from app.services.ledger_documents import parse_datetime
 from app.services.report_contacts import contact_for, contacts_due_for_deletion, delete_contact, update_contact
-from app.services.report_intake import token_hash
+from app.services.report_intake import PREFERENCES_WINDOW, token_hash
+from app.services.report_photos import clean_photos, photo_link, store_photos
 from app.services.report_rules import normalise_reference
-from app.services.issue_voices import sync_voice_retention
 from app.services.report_taxonomy import TOPICS_BY_ID, Category
 from app.services.workflow import NotAllowed
 from app.teams import RECIPIENT_NAMES
@@ -34,7 +38,6 @@ from app.wards import sub_metros, wards
 
 logger = logging.getLogger(__name__)
 
-# The only progress words a personal-safety status shows.
 PRIVATE_STAGES = {
     CaseStatus.SUBMITTED: "received",
     CaseStatus.ASSIGNED: "received",
@@ -48,8 +51,13 @@ class CaseNotFound(Exception):
     """No case has that reference (or ID)."""
 
 
+def history_for(case: dict[str, Any]) -> list[dict[str, Any]]:
+    """The case's audit trail, for the timeline. A personal-safety case never needs it: its timeline is built
+    from fixed lines and the case's own dates, so the words in its trail are not even read."""
+    return [] if case.get("isSensitive") else case_history.entries_for(case["$id"])
+
+
 def find(reference_or_id: str) -> dict[str, Any]:
-    """A case by its short reference, as typed, or by its case ID."""
     reference = normalise_reference(reference_or_id)
     case = report_store.find_by_reference(reference) if reference else None
     if case is None and _is_uuid(reference_or_id):
@@ -80,14 +88,27 @@ def _resolution_notes(assignments: list[dict[str, Any]]) -> list[dict[str, str]]
     ]
 
 
-def public_status(case: dict[str, Any], assignments: list[dict[str, Any]], now: datetime) -> dict[str, Any]:
-    """What the citizen (or anyone with the reference) sees."""
+def _escalation_photos(case: dict[str, Any]) -> list[str]:
+    """Short-lived links to what the resident sent when they escalated, for the escalation step of their timeline.
+
+    A personal-safety case shows no photo anywhere on the status page: whoever holds the reference is not always
+    the person who filed, and a photo of a bruise or a house is the whole story. Its staff see them in the portal.
+    Nothing is even signed here, so no such link can leak into a response by an oversight further down."""
+    if case.get("isSensitive"):
+        return []
+    return [photo_link(name) for name in case.get("escalationPhotoIds") or []]
+
+
+def public_status(case: dict[str, Any], assignments: list[dict[str, Any]], now: datetime,
+                  history: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     common = {
         "reference": case["reference"],
         "case_id": case["$id"],
         "submitted_at": case["createdAt"],
         "escalated": bool(case.get("escalatedAt")),
         "escalate_until": _escalate_until(case, now),
+        "timeline": case_timeline.for_resident(case, assignments, history or [], now,
+                                               escalation_photos=_escalation_photos(case)),
     }
     if case.get("isSensitive"):
         stage = PRIVATE_STAGES[CaseStatus(case["status"])]
@@ -107,13 +128,23 @@ def public_status(case: dict[str, Any], assignments: list[dict[str, Any]], now: 
     }
 
 
-def escalate_case(reference_or_id: str, note: str | None, now: datetime) -> dict[str, Any]:
-    """The citizen's one escalation to the MCE. The numbers are kept while the case is open again."""
+def escalate_case(reference_or_id: str, note: str | None, now: datetime,
+                  photos: list[bytes] | None = None) -> dict[str, Any]:
+    """The numbers are kept while the case is open again.
+
+    Photos sent with the escalation go through exactly what filing puts a photo through, and are stored apart from
+    the ones sent when the report was filed, so both the portal and the timeline can say which stage each came from.
+    """
     case = find(reference_or_id)
     changes = escalate(case, (note or "").strip() or None, now)
+    # The window and the once-only rule are settled first, so a late or repeated escalation costs no image work;
+    # the photos are then cleaned and stored before the case is touched, so one that can't be accepted stops the
+    # escalation with nothing written — the same order filing uses.
+    cleaned = clean_photos(photos or [], MAX_ESCALATION_PHOTOS)
+    if cleaned:
+        changes["escalationPhotoIds"] = store_photos(case["$id"], cleaned)
     updated = report_store.update_case(case["$id"], changes)
-    # A personal-safety case's escalation note is the citizen's own words: kept on the
-    # case for its recipients, never copied into the trail the MCE reads.
+    # A personal-safety note is the citizen's own words: kept for its recipients, never copied into the MCE's trail.
     trail_note = "The citizen escalated the case." if case.get("isSensitive") else changes["escalationNote"]
     entry = CaseEntry(
         CaseHistoryAction.ESCALATED, CITIZEN, from_status=case["status"], to_status=changes["status"], note=trail_note
@@ -130,27 +161,29 @@ class Preferences:
 
 
 def set_preferences(reference_or_id: str, token: str, choice: Preferences, now: datetime) -> tuple[dict[str, Any], bool]:
-    """The citizen's answer about messages and calls, for a report the classifier filed as personal safety.
-    Once only, within the hour, with the token from the receipt. Returns the case and whether messages are now on."""
+    """Once only, with the token from the receipt, for as long as the token lives. Returns the case and whether the
+    "received" message is now owed: a resident whose messages were already on had that message when they filed, so
+    sending it here would be a second copy of one they have."""
     case = find(reference_or_id)
     contact = contact_for(case["$id"])
     expires = parse_datetime(contact.get("preferencesExpiresAt")) if contact else None
     stored = (contact or {}).get("preferencesTokenHash") or ""
     if not contact or not expires or now > expires or not hmac.compare_digest(stored, token_hash(token)):
-        raise NotAllowed("This choice can only be made on the confirmation page, within an hour of reporting.")
+        days = PREFERENCES_WINDOW.days
+        raise NotAllowed(f"This choice can only be made on the confirmation page, within {days} days of reporting.")
+    was_on = bool(contact.get("notify"))
     changes = {
         "notify": choice.notify,
         "callbackConsent": choice.callback_consent,
-        "preferencesTokenHash": None,  # used once
+        "preferencesTokenHash": None,
         "preferencesExpiresAt": None,
     }
     update_contact(case["$id"], changes)
-    return case, choice.notify
+    return case, choice.notify and not was_on
 
 
 def sync_contact_retention(case: dict[str, Any]) -> None:
-    """Keep the deletion date of the citizen's numbers, and of names given with voices, in step with the case:
-    none while open, 30 days after it closes."""
+    """Numbers and names given with voices: kept while open, deleted 30 days after the case closes."""
     purge_at = contact_purge_at(case)
     if contact_for(case["$id"]) is not None:
         update_contact(case["$id"], {"purgeAt": purge_at.isoformat() if purge_at else None})
@@ -159,7 +192,6 @@ def sync_contact_retention(case: dict[str, Any]) -> None:
 
 
 def purge_expired_contacts(now: datetime) -> int:
-    """Delete every citizen's numbers whose retention has ended; the trail records that it happened."""
     deleted = 0
     for contact in contacts_due_for_deletion(now):
         delete_contact(contact["$id"])

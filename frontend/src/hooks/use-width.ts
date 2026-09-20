@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type RefObject } from "react";
 
-/** The width an element is shown at, kept up to date: charts are drawn at it, so their labels stay one size. */
+/** Charts are drawn at the shown width, so their labels stay one size. */
 export function useWidth(fallback: number): [RefObject<HTMLDivElement | null>, number] {
   const ref = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(fallback);

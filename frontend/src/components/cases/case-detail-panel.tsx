@@ -1,18 +1,20 @@
 "use client";
 
-import Image from "next/image";
 import { PhoneIcon, UsersIcon } from "lucide-react";
 
 import { CaseActions } from "@/components/cases/case-actions";
+import { PhotoGallery } from "@/components/cases/photo-gallery";
 import { SharedLocation } from "@/components/cases/shared-location";
 import { ErrorNote } from "@/components/documents/panels";
-import { Tag } from "@/components/documents/tag";
+import { StatusMark, StatusTag } from "@/components/status-tag";
 import { useCase } from "@/lib/api/queries";
-import { caseEventText, caseStatusTag, SEVERITY_LABELS } from "@/lib/cases";
+import { caseEventText, caseNoteReader, caseTrail, SEVERITY_LABELS } from "@/lib/cases";
+import { caseEventTone, caseStatus, NEEDS_ROUTING } from "@/lib/status";
 import { formatDateTime } from "@/lib/time";
 import { voicesTally } from "@/lib/voices";
 
 import type { CaseDetail, Option } from "@/lib/api/types";
+import type { TrailStep } from "@/lib/cases";
 
 function Facts({ detail }: { detail: CaseDetail }) {
   const facts = [
@@ -33,21 +35,6 @@ function Facts({ detail }: { detail: CaseDetail }) {
   );
 }
 
-function Photos({ photos }: { photos: string[] }) {
-  if (photos.length === 0) return null;
-  return (
-    <ul className="grid grid-cols-3 gap-2" aria-label="Photos">
-      {photos.map((url, index) => (
-        <li key={url}>
-          <a href={url} target="_blank" rel="noopener noreferrer" data-testid={`case-photo-${index}`}>
-            <Image src={url} alt={`Photo ${index + 1} from the citizen`} width={160} height={120} unoptimized className="aspect-4/3 w-full rounded-md border object-cover" />
-          </a>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
 function Callback({ detail }: { detail: CaseDetail }) {
   if (!detail.contact) return null;
   const numbers = [detail.contact.phone, detail.contact.whatsapp].filter((n): n is string => Boolean(n));
@@ -64,17 +51,37 @@ function Callback({ detail }: { detail: CaseDetail }) {
   );
 }
 
+const SAFETY_TRAIL = "A personal-safety case: the resident's page says only that it was filed, started and closed. Nothing written here reaches them.";
+const TRAIL_CAPTION = "The steps marked are the ones the resident reads, in this order, with the notes written at them.";
+
+function TrailNote({ step, testId }: { step: TrailStep; testId: string }) {
+  if (!step.note) return null;
+  return (
+    <div className="mt-1" data-testid={testId}>
+      <p className="text-[12.5px] text-ink-soft break-words">&ldquo;{step.note}&rdquo;</p>
+      <p className="text-[12px] text-ink-muted">{caseNoteReader(step.internal)}</p>
+    </div>
+  );
+}
+
 function Trail({ detail }: { detail: CaseDetail }) {
   return (
     <div className="flex flex-col gap-2.5">
-      <p className="text-[12.5px] text-ink-soft">Chain of custody</p>
+      <div>
+        <p className="text-[12.5px] text-ink-soft">Chain of custody</p>
+        <p className="text-[12.5px] text-ink-soft">{detail.private ? SAFETY_TRAIL : TRAIL_CAPTION}</p>
+      </div>
       <ol className="flex flex-col gap-3" data-testid={`case-trail-${detail.case_id}`}>
-        {detail.history.map((event, index) => (
-          <li key={`${event.at}-${index}`} className="grid grid-cols-[12px_minmax(0,1fr)] gap-2.5">
-            <span aria-hidden className="mt-[7px] size-[5px] rounded-full bg-teal" />
+        {caseTrail(detail).map((step, index) => (
+          <li key={`${step.event.at}-${index}`} className="grid grid-cols-[12px_minmax(0,1fr)] gap-2.5">
+            <StatusMark tone={caseEventTone(step.event.action)} className="mt-[3px] size-3" />
             <div>
-              <p className="text-[13px] break-words">{caseEventText(event)}</p>
-              <p className="text-[12px] text-ink-soft tabular-nums">{event.actor_name} · {formatDateTime(event.at)}</p>
+              <p className="text-[13px] break-words">{caseEventText(step.event)}</p>
+              <p className="text-[12px] text-ink-soft tabular-nums">
+                {step.event.actor_name} · {formatDateTime(step.event.at)}
+                {step.seen ? " · On the resident's status page" : ""}
+              </p>
+              <TrailNote step={step} testId={`case-trail-note-${detail.case_id}-${index}`} />
             </div>
           </li>
         ))}
@@ -94,9 +101,23 @@ function Body({ detail }: { detail: CaseDetail }) {
   return (
     <>
       <p className="text-[14.5px] whitespace-pre-line break-words">{detail.description}</p>
-      <Photos photos={detail.photos} />
+      {/* What the escalation says leads, with the photos sent at that moment: it is why the case is open again. */}
       {detail.escalation_note ? (
-        <p className="rounded-lg bg-brick-tint px-3.5 py-3 text-[13px]"><span className="font-medium text-brick">The citizen escalated it: </span>{detail.escalation_note}</p>
+        <div className="flex flex-col gap-2 rounded-lg bg-brick-tint px-3.5 py-3">
+          <p className="text-[13px]"><span className="font-medium text-brick">The citizen escalated it: </span>{detail.escalation_note}</p>
+          {detail.escalation_photos?.length ? (
+            <div className="flex flex-col gap-1.5">
+              <p className="text-[12px] font-medium tracking-wide text-ink-soft uppercase">Added at escalation</p>
+              <PhotoGallery photos={detail.escalation_photos} testIdPrefix="case-escalation-photo" />
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+      {detail.photos.length ? (
+        <div className="flex flex-col gap-1.5">
+          {detail.escalation_photos?.length ? <p className="text-[12px] font-medium tracking-wide text-ink-soft uppercase">Sent when it was reported</p> : null}
+          <PhotoGallery photos={detail.photos} />
+        </div>
       ) : null}
       <Callback detail={detail} />
       <SharedLocation key={detail.case_id} detail={detail} />
@@ -104,7 +125,6 @@ function Body({ detail }: { detail: CaseDetail }) {
   );
 }
 
-/** How many residents said this civic issue affects them; the handling department also sees the names given. */
 function Voices({ detail }: { detail: CaseDetail }) {
   if (!detail.voices) return null;
   const names = detail.voice_names ?? [];
@@ -124,13 +144,13 @@ function Voices({ detail }: { detail: CaseDetail }) {
 }
 
 function Loaded({ detail, recipients }: { detail: CaseDetail; recipients?: Option[] }) {
-  const tag = caseStatusTag(detail);
+  const tag = caseStatus(detail);
   return (
     <div className="flex flex-col gap-4" data-testid={`case-detail-${detail.case_id}`}>
       <div className="flex flex-wrap items-center gap-2.5">
         <span className="text-[12.5px] text-ink-soft tabular-nums">{detail.reference}</span>
-        <Tag tone={tag.tone}>{tag.label}</Tag>
-        {detail.needs_routing ? <Tag tone="gold">Needs routing</Tag> : null}
+        <StatusTag tone={tag.tone}>{tag.label}</StatusTag>
+        {detail.needs_routing ? <StatusTag tone={NEEDS_ROUTING.tone}>{NEEDS_ROUTING.label}</StatusTag> : null}
       </div>
       <h2 className="text-[22px] leading-snug">{detail.topic}</h2>
       <Body detail={detail} />
@@ -142,7 +162,6 @@ function Loaded({ detail, recipients }: { detail: CaseDetail; recipients?: Optio
   );
 }
 
-/** The selected case: what was reported, what can be done, and its chain of custody. */
 export function CaseDetailPanel({ caseId, recipients }: { caseId: string | null; recipients?: Option[] }) {
   const { data, error, isPending } = useCase(caseId);
   if (!caseId) return <p className="text-[13.5px] text-ink-soft">Select a case to read it, see its history and move it along.</p>;

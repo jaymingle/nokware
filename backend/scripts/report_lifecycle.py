@@ -64,6 +64,12 @@ def file(description: str, photos: list[bytes] | None = None, **fields: Any) -> 
     return response
 
 
+def escalate(reference: str, note: str, photos: list[bytes] | None = None) -> Any:
+    """Multipart, like filing: the note and what the resident can show of what is still wrong."""
+    files = [("photos", (f"e{i}.jpg", data, "image/jpeg")) for i, data in enumerate(photos or [])]
+    return client.post(f"/api/reports/{reference}/escalate", data={"note": note}, files=files or None)
+
+
 def outbox(case_id: str) -> list[dict[str, Any]]:
     listing = get_databases().list_documents(DATABASE_ID, NOTIFICATIONS_COLLECTION, queries=[Query.equal("caseId", case_id)])
     return [d.data for d in listing.documents]
@@ -176,12 +182,20 @@ def escalation(case_id: str) -> None:
     purge = contact_for(case_id)["purgeAt"]
     check("numbers set to be deleted 14 + 30 days after resolution", purge and purge.startswith((now + timedelta(days=44)).date().isoformat()), purge)
     ref = resolved["reference"]
-    check("escalating without a reason -> 422", client.post(f"/api/reports/{ref}/escalate", json={"note": ""}).status_code == 422)
-    response = client.post(f"/api/reports/{ref}/escalate", json={"note": "[TEST] Water still stands at the gate."})
+    check("escalating without a reason -> 422", escalate(ref, "").status_code == 422)
+    check("a sixth photo -> 422", escalate(ref, "[TEST] Still flooded.", [gps_photo()] * 6).status_code == 422)
+    response = escalate(ref, "[TEST] Water still stands at the gate.", [gps_photo()])
     check("escalated", response.status_code == 200 and response.json()["escalated"], response.text)
+    case = report_store.find_case(case_id)
+    check("the escalation photo is kept apart from the one filed with the report",
+          len(case["escalationPhotoIds"]) == 1 and case["photoIds"] != case["escalationPhotoIds"], case.get("escalationPhotoIds"))
+    stored = Image.open(io.BytesIO(get_minio().get_object("nokware-report-photos", case["escalationPhotoIds"][0]).read()))
+    check("stored upright with no EXIF or GPS", stored.size == (40, 80) and len(stored.getexif()) == 0, stored.info)
+    step = next((s for s in client.get(f"/api/reports/{ref}").json()["timeline"] if s["action"] == "escalated"), {})
+    check("the resident reads it on the escalation step", len(step.get("photos") or []) == 1, step)
     check("numbers kept while it is open again", contact_for(case_id)["purgeAt"] is None)
     check("escalation acknowledged by SMS", [r["event"] for r in outbox(case_id)] == ["submitted", "escalated"])
-    check("a second escalation -> 409", client.post(f"/api/reports/{ref}/escalate", json={"note": "again"}).status_code == 409)
+    check("a second escalation -> 409", escalate(ref, "again").status_code == 409)
 
 
 def main() -> int:
