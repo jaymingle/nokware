@@ -21,6 +21,7 @@ A dry run by default:
 """
 
 import sys
+from collections import Counter
 from typing import Any
 
 import delete_test_petitions as petitions_script
@@ -41,6 +42,7 @@ DELETE = {CASE_PARENT, PETITION_PARENT, NOTIFICATIONS_COLLECTION,
 KEEP = {"ledger_documents", "document_history"}
 # The only object names this script may remove. Ledger files live in another bucket and are never touched.
 PHOTO_PREFIXES = ("reports/", "petitions/")
+PHOTOS = "photo objects"  # how the objects are named in the count, beside the collections
 
 
 def unknown_collections() -> list[str]:
@@ -60,25 +62,44 @@ def orphan_photos() -> list[str]:
             for obj in get_minio().list_objects(bucket, prefix=prefix, recursive=True)]
 
 
-def take_apart_cases(apply: bool) -> int:
+Accounted = dict[str, set[str]]  # rows a parent has already taken, by collection: the sweep must not count them twice
+
+
+def _note(taken: Accounted, rows: dict[str, list[Any]]) -> Counter[str]:
+    for collection, found in rows.items():
+        taken.setdefault(collection, set()).update(row.id for row in found)
+    return Counter({collection: len(found) for collection, found in rows.items()})
+
+
+def take_apart_cases(apply: bool, taken: Accounted) -> Counter[str]:
+    """Counted as they are found, not by asking afterwards: once a case is taken apart its attachments are gone,
+    so counting them later reports a nil return for work that was done. On a dry run nothing goes, so each row is
+    also noted as taken — otherwise the sweep below counts the same row a second time."""
     photos = reports_script.photo_objects()
     cases = every(CASE_PARENT)
+    counts: Counter[str] = Counter({CASE_PARENT: len(cases)})
     for case in cases:
+        rows = reports_script.related(case.id)
+        counts += _note(taken, rows)
         if apply:
-            reports_script.delete_case(case, reports_script.related(case.id), photos.get(case.id, []))
-    return len(cases)
+            reports_script.delete_case(case, rows, photos.get(case.id, []))
+    return counts
 
 
-def take_apart_petitions(apply: bool) -> int:
+def take_apart_petitions(apply: bool, taken: Accounted) -> Counter[str]:
     found = every(PETITION_PARENT)
+    counts: Counter[str] = Counter({PETITION_PARENT: len(found)})
     for petition in found:
+        rows = petitions_script.related(petition.id)
+        counts += _note(taken, rows)
         if apply:
-            petitions_script.delete(petition, petitions_script.related(petition.id))
-    return len(found)
+            petitions_script.delete(petition, rows)
+    return counts
 
 
-def clear(collection: str, apply: bool) -> int:
-    rows = every(collection)
+def clear(collection: str, apply: bool, taken: Accounted) -> int:
+    """What no parent claimed: an outbox row belonging to no case, or a row left behind by a half-finished run."""
+    rows = [row for row in every(collection) if row.id not in taken.get(collection, set())]
     if apply:
         for row in rows:
             get_databases().delete_document(DATABASE_ID, collection, row.id)
@@ -102,11 +123,18 @@ def main() -> int:
               f"know whether their rows should go: {', '.join(strays)}")
         return 1
 
-    counts = {CASE_PARENT: take_apart_cases(apply), PETITION_PARENT: take_apart_petitions(apply)}
+    # Every object under the two prefixes, counted before anything goes: the cases and petitions take most of
+    # them with them, and the sweep at the end only catches what no surviving record named.
+    taken: Accounted = {}
+    counts: Counter[str] = Counter({PHOTOS: len(orphan_photos())})
+    counts += take_apart_cases(apply, taken)
+    counts += take_apart_petitions(apply, taken)
     # Whatever the two above didn't reach: outbox rows belonging to no case, and any row left by a half-run.
     for collection in sorted(DELETE - {CASE_PARENT, PETITION_PARENT}):
-        counts[collection] = clear(collection, apply)
-    counts["photo objects"] = sweep_photos(apply)
+        counts[collection] += clear(collection, apply, taken)
+    sweep_photos(apply)
+    for collection in DELETE:  # a collection that was empty still belongs in the table, as a nil return
+        counts.setdefault(collection, 0)
 
     width = max(len(name) for name in counts)
     for name, count in sorted(counts.items()):
