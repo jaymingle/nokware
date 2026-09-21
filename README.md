@@ -6,7 +6,6 @@ Ask the Assembly's own documents and get a cited answer. Report a problem or a s
 
 - **Live site:** https://nokware.tstitagency.com
 - **API:** https://api.nokware.tstitagency.com
-- **Demo video:** [link](LINK)
 
 Built for the OSF × Andela hackathon *Information You Can Trust*.
 
